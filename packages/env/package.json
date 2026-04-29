@@ -12,7 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "zod": "3.23.8",
+    "zod": "3.25.76",
     "@memex/errors": "workspace:*"
   },
   "devDependencies": {
