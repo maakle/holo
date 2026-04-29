@@ -1,6 +1,6 @@
 # Memex
 
-> The shared context layer for the multiple custom agents your team already ships. An open-source, self-hostable substrate plus skill layer that any agent can point at over MCP — so the next agent doesn't require building yet another retrieval pipeline.
+> The shared context layer for your AI agents. An open-source, self-hostable MCP server plus skill layer — every agent points at the same source of truth, so building the next one doesn't mean building yet another retrieval pipeline.
 
 **Status:** Pre-alpha. Building in public. Not ready for production.
 
