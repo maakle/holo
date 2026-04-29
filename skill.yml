@@ -1,0 +1,49 @@
+name: Skill request
+description: Request a procedural skill that Memex should be able to synthesize
+labels: ["area:skills", "enhancement"]
+body:
+  - type: input
+    attributes:
+      label: Skill name
+      description: snake_case, action-oriented. e.g. "handle_customer_refund", "review_pull_request", "triage_pagerduty_incident"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Description
+      description: One paragraph. What procedure should this skill encode?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Source artifacts
+      description: |
+        Where does the procedural knowledge live in your company today? Examples:
+        - Slack threads in #support
+        - Notion pages tagged "Refund policy"
+        - Linear issues with label `incident`
+        - Past PRs in repo X
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected steps
+      description: A rough sketch of what the skill should produce. The synthesizer will refine.
+  - type: textarea
+    attributes:
+      label: Tools the skill should be allowed to call
+      description: |
+        Skills can call MCP tools as part of execution. Examples:
+        - read-only retrieval tools (always available)
+        - Slack post tool
+        - Linear create-issue tool
+        - GitHub comment tool
+        - external API (Stripe refund, Zendesk reply)
+  - type: dropdown
+    attributes:
+      label: Risk level
+      description: Skills that take action need explicit user approval per execution. How risky is this one?
+      options:
+        - "Low — read/summarize only"
+        - "Medium — posts comments, sends emails"
+        - "High — moves money, modifies production systems"

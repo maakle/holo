@@ -1,0 +1,35 @@
+name: Connector request
+description: Request a new connector for a specific tool
+labels: ["area:connectors", "enhancement"]
+body:
+  - type: input
+    attributes:
+      label: Connector name
+      description: e.g. "BambooHR", "Salesforce", "Discord"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Why this connector
+      description: What use case does it unlock for you?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Authentication model
+      description: OAuth 2.0? API key? OAuth + per-user installation? Link to their docs if you know.
+  - type: textarea
+    attributes:
+      label: Permissions / ACL model
+      description: How does the source model who-can-see-what? Workspace-wide? Per-resource? Group-based? This is the most important question.
+  - type: textarea
+    attributes:
+      label: Data shape
+      description: What entities matter? Documents, messages, tickets, custom objects?
+  - type: dropdown
+    attributes:
+      label: Would you contribute this?
+      options:
+        - "Yes, I'm willing to implement it"
+        - "Maybe, with guidance"
+        - "No, requesting only"
