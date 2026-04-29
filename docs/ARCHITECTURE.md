@@ -185,6 +185,8 @@ Skills are the differentiator. Querying alone is what Glean and Dust do. Memex g
 
 ### Skill data model
 
+A skill is **not just a procedure template** — it is a *trigger-conditional system prompt + tool allowlist combo*. This refinement comes from observing a working MVP at the founder's company (Kombo) where the same agent has different identities ("external support agent" vs "internal context agent") depending on whether it was triggered from a Slack channel or a Pylon ticket. The `Skill` row carries the trigger spec, the system-prompt content, and the explicit tool allowlist that gates what MCP tools the agent is permitted to call when this skill is active.
+
 ```ts
 type Skill = {
   id: string;
@@ -193,25 +195,43 @@ type Skill = {
   description: string;             // for agent discovery
   version: number;
   status: 'draft' | 'active' | 'deprecated';
-  
-  // Synthesized skill body in Anthropic Skill format
-  content: string;                 // frontmatter + procedure + example tools (stored, not a file)
-  
-  // What it was synthesized from
-  sourceArtifactIds: string[];     // documents that contributed
-  sourceFingerprint: string;       // hash of source contents at synthesis time
-  
-  // Currency
-  lastSynthesizedAt: Date;
+
+  // Trigger: when does this skill activate?
+  trigger: SkillTrigger;           // see SkillTrigger below
+
+  // Tool allowlist: what MCP tools can the agent call when this skill is active?
+  // This is memex's answer to "Pylon MCP can send both internal AND external messages
+  // and we can't restrict it." Per-skill tool gating is enforced at the MCP proxy layer.
+  toolAllowlist: string[];         // e.g., ['search', 'get_thread', 'get_pr'] — must be a subset of available MCP tools
+  toolDenylist?: string[];         // optional explicit denials (e.g., ['pylon.send_external'])
+
+  // System prompt + procedure body in Anthropic Skill format
+  // The "system prompt" framing is the skill's identity ("you are an internal support
+  // researcher; never write replies that would be sent to a customer").
+  // The "procedure" framing is the skill's playbook ("when asked about X, search Y, then Z").
+  content: string;                 // frontmatter + system-prompt + procedure + example tools
+
+  // What it was synthesized from (only set if synthesized; null for hand-authored skills)
+  sourceArtifactIds: string[] | null;
+  sourceFingerprint: string | null;
+  lastSynthesizedAt: Date | null;
   nextRefreshAt: Date | null;
-  staleness: 'fresh' | 'stale' | 'invalidated';
-  
+  staleness: 'fresh' | 'stale' | 'invalidated' | 'hand-authored';
+
   // Execution
   executable: boolean;             // can this skill be run, or is it read-only?
-  toolBindings: ToolBinding[];     // what tools the skill is permitted to call
-  permissionsRequired: string[];
+  permissionsRequired: string[];   // RBAC scopes the calling user must have
 };
+
+type SkillTrigger =
+  | { kind: 'mcp_invoke' }                                          // explicit `execute_skill(id)` call
+  | { kind: 'slack_channel'; channelIds: string[] }                 // bot mentioned in these channels
+  | { kind: 'pylon_event'; eventTypes: string[] }                   // Pylon webhook events
+  | { kind: 'github_event'; eventTypes: string[] }                  // GitHub webhook events
+  | { kind: 'cli'; commandPattern: string };                        // memex CLI invocation
 ```
+
+**Why this matters in practice:** the founder's existing custom agents already use this pattern informally — different system prompts and tool subsets depending on the trigger. memex formalizes it as a first-class concept. Without `trigger` and `toolAllowlist`, agents either get a single global identity (too crude) or implementers re-invent trigger-conditional dispatch in their own code (the bug-prone path the CTO's MVP works around with file-system conventions).
 
 ### Skill synthesis
 

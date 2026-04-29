@@ -32,9 +32,13 @@ Tracked work that isn't in scope for the current milestone but shouldn't be forg
 
 ---
 
-## 2. Production database connector for support-agent analytics queries
+## 2. Production database access via CLI-as-tool (revised after CTO transcript review)
 
-**What:** Decide whether to add a production-DB connector (Postgres / MySQL / whatever the production stack uses) to memex, or accept that the support-agent dual-routes (memex for ingested sources, direct DB for analytics).
+**What:** Implement the CLI-as-tool registration pattern (planned v0.2 in ROADMAP). Founder registers a scoped CLI command (e.g., `bq query --max_rows=100 --use_legacy_sql=false`) with read-only credentials limited to specific datasets, and memex exposes it as an MCP tool the agent can call.
+
+**Original framing (rejected):** Build a Postgres / MySQL connector with OAuth, ingestion, chunking, and per-table ACL. ~2 weeks of work, big new attack surface.
+
+**Revised framing (per CTO's working MVP):** Skip the connector entirely. Hand the agent a scoped CLI + a tightly-scoped service account credential. The agent invokes the CLI through memex's MCP proxy. Done.
 
 **Why:** The support-question agent at Kombo today answers queries that require live production data:
 
@@ -107,3 +111,39 @@ memex v0.0 and v0.1 ingest knowledge sources (Slack/GitHub/Notion/Grain/Pylon/Hu
 **Context:** Surfaced during /plan-ceo-review's spec review on 2026-04-29. v0.1's replay was scoped down to read-only diff specifically to avoid mutating-tool risk. v0.2 is the right home once tool-effect classification is in place.
 
 **Depends on / blocked by:** Tool effect classification (read-only vs side-effecting) at the MCP-tool spec level. Likely a v0.2 architecture decision.
+
+---
+
+## 6. MCP authorization granularity proxy (v0.2)
+
+**What:** memex's MCP layer enforces per-skill `toolAllowlist` (see ARCHITECTURE.md skill data model). Calling agent invokes a tool → memex looks up the active skill → rejects calls outside the allowlist with a structured `MemexError` (per DX D46).
+
+**Why:** Founder's CTO articulated the pain explicitly during the MVP review: *"Pylon MCP has the same method that makes an internal OR external message. We can't decide whether the agent can do one of both or whether he can do both. Cursor doesn't even offer to select tools."* Every adjacent product (Cursor, Claude Desktop, Onyx) assumes "MCP server's whole tool surface is exposed." memex's per-skill allowlist solves a real DX gap that nobody else solves.
+
+**Pros:** Solves a stated pain at the buyer's company today. Differentiates memex from raw MCP servers. Pairs naturally with the v0.1 skill model since `toolAllowlist` is already a field on the skill row.
+
+**Cons:** Requires intercepting every MCP tool call at memex's proxy layer; latency overhead is small but real. Some MCP clients may not pass enough context to identify the active skill — fallback to a default skill or rejection.
+
+**Context:** Surfaced 2026-04-29 from CTO's MVP review. Cross-cuts with the v0.1 skill model work — the data model is in v0.1, but the proxy enforcement lands v0.2.
+
+**Depends on / blocked by:** v0.1 skill model with `trigger` + `toolAllowlist` fields shipped.
+
+---
+
+## 7. GitHub Actions ingestion mode (v0.2)
+
+**What:** Ship `maakle/memex-sync@v1` as a public GitHub Action that wraps memex's ingestion code-path. Teams add a workflow file calling the action on cron; the action authenticates to memex and pushes ingested data through the same code-path the worker process uses.
+
+**Why:** Founder's CTO built the MVP entirely on GitHub Actions cron jobs writing files to a repo. That's a real pattern in the dev-tools ecosystem, especially for OSS teams who already have GitHub Actions but don't want to run another long-lived worker process. Two workflows for memex installs:
+- **Worker mode** (current plan): `apps/worker` runs continuously with BullMQ, processes ingestion jobs.
+- **GitHub Actions mode** (this TODO): no worker process; GitHub Actions runs the same code on cron.
+
+Both write to the same Postgres tables; both use the same connectors and chunking. Different trigger only.
+
+**Pros:** Reaches the segment of buyers who'd otherwise build the CTO's MVP themselves. No new infrastructure to learn — they already use GitHub Actions. Pairs with `npx memex init` for a fully self-hosted, fully OSS path with zero long-lived processes (ingestion is GHA, server is `docker compose up` only when an agent connects).
+
+**Cons:** Requires the same connector code to work in both worker and GHA contexts. GHA has tighter time limits per job (~6 hours) — large initial syncs may need chunking across multiple workflow runs.
+
+**Context:** Surfaced 2026-04-29 from CTO's MVP review. The CTO's whole architecture is GHA-based; that pattern works for at least one of memex's target buyers.
+
+**Depends on / blocked by:** Worker-mode ingestion shipped in v0.0/v0.1 (the connector code is shared).
