@@ -64,11 +64,13 @@ This roadmap was substantially restructured on 2026-04-29. The earlier v0.1→v0
 
 ---
 
-## v0.1 — Skills + public release (weeks 7–14)
+## v0.1 — Skills + public release + OS surface (weeks 7–17, ~10–11 weeks)
 
-**Goal:** ship labeled-template skill synthesis, eval harness, and the first public release on GitHub Releases / GHCR. 3+ external CTOs running memex against their own data, with at least one running it for >2 weeks.
+Expanded after [/plan-ceo-review](../docs/designs/memex-v01-yc-prep.md) accepted 3 cherry-picks: skill marketplace stub, agent observability dashboard with read-only replay diff, and `npx memex-init`. Timeline is honest: 7–8 weeks of original v0.1 + ~2.5 weeks of CP work + 1 week buffer = 10–11 weeks total.
 
-**Demo (public):** "memex extracted these 5 procedures from your last quarter of work; here's an existing custom agent invoking one of them via `get_skill` and `execute_skill`."
+**Goal:** ship labeled-template skill synthesis + eval harness + the OS surface (observability + marketplace) + the OSS adoption story (`npx memex-init`) + first public release on GitHub Releases / GHCR. 3+ external CTOs running memex against their own data; ≥1 running it for >2 weeks.
+
+**Demo (public):** "Run `npx memex-init` and have your first agent query in 2 minutes. Then watch the observability dashboard light up as your agents call memex. Click replay on any past invocation. Browse the public skill marketplace and see what other teams have already shared."
 
 **Week 10 quality kill-switch:** if at least 3 of 5 extracted skills are NOT judged usable by the founder's team (binary: "would I let an agent invoke this?"), ship v0.1 as substrate-only and defer skills to v0.2. Do not delay the public release.
 
@@ -98,26 +100,55 @@ This roadmap was substantially restructured on 2026-04-29. The earlier v0.1→v0
 - [ ] Per-customer telemetry on agent retention and tool-call patterns
 - [ ] Issue triage flow for early users
 
-### Weeks 13–14: Release polish
+### Weeks 12–13: Skill marketplace stub (CP1 from /plan-ceo-review)
+- [ ] `/skills` route in `apps/web` — public registry browse page (no auth required to read)
+- [ ] "Publish anonymized" button on extracted skills (GitHub OAuth required to publish)
+- [ ] **Two-stage publish:** automated LLM-redaction pass produces a diff; human reviews and confirms before anything goes public
+- [ ] Apache-2.0 contribution license; takedown email + rate limit (5 publishes/day per user)
+- [ ] Define "skill" = YAML doc + redacted example outputs
+
+### Weeks 13–14: Agent observability dashboard + read-only replay diff (CP2)
+- [ ] Page in `apps/web` showing last 100 agent invocations: timestamp, calling agent identity, tools called, latency, output preview
+- [ ] **Replay v1 = side-by-side diff of recorded query and result.** Live re-execution deferred to v0.2 (gated on per-tool effect classification — no auto-replay of side-effecting tools)
+- [ ] Every MCP call logs query+result (already required for observability)
+- [ ] Per-CTO replay view metric (proxy for OS framing landing — see Success Metrics in CEO plan)
+
+### Week 15: `npx memex-init` (CP3)
+- [ ] `create-memex` npm package — **macOS + Linux only for v0.1**
+- [ ] Scaffolds memex install: download, generate `.env` with safe defaults, prompt for required values (LLM provider key)
+- [ ] Runs `docker compose up`, runs migrations, opens the Connections page
+- [ ] Graceful error if Docker daemon isn't running
+- [ ] Time-to-hello-world target: ≤ 3 minutes on a clean Linux VM
+
+### Weeks 15–16: Release polish + integration QA buffer
 - [ ] GHCR Docker image auto-published on tag
-- [ ] README quickstart works first-try (no specific minute target)
+- [ ] README quickstart works first-try with `npx memex-init` (target ≤ 3 minutes)
 - [ ] Public website + Discord
 - [ ] Show HN draft, demo recording
+- [ ] Integration QA across new surfaces (marketplace + observability + npx-init)
+
+### Week 17: v0.1.0 launch
 - [ ] v0.1.0 release tag
+- [ ] Show HN
+- [ ] First 3+ external CTOs onboarded (selected from cold-DM responders during v0.0)
 
 ---
 
-## v0.2 — Self-host polish + free-form skills (weeks 15+)
+## v0.2 — Self-host polish + free-form skills + managed cloud (weeks 18+)
 
 Picked from observed v0.1 user need rather than pre-committed.
 
 - [ ] Per-user OAuth ACL fan-out (Better Auth `oauthProvider` plugin) — agents inherit calling user's permissions
 - [ ] Free-form unsupervised skill extraction (variant a), gated on the eval harness having broader coverage
+- [ ] Replay live-execution (v0.1 was read-only diff) — gated on per-tool effect classification (read-only vs side-effecting)
+- [ ] Windows support for `npx memex-init`
 - [ ] Railway + Coolify one-click templates
+- [ ] Managed cloud beta (same code, run by us — see [`memex-v01-yc-prep.md`](./designs/memex-v01-yc-prep.md) for business framing)
 - [ ] Audit log surface for self-hosters
 - [ ] `execute_skill` MCP tool (skill execution as workflow runs, not just read)
 - [ ] DCR endpoint + consent UI (so MCP clients self-register without manual setup)
 - [ ] Webhook-accelerated incremental sync (only if a v0.1 user hits a freshness pain that breaks an agent)
+- [ ] Productize agent templates (CP4 deferred from /plan-ceo-review — once 3+ external CTOs ask for them)
 
 ## Beyond v0.2
 

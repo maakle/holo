@@ -2,6 +2,8 @@
 
 > The shared context layer for your AI agents. An open-source, self-hostable MCP server plus skill layer — every agent points at the same source of truth, so building the next one doesn't mean building yet another retrieval pipeline.
 
+> **Layer today, OS tomorrow.** Today: substrate + procedural skills. Tomorrow: an agent operating system — context, observability, replay, marketplace.
+
 **Status:** Pre-alpha. Building in public. Not ready for production.
 
 ---
@@ -24,8 +26,8 @@ On top of that substrate, Memex extracts the procedural knowledge that emerges f
 - **Hybrid search built for agents.** Vector + BM25 fused with Reciprocal Rank Fusion, ACL-aware results that mirror native source permissions. Agents cannot retrieve what their service identity cannot see.
 - **Continuous, durable sync.** Cursor-checkpointed incremental pulls per connector from day 1 (no full re-pulls — Slack and GitHub rate limits make those unworkable). Webhook-accelerated when a real freshness pain demands it. Crash-resumable. Source-of-truth stays the originating tool.
 - **Procedural skill synthesis.** Recurring agent behaviors get distilled into invokable skills served via `list_skills` / `get_skill` over MCP and over REST. Labeled-template extraction in v0.1; free-form unsupervised in v0.2 once the eval harness exists.
-- **Self-hostable.** `docker compose up`. No Docker socket requirement, no managed-only services on the critical path.
-- **Open source, Apache-2.0.**
+- **Self-hostable.** `docker compose up` (or `npx memex-init` from v0.1) — no Docker socket requirement, no managed-only services on the critical path. Apache-2.0.
+- **Managed cloud, eventually.** Self-hostable is the wedge. Managed cloud is the path to a sustainable company — same code, run by us. Coming after v0.1 has external users on self-host.
 
 ## Who it's for
 
@@ -101,10 +103,12 @@ Or one-click on Railway: *(coming once v0.1 ships)*
 
 See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the full plan and [`docs/decisions/0004-multi-agent-shared-context-wedge.md`](./docs/decisions/0004-multi-agent-shared-context-wedge.md) for why this changed from earlier docs.
 
-- **v0.0 — Internal substrate** *(weeks 0–6)* — 6 connectors (Slack, GitHub, Notion, Grain, Pylon, HubSpot), MCP server with 8 tools, hybrid RRF search, single-service-identity ACL, dogfooded against the founder's own existing custom agents. Not public yet.
-- **v0.1 — Skills + public release** *(weeks 7–14)* — labeled-template skill synthesis, `list_skills` / `get_skill` MCP tools, eval harness, week-10 quality kill-switch, public Apache-2.0 release on GitHub Releases / GHCR.
-- **v0.2 — Self-host polish + free-form skills** *(weeks 15+)* — Railway / Coolify one-click templates, per-user OAuth ACL fan-out, free-form unsupervised skill extraction, audit log.
-- **Beyond** — drift detection (intent-vs-reality), more connectors, managed cloud offering. No fixed dates.
+- **v0.0 — Internal substrate** *(weeks 0–6)* — 6 connectors (Slack, GitHub, Notion, Grain, Pylon, HubSpot), MCP server with 6 tools, hybrid RRF search, ingestion-time allowlists, dogfooded against the founder's own existing custom agents. Not public yet.
+- **v0.1 — Skills + public release + OS surface** *(weeks 7–17, ~10–11 weeks)* — labeled-template skill synthesis with eval harness; **skill marketplace stub** (publish anonymized skills to a public registry); **agent observability dashboard with read-only replay diff** (the OS-tomorrow surface, made concrete); **`npx memex-init` single-line install** (macOS + Linux); REST + OpenAPI surface for ChatGPT Actions / Gemini; week-10 skill quality kill-switch; public Apache-2.0 release on GitHub Releases / GHCR.
+- **v0.2 — Self-host polish + free-form skills + managed cloud** *(weeks 18+)* — Railway / Coolify one-click templates, per-user OAuth ACL fan-out, free-form unsupervised skill extraction, replay live-execution (gated on tool-effect classification), Windows support for `npx memex-init`, managed cloud beta, audit log.
+- **Beyond** — drift detection (intent-vs-reality), more connectors, agent templates marketplace, inferred org chart. No fixed dates.
+
+See [`docs/designs/memex-v01-yc-prep.md`](./docs/designs/memex-v01-yc-prep.md) for the full v0.1 expansion plan.
 
 ---
 

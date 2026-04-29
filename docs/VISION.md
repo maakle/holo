@@ -12,6 +12,8 @@ On top of the substrate, memex extracts the procedural knowledge that emerges fr
 
 The deployment is open-source and self-hostable, because no engineering team should send their entire company knowledge to a third party to make their agents work. The interface is MCP, because that's what every agent already speaks. The first user is the team that's already running custom agents and tired of writing the same retriever twice.
 
+**Layer today, operating system tomorrow.** The substrate is the wedge. What grows on top of it — agent observability, replay, a marketplace where teams share anonymized procedural skills, drift detection between stated intent and actual artifacts — is the operating system that companies live in alongside their agents. Hu's RFS named this "AI Operating System for Companies." Blomfield's RFS named "Company Brain." Both are right; both are downstream of getting the substrate right first.
+
 The companies that win the next decade will be the ones whose agents had the right context first. Memex is the substrate that makes that possible — for the agents your team is already shipping, and for the ones you haven't built yet.
 
 — *Building this in public.*
