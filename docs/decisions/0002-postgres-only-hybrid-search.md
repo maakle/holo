@@ -4,7 +4,7 @@
 
 ## Context
 
-Memex's primary read pattern is hybrid retrieval: vector similarity + lexical (BM25-ish) fused into a single ranked list, filtered by ACL subjects and source/time metadata. Options:
+Holo's primary read pattern is hybrid retrieval: vector similarity + lexical (BM25-ish) fused into a single ranked list, filtered by ACL subjects and source/time metadata. Options:
 
 1. Postgres-only: `pgvector ≥ 0.8` + `tsvector` + `pg_trgm`, fused via Reciprocal Rank Fusion in a single SQL CTE.
 2. Postgres + dedicated vector engine (Qdrant, Weaviate).

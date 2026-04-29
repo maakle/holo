@@ -23,7 +23,7 @@ body:
     attributes:
       label: Environment
       description: |
-        - Memex version / commit
+        - Holo version / commit
         - Self-hosted (docker compose / Railway / Coolify / Kubernetes / other) or development
         - Postgres version
         - Node version

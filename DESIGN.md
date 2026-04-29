@@ -1,4 +1,4 @@
-# Design System — memex
+# Design System — holo
 
 ## Product Context
 - **What this is:** Open-source, self-hostable MCP context layer for AI agents. Apache-2.0.
@@ -111,7 +111,7 @@ If you find yourself using accent on a 6th element, something is wrong. Remove t
 
 ### Why electric indigo, not purple
 
-Linear and Glean both use purple/violet. Stripe uses indigo around `#635BFF`. memex uses a more saturated, blue-leaning indigo (`#3F47FF`) to read as more technical and less "AI marketing" than violet. Anti-AI-slop: no gradient versions, no shifting accent across the surface.
+Linear and Glean both use purple/violet. Stripe uses indigo around `#635BFF`. holo uses a more saturated, blue-leaning indigo (`#3F47FF`) to read as more technical and less "AI marketing" than violet. Anti-AI-slop: no gradient versions, no shifting accent across the surface.
 
 ## Spacing
 - **Base unit:** 4px

@@ -1,5 +1,5 @@
 name: Skill request
-description: Request a procedural skill that Memex should be able to synthesize
+description: Request a procedural skill that Holo should be able to synthesize
 labels: ["area:skills", "enhancement"]
 body:
   - type: input
