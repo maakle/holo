@@ -1,0 +1,23 @@
+{
+  "name": "@memex/crypto",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "libsodium-wrappers": "0.7.15",
+    "@memex/errors": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/libsodium-wrappers": "0.7.14",
+    "typescript": "5.6.3",
+    "vitest": "2.1.3"
+  }
+}
