@@ -29,7 +29,7 @@ The goal of v0.0 (per current ROADMAP) is to ship the **context layer** at the f
 ### 3. Bootstrap `apps/web` (Next.js)
 **Area:** `area:infra` · **Estimate:** 0.5d
 - Next.js 15 App Router, Tailwind, shadcn (Button, Card, Input)
-- Marketing landing page placeholder (uses Memex name + Bush quote)
+- Marketing landing page placeholder (uses Holo name + Bush quote)
 - `/health` route that calls the API
 - **Done when:** `pnpm dev` shows a styled landing page that calls the API.
 

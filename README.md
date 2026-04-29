@@ -1,4 +1,4 @@
-# Memex
+# Holo
 
 > The shared context layer for your AI agents. An open-source, self-hostable MCP server plus skill layer — every agent points at the same source of truth, so building the next one doesn't mean building yet another retrieval pipeline.
 
@@ -14,33 +14,33 @@ Engineering teams aren't building one custom AI agent — they're building sever
 
 The cost shows up in the second, third, and fifth agent. Every new one is gated on a new integration. Cross-agent context is impossible because the context layer is a per-agent fork. When a Notion page moves or a Slack channel archives, every agent breaks individually.
 
-Memex is the missing shared layer. It ingests the tools your team's work actually lives in, exposes a small MCP surface any agent can call (`search`, `get_thread`, `get_pr`, `get_doc`, `get_call`, `get_ticket`, `list_recent_activity`, `whats_changed`), and stays current without anyone rebuilding the retrieval code. One ingestion pipeline, many agents.
+Holo is the missing shared layer. It ingests the tools your team's work actually lives in, exposes a small MCP surface any agent can call (`search`, `get_thread`, `get_pr`, `get_doc`, `get_call`, `get_ticket`, `list_recent_activity`, `whats_changed`), and stays current without anyone rebuilding the retrieval code. One ingestion pipeline, many agents.
 
-On top of that context layer, Memex extracts the procedural knowledge that emerges from how the team has actually worked — recurring agent behaviors get distilled into reusable, MCP-invokable skills. The context layer ships first; the skill layer ships in the same release. The combination is what differentiates Memex from open-source unified-search platforms whose agents own the user (Onyx, Dust) and from closed-source enterprise context-graph products (Interloom, Potpie).
+On top of that context layer, Holo extracts the procedural knowledge that emerges from how the team has actually worked — recurring agent behaviors get distilled into reusable, MCP-invokable skills. The context layer ships first; the skill layer ships in the same release. The combination is what differentiates Holo from open-source unified-search platforms whose agents own the user (Onyx, Dust) and from closed-source enterprise context-graph products (Interloom, Potpie).
 
 ## What it does
 
-- **Bring your own agent.** memex is **MCP-first** for Claude (Desktop, claude.ai, API), Cursor, Cline, Continue, Zed, and any MCP-speaking custom agent (LangChain, in-house frameworks). It also exposes **REST + OpenAPI** for ChatGPT Actions, Gemini function calling, n8n, Zapier, and anything that speaks HTTP. Same backend, same data, same skills — the protocol is the agent's choice, not yours.
-- **One endpoint, two consumer layers.** *Custom agents your team built* — Cursor in Slack, Claude Code, LangChain, in-house Python, Notion-based — point at memex for production traffic. *Off-the-shelf clients* — Claude Desktop, Cursor's MCP integration, Cline, ChatGPT, Gemini — connect for ad-hoc queries. Both layers, both protocols, one auth.
+- **Bring your own agent.** holo is **MCP-first** for Claude (Desktop, claude.ai, API), Cursor, Cline, Continue, Zed, and any MCP-speaking custom agent (LangChain, in-house frameworks). It also exposes **REST + OpenAPI** for ChatGPT Actions, Gemini function calling, n8n, Zapier, and anything that speaks HTTP. Same backend, same data, same skills — the protocol is the agent's choice, not yours.
+- **One endpoint, two consumer layers.** *Custom agents your team built* — Cursor in Slack, Claude Code, LangChain, in-house Python, Notion-based — point at holo for production traffic. *Off-the-shelf clients* — Claude Desktop, Cursor's MCP integration, Cline, ChatGPT, Gemini — connect for ad-hoc queries. Both layers, both protocols, one auth.
 - **Connectors for the tools your work actually lives in.** Slack, GitHub, Notion, Grain, Pylon, HubSpot at v0.1. More follow as users ask.
 - **Hybrid search built for agents.** Vector + BM25 fused with Reciprocal Rank Fusion, ACL-aware results that mirror native source permissions. Agents cannot retrieve what their service identity cannot see.
 - **Continuous, durable sync.** Cursor-checkpointed incremental pulls per connector from day 1 (no full re-pulls — Slack and GitHub rate limits make those unworkable). Webhook-accelerated when a real freshness pain demands it. Crash-resumable. Source-of-truth stays the originating tool.
 - **Procedural skill synthesis.** Recurring agent behaviors get distilled into invokable skills served via `list_skills` / `get_skill` over MCP and over REST. Labeled-template extraction in v0.1; free-form unsupervised in v0.2 once the eval harness exists.
-- **Self-hostable.** `docker compose up` (or `npx memex init` from v0.1) — no Docker socket requirement, no managed-only services on the critical path. Apache-2.0.
+- **Self-hostable.** `docker compose up` (or `npx holo init` from v0.1) — no Docker socket requirement, no managed-only services on the critical path. Apache-2.0.
 - **Managed cloud, eventually.** Self-hostable is the wedge. Managed cloud is the path to a sustainable company — same code, run by us. See [`docs/PRICING.md`](./docs/PRICING.md) for the pricing-direction placeholder. Real numbers arrive after v0.1 has paying-signal conversations.
 
 ## Who it's for
 
-CTOs and lead engineers at small/mid-stage tech companies (30–80 person) who are *currently maintaining 2+ custom AI agents in production*, with each agent's context-fetching code copy-pasted from the last one. Buyer = builder = sufferer collapsed into one role. If you don't have agents in production yet, you're early — Memex compounds value with each new agent, not the first.
+CTOs and lead engineers at small/mid-stage tech companies (30–80 person) who are *currently maintaining 2+ custom AI agents in production*, with each agent's context-fetching code copy-pasted from the last one. Buyer = builder = sufferer collapsed into one role. If you don't have agents in production yet, you're early — Holo compounds value with each new agent, not the first.
 
 ## Why now
 
-Two YC RFSs (2026) describe adjacent pieces of what Memex is:
+Two YC RFSs (2026) describe adjacent pieces of what Holo is:
 
 - **["The AI Operating System for Companies"](https://www.ycombinator.com/rfs#ai-operating-system-for-companies)** by Diana Hu — the queryable context layer underneath agent operations.
 - **["Company Brain"](https://www.ycombinator.com/rfs#company-brain)** by Tom Blomfield — the procedural extraction layer that turns scattered artifacts into invokable skills.
 
-Memex is the open-source, self-hostable take that doesn't require building the agent in our framework. Bring your own.
+Holo is the open-source, self-hostable take that doesn't require building the agent in our framework. Bring your own.
 
 ---
 
@@ -68,8 +68,8 @@ Full reasoning, alternatives considered, and migration paths in [`docs/ARCHITECT
 > Requires Docker, Node 20+, pnpm 9+.
 
 ```bash
-git clone https://github.com/your-org/memex.git
-cd memex
+git clone https://github.com/your-org/holo.git
+cd holo
 pnpm install
 cp .env.example .env
 docker compose up -d postgres redis
@@ -84,7 +84,7 @@ To connect Claude Desktop, add to your `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "memex": { "url": "http://localhost:8090/mcp" }
+    "holo": { "url": "http://localhost:8090/mcp" }
   }
 }
 ```
@@ -104,11 +104,11 @@ Or one-click on Railway: *(coming once v0.1 ships)*
 See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the full plan and [`docs/decisions/0004-multi-agent-shared-context-wedge.md`](./docs/decisions/0004-multi-agent-shared-context-wedge.md) for why this changed from earlier docs.
 
 - **v0.0 — Internal context layer** *(weeks 0–6)* — 6 connectors (Slack, GitHub, Notion, Grain, Pylon, HubSpot), MCP server with 6 tools, hybrid RRF search, ingestion-time allowlists, dogfooded against the founder's own existing custom agents. Not public yet.
-- **v0.1 — Skills + public release + OS surface** *(weeks 7–17, ~10–11 weeks)* — labeled-template skill synthesis with eval harness; **skill marketplace stub** (publish anonymized skills to a public registry); **agent observability dashboard with read-only replay diff** (the OS-tomorrow surface, made concrete); **`npx memex init` single-line install** (macOS + Linux); REST + OpenAPI surface for ChatGPT Actions / Gemini; week-10 skill quality kill-switch; public Apache-2.0 release on GitHub Releases / GHCR.
-- **v0.2 — Self-host polish + free-form skills + managed cloud** *(weeks 18+)* — Railway / Coolify one-click templates, per-user OAuth ACL fan-out, free-form unsupervised skill extraction, replay live-execution (gated on tool-effect classification), Windows support for `npx memex init`, managed cloud beta, audit log.
+- **v0.1 — Skills + public release + OS surface** *(weeks 7–17, ~10–11 weeks)* — labeled-template skill synthesis with eval harness; **skill marketplace stub** (publish anonymized skills to a public registry); **agent observability dashboard with read-only replay diff** (the OS-tomorrow surface, made concrete); **`npx holo init` single-line install** (macOS + Linux); REST + OpenAPI surface for ChatGPT Actions / Gemini; week-10 skill quality kill-switch; public Apache-2.0 release on GitHub Releases / GHCR.
+- **v0.2 — Self-host polish + free-form skills + managed cloud** *(weeks 18+)* — Railway / Coolify one-click templates, per-user OAuth ACL fan-out, free-form unsupervised skill extraction, replay live-execution (gated on tool-effect classification), Windows support for `npx holo init`, managed cloud beta, audit log.
 - **Beyond** — drift detection (intent-vs-reality), more connectors, agent templates marketplace, inferred org chart. No fixed dates.
 
-See [`docs/designs/memex-v01-yc-prep.md`](./docs/designs/memex-v01-yc-prep.md) for the full v0.1 expansion plan.
+See [`docs/designs/holo-v01-yc-prep.md`](./docs/designs/holo-v01-yc-prep.md) for the full v0.1 expansion plan.
 
 ---
 
@@ -126,6 +126,6 @@ Apache-2.0. See [`LICENSE`](./LICENSE).
 
 ## The name
 
-From Vannevar Bush, *As We May Think* (Atlantic Monthly, July 1945):
+Holo is named after the Star Wars *holocron* — a small object encrypted with compressed knowledge from many sources, accessed by anyone with the right key. We shortened it to *holo* because nobody wants to type `holocron init` every time.
 
-> "Consider a future device for individual use, which is a sort of mechanized private file and library. It needs a name, and to coin one at random, 'memex' will do. A memex is a device in which an individual stores all his books, records, and communications, and which is mechanized so that it may be consulted with exceeding speed and flexibility. It is an enlarged intimate supplement to his memory."
+The metaphor maps directly: a holocron compresses what many people knew into one object that any Jedi could query. Holo compresses what your company's tools collectively know into one MCP endpoint that any agent on your team can call. Same shape, different century.

@@ -4,7 +4,7 @@
 
 ## Self-hosted (always free)
 
-`docker compose up` and `npx memex init` give you the same memex that runs in our cloud. **Apache-2.0. No "open core" gating** — every feature in this repo is in the self-hostable build, including:
+`docker compose up` and `npx holo init` give you the same holo that runs in our cloud. **Apache-2.0. No "open core" gating** — every feature in this repo is in the self-hostable build, including:
 
 - All connectors (Slack, GitHub, Notion, Grain, Pylon, HubSpot at v0.1; more to come)
 - Hybrid search across every ingested source
@@ -12,11 +12,11 @@
 - Agent observability dashboard with replay diff
 - MCP server + REST/OpenAPI surface
 
-If you self-host, you pay for your own infrastructure (Postgres, Redis, an LLM API key) and your own time. Memex itself is free.
+If you self-host, you pay for your own infrastructure (Postgres, Redis, an LLM API key) and your own time. Holo itself is free.
 
 ## Managed cloud (coming in v0.2)
 
-When v0.2 ships, we'll offer hosted memex for teams that want the product without the self-host operational burden.
+When v0.2 ships, we'll offer hosted holo for teams that want the product without the self-host operational burden.
 
 **Likely pricing model** (placeholder, subject to validation with v0.1 users):
 
@@ -27,7 +27,7 @@ When v0.2 ships, we'll offer hosted memex for teams that want the product withou
 | **Enterprise** | Larger orgs with compliance asks | Custom | SSO, custom data-residency region, audit log export, dedicated support, SLA |
 
 **Why "per-agent" or "per-org flat" instead of per-seat:**
-Memex's value is grounding *agents*, not human users. A single CTO might run 5 agents and spawn the value of a 50-person team. Per-seat pricing punishes the buyer-builder-sufferer collapse that makes memex's wedge work. Per-agent or per-org aligns price with the value lever.
+Holo's value is grounding *agents*, not human users. A single CTO might run 5 agents and spawn the value of a 50-person team. Per-seat pricing punishes the buyer-builder-sufferer collapse that makes holo's wedge work. Per-agent or per-org aligns price with the value lever.
 
 **Why a free tier:**
 The OSS adoption story is the wedge. Free tier on managed cloud lets devs evaluate without standing up infrastructure. They graduate to paid when they have 2+ agents in production.
@@ -35,7 +35,7 @@ The OSS adoption story is the wedge. Free tier on managed cloud lets devs evalua
 ## Pricing principles (load-bearing for any future pricing decision)
 
 1. **Self-host stays fully featured forever.** No "Enterprise edition" gating in the OSS build. The managed cloud is convenience-as-product, not feature-gating-as-product.
-2. **Price aligns with value to the buyer, not cost to us.** Per-agent (or per-org flat) tracks what the buyer actually gets out of memex. Per-seat would punish multi-agent teams — exactly the ICP we want.
+2. **Price aligns with value to the buyer, not cost to us.** Per-agent (or per-org flat) tracks what the buyer actually gets out of holo. Per-seat would punish multi-agent teams — exactly the ICP we want.
 3. **Free tier never expires.** A free tier with a usage cap is fine. A free tier that converts to paid after 14 days is hostile.
 4. **The marketplace is free for everyone, forever.** Skill marketplace publish + browse is part of the platform, not a tier feature. Network effects depend on it being free.
 5. **Enterprise pricing is custom.** Don't publish enterprise prices; large customers have specific compliance and data-residency asks that don't fit a tier card.

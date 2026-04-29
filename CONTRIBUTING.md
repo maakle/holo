@@ -1,11 +1,11 @@
 # Contributing
 
-Thanks for thinking about contributing. Memex is in early active development. The architecture decisions are settled (see `docs/ARCHITECTURE.md`) but everything on top is open territory.
+Thanks for thinking about contributing. Holo is in early active development. The architecture decisions are settled (see `docs/ARCHITECTURE.md`) but everything on top is open territory.
 
 ## Before you start
 
 1. **Read `docs/ARCHITECTURE.md`.** It captures the decisions and why. PRs that contradict them without strong new evidence will get pushback.
-2. **Read `docs/VISION.md`** to understand what Memex is *for*. Search products and Memex are not the same thing — the skill layer is the differentiator.
+2. **Read `docs/VISION.md`** to understand what Holo is *for*. Search products and Holo are not the same thing — the skill layer is the differentiator.
 3. **Check the roadmap** in `docs/ROADMAP.md` to see what milestone we're in.
 4. **Look at issues tagged `good-first-issue`** if you want a contained task.
 5. **For anything bigger than a small fix, open an issue first.**
@@ -13,8 +13,8 @@ Thanks for thinking about contributing. Memex is in early active development. Th
 ## Setup
 
 ```bash
-git clone https://github.com/your-org/memex.git
-cd memex
+git clone https://github.com/your-org/holo.git
+cd holo
 pnpm install
 cp .env.example .env
 docker compose up -d postgres redis

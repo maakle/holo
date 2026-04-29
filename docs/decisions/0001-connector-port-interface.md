@@ -4,7 +4,7 @@
 
 ## Context
 
-Memex ingests data from many third-party systems (Slack, GitHub, Notion, Google Workspace, Linear, meeting transcript platforms, and a long tail). Each system has a different OAuth model, sync semantics, webhook format, ACL primitive, and rate-limit shape. Two paths were considered:
+Holo ingests data from many third-party systems (Slack, GitHub, Notion, Google Workspace, Linear, meeting transcript platforms, and a long tail). Each system has a different OAuth model, sync semantics, webhook format, ACL primitive, and rate-limit shape. Two paths were considered:
 
 1. Adopt a connector framework (Nango, Composio, Pipedream Connect) and build everything on top of it.
 2. Roll our own connector layer behind a strict port interface, using official per-vendor SDKs.

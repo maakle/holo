@@ -1,10 +1,10 @@
 # Architecture
 
-This document captures the architectural decisions for Memex. The decisions here are settled — they were made after deep research into how comparable open-source projects (Dust, Onyx, Langfuse v3, Twenty, Trigger.dev, Cal.com) actually structure themselves and what they regret. Don't relitigate them in issues without strong new evidence.
+This document captures the architectural decisions for Holo. The decisions here are settled — they were made after deep research into how comparable open-source projects (Dust, Onyx, Langfuse v3, Twenty, Trigger.dev, Cal.com) actually structure themselves and what they regret. Don't relitigate them in issues without strong new evidence.
 
 ## The product in three layers
 
-Memex is structured as three architectural layers stacked on top of each other:
+Holo is structured as three architectural layers stacked on top of each other:
 
 1. **Context layer** — connectors ingest from every tool, normalize, embed, store with ACLs preserved. Agents and humans can query it. Foundation for everything above.
 2. **Skills** — synthesizer extracts procedures from the context layer (how refunds get handled, how PRs get reviewed) and stores them as Postgres rows in the Anthropic Skill format (frontmatter + procedure + example tools). Agents discover and invoke them via the MCP `list_skills` and `get_skill` tools — skills are served dynamically from the database, not as filesystem artifacts.
@@ -181,7 +181,7 @@ Multi-tenant via shared-schema with `workspace_id` everywhere. Schema-per-tenant
 
 ## The skills layer
 
-Skills are the differentiator. Querying alone is what Glean and Dust do. Memex goes further — extracts procedures, makes them executable.
+Skills are the differentiator. Querying alone is what Glean and Dust do. Holo goes further — extracts procedures, makes them executable.
 
 ### Skill data model
 
@@ -200,7 +200,7 @@ type Skill = {
   trigger: SkillTrigger;           // see SkillTrigger below
 
   // Tool allowlist: what MCP tools can the agent call when this skill is active?
-  // This is memex's answer to "Pylon MCP can send both internal AND external messages
+  // This is holo's answer to "Pylon MCP can send both internal AND external messages
   // and we can't restrict it." Per-skill tool gating is enforced at the MCP proxy layer.
   toolAllowlist: string[];         // e.g., ['search', 'get_thread', 'get_pr'] — must be a subset of available MCP tools
   toolDenylist?: string[];         // optional explicit denials (e.g., ['pylon.send_external'])
@@ -228,10 +228,10 @@ type SkillTrigger =
   | { kind: 'slack_channel'; channelIds: string[] }                 // bot mentioned in these channels
   | { kind: 'pylon_event'; eventTypes: string[] }                   // Pylon webhook events
   | { kind: 'github_event'; eventTypes: string[] }                  // GitHub webhook events
-  | { kind: 'cli'; commandPattern: string };                        // memex CLI invocation
+  | { kind: 'cli'; commandPattern: string };                        // holo CLI invocation
 ```
 
-**Why this matters in practice:** the founder's existing custom agents already use this pattern informally — different system prompts and tool subsets depending on the trigger. memex formalizes it as a first-class concept. Without `trigger` and `toolAllowlist`, agents either get a single global identity (too crude) or implementers re-invent trigger-conditional dispatch in their own code (the bug-prone path the CTO's MVP works around with file-system conventions).
+**Why this matters in practice:** the founder's existing custom agents already use this pattern informally — different system prompts and tool subsets depending on the trigger. holo formalizes it as a first-class concept. Without `trigger` and `toolAllowlist`, agents either get a single global identity (too crude) or implementers re-invent trigger-conditional dispatch in their own code (the bug-prone path the CTO's MVP works around with file-system conventions).
 
 ### Skill synthesis
 
@@ -248,8 +248,8 @@ A `SkillSynthesizer` worker:
 
 Skills are not raw code. They're structured procedures. When `execute_skill` is invoked:
 
-1. Memex loads the skill content.
-2. The skill is run inside an agent loop where the agent reads the procedure and executes its steps using its own tools (or tools Memex provides via `toolBindings`).
+1. Holo loads the skill content.
+2. The skill is run inside an agent loop where the agent reads the procedure and executes its steps using its own tools (or tools Holo provides via `toolBindings`).
 3. Every execution is recorded as a `skill_run` with full step trace.
 4. Skill executions write to the same `workflow_runs` infrastructure as connector syncs.
 
@@ -257,7 +257,7 @@ This is deliberately *not* a deterministic workflow engine. The skill is a *play
 
 ### Why this layer matters
 
-This is what makes Memex Blomfield's "Company Brain" rather than just "another RAG over company data." Glean and Dust are search products. Onyx is a search product. Memex is a search product *plus* a skill synthesis layer that turns the search results into operable knowledge.
+This is what makes Holo Blomfield's "Company Brain" rather than just "another RAG over company data." Glean and Dust are search products. Onyx is a search product. Holo is a search product *plus* a skill synthesis layer that turns the search results into operable knowledge.
 
 The context layer is necessary. The skills are what make it useful for automation.
 
@@ -298,7 +298,7 @@ In v0.5, `worker` may split into `sync-worker` and `synthesis-worker` for indepe
 ## Repo layout
 
 ```
-memex/
+holo/
 ├── apps/
 │   ├── web/              # Next.js 15 — UI + marketing + docs + dashboard
 │   ├── api/              # NestJS 11 — REST + OpenAPI + domain modules
