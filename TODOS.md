@@ -17,7 +17,10 @@ Tracked work that isn't in scope for the current milestone but shouldn't be forg
 - Skill eval harness with ≥10 golden-set entries (for v0.1 skill synthesis)
 - **Skill marketplace publish (CP1):** redaction-pass golden-set tests with 10 hand-labeled PII examples to verify LLM-redaction works; takedown flow E2E
 - **Observability dashboard (CP2):** snapshot test on the replay diff rendering; metric correctness for replay-views-per-CTO
-- **`npx memex-init` (CP3):** integration test on a clean Linux container — full bootstrap completes in ≤ 3 minutes
+- **`npx memex init` (CP3 + DX D44):** integration test on a clean Linux container — full bootstrap completes + first MCP `search` query succeeds in ≤ 30 seconds (GitHub-only quickstart)
+- **`MemexError` format (DX D46):** golden-set tests for 5+ error scenarios (missing token, OAuth failure, ingestion fail, search miss, rate limit). Verify each error has `code`, `problem`, `cause`, `fix`, `docs_url` populated. ESLint rule blocks bare `throw new Error()`.
+- **"Connect your agent" page (DX D45):** snapshot tests for each generated config blob (Cursor, Claude Desktop, Cline, curl, Python, TypeScript). Verify token substitution and copy-button works.
+- **TTHW telemetry (DX D48):** end-to-end test: install → first search → metric emitted to local endpoint with anonymous UUID + duration. Privacy test: verify no data content in payload.
 
 **Pros:** Catches the allowlist regression that would cause an incident on day 1 of v0.1; per-connector tests catch ingestion drift when source APIs change; skill eval harness prevents silent quality regression on prompt iteration.
 

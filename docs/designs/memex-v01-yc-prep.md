@@ -30,7 +30,7 @@ Three framing decisions this session that compound the YC pitch without expandin
 |---|----------|--------|----------|-----------|
 | CP1 | Skill marketplace stub in v0.1 | ~5–7 days (revised after spec review) | ACCEPTED | YC pitch graduates from middleware to platform; first 100 published skills become marketing |
 | CP2 | Agent observability dashboard + replay (read-only side-by-side) in v0.1 | ~1 week | ACCEPTED | Makes "OS tomorrow" framing concrete; replay v1 is recorded query+result diff (live re-execution deferred to v0.2 to avoid mutating-tool risk) |
-| CP3 | `npx memex-init` single-line install in v0.1 (macOS + Linux only) | ~2 days | ACCEPTED | Drops time-to-hello-world from ~10 min to ~2 min; differentiates DX vs Onyx/Dust |
+| CP3 | `npx memex init` single-line install in v0.1 (macOS + Linux only) | ~2 days | ACCEPTED | Drops time-to-hello-world from ~10 min to ~2 min; differentiates DX vs Onyx/Dust |
 | CP4 | Productize 3 v0.0 agents as YAML templates | ~3 days | DEFERRED | User chose to revisit post-v0.1 once external-CTO demand surfaces |
 | CP5 | Inferred org chart / who-does-what | ~1 week | NOT SURFACED | Lower priority; available for future review |
 | CP6 | Slack `/memex` slash command | ~3–4 days | NOT SURFACED | Lower priority; alternate-audience play |
@@ -44,7 +44,7 @@ v0.1 timeline shifts from 7–8 weeks to **~10–11 weeks** to absorb the three 
 
 - **Skill marketplace stub** — `Publish anonymized` button on extracted skills + public registry page (`/skills` route in `apps/web`). **Two-stage publish:** automated LLM-redaction pass produces a diff; human reviews and confirms before anything goes public. GitHub OAuth required to publish (browse is anonymous). Apache-2.0 contribution license. Takedown email + rate limit on publish (5/day per user). **Skill = YAML doc + redacted example outputs.**
 - **Agent observability dashboard + replay (read-only)** — page in `apps/web` showing last 100 agent invocations with: timestamp, calling agent identity, tools called, latency, output preview. **Replay v1 = side-by-side diff of the recorded query and result; no live re-execution.** Live re-execution deferred to v0.2 once tool-effect classification (read-only vs side-effecting) is in place. Requires every MCP call to log query+result (already implied for v0.1 observability).
-- **`npx memex-init` package** — `create-memex` npm package, **macOS + Linux only for v0.1** (Windows in v0.2). Scaffolds a memex install: download, generate `.env` with safe defaults, prompt for required values (LLM provider key), run `docker compose up`, run migrations, open the Connections page. Handles "docker daemon not running" gracefully with a clear error message.
+- **`npx memex init` package** — `create-memex` npm package, **macOS + Linux only for v0.1** (Windows in v0.2). Scaffolds a memex install: download, generate `.env` with safe defaults, prompt for required values (LLM provider key), run `docker compose up`, run migrations, open the Connections page. Handles "docker daemon not running" gracefully with a clear error message.
 
 ## Deferred to TODOS.md
 
@@ -54,7 +54,7 @@ v0.1 timeline shifts from 7–8 weeks to **~10–11 weeks** to absorb the three 
 
 Numeric targets that gate "v0.1 succeeded" beyond the binary success criteria already in the design doc:
 
-- **Time-to-hello-world** (`npx memex-init` to first `search` query): **≤ 3 minutes** measured on a clean Linux VM and a clean macOS environment.
+- **Time-to-hello-world** (`npx memex init` to first `search` query): **≤ 3 minutes** measured on a clean Linux VM and a clean macOS environment.
 - **Marketplace publishes** (cumulative across external CTOs in first 30 days post-launch): **≥ 5 published skills**, all clean of named entities (founder reviews each manually for v0.1).
 - **Replay-page usage**: **≥ 1 view per active CTO per week** in the first month — proxy for "OS tomorrow" framing landing.
 - **Design-partner verbal commit**: **landed within 2 weeks** of v0.0 build start (P3/D36). If not landed by week 2, escalate scope decision.
@@ -63,7 +63,7 @@ Numeric targets that gate "v0.1 succeeded" beyond the binary success criteria al
 
 - **LLM-redaction misses PII** in skill marketplace publish → leaks customer names. Mitigation: two-stage publish with explicit human confirmation diff; allowlist-only fields for v0.1; takedown SLA (24h).
 - **Replay live re-execution would re-trigger side-effecting MCP tools.** Mitigation: replay v1 is read-only diff; live re-execution gated on per-tool effect classification (v0.2).
-- **`npx memex-init` Windows fragility.** Mitigation: explicit macOS + Linux scope for v0.1; document Windows as v0.2.
+- **`npx memex init` Windows fragility.** Mitigation: explicit macOS + Linux scope for v0.1; document Windows as v0.2.
 - **Design-partner verbal yes within 1 week assumes peer-CTO availability.** Mitigation: 2-week window with a named target list of 5 CTOs (founder owns); decision rule: if 0 yeses by week 2, document why and proceed with internal-only v0.0.
 
 ## Pitch sharpening (output of this review)
@@ -71,7 +71,7 @@ Numeric targets that gate "v0.1 succeeded" beyond the binary success criteria al
 The combined effect of D34/35/36 + the 3 accepted CPs is a meaningfully stronger YC application:
 
 - **Headline:** "memex — the open-source company-brain for AI agents. Layer today, OS tomorrow."
-- **Pitch:** "Engineering teams are building 2+ custom AI agents in production today, each with bespoke context-fetching code. Memex is the shared MCP context layer that the agents your team is already shipping all point at. Today: substrate + procedural skills. Tomorrow: agent operating system. Deploy via `npx memex-init` or self-host with Apache-2.0; managed cloud later."
+- **Pitch:** "Engineering teams are building 2+ custom AI agents in production today, each with bespoke context-fetching code. Memex is the shared MCP context layer that the agents your team is already shipping all point at. Today: substrate + procedural skills. Tomorrow: agent operating system. Deploy via `npx memex init` or self-host with Apache-2.0; managed cloud later."
 - **Differentiation:** "Onyx and Dust own search; Interloom and Potpie are enterprise-only. Memex is the only OSS-self-hostable layer that ships a skill marketplace from day one and is built for teams running 2+ agents already."
 - **Demo:** "Here are 5 procedures memex extracted from one engineering team's last quarter of work. Here's an external Cursor agent invoking one of them via MCP. And here's the replay button showing exactly what context grounded the answer."
 
