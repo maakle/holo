@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { encryptToken, decryptToken, generateKey, initCrypto } from '../src/index';
-import { MemexError } from '@memex/errors';
+import { HoloError } from '@holo/errors';
 
 describe('crypto', () => {
   beforeAll(async () => {
@@ -22,21 +22,21 @@ describe('crypto', () => {
     expect(a).not.toBe(b);
   });
 
-  it('throws MEMEX_TOKEN_DECRYPT_FAILED with the wrong key', () => {
+  it('throws HOLO_TOKEN_DECRYPT_FAILED with the wrong key', () => {
     const k1 = generateKey();
     const k2 = generateKey();
     const ct = encryptToken('secret', k1);
-    expect(() => decryptToken(ct, k2)).toThrow(MemexError);
+    expect(() => decryptToken(ct, k2)).toThrow(HoloError);
     try {
       decryptToken(ct, k2);
     } catch (e) {
-      expect((e as MemexError).code).toBe('MEMEX_TOKEN_DECRYPT_FAILED');
+      expect((e as HoloError).code).toBe('HOLO_TOKEN_DECRYPT_FAILED');
     }
   });
 
-  it('throws MEMEX_TOKEN_DECRYPT_FAILED on malformed ciphertext', () => {
+  it('throws HOLO_TOKEN_DECRYPT_FAILED on malformed ciphertext', () => {
     const key = generateKey();
-    expect(() => decryptToken('not-base64-!@#', key)).toThrow(MemexError);
+    expect(() => decryptToken('not-base64-!@#', key)).toThrow(HoloError);
   });
 
   it('supports key rotation via re-encryption', () => {

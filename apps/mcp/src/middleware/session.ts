@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
-import { validateSessionCookie } from '@memex/auth';
-import type { DB } from '@memex/db';
+import { validateSessionCookie } from '@holo/auth';
+import type { DB } from '@holo/db';
 
 export interface McpSessionVars {
   user: { userId: string; organizationId: string; email: string };

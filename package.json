@@ -1,5 +1,5 @@
 {
-  "name": "memex",
+  "name": "holo",
   "private": true,
   "version": "0.0.0",
   "engines": {
@@ -13,8 +13,8 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "db:migrate": "pnpm -F @memex/db migrate",
-    "db:generate": "pnpm -F @memex/db generate"
+    "db:migrate": "pnpm -F @holo/db migrate",
+    "db:generate": "pnpm -F @holo/db generate"
   },
   "devDependencies": {
     "@types/node": "20.16.11",

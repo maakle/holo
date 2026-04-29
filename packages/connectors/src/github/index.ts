@@ -9,7 +9,7 @@ import type {
   WebhookEnvelope,
   NormalizedWebhookEvent,
 } from '../contract';
-import { memexError, ErrorCode } from '@memex/errors';
+import { holoError, ErrorCode } from '@holo/errors';
 
 export interface GithubConnectorOptions {
   clientId: string;
@@ -48,16 +48,16 @@ export function createGithubConnector(opts: GithubConnectorOptions): Connector {
         }),
       });
       if (!res.ok) {
-        throw memexError({
-          code: ErrorCode.MEMEX_OAUTH_EXCHANGE_FAILED,
+        throw holoError({
+          code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
           problem: `GitHub OAuth code exchange returned HTTP ${res.status}`,
           fix: 'Verify GITHUB_CONNECTOR_CLIENT_ID/SECRET and the OAuth app callback URL.',
         });
       }
       const data = (await res.json()) as Record<string, unknown>;
       if (typeof data['error'] === 'string') {
-        throw memexError({
-          code: ErrorCode.MEMEX_OAUTH_EXCHANGE_FAILED,
+        throw holoError({
+          code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
           problem: `GitHub OAuth code exchange returned error: ${data['error']}`,
           cause:
             typeof data['error_description'] === 'string'
@@ -68,8 +68,8 @@ export function createGithubConnector(opts: GithubConnectorOptions): Connector {
       }
       const accessToken = data['access_token'];
       if (typeof accessToken !== 'string') {
-        throw memexError({
-          code: ErrorCode.MEMEX_OAUTH_EXCHANGE_FAILED,
+        throw holoError({
+          code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
           problem: 'GitHub OAuth response did not include access_token',
           fix: 'Restart the connect flow.',
         });
@@ -83,8 +83,8 @@ export function createGithubConnector(opts: GithubConnectorOptions): Connector {
     },
 
     async refresh(_input: RefreshInput): Promise<ConnectorTokens> {
-      throw memexError({
-        code: ErrorCode.MEMEX_CONNECTOR_NOT_IMPLEMENTED,
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: 'GitHub token refresh is not implemented in Foundation',
         fix: 'Lands in spec #2 (first connector + ingestion).',
       });
@@ -99,8 +99,8 @@ export function createGithubConnector(opts: GithubConnectorOptions): Connector {
         },
       });
       if (!res.ok) {
-        throw memexError({
-          code: ErrorCode.MEMEX_OAUTH_EXCHANGE_FAILED,
+        throw holoError({
+          code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
           problem: `GitHub /user check returned HTTP ${res.status}`,
           fix: 'Token may be invalid. Restart the connect flow.',
         });
@@ -115,32 +115,32 @@ export function createGithubConnector(opts: GithubConnectorOptions): Connector {
     },
 
     async fullSync(): Promise<SyncResult> {
-      throw memexError({
-        code: ErrorCode.MEMEX_CONNECTOR_NOT_IMPLEMENTED,
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: 'GitHub fullSync is not implemented in Foundation',
         fix: 'Lands in spec #2.',
       });
     },
 
     async incrementalSync(): Promise<SyncResult> {
-      throw memexError({
-        code: ErrorCode.MEMEX_CONNECTOR_NOT_IMPLEMENTED,
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: 'GitHub incrementalSync is not implemented in Foundation',
         fix: 'Lands in spec #2.',
       });
     },
 
     verifyWebhook(_env: WebhookEnvelope, _secret: string): boolean {
-      throw memexError({
-        code: ErrorCode.MEMEX_CONNECTOR_NOT_IMPLEMENTED,
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: 'GitHub webhook verification is not implemented in Foundation',
         fix: 'Lands in spec #2 if webhooks are enabled.',
       });
     },
 
     normalizeWebhook(_env: WebhookEnvelope): NormalizedWebhookEvent {
-      throw memexError({
-        code: ErrorCode.MEMEX_CONNECTOR_NOT_IMPLEMENTED,
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: 'GitHub webhook normalization is not implemented in Foundation',
         fix: 'Lands in spec #2 if webhooks are enabled.',
       });

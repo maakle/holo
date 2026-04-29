@@ -1,8 +1,8 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import type { DB } from '@memex/db';
-import { schema } from '@memex/db';
-import type { Env } from '@memex/env';
+import type { DB } from '@holo/db';
+import { schema } from '@holo/db';
+import type { Env } from '@holo/env';
 
 export interface CreateAuthOpts {
   db: DB;

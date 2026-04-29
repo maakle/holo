@@ -29,7 +29,7 @@ const REQUIRED_TABLES = [
   'connector_cursors',
 ];
 
-const url = process.env.DATABASE_URL ?? 'postgresql://memex:memex@localhost:5436/memex';
+const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';
 let sql: ReturnType<typeof postgres>;
 
 beforeAll(() => {

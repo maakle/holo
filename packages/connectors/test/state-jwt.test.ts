@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { signState, verifyState } from '../src/shared/state-jwt';
-import { MemexError } from '@memex/errors';
+import { HoloError } from '@holo/errors';
 
 const SECRET = 'a'.repeat(64);
 
@@ -22,10 +22,10 @@ describe('state JWT', () => {
       { user_id: 'u', organization_id: 'o', csrf_nonce: 'n', provider: 'github' },
       SECRET,
     );
-    await expect(verifyState(token, 'b'.repeat(64))).rejects.toThrow(MemexError);
+    await expect(verifyState(token, 'b'.repeat(64))).rejects.toThrow(HoloError);
   });
 
   it('rejects malformed token', async () => {
-    await expect(verifyState('not.a.jwt', SECRET)).rejects.toThrow(MemexError);
+    await expect(verifyState('not.a.jwt', SECRET)).rejects.toThrow(HoloError);
   });
 });

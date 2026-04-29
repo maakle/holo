@@ -1,12 +1,12 @@
 import { customType } from 'drizzle-orm/pg-core';
-import { encryptToken, decryptToken, keyFromBase64 } from '@memex/crypto';
+import { encryptToken, decryptToken, keyFromBase64 } from '@holo/crypto';
 
 let cachedKey: Uint8Array | undefined;
 
 function getKey(): Uint8Array {
   if (cachedKey) return cachedKey;
-  const b64 = process.env.MEMEX_TOKEN_ENCRYPTION_KEY;
-  if (!b64) throw new Error('MEMEX_TOKEN_ENCRYPTION_KEY not set');
+  const b64 = process.env.HOLO_TOKEN_ENCRYPTION_KEY;
+  if (!b64) throw new Error('HOLO_TOKEN_ENCRYPTION_KEY not set');
   cachedKey = keyFromBase64(b64);
   return cachedKey;
 }

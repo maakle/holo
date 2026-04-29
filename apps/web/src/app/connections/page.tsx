@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { eq, and } from 'drizzle-orm';
-import { schema } from '@memex/db';
+import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { CONNECTORS } from '@/lib/connector-registry';
 import { ConnectorRow } from '@/components/connector-row';

@@ -2,11 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { sql as drizzleSql } from 'drizzle-orm';
-import { schema } from '@memex/db';
+import { schema } from '@holo/db';
 import { validateSessionCookie, readSessionCookie } from '../src/mcp-session';
-import { MemexError } from '@memex/errors';
+import { HoloError } from '@holo/errors';
 
-const url = process.env.DATABASE_URL ?? 'postgresql://memex:memex@localhost:5436/memex';
+const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';
 let pg: ReturnType<typeof postgres>;
 let db: ReturnType<typeof drizzle>;
 let userId: string;
@@ -64,13 +64,13 @@ describe('validateSessionCookie', () => {
     expect(result.email).toBe('mcp-test@example.com');
   });
 
-  it('throws MEMEX_AUTH_NO_SESSION when no cookie', async () => {
-    await expect(validateSessionCookie(db as never, undefined)).rejects.toThrow(MemexError);
+  it('throws HOLO_AUTH_NO_SESSION when no cookie', async () => {
+    await expect(validateSessionCookie(db as never, undefined)).rejects.toThrow(HoloError);
   });
 
-  it('throws MEMEX_AUTH_NO_SESSION when token is unknown', async () => {
+  it('throws HOLO_AUTH_NO_SESSION when token is unknown', async () => {
     await expect(
       validateSessionCookie(db as never, 'better-auth.session_token=does-not-exist'),
-    ).rejects.toThrow(MemexError);
+    ).rejects.toThrow(HoloError);
   });
 });

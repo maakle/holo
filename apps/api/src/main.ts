@@ -1,8 +1,8 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
-import { initCrypto } from '@memex/crypto';
-import { parseEnv } from '@memex/env';
+import { initCrypto } from '@holo/crypto';
+import { parseEnv } from '@holo/env';
 import { AppModule } from './app.module';
 
 async function bootstrap() {

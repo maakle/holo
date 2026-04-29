@@ -1,5 +1,5 @@
 'use client';
-import { signOut } from '@memex/auth/client';
+import { signOut } from '@holo/auth/client';
 
 export function SignOutButton() {
   return (

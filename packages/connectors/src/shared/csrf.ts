@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-export const CSRF_COOKIE_NAME = 'memex-connector-csrf';
+export const CSRF_COOKIE_NAME = 'holo-connector-csrf';
 
 export function generateCsrfNonce(): string {
   return randomBytes(16).toString('hex');

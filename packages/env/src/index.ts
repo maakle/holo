@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { memexError, ErrorCode } from '@memex/errors';
+import { holoError, ErrorCode } from '@holo/errors';
 
 const EnvSchema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
-  MEMEX_TOKEN_ENCRYPTION_KEY: z.string().min(40),
+  HOLO_TOKEN_ENCRYPTION_KEY: z.string().min(40),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.string().url(),
   GITHUB_LOGIN_CLIENT_ID: z.string().min(1),
@@ -25,8 +25,8 @@ export function parseEnv(raw: Record<string, string | undefined>): Env {
     const issues = result.error.issues
       .map((i) => `${i.path.join('.')}: ${i.message}`)
       .join('; ');
-    throw memexError({
-      code: ErrorCode.MEMEX_ENV_INVALID,
+    throw holoError({
+      code: ErrorCode.HOLO_ENV_INVALID,
       problem: 'environment variables are missing or invalid',
       cause: issues,
       fix: 'Verify your .env file matches .env.example. Generate secrets with `openssl rand -base64 32`.',

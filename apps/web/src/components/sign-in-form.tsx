@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from '@memex/auth/client';
+import { signIn } from '@holo/auth/client';
 
 export function SignInForm() {
   const [error, setError] = useState<string | null>(null);

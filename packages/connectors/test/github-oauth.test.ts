@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createGithubConnector } from '../src/github/index';
-import { MemexError } from '@memex/errors';
+import { HoloError } from '@holo/errors';
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -41,13 +41,13 @@ describe('GitHub connector', () => {
     );
   });
 
-  it('exchangeCode throws MEMEX_OAUTH_EXCHANGE_FAILED on error response', async () => {
+  it('exchangeCode throws HOLO_OAUTH_EXCHANGE_FAILED on error response', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       jsonResponse({ error: 'bad_verification_code', error_description: 'expired' }),
     );
     const conn = createGithubConnector({ clientId: 'cid', clientSecret: 'csec', fetchImpl });
     await expect(conn.exchangeCode({ code: 'X', redirectUri: 'http://x/cb' })).rejects.toThrow(
-      MemexError,
+      HoloError,
     );
   });
 
@@ -55,7 +55,7 @@ describe('GitHub connector', () => {
     const fetchImpl = vi.fn().mockResolvedValue(textResponse('boom', 500));
     const conn = createGithubConnector({ clientId: 'cid', clientSecret: 'csec', fetchImpl });
     await expect(conn.exchangeCode({ code: 'X', redirectUri: 'http://x/cb' })).rejects.toThrow(
-      MemexError,
+      HoloError,
     );
   });
 
@@ -76,22 +76,22 @@ describe('GitHub connector', () => {
   it('testConnection throws on non-2xx', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(textResponse('nope', 401));
     const conn = createGithubConnector({ clientId: 'cid', clientSecret: 'csec', fetchImpl });
-    await expect(conn.testConnection({ accessToken: 'bad' })).rejects.toThrow(MemexError);
+    await expect(conn.testConnection({ accessToken: 'bad' })).rejects.toThrow(HoloError);
   });
 
-  it('sync methods throw MEMEX_CONNECTOR_NOT_IMPLEMENTED', async () => {
+  it('sync methods throw HOLO_CONNECTOR_NOT_IMPLEMENTED', async () => {
     const conn = createGithubConnector({ clientId: 'cid', clientSecret: 'csec' });
     await expect(
       conn.fullSync(
         { accessToken: 'x' },
         { sourceId: 's', organizationId: 'o', cursorScope: 'all' },
       ),
-    ).rejects.toThrow(MemexError);
+    ).rejects.toThrow(HoloError);
     await expect(
       conn.incrementalSync(
         { accessToken: 'x' },
         { sourceId: 's', organizationId: 'o', cursorScope: 'all' },
       ),
-    ).rejects.toThrow(MemexError);
+    ).rejects.toThrow(HoloError);
   });
 });

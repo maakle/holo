@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from 'jose';
-import { memexError, ErrorCode } from '@memex/errors';
+import { holoError, ErrorCode } from '@holo/errors';
 
 export interface StateClaims {
   user_id: string;
@@ -31,8 +31,8 @@ export async function verifyState(token: string, secret: string): Promise<StateC
       provider: String(payload['provider']),
     };
   } catch (e) {
-    throw memexError({
-      code: ErrorCode.MEMEX_OAUTH_EXCHANGE_FAILED,
+    throw holoError({
+      code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
       problem: 'OAuth state JWT failed verification (invalid signature, malformed, or expired)',
       cause: (e as Error).message,
       fix: 'Restart the connect flow. State JWTs expire after 10 minutes.',

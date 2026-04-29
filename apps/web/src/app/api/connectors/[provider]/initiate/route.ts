@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { headers, cookies } from 'next/headers';
-import { memexError, ErrorCode, MemexError } from '@memex/errors';
-import { shared, createGithubConnector } from '@memex/connectors';
+import { holoError, ErrorCode, HoloError } from '@holo/errors';
+import { shared, createGithubConnector } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ provider: string }> }) {
@@ -10,16 +10,16 @@ export async function POST(_req: Request, { params }: { params: Promise<{ provid
     const { auth, env, defaultOrgId } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
-      throw memexError({
-        code: ErrorCode.MEMEX_AUTH_NO_SESSION,
+      throw holoError({
+        code: ErrorCode.HOLO_AUTH_NO_SESSION,
         problem: 'must be signed in to connect a connector',
         fix: 'Sign in first.',
       });
     }
 
     if (provider !== 'github') {
-      throw memexError({
-        code: ErrorCode.MEMEX_CONNECTOR_NOT_IMPLEMENTED,
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: `${provider} connector is not implemented in Foundation`,
         fix: 'Only GitHub is available in v0.0. Other connectors land in subsequent specs.',
       });
@@ -54,18 +54,18 @@ export async function POST(_req: Request, { params }: { params: Promise<{ provid
 
     return NextResponse.json({ authorizeUrl });
   } catch (e) {
-    if (e instanceof MemexError) {
+    if (e instanceof HoloError) {
       const status =
-        e.code === 'MEMEX_AUTH_NO_SESSION'
+        e.code === 'HOLO_AUTH_NO_SESSION'
           ? 401
-          : e.code === 'MEMEX_CONNECTOR_NOT_IMPLEMENTED'
+          : e.code === 'HOLO_CONNECTOR_NOT_IMPLEMENTED'
             ? 501
             : 400;
       return NextResponse.json(e.toJSON(), { status });
     }
     console.error(e);
     return NextResponse.json(
-      { code: 'MEMEX_INTERNAL', problem: 'unexpected error', fix: 'check server logs' },
+      { code: 'HOLO_INTERNAL', problem: 'unexpected error', fix: 'check server logs' },
       { status: 500 },
     );
   }

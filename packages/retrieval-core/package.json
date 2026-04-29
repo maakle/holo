@@ -1,5 +1,5 @@
 {
-  "name": "@memex/retrieval-core",
+  "name": "@holo/retrieval-core",
   "version": "0.0.0",
   "private": true,
   "type": "module",

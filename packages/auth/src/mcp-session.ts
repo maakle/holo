@@ -1,7 +1,7 @@
 import { eq, and, gt } from 'drizzle-orm';
-import type { DB } from '@memex/db';
-import { schema } from '@memex/db';
-import { memexError, ErrorCode } from '@memex/errors';
+import type { DB } from '@holo/db';
+import { schema } from '@holo/db';
+import { holoError, ErrorCode } from '@holo/errors';
 
 export interface SessionUser {
   userId: string;
@@ -34,8 +34,8 @@ export async function validateSessionCookie(
 ): Promise<SessionUser> {
   const tokenCandidate = readSessionCookie(cookieHeader);
   if (!tokenCandidate) {
-    throw memexError({
-      code: ErrorCode.MEMEX_AUTH_NO_SESSION,
+    throw holoError({
+      code: ErrorCode.HOLO_AUTH_NO_SESSION,
       problem: 'no Better Auth session cookie on request',
       fix: 'Sign in at the dashboard URL. For agents, see docs/auth.md.',
     });
@@ -55,8 +55,8 @@ export async function validateSessionCookie(
 
   const row = rows[0];
   if (!row) {
-    throw memexError({
-      code: ErrorCode.MEMEX_AUTH_NO_SESSION,
+    throw holoError({
+      code: ErrorCode.HOLO_AUTH_NO_SESSION,
       problem: 'session cookie present but not valid (expired or unknown)',
       fix: 'Sign in again at the dashboard URL.',
     });

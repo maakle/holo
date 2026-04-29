@@ -1,5 +1,5 @@
 {
-  "name": "@memex/crypto",
+  "name": "@holo/crypto",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "libsodium-wrappers": "0.7.15",
-    "@memex/errors": "workspace:*"
+    "@holo/errors": "workspace:*"
   },
   "devDependencies": {
     "@types/libsodium-wrappers": "0.7.14",

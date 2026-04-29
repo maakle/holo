@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
-import { parseEnv } from '@memex/env';
+import { parseEnv } from '@holo/env';
 import { AppModule } from './app.module';
 
 async function bootstrap() {

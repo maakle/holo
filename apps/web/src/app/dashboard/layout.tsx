@@ -16,7 +16,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         <nav className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <Link href="/dashboard" className="text-sm font-semibold">
-              memex
+              holo
             </Link>
             <Link href="/dashboard" className="text-sm text-gray-600 dark:text-gray-300">
               Overview

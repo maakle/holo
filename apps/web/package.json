@@ -1,5 +1,5 @@
 {
-  "name": "@memex/web",
+  "name": "@holo/web",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -11,12 +11,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@memex/auth": "workspace:*",
-    "@memex/connectors": "workspace:*",
-    "@memex/crypto": "workspace:*",
-    "@memex/db": "workspace:*",
-    "@memex/env": "workspace:*",
-    "@memex/errors": "workspace:*",
+    "@holo/auth": "workspace:*",
+    "@holo/connectors": "workspace:*",
+    "@holo/crypto": "workspace:*",
+    "@holo/db": "workspace:*",
+    "@holo/env": "workspace:*",
+    "@holo/errors": "workspace:*",
     "better-auth": "1.1.6",
     "drizzle-orm": "0.36.0",
     "next": "15.0.3",

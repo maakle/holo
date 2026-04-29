@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { eq, and } from 'drizzle-orm';
-import { schema } from '@memex/db';
-import { memexError, ErrorCode, MemexError } from '@memex/errors';
-import { shared, createGithubConnector } from '@memex/connectors';
+import { schema } from '@holo/db';
+import { holoError, ErrorCode, HoloError } from '@holo/errors';
+import { shared, createGithubConnector } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 
 export async function GET(req: Request) {
@@ -13,16 +13,16 @@ export async function GET(req: Request) {
     const state = url.searchParams.get('state');
     const errParam = url.searchParams.get('error');
     if (errParam) {
-      throw memexError({
-        code: ErrorCode.MEMEX_OAUTH_EXCHANGE_FAILED,
+      throw holoError({
+        code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
         problem: `GitHub returned error: ${errParam}`,
         cause: url.searchParams.get('error_description') ?? undefined,
         fix: 'Restart the connect flow.',
       });
     }
     if (!code || !state) {
-      throw memexError({
-        code: ErrorCode.MEMEX_OAUTH_EXCHANGE_FAILED,
+      throw holoError({
+        code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
         problem: 'GitHub callback missing code or state',
         fix: 'Restart the connect flow from /connections.',
       });
@@ -34,8 +34,8 @@ export async function GET(req: Request) {
     const cookieStore = await cookies();
     const csrfFromCookie = cookieStore.get(shared.CSRF_COOKIE_NAME)?.value;
     if (!csrfFromCookie || csrfFromCookie !== claims.csrf_nonce) {
-      throw memexError({
-        code: ErrorCode.MEMEX_OAUTH_EXCHANGE_FAILED,
+      throw holoError({
+        code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
         problem: 'CSRF nonce mismatch on GitHub callback',
         fix: 'Restart the connect flow. Do not share callback URLs.',
       });
@@ -106,13 +106,13 @@ export async function GET(req: Request) {
 
     return NextResponse.redirect(new URL('/connections', req.url));
   } catch (e) {
-    if (e instanceof MemexError) {
+    if (e instanceof HoloError) {
       const u = new URL('/connections', req.url);
       u.searchParams.set('connect_error', e.code);
       u.searchParams.set('connect_fix', e.fix);
       return NextResponse.redirect(u);
     }
     console.error(e);
-    return NextResponse.redirect(new URL('/connections?connect_error=MEMEX_INTERNAL', req.url));
+    return NextResponse.redirect(new URL('/connections?connect_error=HOLO_INTERNAL', req.url));
   }
 }

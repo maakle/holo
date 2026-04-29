@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
-import { initCrypto } from '@memex/crypto';
-import { parseEnv } from '@memex/env';
-import { createDb } from '@memex/db';
-import { MemexError } from '@memex/errors';
+import { initCrypto } from '@holo/crypto';
+import { parseEnv } from '@holo/env';
+import { createDb } from '@holo/db';
+import { HoloError } from '@holo/errors';
 import { createSessionMiddleware } from './middleware/session';
 
 async function main() {
@@ -14,18 +14,18 @@ async function main() {
   const app = new Hono();
 
   app.onError((err, c) => {
-    if (err instanceof MemexError) {
+    if (err instanceof HoloError) {
       const status =
-        err.code === 'MEMEX_AUTH_NO_SESSION'
+        err.code === 'HOLO_AUTH_NO_SESSION'
           ? 401
-          : err.code === 'MEMEX_CONNECTOR_NOT_IMPLEMENTED'
+          : err.code === 'HOLO_CONNECTOR_NOT_IMPLEMENTED'
             ? 501
             : 500;
       return c.json(err.toJSON(), status);
     }
     console.error(err);
     return c.json(
-      { code: 'MEMEX_INTERNAL', problem: 'unexpected error', fix: 'check server logs' },
+      { code: 'HOLO_INTERNAL', problem: 'unexpected error', fix: 'check server logs' },
       500,
     );
   });

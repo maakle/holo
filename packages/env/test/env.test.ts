@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { parseEnv } from '../src/index';
-import { MemexError } from '@memex/errors';
+import { HoloError } from '@holo/errors';
 
 const COMPLETE_ENV = {
-  DATABASE_URL: 'postgresql://localhost/memex',
+  DATABASE_URL: 'postgresql://localhost/holo',
   REDIS_URL: 'redis://localhost:6379',
-  MEMEX_TOKEN_ENCRYPTION_KEY: 'a'.repeat(44),
+  HOLO_TOKEN_ENCRYPTION_KEY: 'a'.repeat(44),
   BETTER_AUTH_SECRET: 'b'.repeat(44),
   BETTER_AUTH_URL: 'http://localhost:3000',
   GITHUB_LOGIN_CLIENT_ID: 'lid',
@@ -19,17 +19,17 @@ const COMPLETE_ENV = {
 describe('parseEnv', () => {
   it('parses a complete env object', () => {
     const env = parseEnv(COMPLETE_ENV);
-    expect(env.DATABASE_URL).toBe('postgresql://localhost/memex');
+    expect(env.DATABASE_URL).toBe('postgresql://localhost/holo');
     expect(env.NODE_ENV).toBe('development');
   });
 
-  it('throws MEMEX_ENV_INVALID when required vars missing', () => {
-    expect(() => parseEnv({})).toThrow(MemexError);
+  it('throws HOLO_ENV_INVALID when required vars missing', () => {
+    expect(() => parseEnv({})).toThrow(HoloError);
     try {
       parseEnv({});
     } catch (e) {
-      expect((e as MemexError).code).toBe('MEMEX_ENV_INVALID');
-      expect((e as MemexError).cause).toContain('DATABASE_URL');
+      expect((e as HoloError).code).toBe('HOLO_ENV_INVALID');
+      expect((e as HoloError).cause).toContain('DATABASE_URL');
     }
   });
 
@@ -39,6 +39,6 @@ describe('parseEnv', () => {
         ...COMPLETE_ENV,
         EMAIL_PROVIDER: 'sendgrid',
       }),
-    ).toThrow(MemexError);
+    ).toThrow(HoloError);
   });
 });

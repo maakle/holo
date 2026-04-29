@@ -1,5 +1,5 @@
 {
-  "name": "@memex/connectors",
+  "name": "@holo/connectors",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -17,7 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@memex/errors": "workspace:*",
+    "@holo/errors": "workspace:*",
     "jose": "5.9.6"
   },
   "devDependencies": {

@@ -2,15 +2,15 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_USER: memex
-      POSTGRES_PASSWORD: memex
-      POSTGRES_DB: memex
+      POSTGRES_USER: holo
+      POSTGRES_PASSWORD: holo
+      POSTGRES_DB: holo
     ports:
       - "5436:5432"
     volumes:
-      - memex_pg_data:/var/lib/postgresql/data
+      - holo_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U memex"]
+      test: ["CMD-SHELL", "pg_isready -U holo"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,7 +20,7 @@ services:
     ports:
       - "6382:6379"
     volumes:
-      - memex_redis_data:/data
+      - holo_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -28,5 +28,5 @@ services:
       retries: 5
 
 volumes:
-  memex_pg_data:
-  memex_redis_data:
+  holo_pg_data:
+  holo_redis_data:

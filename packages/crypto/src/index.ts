@@ -1,5 +1,5 @@
 import sodium from 'libsodium-wrappers';
-import { memexError, ErrorCode } from '@memex/errors';
+import { holoError, ErrorCode } from '@holo/errors';
 
 let initialized = false;
 
@@ -11,8 +11,8 @@ export async function initCrypto(): Promise<void> {
 
 function ensureInit(): void {
   if (!initialized) {
-    throw memexError({
-      code: ErrorCode.MEMEX_TOKEN_DECRYPT_FAILED,
+    throw holoError({
+      code: ErrorCode.HOLO_TOKEN_DECRYPT_FAILED,
       problem: 'crypto not initialized',
       fix: 'Call initCrypto() at app boot before any encrypt/decrypt call.',
     });
@@ -33,9 +33,9 @@ export function keyFromBase64(b64: string): Uint8Array {
     }
     return raw;
   } catch (e) {
-    throw memexError({
-      code: ErrorCode.MEMEX_TOKEN_DECRYPT_FAILED,
-      problem: 'MEMEX_TOKEN_ENCRYPTION_KEY is not a valid 32-byte base64 string',
+    throw holoError({
+      code: ErrorCode.HOLO_TOKEN_DECRYPT_FAILED,
+      problem: 'HOLO_TOKEN_ENCRYPTION_KEY is not a valid 32-byte base64 string',
       cause: (e as Error).message,
       fix: 'Generate a key with: openssl rand -base64 32',
     });
@@ -65,11 +65,11 @@ export function decryptToken(ciphertext: string, key: Uint8Array): string {
     const plain = sodium.crypto_secretbox_open_easy(ct, nonce, key);
     return sodium.to_string(plain);
   } catch (e) {
-    throw memexError({
-      code: ErrorCode.MEMEX_TOKEN_DECRYPT_FAILED,
+    throw holoError({
+      code: ErrorCode.HOLO_TOKEN_DECRYPT_FAILED,
       problem: 'failed to decrypt token',
       cause: (e as Error).message,
-      fix: 'Verify MEMEX_TOKEN_ENCRYPTION_KEY matches the key tokens were encrypted with. If you rotated the key, reconnect each connector.',
+      fix: 'Verify HOLO_TOKEN_ENCRYPTION_KEY matches the key tokens were encrypted with. If you rotated the key, reconnect each connector.',
     });
   }
 }

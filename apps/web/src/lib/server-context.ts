@@ -1,8 +1,8 @@
 import 'server-only';
-import { createDb, type DB, schema } from '@memex/db';
-import { createAuth, type Auth } from '@memex/auth';
-import { initCrypto } from '@memex/crypto';
-import { parseEnv, type Env } from '@memex/env';
+import { createDb, type DB, schema } from '@holo/db';
+import { createAuth, type Auth } from '@holo/auth';
+import { initCrypto } from '@holo/crypto';
+import { parseEnv, type Env } from '@holo/env';
 import { sql } from 'drizzle-orm';
 
 let cached: { env: Env; db: DB; auth: Auth; defaultOrgId: string } | null = null;

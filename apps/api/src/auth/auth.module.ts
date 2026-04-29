@@ -1,8 +1,8 @@
 import { Module, Global } from '@nestjs/common';
-import { createDb, type DB, schema } from '@memex/db';
-import { createAuth, type Auth } from '@memex/auth';
+import { createDb, type DB, schema } from '@holo/db';
+import { createAuth, type Auth } from '@holo/auth';
 import { sql } from 'drizzle-orm';
-import { parseEnv } from '@memex/env';
+import { parseEnv } from '@holo/env';
 
 const env = parseEnv(process.env);
 const db: DB = createDb(env.DATABASE_URL);

@@ -1,5 +1,5 @@
 {
-  "name": "@memex/auth",
+  "name": "@holo/auth",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -18,9 +18,9 @@
   },
   "dependencies": {
     "better-auth": "1.1.6",
-    "@memex/db": "workspace:*",
-    "@memex/env": "workspace:*",
-    "@memex/errors": "workspace:*",
+    "@holo/db": "workspace:*",
+    "@holo/env": "workspace:*",
+    "@holo/errors": "workspace:*",
     "drizzle-orm": "0.36.0"
   },
   "devDependencies": {

@@ -3,11 +3,11 @@ import { Hono } from 'hono';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { sql as drizzleSql } from 'drizzle-orm';
-import { schema } from '@memex/db';
+import { schema } from '@holo/db';
 import { createSessionMiddleware } from '../src/middleware/session';
-import { MemexError } from '@memex/errors';
+import { HoloError } from '@holo/errors';
 
-const url = process.env.DATABASE_URL ?? 'postgresql://memex:memex@localhost:5436/memex';
+const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';
 let pg: ReturnType<typeof postgres>;
 let db: ReturnType<typeof drizzle>;
 let userId: string;
@@ -46,7 +46,7 @@ describe('createSessionMiddleware', () => {
       .use('*', createSessionMiddleware(db as never))
       .get('/me', (c) => c.json(c.get('user' as never)));
     app.onError((err, c) =>
-      err instanceof MemexError ? c.json(err.toJSON(), 401) : c.json({}, 500),
+      err instanceof HoloError ? c.json(err.toJSON(), 401) : c.json({}, 500),
     );
     return app;
   }
@@ -61,10 +61,10 @@ describe('createSessionMiddleware', () => {
     expect(body.userId).toBe(userId);
   });
 
-  it('returns 401 with MemexError JSON when cookie missing', async () => {
+  it('returns 401 with HoloError JSON when cookie missing', async () => {
     const app = buildApp();
     const res = await app.request('/me');
     expect(res.status).toBe(401);
-    expect(((await res.json()) as { code: string }).code).toBe('MEMEX_AUTH_NO_SESSION');
+    expect(((await res.json()) as { code: string }).code).toBe('HOLO_AUTH_NO_SESSION');
   });
 });
