@@ -31,7 +31,7 @@ This roadmap was substantially restructured on 2026-04-29. The earlier v0.1→v0
 - [ ] `packages/skills` and `packages/plans` exist as architectural placeholders
 - [ ] `docker-compose.yml` runs Postgres + pgvector + Redis + the four apps
 - [ ] CI runs lint + typecheck + tests on every PR
-- [ ] **Better Auth in single-user mode** (login, session)
+- [ ] **Better Auth in single-user mode** (login, session) — **GitHub OAuth + email magic link / OTP** as login methods
 - [ ] **Connections page in `apps/web`** — one row per connector, "Connect" button → OAuth flow → "Connected ✓"
 - [ ] **`connector_cursors` table + cursor logic** — per-connector incremental sync from day 1. No nightly full re-pulls; track `latest_seen_ts` per channel/repo/page (Issue 4A from /plan-eng-review). Slack rate-limit (50/min) and GitHub rate-limit (5000/hr) make full re-pulls unworkable past ~2 weeks of normal usage.
 - [ ] **Ingestion-time allowlist enforcement** — config-driven allowlist per connector (Slack channels, GitHub repos, Notion page trees). Bot/integration sees its own permissions, but memex only ingests from allowlisted scopes. Defense against accidentally surfacing #legal / #hiring / #exec data via agents (Issue 1A from /plan-eng-review).

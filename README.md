@@ -27,7 +27,7 @@ On top of that substrate, Memex extracts the procedural knowledge that emerges f
 - **Continuous, durable sync.** Cursor-checkpointed incremental pulls per connector from day 1 (no full re-pulls — Slack and GitHub rate limits make those unworkable). Webhook-accelerated when a real freshness pain demands it. Crash-resumable. Source-of-truth stays the originating tool.
 - **Procedural skill synthesis.** Recurring agent behaviors get distilled into invokable skills served via `list_skills` / `get_skill` over MCP and over REST. Labeled-template extraction in v0.1; free-form unsupervised in v0.2 once the eval harness exists.
 - **Self-hostable.** `docker compose up` (or `npx memex-init` from v0.1) — no Docker socket requirement, no managed-only services on the critical path. Apache-2.0.
-- **Managed cloud, eventually.** Self-hostable is the wedge. Managed cloud is the path to a sustainable company — same code, run by us. Coming after v0.1 has external users on self-host.
+- **Managed cloud, eventually.** Self-hostable is the wedge. Managed cloud is the path to a sustainable company — same code, run by us. See [`docs/PRICING.md`](./docs/PRICING.md) for the pricing-direction placeholder. Real numbers arrive after v0.1 has paying-signal conversations.
 
 ## Who it's for
 

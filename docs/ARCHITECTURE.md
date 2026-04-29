@@ -35,6 +35,7 @@ Layers ship in order. v0.1–v0.4 build the substrate. v0.5 adds skills. v0.6+ a
 | Cache/Queue | Redis 7 |
 | Auth | Better Auth (organization + apiKey + oauthProvider) |
 | Embeddings | `text-embedding-3-large` @ 1024 dims default; BGE-M3 self-host |
+| LLM provider | Anthropic Claude default (skill synthesis, contextual chunking, redaction). Pluggable per workspace config — switch to OpenAI / Mistral / local model without code changes. |
 | Reranker | bge-reranker-v2-m3 (opt-in) |
 | Skill format | Anthropic Skill format (frontmatter + procedure + example tools), stored as Postgres rows and served dynamically over MCP — not filesystem artifacts |
 | Monorepo | pnpm workspaces + Turborepo |
