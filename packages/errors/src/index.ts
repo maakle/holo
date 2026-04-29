@@ -1,4 +1,4 @@
-import type { ErrorCodeValue } from './codes.js';
+import type { ErrorCodeValue } from './codes';
 
 export interface MemexErrorInput {
   code: ErrorCodeValue;
@@ -40,5 +40,5 @@ export function memexError(input: MemexErrorInput): MemexError {
   return new MemexError(input);
 }
 
-export { ErrorCode } from './codes.js';
-export type { ErrorCodeValue } from './codes.js';
+export { ErrorCode } from './codes';
+export type { ErrorCodeValue } from './codes';
