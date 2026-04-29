@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { MemexError, memexError } from '../src/index.js';
-import { ErrorCode } from '../src/codes.js';
+import { MemexError, memexError } from '../src/index';
+import { ErrorCode } from '../src/codes';
 
 describe('MemexError', () => {
   it('exposes code, problem, cause, fix, docs_url fields', () => {

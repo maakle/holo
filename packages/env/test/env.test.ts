@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseEnv } from '../src/index.js';
+import { parseEnv } from '../src/index';
 import { MemexError } from '@memex/errors';
 
 const COMPLETE_ENV = {

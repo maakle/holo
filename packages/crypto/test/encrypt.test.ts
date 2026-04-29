@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { encryptToken, decryptToken, generateKey, initCrypto } from '../src/index.js';
+import { encryptToken, decryptToken, generateKey, initCrypto } from '../src/index';
 import { MemexError } from '@memex/errors';
 
 describe('crypto', () => {

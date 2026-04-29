@@ -2,8 +2,8 @@ import 'dotenv/config';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
-import * as schema from './schema/index.js';
-import { seedDefaultOrganization } from './seed.js';
+import * as schema from './schema/index';
+import { seedDefaultOrganization } from './seed';
 
 async function main() {
   const url = process.env.DATABASE_URL;

@@ -1,5 +1,5 @@
-import type { DB } from './client.js';
-import { organization } from './schema/auth.js';
+import type { DB } from './client';
+import { organization } from './schema/auth';
 import { sql } from 'drizzle-orm';
 
 export const DEFAULT_ORG_SLUG = 'default';
