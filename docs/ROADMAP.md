@@ -86,9 +86,11 @@ This roadmap was substantially restructured on 2026-04-29. The earlier v0.1→v0
 ### Week 10: Quality kill-switch
 - [ ] Apply the 3-of-5-usable criterion. If pass → continue with skills in v0.1. If fail → ship v0.1 substrate-only, defer skills.
 
-### Weeks 11–12: External onboarding
+### Weeks 11–12: External onboarding + BYO-agent reach
 - [ ] Better Auth `organization` plugin — multi-tenant signup, workspace creation, invite flow
 - [ ] OAuth 2.1 with PKCE on the MCP server (static client; DCR optional, deferred to v0.2)
+- [ ] **REST + OpenAPI surface** — auto-generated from NestJS controllers, sharing `packages/retrieval-core` with the MCP server. Endpoints mirror the MCP tool surface (`POST /v1/search`, `GET /v1/threads/:id`, `GET /v1/skills`, etc.). Static API key auth for v0.1; unified OAuth in v0.2.
+- [ ] **Verified BYO-agent reach end-to-end:** demo a ChatGPT Action and a Gemini function call hitting the same memex instance an MCP client is using
 - [ ] First 3+ external CTOs (selected from cold-DM responders during v0.0) onboarded
 - [ ] Per-customer telemetry on agent retention and tool-call patterns
 - [ ] Issue triage flow for early users
