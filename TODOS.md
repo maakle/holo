@@ -66,13 +66,13 @@ memex v0.0 and v0.1 ingest knowledge sources (Slack/GitHub/Notion/Grain/Pylon/Hu
 
 **What:** Decide whether to support per-message attachment ingestion (PDFs, images) attached to Slack messages, Notion pages, or Pylon tickets — or accept this as permanently out of scope.
 
-**Why:** The support-agent today handles queries like "answer the coverage questions in this attached PDF" (Jesse's Tipalti example). The current agent presumably reads attachments inline at query time. memex's substrate ingests structured records (messages, threads, PRs, pages, calls) but not arbitrary file attachments.
+**Why:** The support-agent today handles queries like "answer the coverage questions in this attached PDF" (Jesse's Tipalti example). The current agent presumably reads attachments inline at query time. memex's context layer ingests structured records (messages, threads, PRs, pages, calls) but not arbitrary file attachments.
 
 **Pros (build attachment parsing):** Covers more of the agent's real query mix; one less reason for the agent to dual-route.
 
-**Cons (build attachment parsing):** PDF parsing is non-trivial (text extraction, table extraction, OCR for scanned PDFs); files attached to one message are a fundamentally different access pattern (per-message vs. substrate) and may not benefit from being ingested into the global search index; storage costs grow fast.
+**Cons (build attachment parsing):** PDF parsing is non-trivial (text extraction, table extraction, OCR for scanned PDFs); files attached to one message are a fundamentally different access pattern (per-message vs. context layer) and may not benefit from being ingested into the global search index; storage costs grow fast.
 
-**Pros (accept out of scope):** Substrate stays focused on knowledge sources; attachment parsing stays the agent's responsibility (where Cursor / Claude already handle it well).
+**Pros (accept out of scope):** Context layer stays focused on knowledge sources; attachment parsing stays the agent's responsibility (where Cursor / Claude already handle it well).
 
 **Cons (accept out of scope):** "Shared context layer for all agents" claim has a documented hole.
 
@@ -88,7 +88,7 @@ memex v0.0 and v0.1 ingest knowledge sources (Slack/GitHub/Notion/Grain/Pylon/Hu
 
 **Why:** Most teams don't have a custom AI agent today. They want one but don't know where to start. Memex's pitch — "shared context layer for the agents your team is already shipping" — assumes they have agents. Templates give them a starting point. Changes the launch story from "bring your own agents" to "bring your own agents *or pick one of ours*."
 
-**Pros:** Productizes work already being done at the founder's company (low marginal cost — ~3 days). Templates become marketing artifacts ("4 real-world agent patterns we tested on"). Demonstrates memex is a complete solution, not just a substrate.
+**Pros:** Productizes work already being done at the founder's company (low marginal cost — ~3 days). Templates become marketing artifacts ("4 real-world agent patterns we tested on"). Demonstrates memex is a complete solution, not just a context layer.
 
 **Cons:** Templates need ongoing maintenance as memex API evolves. Some teams will customize and fork; that's a support burden. Risk of templates drifting from the founder's actual agents if those evolve internally.
 

@@ -1,8 +1,10 @@
 # Week-1 backlog
 
-Concrete issues to seed the GitHub Project. Each is sized to fit in a day or two. Copy them into GitHub Issues; tag with `v0.1` and the relevant `area:` label.
+> **Stale notice (2026-04-29):** This file was written before the post-eng-review and post-CEO-review restructuring. Milestone numbering here (v0.1, v0.5, v0.6) is from the ORIGINAL roadmap that was superseded by [ADR-0004](./decisions/0004-multi-agent-shared-context-wedge.md). Use [`ROADMAP.md`](./ROADMAP.md) as the source of truth for current milestones; the *individual issues* below are still useful as a seed list for v0.0/v0.1 GitHub issues, but ignore the milestone tags.
 
-The goal of v0.1 is the **substrate** — Slack ingested end-to-end, hybrid search working, MCP serving retrieval tools to Claude Desktop. Skills (v0.5) and the closed loop (v0.6) are scaffolded as empty packages with READMEs only, so the architectural seams are visible but no implementation work happens on them yet.
+Concrete issues to seed the GitHub Project. Each is sized to fit in a day or two. Copy them into GitHub Issues; retag with the *current* milestone (`v0.0` or `v0.1` per ROADMAP.md) and the relevant `area:` label.
+
+The goal of v0.0 (per current ROADMAP) is to ship the **context layer** at the founder's company internally — 6 connectors (Slack, GitHub, Notion, Grain, Pylon, HubSpot), MCP server, dogfooded against existing custom agents.
 
 ---
 

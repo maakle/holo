@@ -1,25 +1,25 @@
-# 0004 — Multi-agent shared-context wedge; abandon v0.1→v0.5 substrate-then-skills sequencing
+# 0004 — Multi-agent shared-context wedge; abandon v0.1→v0.5 context layer-then-skills sequencing
 
 **Status:** Accepted
 **Date:** 2026-04-29
 
 ## Context
 
-The original positioning (`VISION.md`, `README.md`, `ROADMAP.md` as of commit `cd1fb87`) framed memex as a "company brain" — a unified queryable substrate over a company's tools, plus a procedural skill layer (v0.5) and a closed-loop drift detector (v0.6). The roadmap shipped substrate first (v0.1, weeks 1–4), then four more substrate-flavored milestones, then skills at v0.5 (weeks 17–22).
+The original positioning (`VISION.md`, `README.md`, `ROADMAP.md` as of commit `cd1fb87`) framed memex as a "company brain" — a unified queryable context layer over a company's tools, plus a procedural skill layer (v0.5) and a closed-loop drift detector (v0.6). The roadmap shipped context layer first (v0.1, weeks 1–4), then four more context layer-flavored milestones, then skills at v0.5 (weeks 17–22).
 
 A YC-style diagnostic in April 2026 surfaced two problems with this framing:
 
-1. **The substrate alone is commodity by 2026.** Open-source self-hostable unified-knowledge platforms with built-in agents (Onyx, Dust, PipesHub) already exist. Onyx in particular is MIT-licensed, has 40+ connectors, ships agents as a built-in feature, and has production users at Netflix, Ramp, and Thales. memex's v0.1 plan was indistinguishable from a thinner Onyx for the first 17 weeks.
+1. **The context layer alone is commodity by 2026.** Open-source self-hostable unified-knowledge platforms with built-in agents (Onyx, Dust, PipesHub) already exist. Onyx in particular is MIT-licensed, has 40+ connectors, ships agents as a built-in feature, and has production users at Netflix, Ramp, and Thales. memex's v0.1 plan was indistinguishable from a thinner Onyx for the first 17 weeks.
 2. **The wedge wasn't "ground a custom agent." It was "shared context for many."** The diagnostic surfaced that the founder's own team is running 2+ custom agents in production today (a Slack-triggered Cursor support-question agent and a Notion-based interview-prep agent), each with its own bespoke context-fetching pipeline. The pain is per-agent context duplication, not first-agent enablement. CTOs at peer companies report the same multi-agent pattern.
 
-Existing closed-source competitors (Interloom, $16.5M raised; Potpie, $2.2M raised) target the procedural-context-graph thesis but at enterprise scale. The open gap memex now occupies: **a self-hostable shared context substrate that the multiple custom agents an engineering team already runs can all point at, plus a procedural skill layer that turns recurring agent behaviors into reusable, MCP-invokable skills.**
+Existing closed-source competitors (Interloom, $16.5M raised; Potpie, $2.2M raised) target the procedural-context-graph thesis but at enterprise scale. The open gap memex now occupies: **a self-hostable shared context context layer that the multiple custom agents an engineering team already runs can all point at, plus a procedural skill layer that turns recurring agent behaviors into reusable, MCP-invokable skills.**
 
 ## Decision
 
 1. **Reframe memex as a shared context layer for multiple custom agents**, not as a unified-knowledge "company brain." The product surface is the MCP endpoint that an engineering team's existing agents (Cursor, Claude Code, LangChain, in-house) point at instead of building bespoke retrievers.
-2. **Abandon the v0.1→v0.5 substrate-then-skills sequencing.** Skills ship in v0.1 alongside substrate. The substrate-only milestones in the original roadmap (v0.2 knowledge layer, v0.3 multi-source, v0.4 self-host polish) are collapsed into v0.0 and v0.1.
+2. **Abandon the v0.1→v0.5 context layer-then-skills sequencing.** Skills ship in v0.1 alongside context layer. The context layer-only milestones in the original roadmap (v0.2 knowledge layer, v0.3 multi-source, v0.4 self-host polish) are collapsed into v0.0 and v0.1.
 3. **v0.0 is an internal-dogfood build at the founder's own company** — 6 connectors (Slack, GitHub, Notion, Grain, Pylon, HubSpot), 5–6 weeks. Validation gate is "both existing agents migrated off bespoke context fetchers, customer-success agent prototyped on top." External CTO validation moves to v0.1.
-4. **v0.1 ships skills + public release** — labeled-template skill synthesis only (free-form unsupervised extraction deferred to v0.2), 7–8 weeks, with a week-10 quality kill-switch that ships substrate-only if extracted skills aren't usable.
+4. **v0.1 ships skills + public release** — labeled-template skill synthesis only (free-form unsupervised extraction deferred to v0.2), 7–8 weeks, with a week-10 quality kill-switch that ships context layer-only if extracted skills aren't usable.
 5. **The closed-loop drift detector (originally v0.6) is deprioritized indefinitely.** It belongs in `VISION.md` as long-run direction, not on any near-term roadmap. Year-3 conversation, not v1.
 
 ## Consequences
@@ -27,7 +27,7 @@ Existing closed-source competitors (Interloom, $16.5M raised; Potpie, $2.2M rais
 - The "company brain" framing in older docs no longer matches the lead positioning. `VISION.md`, `README.md`, and `ROADMAP.md` are updated in the same commit as this ADR.
 - v0.0 is larger than a typical falsifier (6 connectors, 5–6 weeks vs. a 1-week prototype). The founder explicitly accepted this scope expansion against advisor pushback, on the reasoning that the buyer-builder-sufferer collapse means "make it work at my company first" includes connectors that support not-yet-built agents (Pylon and HubSpot for a customer-success agent).
 - **Risk recorded:** the broader-dogfood path can pull memex toward consolidation (Onyx's lane) instead of agent grounding. Mitigation: the v0.0 success criteria require both existing agents to migrate *successfully* and the customer-success agent prototype to actually function — not just "the connectors got built."
-- ADR-0001 (connector port interface) and ADR-0002 (Postgres-only hybrid search) stand. ADR-0003 (skills on top of substrate) stands but its sequencing is updated by this ADR — skills are no longer "on top of" a finished substrate; they ship together in v0.1.
+- ADR-0001 (connector port interface) and ADR-0002 (Postgres-only hybrid search) stand. ADR-0003 (skills on top of context layer) stands but its sequencing is updated by this ADR — skills are no longer "on top of" a finished context layer; they ship together in v0.1.
 - External validation (cold-DM outreach to peer CTOs about multi-agent context duplication) runs in parallel with v0.0 build, gating the v0.1 public release rather than gating v0.0 itself.
 
 ## See also

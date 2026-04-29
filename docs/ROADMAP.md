@@ -2,19 +2,19 @@
 
 The plan is to ship v0.0 internally at the founder's company in 5–6 weeks, then v0.1 (skills + public release) in 7–8 more weeks. Every milestone ends with a concrete demo and a definition of done. If a milestone slips, cut scope, don't extend the timeline.
 
-This roadmap was substantially restructured on 2026-04-29. The earlier v0.1→v0.5 substrate-then-skills sequencing was abandoned. See [`decisions/0004-multi-agent-shared-context-wedge.md`](./decisions/0004-multi-agent-shared-context-wedge.md) for the reasoning.
+This roadmap was substantially restructured on 2026-04-29. The earlier v0.1→v0.5 context layer-then-skills sequencing was abandoned. See [`decisions/0004-multi-agent-shared-context-wedge.md`](./decisions/0004-multi-agent-shared-context-wedge.md) for the reasoning.
 
 ## Guiding principles
 
 - **Multi-agent dogfood first.** v0.0 must successfully migrate the founder's two existing custom agents (a Slack-triggered Cursor support-question agent and a Notion-based interview-prep agent) off their bespoke context fetchers onto memex's MCP endpoint. If it can't do that, the wedge isn't real.
-- **Skills ship in v0.1, not v0.5.** The v0.1→v0.5 sequencing in earlier roadmaps was fatal — substrate alone is a commodity by 2026 (Onyx, Dust, PipesHub). Skills are the differentiator and ship in the same release as substrate.
+- **Skills ship in v0.1, not v0.5.** The v0.1→v0.5 sequencing in earlier roadmaps was fatal — context layer alone is a commodity by 2026 (Onyx, Dust, PipesHub). Skills are the differentiator and ship in the same release as context layer.
 - **Self-host on day one.** If it doesn't `docker compose up`, it doesn't ship.
 - **MCP is the demo.** Every milestone ends with "point an existing custom agent at this MCP endpoint and watch it work."
 - **Validate the wedge externally in parallel.** Cold-DM peer CTOs during v0.0 to confirm the multi-agent context-duplication pain exists outside the founder's company. The v0.1 *public* release does not ship without 2+ external responders confirming.
 
 ---
 
-## v0.0 — Internal substrate (weeks 0–6)
+## v0.0 — Internal context layer (weeks 0–6)
 
 **Goal:** memex runs at the founder's company as the unified context layer for the two existing custom agents and a new customer-success agent prototype. Not public yet. No external users.
 
@@ -73,7 +73,7 @@ Expanded after [/plan-ceo-review](../docs/designs/memex-v01-yc-prep.md) accepted
 
 **Demo (public):** "Run `npx memex init` and have your first agent query in 2 minutes. Then watch the observability dashboard light up as your agents call memex. Click replay on any past invocation. Browse the public skill marketplace and see what other teams have already shared."
 
-**Week 10 quality kill-switch:** if at least 3 of 5 extracted skills are NOT judged usable by the founder's team (binary: "would I let an agent invoke this?"), ship v0.1 as substrate-only and defer skills to v0.2. Do not delay the public release.
+**Week 10 quality kill-switch:** if at least 3 of 5 extracted skills are NOT judged usable by the founder's team (binary: "would I let an agent invoke this?"), ship v0.1 as context layer-only and defer skills to v0.2. Do not delay the public release.
 
 ### Weeks 7–8: Skill eval harness *first*
 - [ ] `skills` table with content, version, status, source artifacts, fingerprint, staleness fields
@@ -90,7 +90,7 @@ Expanded after [/plan-ceo-review](../docs/designs/memex-v01-yc-prep.md) accepted
 - [ ] **Free-form unsupervised extraction (variant a) is NOT in v0.1.** Deferred to v0.2 once the harness has more golden data.
 
 ### Week 10: Quality kill-switch
-- [ ] Apply the 3-of-5-usable criterion. If pass → continue with skills in v0.1. If fail → ship v0.1 substrate-only, defer skills.
+- [ ] Apply the 3-of-5-usable criterion. If pass → continue with skills in v0.1. If fail → ship v0.1 context layer-only, defer skills.
 
 ### Weeks 11–12: External onboarding + BYO-agent reach
 - [ ] Better Auth `organization` plugin — multi-tenant signup, workspace creation, invite flow

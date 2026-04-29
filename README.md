@@ -2,7 +2,7 @@
 
 > The shared context layer for your AI agents. An open-source, self-hostable MCP server plus skill layer — every agent points at the same source of truth, so building the next one doesn't mean building yet another retrieval pipeline.
 
-> **Layer today, OS tomorrow.** Today: substrate + procedural skills. Tomorrow: an agent operating system — context, observability, replay, marketplace.
+> **Layer today, OS tomorrow.** Today: context layer + procedural skills. Tomorrow: an agent operating system — context, observability, replay, marketplace.
 
 **Status:** Pre-alpha. Building in public. Not ready for production.
 
@@ -12,11 +12,11 @@
 
 Engineering teams aren't building one custom AI agent — they're building several. A Slack-triggered Cursor agent that answers product questions from the codebase. A Notion-based agent that prepares interview rubrics from Grain recordings. A customer-success agent over Pylon and HubSpot. Each agent solves a different workflow. Each one re-implements its own context-fetching pipeline against the company's tools.
 
-The cost shows up in the second, third, and fifth agent. Every new one is gated on a new integration. Cross-agent context is impossible because the substrate is a per-agent fork. When a Notion page moves or a Slack channel archives, every agent breaks individually.
+The cost shows up in the second, third, and fifth agent. Every new one is gated on a new integration. Cross-agent context is impossible because the context layer is a per-agent fork. When a Notion page moves or a Slack channel archives, every agent breaks individually.
 
 Memex is the missing shared layer. It ingests the tools your team's work actually lives in, exposes a small MCP surface any agent can call (`search`, `get_thread`, `get_pr`, `get_doc`, `get_call`, `get_ticket`, `list_recent_activity`, `whats_changed`), and stays current without anyone rebuilding the retrieval code. One ingestion pipeline, many agents.
 
-On top of that substrate, Memex extracts the procedural knowledge that emerges from how the team has actually worked — recurring agent behaviors get distilled into reusable, MCP-invokable skills. The substrate ships first; the skill layer ships in the same release. The combination is what differentiates Memex from open-source unified-search platforms whose agents own the user (Onyx, Dust) and from closed-source enterprise context-graph products (Interloom, Potpie).
+On top of that context layer, Memex extracts the procedural knowledge that emerges from how the team has actually worked — recurring agent behaviors get distilled into reusable, MCP-invokable skills. The context layer ships first; the skill layer ships in the same release. The combination is what differentiates Memex from open-source unified-search platforms whose agents own the user (Onyx, Dust) and from closed-source enterprise context-graph products (Interloom, Potpie).
 
 ## What it does
 
@@ -37,7 +37,7 @@ CTOs and lead engineers at small/mid-stage tech companies (30–80 person) who a
 
 Two YC RFSs (2026) describe adjacent pieces of what Memex is:
 
-- **["The AI Operating System for Companies"](https://www.ycombinator.com/rfs#ai-operating-system-for-companies)** by Diana Hu — the queryable substrate underneath agent operations.
+- **["The AI Operating System for Companies"](https://www.ycombinator.com/rfs#ai-operating-system-for-companies)** by Diana Hu — the queryable context layer underneath agent operations.
 - **["Company Brain"](https://www.ycombinator.com/rfs#company-brain)** by Tom Blomfield — the procedural extraction layer that turns scattered artifacts into invokable skills.
 
 Memex is the open-source, self-hostable take that doesn't require building the agent in our framework. Bring your own.
@@ -103,7 +103,7 @@ Or one-click on Railway: *(coming once v0.1 ships)*
 
 See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the full plan and [`docs/decisions/0004-multi-agent-shared-context-wedge.md`](./docs/decisions/0004-multi-agent-shared-context-wedge.md) for why this changed from earlier docs.
 
-- **v0.0 — Internal substrate** *(weeks 0–6)* — 6 connectors (Slack, GitHub, Notion, Grain, Pylon, HubSpot), MCP server with 6 tools, hybrid RRF search, ingestion-time allowlists, dogfooded against the founder's own existing custom agents. Not public yet.
+- **v0.0 — Internal context layer** *(weeks 0–6)* — 6 connectors (Slack, GitHub, Notion, Grain, Pylon, HubSpot), MCP server with 6 tools, hybrid RRF search, ingestion-time allowlists, dogfooded against the founder's own existing custom agents. Not public yet.
 - **v0.1 — Skills + public release + OS surface** *(weeks 7–17, ~10–11 weeks)* — labeled-template skill synthesis with eval harness; **skill marketplace stub** (publish anonymized skills to a public registry); **agent observability dashboard with read-only replay diff** (the OS-tomorrow surface, made concrete); **`npx memex init` single-line install** (macOS + Linux); REST + OpenAPI surface for ChatGPT Actions / Gemini; week-10 skill quality kill-switch; public Apache-2.0 release on GitHub Releases / GHCR.
 - **v0.2 — Self-host polish + free-form skills + managed cloud** *(weeks 18+)* — Railway / Coolify one-click templates, per-user OAuth ACL fan-out, free-form unsupervised skill extraction, replay live-execution (gated on tool-effect classification), Windows support for `npx memex init`, managed cloud beta, audit log.
 - **Beyond** — drift detection (intent-vs-reality), more connectors, agent templates marketplace, inferred org chart. No fixed dates.

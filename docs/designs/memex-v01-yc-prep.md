@@ -71,7 +71,7 @@ Numeric targets that gate "v0.1 succeeded" beyond the binary success criteria al
 The combined effect of D34/35/36 + the 3 accepted CPs is a meaningfully stronger YC application:
 
 - **Headline:** "memex — the open-source company-brain for AI agents. Layer today, OS tomorrow."
-- **Pitch:** "Engineering teams are building 2+ custom AI agents in production today, each with bespoke context-fetching code. Memex is the shared MCP context layer that the agents your team is already shipping all point at. Today: substrate + procedural skills. Tomorrow: agent operating system. Deploy via `npx memex init` or self-host with Apache-2.0; managed cloud later."
+- **Pitch:** "Engineering teams are building 2+ custom AI agents in production today, each with bespoke context-fetching code. Memex is the shared MCP context layer that the agents your team is already shipping all point at. Today: context layer + procedural skills. Tomorrow: agent operating system. Deploy via `npx memex init` or self-host with Apache-2.0; managed cloud later."
 - **Differentiation:** "Onyx and Dust own search; Interloom and Potpie are enterprise-only. Memex is the only OSS-self-hostable layer that ships a skill marketplace from day one and is built for teams running 2+ agents already."
 - **Demo:** "Here are 5 procedures memex extracted from one engineering team's last quarter of work. Here's an external Cursor agent invoking one of them via MCP. And here's the replay button showing exactly what context grounded the answer."
 

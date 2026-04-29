@@ -6,11 +6,11 @@ This document captures the architectural decisions for Memex. The decisions here
 
 Memex is structured as three architectural layers stacked on top of each other:
 
-1. **Substrate** — connectors ingest from every tool, normalize, embed, store with ACLs preserved. Agents and humans can query it. Foundation for everything above.
-2. **Skills** — synthesizer extracts procedures from the substrate (how refunds get handled, how PRs get reviewed) and stores them as Postgres rows in the Anthropic Skill format (frontmatter + procedure + example tools). Agents discover and invoke them via the MCP `list_skills` and `get_skill` tools — skills are served dynamically from the database, not as filesystem artifacts.
+1. **Context layer** — connectors ingest from every tool, normalize, embed, store with ACLs preserved. Agents and humans can query it. Foundation for everything above.
+2. **Skills** — synthesizer extracts procedures from the context layer (how refunds get handled, how PRs get reviewed) and stores them as Postgres rows in the Anthropic Skill format (frontmatter + procedure + example tools). Agents discover and invoke them via the MCP `list_skills` and `get_skill` tools — skills are served dynamically from the database, not as filesystem artifacts.
 3. **Loop** — Plans/Intents subsystem holds declarations of what should be happening (sprint goals, PRDs, OKRs). Drift detector continuously compares actual artifacts against intent and surfaces gaps.
 
-Layers ship in order. v0.1–v0.4 build the substrate. v0.5 adds skills. v0.6+ adds the loop. The repo structure anticipates all three from day one so we never have to refactor the foundation.
+Layers ship in order. v0.1–v0.4 build the context layer. v0.5 adds skills. v0.6+ adds the loop. The repo structure anticipates all three from day one so we never have to refactor the foundation.
 
 ## Goals and constraints
 
@@ -238,7 +238,7 @@ type SkillTrigger =
 A `SkillSynthesizer` worker:
 
 1. Takes a topic (declared by user: "how do we handle refunds") or auto-discovers candidates from clustering retrieval queries that hit similar artifacts.
-2. Runs a multi-pass retrieval over the substrate to gather every artifact relevant to the topic.
+2. Runs a multi-pass retrieval over the context layer to gather every artifact relevant to the topic.
 3. Uses an LLM with a templated prompt to extract the procedure: trigger conditions, steps, decision points, exceptions, tool calls.
 4. Writes a `skills` row whose `content` field matches Anthropic's Skill format. The MCP `get_skill` tool serves this content dynamically — there's no filesystem `.md` file.
 5. Records `sourceFingerprint` so changes to source artifacts trigger re-synthesis.
@@ -259,7 +259,7 @@ This is deliberately *not* a deterministic workflow engine. The skill is a *play
 
 This is what makes Memex Blomfield's "Company Brain" rather than just "another RAG over company data." Glean and Dust are search products. Onyx is a search product. Memex is a search product *plus* a skill synthesis layer that turns the search results into operable knowledge.
 
-The substrate is necessary. The skills are what make it useful for automation.
+The context layer is necessary. The skills are what make it useful for automation.
 
 ## The closed loop (v0.6+)
 
@@ -271,7 +271,7 @@ The endpoint of the architecture. Users declare intent — sprint goals, OKRs, P
 
 Drift becomes a first-class signal exposed to humans and agents. Hu's "engineering is building the wrong thing" alert.
 
-This layer is deferred to v0.6. The substrate and skills must be solid first. But the architecture leaves room: `Plan` and `Intent` tables, `DriftDetector` worker, `drift_reports` queue.
+This layer is deferred to v0.6. The context layer and skills must be solid first. But the architecture leaves room: `Plan` and `Intent` tables, `DriftDetector` worker, `drift_reports` queue.
 
 ## Process topology
 
