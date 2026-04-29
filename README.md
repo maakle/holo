@@ -22,7 +22,7 @@ On top of that substrate, Memex extracts the procedural knowledge that emerges f
 - **One endpoint, two consumer layers.** *Custom agents your team built* — Cursor in Slack, Claude Code, LangChain, in-house Python, Notion-based — point at memex for production traffic. *Off-the-shelf clients* — Claude Desktop, Cursor's MCP integration, Cline, ChatGPT, Gemini — connect for ad-hoc queries. Both layers, both protocols, one auth.
 - **Connectors for the tools your work actually lives in.** Slack, GitHub, Notion, Grain, Pylon, HubSpot at v0.1. More follow as users ask.
 - **Hybrid search built for agents.** Vector + BM25 fused with Reciprocal Rank Fusion, ACL-aware results that mirror native source permissions. Agents cannot retrieve what their service identity cannot see.
-- **Continuous, durable sync.** Cadence-driven full pulls in v0.0; webhook-accelerated incremental sync once a real freshness pain demands it. Crash-resumable. Source-of-truth stays the originating tool.
+- **Continuous, durable sync.** Cursor-checkpointed incremental pulls per connector from day 1 (no full re-pulls — Slack and GitHub rate limits make those unworkable). Webhook-accelerated when a real freshness pain demands it. Crash-resumable. Source-of-truth stays the originating tool.
 - **Procedural skill synthesis.** Recurring agent behaviors get distilled into invokable skills served via `list_skills` / `get_skill` over MCP and over REST. Labeled-template extraction in v0.1; free-form unsupervised in v0.2 once the eval harness exists.
 - **Self-hostable.** `docker compose up`. No Docker socket requirement, no managed-only services on the critical path.
 - **Open source, Apache-2.0.**

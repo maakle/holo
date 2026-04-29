@@ -22,36 +22,39 @@ This roadmap was substantially restructured on 2026-04-29. The earlier v0.1→v0
 
 **Internal-dogfood gate at week 6:** if both existing agents are running on memex with parity-or-better context quality AND the customer-success agent prototype is functional → proceed to v0.1. If the migration breaks an agent or the customer-success agent doesn't work, do *not* proceed; diagnose first.
 
-### Week 1: Skeleton + risky-API verification
-- [ ] Day 1–2: Verify Grain and Pylon have read APIs with sufficient rate limits for nightly full-pull. If either fails, replace with a stopgap (manual export script) or drop from v0.0 scope before any other work.
+### Week 1: Skeleton + codebase+KB cluster (revised after /plan-eng-review)
+- [ ] Day 1–2: Verify Grain and Pylon have read APIs with sufficient rate limits for incremental ingestion. If either fails, replace with a stopgap (manual export script) or drop from v0.0 scope before any other work.
 - [ ] Monorepo (`apps/`, `packages/`, pnpm workspaces, Turborepo)
 - [ ] `apps/api` (NestJS) + `apps/worker` (NestJS standalone, BullMQ) + `apps/mcp` (Hono) + `apps/web` (Next.js, minimal)
-- [ ] `packages/db` — Drizzle schema, initial migration
+- [ ] `packages/db` — Drizzle schema, initial migration. **Day-1 migration MUST include: HNSW index on embeddings vector, GIN on tsvector, GIN on `acl_subjects`, btree on `(source_type, ...)` composite.** Without these, queries silently degrade past 100K chunks.
+- [ ] `packages/retrieval-core` — shared package between MCP and (v0.1) REST. **ESLint boundary rule: `apps/mcp` and `apps/api` cannot import `packages/db` directly; only via `packages/retrieval-core`.** Enforces DRY by construction (Issue 1B from /plan-eng-review).
 - [ ] `packages/skills` and `packages/plans` exist as architectural placeholders
 - [ ] `docker-compose.yml` runs Postgres + pgvector + Redis + the four apps
 - [ ] CI runs lint + typecheck + tests on every PR
-- [ ] **Better Auth in single-user mode** (login, session) — required because OAuth flows for connectors need a browser-based redirect handler
-- [ ] **Connections page in `apps/web`** — one row per connector, "Connect" button → OAuth flow → "Connected ✓". This is the only UI in v0.0.
-- [ ] **Slack + GitHub connectors end-to-end** (OAuth via the Connections page; the rest of the connectors land later in v0.0)
-- [ ] **MCP tools wired up:** `search`, `get_thread`, `get_pr` working
-- [ ] **First migration:** point the support-question agent at memex's `search` instead of its bespoke retriever; verify parity on 3 sample queries
+- [ ] **Better Auth in single-user mode** (login, session)
+- [ ] **Connections page in `apps/web`** — one row per connector, "Connect" button → OAuth flow → "Connected ✓"
+- [ ] **`connector_cursors` table + cursor logic** — per-connector incremental sync from day 1. No nightly full re-pulls; track `latest_seen_ts` per channel/repo/page (Issue 4A from /plan-eng-review). Slack rate-limit (50/min) and GitHub rate-limit (5000/hr) make full re-pulls unworkable past ~2 weeks of normal usage.
+- [ ] **Ingestion-time allowlist enforcement** — config-driven allowlist per connector (Slack channels, GitHub repos, Notion page trees). Bot/integration sees its own permissions, but memex only ingests from allowlisted scopes. Defense against accidentally surfacing #legal / #hiring / #exec data via agents (Issue 1A from /plan-eng-review).
+- [ ] **Slack + GitHub + Notion connectors end-to-end** (codebase+KB cluster). Notion moved up from week 2 so the support-question agent can fully migrate in week 1 (Issue 1C from /plan-eng-review).
+- [ ] **MCP tools wired up:** `search`, `get_thread`, `get_pr`, `get_doc` working
+- [ ] **Support-question agent migration:** point the agent at memex's `search` instead of its bespoke retriever; verify parity on 3 sample queries from the codebase+KB cluster (e.g., Jesse's MFA/retention questions, Mo's workable ID question, Maria's UKG Pro question)
 
-### Week 2: Notion + Grain connectors
-- [ ] Notion connector (OAuth, databases→pages→blocks, breadcrumb prefixing)
-- [ ] Grain connector (per-speaker turn chunks with timestamps, meeting-level summary chunk)
-- [ ] MCP tools: `get_doc`, `get_call`
-- [ ] **Second migration:** point the interview-prep agent at memex; verify both existing agents now run on memex
+### Week 2: Grain connector + interview-prep agent migration
+- [ ] Grain connector (per-speaker turn chunks with timestamps, meeting-level summary chunk; uses cursor logic from week 1)
+- [ ] MCP tool: `get_call`
+- [ ] **Second migration:** point the interview-prep agent at memex; verify both existing agents now run on memex (note: Ashby is *not* in v0.0 scope per D23 — interview-prep migration covers Grain + Notion paths only, with Ashby data still served by the agent's existing fetcher)
 
-### Weeks 3–4: Pylon + HubSpot connectors
+### Weeks 3–4: Pylon + HubSpot connectors (customer cluster)
 - [ ] Pylon connector (support tickets + conversation history)
 - [ ] HubSpot connector (deals, deal sizes, sales context). Note: founder confirms HubSpot data is mirrored into Pylon today, so verify whether a separate HubSpot fetch adds value or whether Pylon's mirror is sufficient. If sufficient, drop the HubSpot connector from v0.0.
 - [ ] MCP tool: `get_ticket` (with linked HubSpot deal data when present)
+- [ ] **Support-question agent expansion:** customer-context queries (Ryan's "customers similar to EGYM", Konsti's "MrWork overages") now served by memex
 - [ ] **New agent build:** customer-success agent prototype using Pylon + HubSpot context to draft replies / surface relevant deal context
 
-### Week 5: Cross-source quality + remaining MCP tools
+### Week 5: Cross-source quality + observability
 - [ ] Hybrid search (`pgvector` + `tsvector` fused with RRF, single SQL CTE) tuned across all 6 sources
-- [ ] MCP tools: `list_recent_activity`, `whats_changed`
-- [ ] Single-service-identity ACL documented as known limitation
+- [ ] **v0.0 MCP tool surface = 6 tools:** `search`, `get_thread`, `get_pr`, `get_doc`, `get_call`, `get_ticket`. **Dropped from v0.0:** `whats_changed` and `list_recent_activity` (no agent query in scope needs them — defer to v0.1 if a real consumer materializes; Issue 2A from /plan-eng-review).
+- [ ] Single-service-identity ACL documented as known limitation; ingestion allowlists are the v0.0 defense
 - [ ] Internal observability: per-tool latency, query patterns, retrieval quality samples
 
 ### Week 6: Internal-dogfood gate
