@@ -1,6 +1,6 @@
 # Memex
 
-> The connective tissue between every tool your company uses and the agents that act on its behalf. An open-source operating system that ingests company knowledge, synthesizes it into executable skills, and exposes both to AI through MCP.
+> The shared context layer for the multiple custom agents your team already ships. An open-source, self-hostable substrate plus skill layer that any agent can point at over MCP — so the next agent doesn't require building yet another retrieval pipeline.
 
 **Status:** Pre-alpha. Building in public. Not ready for production.
 
@@ -8,37 +8,37 @@
 
 ## What is this
 
-In 1945, Vannevar Bush wrote an essay called *As We May Think*. He described a device he called the "memex" — a personal store of every book, record, and communication a person had ever produced, mechanized so it could be consulted with extraordinary speed. An enlarged, intimate supplement to memory.
+Engineering teams aren't building one custom AI agent — they're building several. A Slack-triggered Cursor agent that answers product questions from the codebase. A Notion-based agent that prepares interview rubrics from Grain recordings. A customer-success agent over Pylon and HubSpot. Each agent solves a different workflow. Each one re-implements its own context-fetching pipeline against the company's tools.
 
-Eighty years later, every company already has its memex — scattered across Slack, Linear, GitHub, Notion, Google Workspace, call recordings, support tickets, customer emails. The information exists. It's just not consultable. The company works because humans vaguely remember where the knowledge lives and how to apply it. Agents can't operate like that.
+The cost shows up in the second, third, and fifth agent. Every new one is gated on a new integration. Cross-agent context is impossible because the substrate is a per-agent fork. When a Notion page moves or a Slack channel archives, every agent breaks individually.
 
-Memex is the missing layer. It pulls knowledge from every tool, structures it, keeps it current, and makes it queryable by humans and agents alike. Then it goes further: it watches the knowledge, extracts the *procedures* hidden inside it (how refunds get handled, how PRs get reviewed, how incidents get triaged), and exposes them as executable skills agents can invoke.
+Memex is the missing shared layer. It ingests the tools your team's work actually lives in, exposes a small MCP surface any agent can call (`search`, `get_thread`, `get_pr`, `get_doc`, `get_call`, `get_ticket`, `list_recent_activity`, `whats_changed`), and stays current without anyone rebuilding the retrieval code. One ingestion pipeline, many agents.
 
-The thesis: querying isn't enough. Agents need to know *what to do*, not just *what's been said*. Memex is the substrate plus the skill layer that turns it into action.
+On top of that substrate, Memex extracts the procedural knowledge that emerges from how the team has actually worked — recurring agent behaviors get distilled into reusable, MCP-invokable skills. The substrate ships first; the skill layer ships in the same release. The combination is what differentiates Memex from open-source unified-search platforms whose agents own the user (Onyx, Dust) and from closed-source enterprise context-graph products (Interloom, Potpie).
 
 ## What it does
 
-- **Universal company graph.** Bidirectional connectors to Slack, Linear, GitHub, Notion, Google Workspace, and meeting/transcript platforms (Granola, Fathom, Fireflies). Everything normalizes into one store with provenance and ACL preservation.
-- **Continuous, durable sync.** Runs on cadence multiple times per day, accelerated by webhooks. Crash-resumable. Source-of-truth is the periodic pull.
-- **Hybrid search built for agents.** Vector + BM25 fused with Reciprocal Rank Fusion, optional reranking, ACL-aware results that mirror native source permissions. Agents cannot retrieve what users cannot see.
-- **Procedural skill synthesis.** Memex watches the substrate and extracts how things get done — emitting skills as `SKILL.md` files agents can discover and invoke. Skills stay current as the underlying procedures evolve.
-- **MCP-first interface.** Agents connect via OAuth 2.1 + Dynamic Client Registration. Eight retrieval tools plus a skill execution surface. REST API is secondary.
-- **Closed-loop drift detection.** Declare what *should* be happening (sprint goals, OKRs, PRDs) and Memex continuously compares actual artifacts against stated intent. The system that flags when engineering is building the wrong thing.
-- **Self-hostable.** `docker compose up` works. Five long-lived containers, no Vercel lock-in, no Docker socket requirement, no managed-only services on the critical path.
+- **Shared MCP context surface for any agent your team builds.** Cursor, Claude Code, LangChain, in-house frameworks — all point at one MCP endpoint instead of writing bespoke retrievers. New agents stop carrying connector setup tax.
+- **Connectors for the tools your work actually lives in.** Slack, GitHub, Notion, Grain, Pylon, HubSpot at v0.1. More follow as users ask.
+- **Hybrid search built for agents.** Vector + BM25 fused with Reciprocal Rank Fusion, ACL-aware results that mirror native source permissions. Agents cannot retrieve what their service identity cannot see.
+- **Continuous, durable sync.** Cadence-driven full pulls in v0.0; webhook-accelerated incremental sync once a real freshness pain demands it. Crash-resumable. Source-of-truth stays the originating tool.
+- **Procedural skill synthesis.** Recurring agent behaviors get distilled into MCP-invokable skills (`list_skills`, `get_skill`). Labeled-template extraction in v0.1; free-form unsupervised in v0.2 once the eval harness exists.
+- **MCP-first.** Agents connect via OAuth 2.1; static-token auth in v0.0. REST API secondary.
+- **Self-hostable.** `docker compose up`. No Docker socket requirement, no managed-only services on the critical path.
 - **Open source, Apache-2.0.**
 
 ## Who it's for
 
-Technical founders, CTOs, and platform teams who want their company's knowledge — and the procedures hidden inside it — accessible to internal agents without sending the entire knowledge base to a third party.
+CTOs and lead engineers at small/mid-stage tech companies (30–80 person) who are *currently maintaining 2+ custom AI agents in production*, with each agent's context-fetching code copy-pasted from the last one. Buyer = builder = sufferer collapsed into one role. If you don't have agents in production yet, you're early — Memex compounds value with each new agent, not the first.
 
 ## Why now
 
-Two YC RFSs (2026) describe pieces of what Memex is:
+Two YC RFSs (2026) describe adjacent pieces of what Memex is:
 
-- **["The AI Operating System for Companies"](https://www.ycombinator.com/rfs#ai-operating-system-for-companies)** by Diana Hu — the queryable substrate, the closed loop between intent and reality.
-- **["Company Brain"](https://www.ycombinator.com/rfs#company-brain)** by Tom Blomfield — the procedural extraction layer that turns scattered artifacts into executable skills.
+- **["The AI Operating System for Companies"](https://www.ycombinator.com/rfs#ai-operating-system-for-companies)** by Diana Hu — the queryable substrate underneath agent operations.
+- **["Company Brain"](https://www.ycombinator.com/rfs#company-brain)** by Tom Blomfield — the procedural extraction layer that turns scattered artifacts into invokable skills.
 
-These are complementary, not redundant. Hu describes the substrate; Blomfield describes what you build on top. Memex claims both.
+Memex is the open-source, self-hostable take that doesn't require building the agent in our framework. Bring your own.
 
 ---
 
@@ -48,7 +48,7 @@ These are complementary, not redundant. Hu describes the substrate; Blomfield de
 |---|---|
 | Web/API | NestJS 11 (API) + Next.js 15 App Router (dashboard) |
 | ORM | Drizzle on Postgres + pgvector ≥ 0.8 |
-| Auth | Better Auth with `organization`, `apiKey`, `oauthProvider` plugins |
+| Auth | Better Auth — single-user mode in v0.0, `organization` plugin in v0.1, `oauthProvider` for MCP DCR in v0.2 |
 | Workers | BullMQ on Redis, NestJS-wrapped, with a `step()` checkpoint helper |
 | Connectors | Hand-written behind a `Connector<>` interface, official SDKs |
 | Vector + search | pgvector + tsvector + pg_trgm fused with RRF; opt-in `pg_search` (ParadeDB) |
@@ -99,14 +99,12 @@ Or one-click on Railway: *(coming once v0.1 ships)*
 
 ## Roadmap
 
-See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the full plan.
+See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the full plan and [`docs/decisions/0004-multi-agent-shared-context-wedge.md`](./docs/decisions/0004-multi-agent-shared-context-wedge.md) for why this changed from earlier docs.
 
-- **v0.1 — Substrate** *(weeks 1–4)* — monorepo, Drizzle schema, Better Auth, Slack connector end-to-end, basic search, MCP `search` + `fetch_document`.
-- **v0.2 — Knowledge layer** *(weeks 5–8)* — GitHub + Notion, contextual chunking, hybrid RRF search, ACL enforcement.
-- **v0.3 — Multi-source** *(weeks 9–12)* — Linear + Google Workspace + meeting transcripts (Granola), all eight MCP retrieval tools, OAuth 2.1 with DCR.
-- **v0.4 — Self-host polish** *(weeks 13–16)* — Railway template, Coolify guide, audit log, first public release.
-- **v0.5 — Skills** *(weeks 17–22)* — procedural synthesis, `SKILL.md` generation, MCP `list_skills` / `get_skill` / `execute_skill`. The Company Brain layer.
-- **v0.6 — Closed loop** *(weeks 23+)* — Plans/Intents subsystem, drift detection, "engineering is building the wrong thing" alerts.
+- **v0.0 — Internal substrate** *(weeks 0–6)* — 6 connectors (Slack, GitHub, Notion, Grain, Pylon, HubSpot), MCP server with 8 tools, hybrid RRF search, single-service-identity ACL, dogfooded against the founder's own existing custom agents. Not public yet.
+- **v0.1 — Skills + public release** *(weeks 7–14)* — labeled-template skill synthesis, `list_skills` / `get_skill` MCP tools, eval harness, week-10 quality kill-switch, public Apache-2.0 release on GitHub Releases / GHCR.
+- **v0.2 — Self-host polish + free-form skills** *(weeks 15+)* — Railway / Coolify one-click templates, per-user OAuth ACL fan-out, free-form unsupervised skill extraction, audit log.
+- **Beyond** — drift detection (intent-vs-reality), more connectors, managed cloud offering. No fixed dates.
 
 ---
 

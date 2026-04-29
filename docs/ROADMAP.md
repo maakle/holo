@@ -1,200 +1,140 @@
 # Roadmap
 
-The plan is to ship a usable v0.1 in 4 weeks, then iterate publicly. v0.5 is when Memex stops being a search product and becomes the Company Brain. v0.6 closes the loop. Every milestone has a concrete demo and a definition of done. If a milestone slips, cut scope, don't extend the timeline.
+The plan is to ship v0.0 internally at the founder's company in 5–6 weeks, then v0.1 (skills + public release) in 7–8 more weeks. Every milestone ends with a concrete demo and a definition of done. If a milestone slips, cut scope, don't extend the timeline.
+
+This roadmap was substantially restructured on 2026-04-29. The earlier v0.1→v0.5 substrate-then-skills sequencing was abandoned. See [`decisions/0004-multi-agent-shared-context-wedge.md`](./decisions/0004-multi-agent-shared-context-wedge.md) for the reasoning.
 
 ## Guiding principles
 
-- **Slack first, always.** Every connector decision is validated against Slack before being generalized.
+- **Multi-agent dogfood first.** v0.0 must successfully migrate the founder's two existing custom agents (a Slack-triggered Cursor support-question agent and a Notion-based interview-prep agent) off their bespoke context fetchers onto memex's MCP endpoint. If it can't do that, the wedge isn't real.
+- **Skills ship in v0.1, not v0.5.** The v0.1→v0.5 sequencing in earlier roadmaps was fatal — substrate alone is a commodity by 2026 (Onyx, Dust, PipesHub). Skills are the differentiator and ship in the same release as substrate.
 - **Self-host on day one.** If it doesn't `docker compose up`, it doesn't ship.
-- **MCP is the demo.** Every milestone ends with "connect Claude Desktop and try this query (or skill)."
-- **Eat your own dog food.** Connect Memex to Memex's own Slack, Linear, GitHub, Notion, Granola. The first user is us.
-- **Skills are the product, not a v2 nice-to-have.** Architecture supports them from v0.1; they ship in v0.5.
+- **MCP is the demo.** Every milestone ends with "point an existing custom agent at this MCP endpoint and watch it work."
+- **Validate the wedge externally in parallel.** Cold-DM peer CTOs during v0.0 to confirm the multi-agent context-duplication pain exists outside the founder's company. The v0.1 *public* release does not ship without 2+ external responders confirming.
 
 ---
 
-## v0.1 — Substrate (weeks 1–4)
+## v0.0 — Internal substrate (weeks 0–6)
 
-**Demo:** "Connect a Slack workspace. Watch it sync. Open Claude Desktop, ask a question about a thread, get an answer with the source linked."
+**Goal:** memex runs at the founder's company as the unified context layer for the two existing custom agents and a new customer-success agent prototype. Not public yet. No external users.
 
-### Week 1: Skeleton
+**Demo (private):** "Both existing agents are running on memex's MCP endpoint with parity-or-better context quality. The customer-success agent prototype, built on top of Pylon + HubSpot data, produces useful output. Daily agent invocations across all 3 agents do not regress in latency by more than 30%."
+
+**Internal-dogfood gate at week 6:** if both existing agents are running on memex with parity-or-better context quality AND the customer-success agent prototype is functional → proceed to v0.1. If the migration breaks an agent or the customer-success agent doesn't work, do *not* proceed; diagnose first.
+
+### Week 1: Skeleton + risky-API verification
+- [ ] Day 1–2: Verify Grain and Pylon have read APIs with sufficient rate limits for nightly full-pull. If either fails, replace with a stopgap (manual export script) or drop from v0.0 scope before any other work.
 - [ ] Monorepo (`apps/`, `packages/`, pnpm workspaces, Turborepo)
-- [ ] `apps/api` boots with NestJS, health endpoint, OpenAPI auto-generated
-- [ ] `apps/web` boots with Next.js 15 App Router, shadcn, Tailwind
-- [ ] `apps/worker` boots, NestJS standalone, BullMQ "hello world" job
-- [ ] `apps/mcp` boots with Hono, streams a `ping` tool
-- [ ] `packages/db` — Drizzle schema, initial migration: `workspaces`, `users`, `sessions`
-- [ ] `packages/skills` and `packages/plans` exist as stub folders with README explaining future contents (architectural placeholders)
-- [ ] `docker-compose.yml` runs Postgres + pgvector + Redis + all four apps
+- [ ] `apps/api` (NestJS) + `apps/worker` (NestJS standalone, BullMQ) + `apps/mcp` (Hono) + `apps/web` (Next.js, minimal)
+- [ ] `packages/db` — Drizzle schema, initial migration
+- [ ] `packages/skills` and `packages/plans` exist as architectural placeholders
+- [ ] `docker-compose.yml` runs Postgres + pgvector + Redis + the four apps
 - [ ] CI runs lint + typecheck + tests on every PR
+- [ ] **Better Auth in single-user mode** (login, session) — required because OAuth flows for connectors need a browser-based redirect handler
+- [ ] **Connections page in `apps/web`** — one row per connector, "Connect" button → OAuth flow → "Connected ✓". This is the only UI in v0.0.
+- [ ] **Slack + GitHub connectors end-to-end** (OAuth via the Connections page; the rest of the connectors land later in v0.0)
+- [ ] **MCP tools wired up:** `search`, `get_thread`, `get_pr` working
+- [ ] **First migration:** point the support-question agent at memex's `search` instead of its bespoke retriever; verify parity on 3 sample queries
 
-### Week 2: Auth and workspaces
-- [ ] Better Auth integrated with `organization` and `apiKey` plugins
-- [ ] Sign-up / sign-in flows (email + GitHub OAuth)
-- [ ] Workspace creation, invite flow, member list
-- [ ] API key generation UI, revocation, last-used timestamp
-- [ ] `ApiKeyGuard` and `SessionGuard` in `apps/api`
-- [ ] Audit log table, every authenticated request writes a row
+### Week 2: Notion + Grain connectors
+- [ ] Notion connector (OAuth, databases→pages→blocks, breadcrumb prefixing)
+- [ ] Grain connector (per-speaker turn chunks with timestamps, meeting-level summary chunk)
+- [ ] MCP tools: `get_doc`, `get_call`
+- [ ] **Second migration:** point the interview-prep agent at memex; verify both existing agents now run on memex
 
-### Week 3: Slack connector end-to-end
-- [ ] `Connector<>` interface defined
-- [ ] Slack OAuth install flow, token storage with envelope encryption
-- [ ] `fullSync`: channels → threads → messages, paginated, with checkpoints
-- [ ] `incrementalSync` using `oldest` cursor per channel
-- [ ] Webhook receiver: HMAC verify, idempotency, enqueue
-- [ ] Mention/channel resolution before embedding
-- [ ] Thread-as-document chunking
-- [ ] `connections`, `documents`, `chunks` tables
+### Weeks 3–4: Pylon + HubSpot connectors
+- [ ] Pylon connector (support tickets + conversation history)
+- [ ] HubSpot connector (deals, deal sizes, sales context). Note: founder confirms HubSpot data is mirrored into Pylon today, so verify whether a separate HubSpot fetch adds value or whether Pylon's mirror is sufficient. If sufficient, drop the HubSpot connector from v0.0.
+- [ ] MCP tool: `get_ticket` (with linked HubSpot deal data when present)
+- [ ] **New agent build:** customer-success agent prototype using Pylon + HubSpot context to draft replies / surface relevant deal context
 
-### Week 4: Search and MCP
-- [ ] Embedding pipeline: `text-embedding-3-large` truncated to 1024 dims, pluggable
-- [ ] Hybrid search: pgvector + tsvector fused with RRF, single SQL CTE
-- [ ] `POST /v1/search` returning chunks with provenance
-- [ ] MCP `search` and `fetch_document` tools
-- [ ] OAuth 2.1 + PKCE on the MCP server (static client, no DCR yet)
-- [ ] Connections page in dashboard with sync progress
-- [ ] First public demo: README quickstart works end-to-end
+### Week 5: Cross-source quality + remaining MCP tools
+- [ ] Hybrid search (`pgvector` + `tsvector` fused with RRF, single SQL CTE) tuned across all 6 sources
+- [ ] MCP tools: `list_recent_activity`, `whats_changed`
+- [ ] Single-service-identity ACL documented as known limitation
+- [ ] Internal observability: per-tool latency, query patterns, retrieval quality samples
 
----
-
-## v0.2 — Knowledge layer (weeks 5–8)
-
-**Demo:** "Three connectors syncing continuously. Hybrid search returns relevant chunks across them. ACLs respected — a user can't retrieve content they can't see in the source."
-
-- [ ] **Week 5: Contextual chunking** — Anthropic-style situating blurbs, prompt caching for parents, re-embedding job
-- [ ] **Week 6: GitHub connector** — GitHub App, repos→PRs→reviews→issues, three-chunk PR strategy, code embeddings
-- [ ] **Week 7: Notion connector** — OAuth, databases→pages→blocks, breadcrumb prefixing, search-index API
-- [ ] **Week 8: ACL enforcement** — `acl_subjects` GIN index, per-connector extractors, user subject resolver, audit on every retrieval, RLS, permission preview tool
+### Week 6: Internal-dogfood gate
+- [ ] All 3 agents (support-question, interview-prep, customer-success) running on memex daily
+- [ ] Verify parity on the agents' real workload over a week
+- [ ] Snapshot the v0.0 surface; freeze API for v0.1 build
 
 ---
 
-## v0.3 — Multi-source + transcripts (weeks 9–12)
+## v0.1 — Skills + public release (weeks 7–14)
 
-**Demo:** "Linear, Google Workspace, and Granola transcripts ingested. Claude Desktop can reach all of it. OAuth 2.1 + DCR works — Claude registers itself with no manual setup. `who_knows_about` correctly identifies subject-matter experts based on call participation."
+**Goal:** ship labeled-template skill synthesis, eval harness, and the first public release on GitHub Releases / GHCR. 3+ external CTOs running memex against their own data, with at least one running it for >2 weeks.
 
-### Week 9: Linear + Google Workspace
-- [ ] Linear: issues + comments, OAuth, webhook
-- [ ] Google Workspace: Drive (`changes.list`), Gmail (`history.list`), Docs/Sheets/Slides
-- [ ] Per-source chunking strategies finalized
+**Demo (public):** "memex extracted these 5 procedures from your last quarter of work; here's an existing custom agent invoking one of them via `get_skill` and `execute_skill`."
 
-### Week 10: Meeting transcripts
-- [ ] Granola connector first (founder uses it)
-- [ ] Per-speaker turn chunks with timestamps
-- [ ] Meeting-level summary chunk for navigational queries
-- [ ] Speakers as ACL subjects
-- [ ] Decision-extraction pipeline as a downstream job (decisions made on calls become first-class records)
-- [ ] Fathom and Fireflies as fast-follows
+**Week 10 quality kill-switch:** if at least 3 of 5 extracted skills are NOT judged usable by the founder's team (binary: "would I let an agent invoke this?"), ship v0.1 as substrate-only and defer skills to v0.2. Do not delay the public release.
 
-### Week 11: All eight retrieval MCP tools
-- [ ] `search`, `fetch_document`, `list_recent` (generic)
-- [ ] `get_slack_thread`, `get_pr`, `get_notion_page`, `get_linear_issue`, `get_meeting`
-- [ ] `who_knows_about` (uses participation across threads, PRs, calls)
-- [ ] All tools annotated with `readOnlyHint`, `idempotentHint`, `openWorldHint`
-- [ ] Output schemas via Zod v4
+### Weeks 7–8: Skill eval harness *first*
+- [ ] `skills` table with content, version, status, source artifacts, fingerprint, staleness fields
+- [ ] Skill format = Anthropic Skill format (frontmatter + procedure + example tools), stored as Postgres rows (not filesystem artifacts)
+- [ ] Hand-label a golden set of 10 procedures from the founder's team's actual data
+- [ ] Build a regression test that scores extracted templates against the golden set on each prompt change
+- [ ] **No prompt iteration on synthesis without the harness running** — otherwise quality regresses invisibly
 
-### Week 12: OAuth 2.1 provider with DCR
-- [ ] Better Auth `oauthProvider` plugin configured
-- [ ] Dynamic Client Registration endpoint
-- [ ] Protected Resource Metadata + Authorization Server Metadata
-- [ ] Consent UI in dashboard
-- [ ] Per-`(workspace, user, agent)` token scoping
+### Weeks 8–10: Labeled-template synthesis
+- [ ] User labels 5–10 example procedures ("this thread is a refund-handling procedure," "this PR is a security-review procedure")
+- [ ] LLM extracts a parameterized template per label set; embedding-similarity match for new artifacts
+- [ ] MCP tools: `list_skills(filter?)`, `get_skill(id)`
+- [ ] Skill execution surface deferred to v0.2 (read-only in v0.1)
+- [ ] **Free-form unsupervised extraction (variant a) is NOT in v0.1.** Deferred to v0.2 once the harness has more golden data.
 
----
+### Week 10: Quality kill-switch
+- [ ] Apply the 3-of-5-usable criterion. If pass → continue with skills in v0.1. If fail → ship v0.1 substrate-only, defer skills.
 
-## v0.4 — Self-host polish + first public release (weeks 13–16)
+### Weeks 11–12: External onboarding
+- [ ] Better Auth `organization` plugin — multi-tenant signup, workspace creation, invite flow
+- [ ] OAuth 2.1 with PKCE on the MCP server (static client; DCR optional, deferred to v0.2)
+- [ ] First 3+ external CTOs (selected from cold-DM responders during v0.0) onboarded
+- [ ] Per-customer telemetry on agent retention and tool-call patterns
+- [ ] Issue triage flow for early users
 
-**Demo:** "One-click Railway deploy. Coolify guide. Self-hosters joining Discord. First non-team user successfully running production."
-
-- [ ] **Week 13: Deployment** — Railway template, Coolify guide, VPS guide with Caddy
-- [ ] **Week 14: Operational maturity** — Health checks, Prometheus metrics, structured logging, OTel traces, backup/restore docs
-- [ ] **Week 15: Documentation** — Nextra docs site, per-connector setup guides, MCP integration guides
-- [ ] **Week 16: Launch** — public website, Show HN draft, Discord, demo video, v0.4.0 release
-
-This is the moment Memex is publicly usable as the substrate. From here, the differentiation begins.
+### Weeks 13–14: Release polish
+- [ ] GHCR Docker image auto-published on tag
+- [ ] README quickstart works first-try (no specific minute target)
+- [ ] Public website + Discord
+- [ ] Show HN draft, demo recording
+- [ ] v0.1.0 release tag
 
 ---
 
-## v0.5 — Skills (weeks 17–22)
+## v0.2 — Self-host polish + free-form skills (weeks 15+)
 
-**Demo:** "Memex synthesizes a `handle_customer_refund` skill from 47 Slack threads, 3 Notion pages, and 12 PRs. Workspace admin reviews and promotes it. Claude Desktop discovers the skill via `list_skills`, fetches it via `get_skill`, and executes it via `execute_skill` — Memex records the run, the agent does the work."
+Picked from observed v0.1 user need rather than pre-committed.
 
-The transition from *search product* to *Company Brain* happens in this milestone.
+- [ ] Per-user OAuth ACL fan-out (Better Auth `oauthProvider` plugin) — agents inherit calling user's permissions
+- [ ] Free-form unsupervised skill extraction (variant a), gated on the eval harness having broader coverage
+- [ ] Railway + Coolify one-click templates
+- [ ] Audit log surface for self-hosters
+- [ ] `execute_skill` MCP tool (skill execution as workflow runs, not just read)
+- [ ] DCR endpoint + consent UI (so MCP clients self-register without manual setup)
+- [ ] Webhook-accelerated incremental sync (only if a v0.1 user hits a freshness pain that breaks an agent)
 
-### Week 17: Skill data model and storage
-- [ ] `skills` table with content, version, status, source artifacts, fingerprint, staleness
-- [ ] `skill_runs` table linked to `workflow_runs`
-- [ ] Skill format documented (frontmatter + procedure + example tools, matching Anthropic's Skill format)
-- [ ] CRUD UI for skills in dashboard
-- [ ] ADR `0003-skills-on-top-of-substrate.md`
-
-### Week 18: Synthesis worker
-- [ ] `SkillSynthesizer` worker invoked by user request ("synthesize a skill for X")
-- [ ] Multi-pass retrieval to gather all relevant artifacts
-- [ ] LLM-driven extraction with templated prompt
-- [ ] `sourceFingerprint` computed and stored
-- [ ] Output as structured `SKILL.md` content
-- [ ] Skills emitted in `draft` state by default
-
-### Week 19: Skill review + promotion
-- [ ] Admin UI: list draft skills, diff against previous version, edit, promote to `active`
-- [ ] Skill versioning — promoting creates a new version, preserves history
-- [ ] Deprecation flow
-
-### Week 20: Skill freshness
-- [ ] Background job: when source artifacts change, mark skills `stale`
-- [ ] Auto-resynthesis for `stale` skills (still emitted as `draft` for review)
-- [ ] Notification flow for skill maintainers
-
-### Week 21: MCP skill tools
-- [ ] `list_skills` with descriptions, ACL-filtered
-- [ ] `get_skill` returning full content
-- [ ] `execute_skill` invoking the procedure as a `workflow_run`, returning step-by-step trace
-- [ ] `execute_skill` requires explicit user approval (not auto-approvable)
-- [ ] Tool annotations updated
-
-### Week 22: Skill evaluation harness
-- [ ] LLM-as-judge eval framework for synthesis quality
-- [ ] Per-skill golden datasets — known-good inputs, known-good outputs
-- [ ] Skill execution feedback (thumbs-up/down) flows back into prompts
-- [ ] First public demo of skills: announce v0.5
-
----
-
-## v0.6+ — Closed loop (weeks 23+)
-
-**Demo:** "Workspace declares a sprint goal. Memex reads linked Linear issues, GitHub PRs, Slack threads. Surfaces a drift report: 'feature X was committed to but engineering has been working on Y for the last 3 days.' Engineering team acts on it."
-
-This is Hu's "engineering is building the wrong thing" alert.
-
-- **Plans / Intents data model** — `plans` table holding sprint goals, OKRs, PRDs, runbooks as first-class records
-- **Plan ingestion** — declared via dashboard, optionally synced from Linear cycles or Notion templates
-- **Drift detector worker** — scans linked artifacts, compares state against plan, emits `drift_reports`
-- **Drift dashboard** — surface to humans
-- **MCP tools** — `list_plans`, `get_plan`, `get_drift`
-- **Closed-loop UX** — drift triggers Slack/email notifications; users can mark drift reports as accepted/rejected for tuning
-
-The architecture leaves space for this (`packages/plans` exists from v0.1) but the implementation is deferred until skills are solid.
-
----
-
-## Beyond v0.6
+## Beyond v0.2
 
 Picked from observed user need:
 
-- **Inngest self-hosted migration** when durable workflows need event waits
+- **Drift detection** (the original v0.6 idea) — declare sprint goals / OKRs / PRDs, compare against actual artifacts, flag drift. Year-3 conversation, not on the near-term roadmap. Belongs in [`VISION.md`](./VISION.md) as long-run direction.
+- **Long-tail connectors** — Linear, Google Workspace, Fathom, Fireflies, Salesforce, BambooHR. Added as v0.1 users ask.
 - **Reranker on by default** if dogfooding shows latency is acceptable
-- **Long-tail connectors via Nango adapter**: BambooHR, Salesforce, HubSpot
 - **Action tools in MCP** — write, not just read; agents can post to Slack, comment on PRs, create Linear issues
-- **Agent marketplace** — pre-built skills shared across companies (community-contributed `handle_pagerduty_incident.md`, etc.)
+- **Agent marketplace** — pre-built skills shared across companies (community-contributed `handle_pagerduty_incident`, etc.)
+- **Managed cloud offering** when v0.2 has 3+ paying self-host customers asking for it
 - **Graph layer** (Apache AGE) when relational + `parent_id` is genuinely insufficient
 - **ClickHouse for analytics** at >10M event rows
-- **Multi-modal ingestion** — figma designs, video, screenshots
+- **Multi-modal ingestion** — Figma designs, video, screenshots
 
 ---
 
 ## How we'll work
 
 - One week = one milestone slice. Slip = cut scope.
-- Every milestone ends with a demo recording posted to Discussions.
-- Issues live on the `Memex` GitHub Project. Tagged with milestone (`v0.1`, `v0.5`, …) and area (`area:connectors`, `area:mcp`, `area:auth`, `area:retrieval`, `area:skills`, `area:plans`, `area:web`, `area:infra`).
-- ADRs in `docs/decisions/` for any non-obvious decision.
+- Every milestone ends with a demo recording (private during v0.0, public from v0.1).
+- Issues live on the `Memex` GitHub Project. Tagged with milestone (`v0.0`, `v0.1`, `v0.2`) and area (`area:connectors`, `area:mcp`, `area:auth`, `area:retrieval`, `area:skills`, `area:web`, `area:infra`).
+- ADRs in `docs/decisions/` for any non-obvious decision. The wedge reframe and roadmap restructure are documented in [`0004-multi-agent-shared-context-wedge.md`](./decisions/0004-multi-agent-shared-context-wedge.md).
 - No private branches that live more than a week.
+- **Parallel external validation track during v0.0:** founder cold-DMs 10 peer CTOs in week 1 with one question — *"How many custom AI agents does your team currently run in production, and what does building a new one cost in engineering time?"* — and tracks responses through week 4. v0.1 public release does not ship without 2+ responders confirming the multi-agent context-duplication pain.

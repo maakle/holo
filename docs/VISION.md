@@ -1,17 +1,19 @@
 # Why Memex exists
 
-Most companies are not knowable by their own software. Decisions live in DMs nobody else can read. Specs sit in docs nobody can find. Tickets reference threads, threads reference tickets, neither references the customer call where the actual decision happened. The information is somewhere, but it's not anywhere.
+Engineering teams are not building one custom AI agent. They're building several. A Slack-triggered Cursor agent that answers product questions from the codebase. A Notion-based agent that prepares interview rubrics from Grain recordings. A customer-success agent over support tickets and CRM data. Each agent solves a different workflow, and each one — quietly, expensively — re-implements its own context-fetching pipeline against the company's tools.
 
-Search products tried to solve this and built indexes. Wikis tried and built filing systems. Both lost to the gravity of the tools people actually live in: Slack, Linear, GitHub, Notion, Google Workspace, calls. Information stays where work happens. The fix isn't another place to put things; it's a substrate underneath the places things already are.
+The cost is not the first agent. The cost is the second, third, and fifth. Every new agent is gated on a new integration. Cross-agent context (a sales-prep agent learning from a support-question agent's recent answers) is impossible because the substrate is a per-agent fork. When a Notion page moves or a Slack channel archives, every agent breaks individually.
 
-Agents change the math. An LLM with access to a single Slack message can answer trivial questions. An LLM with access to *the entire substrate* — every thread, PR, issue, doc, call transcript, with provenance and permissions intact — can do real work.
+Existing unified-search and "company brain" products tried to fix this with a search box. The search box is the wrong abstraction. Engineers don't want to query a company; they want their agents to *act* on a company's current state, with permissions intact, without rebuilding the retrieval layer for every new use case. The thing missing is not a place to look up information. It's a shared context layer the agents your team already runs can all point at.
 
-But knowing what was said is not the same as knowing what to do. The hardest knowledge in any company is procedural — how refunds get handled, how on-call works, how a PR actually gets reviewed. That knowledge lives in nobody's head completely; it's an emergent property of how the team has acted across thousands of past artifacts. Memex extracts it. It watches the substrate, identifies the procedures hidden inside, and emits them as executable skills agents can invoke. Skills that stay current as the procedures evolve.
+Memex is that layer. A self-hostable substrate that ingests the tools your work actually lives in (Slack, GitHub, Notion, Grain, Pylon, HubSpot, more) and exposes a small MCP surface — search, fetch, recent-activity, ownership, change-detection — that any custom agent can call. One ingestion pipeline, many agents. Permissions preserved, provenance tracked, source-of-truth always the originating tool.
 
-The endpoint is a closed loop. Companies declare what should be happening — sprint goals, OKRs, PRDs. Memex compares stated intent against actual artifacts and flags drift. The team builds, the system watches, the team adjusts. Open loops become closed.
+On top of the substrate, memex extracts the procedural knowledge that emerges from how a team has actually worked over thousands of past artifacts. Recurring agent behaviors — how a refund gets approved, how a security review unfolds, how an interview rubric gets applied — get distilled into MCP-invokable skills agents can call directly. Skills stay current as the procedures evolve. The team builds, the substrate watches, the skills accumulate.
 
-The product is the substrate, the skill layer on top, and the loop that closes between intent and reality. The interface is MCP, because that's what every agent already speaks. The deployment is open-source and self-hostable, because no team should send their entire knowledge base to a third party to make it queryable.
+The deployment is open-source and self-hostable, because no engineering team should send their entire company knowledge to a third party to make their agents work. The interface is MCP, because that's what every agent already speaks. The first user is the team that's already running custom agents and tired of writing the same retriever twice.
 
-The companies that win the next decade will be the ones that became *legible to themselves* first — and then *operable on themselves* second. The first commit toward that for any team is connecting Memex and watching their company become something an agent can both understand and act upon.
+The companies that win the next decade will be the ones whose agents had the right context first. Memex is the substrate that makes that possible — for the agents your team is already shipping, and for the ones you haven't built yet.
 
 — *Building this in public.*
+
+The name comes from Vannevar Bush's 1945 essay *As We May Think*, which described "a sort of mechanized private file and library... an enlarged intimate supplement to memory." The original memex was personal. This one is for the agents acting on a company's behalf.
