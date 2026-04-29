@@ -18,7 +18,7 @@ On top of that substrate, Memex extracts the procedural knowledge that emerges f
 
 ## What it does
 
-- **Shared MCP context surface for any agent your team builds.** Cursor, Claude Code, LangChain, in-house frameworks — all point at one MCP endpoint instead of writing bespoke retrievers. New agents stop carrying connector setup tax.
+- **One endpoint, two consumer layers.** *Custom agents your team built* — Cursor in Slack, Claude Code, LangChain, in-house Python, Notion-based — point at memex's MCP endpoint instead of writing bespoke retrievers. *Off-the-shelf MCP clients* — Claude Desktop, Cursor's MCP integration, Cline, ChatGPT (when it adds MCP) — connect the same way for ad-hoc queries. Same endpoint, same auth, same data, no separate integration.
 - **Connectors for the tools your work actually lives in.** Slack, GitHub, Notion, Grain, Pylon, HubSpot at v0.1. More follow as users ask.
 - **Hybrid search built for agents.** Vector + BM25 fused with Reciprocal Rank Fusion, ACL-aware results that mirror native source permissions. Agents cannot retrieve what their service identity cannot see.
 - **Continuous, durable sync.** Cadence-driven full pulls in v0.0; webhook-accelerated incremental sync once a real freshness pain demands it. Crash-resumable. Source-of-truth stays the originating tool.

@@ -7,7 +7,7 @@ This document captures the architectural decisions for Memex. The decisions here
 Memex is structured as three architectural layers stacked on top of each other:
 
 1. **Substrate** — connectors ingest from every tool, normalize, embed, store with ACLs preserved. Agents and humans can query it. Foundation for everything above.
-2. **Skills** — synthesizer extracts procedures from the substrate (how refunds get handled, how PRs get reviewed) and emits them as executable `SKILL.md` files. Agents discover and invoke them via MCP.
+2. **Skills** — synthesizer extracts procedures from the substrate (how refunds get handled, how PRs get reviewed) and stores them as Postgres rows in the Anthropic Skill format (frontmatter + procedure + example tools). Agents discover and invoke them via the MCP `list_skills` and `get_skill` tools — skills are served dynamically from the database, not as filesystem artifacts.
 3. **Loop** — Plans/Intents subsystem holds declarations of what should be happening (sprint goals, PRDs, OKRs). Drift detector continuously compares actual artifacts against intent and surfaces gaps.
 
 Layers ship in order. v0.1–v0.4 build the substrate. v0.5 adds skills. v0.6+ adds the loop. The repo structure anticipates all three from day one so we never have to refactor the foundation.
@@ -36,7 +36,7 @@ Layers ship in order. v0.1–v0.4 build the substrate. v0.5 adds skills. v0.6+ a
 | Auth | Better Auth (organization + apiKey + oauthProvider) |
 | Embeddings | `text-embedding-3-large` @ 1024 dims default; BGE-M3 self-host |
 | Reranker | bge-reranker-v2-m3 (opt-in) |
-| Skill format | Anthropic Skill format (`SKILL.md` with frontmatter + steps + example tools) |
+| Skill format | Anthropic Skill format (frontmatter + procedure + example tools), stored as Postgres rows and served dynamically over MCP — not filesystem artifacts |
 | Monorepo | pnpm workspaces + Turborepo |
 
 ## Why these choices
@@ -157,7 +157,7 @@ Onyx's `mcp_server` runs as a sibling service. We do the same. Independent scali
 
 *Skill tools (v0.5):*
 - `list_skills` — enumerate available procedural skills with descriptions and metadata
-- `get_skill` — fetch a full `SKILL.md` for an agent to read
+- `get_skill` — fetch a full skill (Anthropic Skill format content from the `skills` row) for an agent to read
 - `execute_skill` — invoke a skill with parameters; the skill's procedure runs as a workflow with audit trail
 
 *Loop tools (v0.6+):*
@@ -193,8 +193,8 @@ type Skill = {
   version: number;
   status: 'draft' | 'active' | 'deprecated';
   
-  // The synthesized SKILL.md content
-  content: string;                 // frontmatter + procedure + example tools
+  // Synthesized skill body in Anthropic Skill format
+  content: string;                 // frontmatter + procedure + example tools (stored, not a file)
   
   // What it was synthesized from
   sourceArtifactIds: string[];     // documents that contributed
@@ -219,7 +219,7 @@ A `SkillSynthesizer` worker:
 1. Takes a topic (declared by user: "how do we handle refunds") or auto-discovers candidates from clustering retrieval queries that hit similar artifacts.
 2. Runs a multi-pass retrieval over the substrate to gather every artifact relevant to the topic.
 3. Uses an LLM with a templated prompt to extract the procedure: trigger conditions, steps, decision points, exceptions, tool calls.
-4. Emits a `SKILL.md` matching Anthropic's Skill format.
+4. Writes a `skills` row whose `content` field matches Anthropic's Skill format. The MCP `get_skill` tool serves this content dynamically — there's no filesystem `.md` file.
 5. Records `sourceFingerprint` so changes to source artifacts trigger re-synthesis.
 6. Marks the skill `draft` until a workspace admin reviews and promotes to `active`.
 
