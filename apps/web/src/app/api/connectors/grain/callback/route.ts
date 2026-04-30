@@ -103,7 +103,7 @@ export async function GET(req: Request) {
         provider: 'grain',
         externalId: ident.externalId,
         name: ident.name,
-        metadata: { workspace: ident.externalId },
+        metadata: { grain_singleton: true },
       })
       .onConflictDoUpdate({
         target: [
@@ -111,7 +111,7 @@ export async function GET(req: Request) {
           schema.sources.provider,
           schema.sources.externalId,
         ],
-        set: { name: ident.name, updatedAt: new Date() },
+        set: { name: ident.name, metadata: { grain_singleton: true }, updatedAt: new Date() },
       });
 
     return NextResponse.redirect(new URL('/connections', req.url));

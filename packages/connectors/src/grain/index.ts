@@ -117,6 +117,8 @@ export function createGrainConnector(opts: GrainConnectorOptions): Connector {
     async testConnection(tokens: ConnectorTokens): Promise<TestConnectionResult> {
       const client = createGrainApiClient(tokens.accessToken, fetchImpl);
       const { recordings } = await client.listRecordings({ include: {} });
+      // Grain's public API does not expose a workspace identifier; 'grain' is a stable
+      // singleton key — each holo org has at most one Grain connection.
       return {
         ok: true,
         externalId: 'grain',
