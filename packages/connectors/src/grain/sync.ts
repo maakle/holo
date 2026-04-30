@@ -1,6 +1,5 @@
 import { grainCallChunker } from '@holo/chunker';
 import { chunkHash } from '../shared/content-hash';
-import { ErrorCode, holoError } from '@holo/errors';
 import type { GrainApiClient } from './api-client';
 
 export type GrainChunkPayload = {
@@ -114,14 +113,6 @@ export async function runGrainSync(input: RunGrainSyncInput): Promise<RunGrainSy
 
     cursor = page.nextCursor;
   } while (cursor);
-
-  if (totalArtifacts === 0 && !input.updatedAfter) {
-    throw holoError({
-      code: ErrorCode.HOLO_ALLOWLIST_EMPTY,
-      problem: 'Grain sync returned zero recordings',
-      fix: 'Verify the Grain access token has read access to at least one recording.',
-    });
-  }
 
   return { artifactCount: totalArtifacts, latestStartedAt };
 }

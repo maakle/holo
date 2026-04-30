@@ -33,7 +33,11 @@ export interface GrainTranscriptTurn {
 }
 
 export interface GrainApiClient {
-  listRecordings(opts: { updatedAfter?: string; cursor?: string }): Promise<{
+  listRecordings(opts: {
+    updatedAfter?: string;
+    cursor?: string;
+    include?: Record<string, boolean>;
+  }): Promise<{
     recordings: GrainRecording[];
     nextCursor?: string;
   }>;
@@ -74,7 +78,7 @@ export function createGrainApiClient(
   return {
     async listRecordings(opts) {
       const body: Record<string, unknown> = {
-        include: { ai_summary: true, participants: true },
+        include: opts.include ?? { ai_summary: true, participants: true },
       };
       if (opts.updatedAfter) body['after_datetime'] = opts.updatedAfter;
       if (opts.cursor) body['cursor'] = opts.cursor;

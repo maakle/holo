@@ -116,7 +116,7 @@ export function createGrainConnector(opts: GrainConnectorOptions): Connector {
 
     async testConnection(tokens: ConnectorTokens): Promise<TestConnectionResult> {
       const client = createGrainApiClient(tokens.accessToken, fetchImpl);
-      const { recordings } = await client.listRecordings({});
+      const { recordings } = await client.listRecordings({ include: {} });
       return {
         ok: true,
         externalId: 'grain',
@@ -141,6 +141,11 @@ export function createGrainConnector(opts: GrainConnectorOptions): Connector {
         existingHashes,
         enqueueEmbed: opts.enqueueEmbed,
       });
+      if (result.latestStartedAt) {
+        await persistCursorMetadata(opts.db, ctx.organizationId, ctx.sourceId, {
+          latest_started_at: result.latestStartedAt,
+        });
+      }
       return { artifactCount: result.artifactCount, newCursor: new Date() };
     },
 
@@ -153,7 +158,8 @@ export function createGrainConnector(opts: GrainConnectorOptions): Connector {
         });
       }
       const cursor = await loadCursorMetadata(opts.db, ctx.sourceId);
-      const updatedAfter = cursor['latest_started_at'] as string | undefined;
+      const raw = cursor['latest_started_at'];
+      const updatedAfter = typeof raw === 'string' ? raw : undefined;
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
       const result = await runGrainSync({
         client: createGrainApiClient(tokens.accessToken, fetchImpl),
@@ -163,6 +169,11 @@ export function createGrainConnector(opts: GrainConnectorOptions): Connector {
         existingHashes,
         enqueueEmbed: opts.enqueueEmbed,
       });
+      if (result.latestStartedAt) {
+        await persistCursorMetadata(opts.db, ctx.organizationId, ctx.sourceId, {
+          latest_started_at: result.latestStartedAt,
+        });
+      }
       return { artifactCount: result.artifactCount, newCursor: new Date() };
     },
 
@@ -189,6 +200,23 @@ async function loadCursorMetadata(db: DB, sourceId: string): Promise<Record<stri
     .where(and(eq(schema.connectorCursors.sourceId, sourceId), eq(schema.connectorCursors.scope, 'sync')))
     .limit(1);
   return rows[0]?.metadata ?? {};
+}
+
+async function persistCursorMetadata(
+  db: DB,
+  organizationId: string,
+  sourceId: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  const { sql } = await import('drizzle-orm');
+  await db.execute(sql`
+    INSERT INTO connector_cursors (organization_id, source_id, scope, metadata, last_run_at, last_status)
+    VALUES (${organizationId}, ${sourceId}, 'sync', ${JSON.stringify(metadata)}::jsonb, now(), 'ok')
+    ON CONFLICT (source_id, scope) DO UPDATE SET
+      metadata = EXCLUDED.metadata,
+      last_run_at = now(),
+      last_status = 'ok'
+  `);
 }
 
 async function loadExistingHashes(db: DB, organizationId: string): Promise<Set<string>> {
