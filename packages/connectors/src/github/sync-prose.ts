@@ -7,8 +7,6 @@ import { chunkHash } from '../shared/content-hash';
 import { ErrorCode, holoError } from '@holo/errors';
 import type {
   GithubApiClient,
-  GithubPullRequest,
-  GithubIssue,
   GithubPrReview,
   GithubPrReviewComment,
 } from './api-client';

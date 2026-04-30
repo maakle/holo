@@ -1,10 +1,11 @@
 import { createDb, schema } from '@holo/db';
 import type { DB } from '@holo/db';
 import { and, eq } from 'drizzle-orm';
+import { holoError, ErrorCode } from '@holo/errors';
 
 export function makeTestDb(): DB {
   const url = process.env['DATABASE_URL'];
-  if (!url) throw new Error('DATABASE_URL is not set');
+  if (!url) throw holoError({ code: ErrorCode.HOLO_ENV_INVALID, problem: 'DATABASE_URL is not set', fix: 'Set DATABASE_URL before running integration tests.' });
   return createDb(url);
 }
 

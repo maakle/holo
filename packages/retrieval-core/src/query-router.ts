@@ -3,6 +3,7 @@ import {
   createVoyageEmbedder,
   type Embedder,
 } from '@holo/embedder';
+import { holoError, ErrorCode } from '@holo/errors';
 
 export type EmbeddingModel = 'openai-3-large' | 'voyage-code-3';
 
@@ -24,7 +25,7 @@ let cachedVoyage: Embedder | undefined;
 function getOpenai(): Embedder {
   if (cachedOpenai) return cachedOpenai;
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY not set');
+  if (!apiKey) throw holoError({ code: ErrorCode.HOLO_ENV_INVALID, problem: 'OPENAI_API_KEY is not set', fix: 'Set the OPENAI_API_KEY environment variable.' });
   const e = createOpenAiEmbedder({ apiKey });
   cachedOpenai = e;
   return e;
@@ -33,7 +34,7 @@ function getOpenai(): Embedder {
 function getVoyage(): Embedder {
   if (cachedVoyage) return cachedVoyage;
   const apiKey = process.env.VOYAGE_API_KEY;
-  if (!apiKey) throw new Error('VOYAGE_API_KEY not set');
+  if (!apiKey) throw holoError({ code: ErrorCode.HOLO_ENV_INVALID, problem: 'VOYAGE_API_KEY is not set', fix: 'Set the VOYAGE_API_KEY environment variable.' });
   const e = createVoyageEmbedder({ apiKey });
   cachedVoyage = e;
   return e;
@@ -57,7 +58,7 @@ export async function embedQueryWith(
 ): Promise<EmbedQueryResult> {
   const embedder = model === 'voyage-code-3' ? getVoyage() : getOpenai();
   const [embedding] = await embedder.embed([q]);
-  if (!embedding) throw new Error('Embedder returned no vector');
+  if (!embedding) throw holoError({ code: ErrorCode.HOLO_FETCH_FAILED, problem: 'Embedder returned no vector for the query', fix: 'Check the embedder API response and retry.' });
   return { embedding, model };
 }
 

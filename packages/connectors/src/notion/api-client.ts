@@ -1,5 +1,6 @@
 // Thin fetch-based Notion API client interface — avoids the @notionhq/client
 // bundle and lets tests mock with vi.fn() without any HTTP mocking library.
+import { holoError, ErrorCode } from '@holo/errors';
 
 export interface NotionPage {
   id: string;
@@ -74,7 +75,7 @@ async function notionFetch(
     const err = Object.assign(new Error('Notion 429 Rate Limited'), { status: 429, retryAfter });
     throw err;
   }
-  if (!res.ok) throw new Error(`Notion API ${res.status}`);
+  if (!res.ok) throw holoError({ code: ErrorCode.HOLO_FETCH_FAILED, problem: `Notion API ${res.status}`, fix: 'Check the request and integration token.' });
   return res.json();
 }
 

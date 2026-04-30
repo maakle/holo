@@ -1,6 +1,7 @@
 import type { Chunker, Chunk, ChunkContext } from './contract.js';
 import { recursiveSplit } from './recursive-split.js';
 import { astChunk } from './tree-sitter/index.js';
+import { holoError, ErrorCode } from '@holo/errors';
 
 export interface GithubCodeInput {
   repoFullName: string;
@@ -32,7 +33,11 @@ export const githubCodeChunker: Chunker<GithubCodeInput> = {
   embeddingModel: 'voyage-code-3',
   async chunk(input: GithubCodeInput, ctx: ChunkContext): Promise<Chunk[]> {
     if (!ctx.treeSitter) {
-      throw new Error('github-code chunker requires ctx.treeSitter');
+      throw holoError({
+        code: ErrorCode.HOLO_INVALID_INPUT,
+        problem: 'github-code chunker requires ctx.treeSitter to be provided',
+        fix: 'Pass a TreeSitterRegistry instance in the chunk context.',
+      });
     }
 
     const parentExternalId = `code:${input.repoFullName}:${input.commitSha}:${input.filePath}`;

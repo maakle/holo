@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import nock from 'nock';
 import { createOpenAiEmbedder } from '../src/openai';
-import { HoloError } from '@holo/errors';
 
 const API_BASE = 'https://api.openai.com';
 const EMBED_PATH = '/v1/embeddings';

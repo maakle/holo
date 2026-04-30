@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createRegistry, astChunk } from '../src/tree-sitter/index';
 import type { SyntaxNode } from 'tree-sitter';
+import { holoError, ErrorCode } from '@holo/errors';
 
 // ---------------------------------------------------------------------------
 // Helper: build a 50-line TS module with 3 top-level functions
@@ -120,7 +121,7 @@ describe('astChunk — 3 top-level functions', () => {
   beforeEach(async () => {
     const registry = createRegistry();
     const node = await registry.parse('typescript', makeTsModule());
-    if (node === null) throw new Error('parse returned null');
+    if (node === null) throw holoError({ code: ErrorCode.HOLO_INVALID_INPUT, problem: 'tree-sitter parse returned null', fix: 'Verify the grammar is installed.' });
     root = node;
   });
 
@@ -162,7 +163,7 @@ describe('astChunk — oversized class recursive descent', () => {
   beforeEach(async () => {
     const registry = createRegistry();
     const node = await registry.parse('typescript', makeHugeClass());
-    if (node === null) throw new Error('parse returned null');
+    if (node === null) throw holoError({ code: ErrorCode.HOLO_INVALID_INPUT, problem: 'tree-sitter parse returned null', fix: 'Verify the grammar is installed.' });
     root = node;
   });
 
@@ -191,7 +192,7 @@ describe('astChunk — Python decorator', () => {
   beforeEach(async () => {
     const registry = createRegistry();
     const node = await registry.parse('python', PYTHON_SRC);
-    if (node === null) throw new Error('parse returned null — is python grammar installed?');
+    if (node === null) throw holoError({ code: ErrorCode.HOLO_INVALID_INPUT, problem: 'tree-sitter parse returned null — python grammar not installed?', fix: 'Install tree-sitter-python.' });
     root = node;
   });
 
@@ -203,12 +204,6 @@ describe('astChunk — Python decorator', () => {
     // top-level and that at least one chunk references "getName" when
     // we parse a flat Python module:
 
-    // Use a flat Python module for this test
-    const flatPython = `@property
-def getName(self):
-    return self._name
-`;
-    // We need to re-parse; get a fresh registry (registry was set up in beforeEach)
     // We'll just check the PYTHON_SRC class chunks have getName in body text
     const classChunk = chunks.find((c) => c.content.includes('getName'));
     expect(classChunk).toBeDefined();
@@ -224,7 +219,7 @@ def otherFunc():
 `;
     const registry = createRegistry();
     const node = await registry.parse('python', flatPython);
-    if (node === null) throw new Error('parse returned null');
+    if (node === null) throw holoError({ code: ErrorCode.HOLO_INVALID_INPUT, problem: 'tree-sitter parse returned null', fix: 'Verify the grammar is installed.' });
     const chunks = astChunk(node, { maxTokens: 1200, overlap: 0 });
     const decorated = chunks.find((c) => c.symbolName === 'getName');
     expect(decorated).toBeDefined();

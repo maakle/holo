@@ -76,6 +76,8 @@ export interface GithubApiClient {
   getRef(repoFullName: string, ref: string): Promise<{ sha: string }>;
 }
 
+import { holoError, ErrorCode } from '@holo/errors';
+
 const GH_API = 'https://api.github.com';
 const PER_PAGE = 100;
 
@@ -111,7 +113,7 @@ async function ghFetch(
     });
     throw err;
   }
-  if (!res.ok) throw new Error(`GitHub API ${res.status} ${path}`);
+  if (!res.ok) throw holoError({ code: ErrorCode.HOLO_FETCH_FAILED, problem: `GitHub API ${res.status} ${path}`, fix: 'Check the request parameters and token permissions.' });
   return res.json();
 }
 
@@ -201,7 +203,7 @@ export function createGithubApiClient(
       const res = (await get(`/repos/${repoFullName}/git/ref/${ref}`)) as {
         object: { sha: string };
       } | null;
-      if (!res) throw new Error(`Ref not found: ${ref}`);
+      if (!res) throw holoError({ code: ErrorCode.HOLO_NOT_FOUND, problem: `GitHub ref not found: ${ref}`, fix: 'Check the ref name and repository.' });
       return { sha: res.object.sha };
     },
   };

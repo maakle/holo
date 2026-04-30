@@ -27,6 +27,7 @@
     "tree-sitter-cpp": "0.22.3"
   },
   "devDependencies": {
+    "@holo/errors": "workspace:*",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }
