@@ -1,3 +1,4 @@
+import '../../tools/test-env';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
