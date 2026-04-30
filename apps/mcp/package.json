@@ -20,7 +20,10 @@
     "@holo/retrieval-core": "workspace:*",
     "hono": "4.6.7",
     "@hono/node-server": "1.13.2",
-    "pino": "9.5.0"
+    "pino": "9.5.0",
+    "zod": "3.25.76",
+    "zod-to-json-schema": "^3.23.5",
+    "drizzle-orm": "^0.36.0"
   },
   "devDependencies": {
     "drizzle-orm": "0.36.0",
