@@ -2,3 +2,9 @@ export type { Chunker, Chunk, ChunkContext, TreeSitterRegistry } from './contrac
 export { recursiveSplit } from './recursive-split.js';
 export { createRegistry, astChunk } from './tree-sitter/index.js';
 export type { AstChunk } from './tree-sitter/index.js';
+export { githubPrChunker, type GithubPrInput } from './github-pr.js';
+export { githubIssueChunker, type GithubIssueInput } from './github-issue.js';
+export { githubDocChunker, type GithubDocInput } from './github-doc.js';
+export { githubCodeChunker, type GithubCodeInput } from './github-code.js';
+export { slackThreadChunker, type SlackThreadInput } from './slack-thread.js';
+export { notionPageChunker, type NotionPageInput } from './notion-page.js';
