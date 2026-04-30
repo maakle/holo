@@ -1,3 +1,7 @@
+import type { TreeSitterRegistry } from './tree-sitter/registry.js';
+
+export type { TreeSitterRegistry };
+
 export interface Chunker<TInput> {
   readonly kind: string;
   readonly embeddingModel: 'openai-3-large' | 'voyage-code-3';
@@ -16,9 +20,4 @@ export interface ChunkContext {
   sourceId: string;
   sourceArtifactId: string;
   treeSitter?: TreeSitterRegistry;
-}
-
-// Forward-declared — full implementation lands in Task 3.3.
-export interface TreeSitterRegistry {
-  parse(language: string, source: string): unknown;
 }
