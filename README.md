@@ -63,31 +63,58 @@ Full reasoning, alternatives considered, and migration paths in [`docs/ARCHITECT
 
 ---
 
-## Quick start (development)
+## Quick start (v0.0 Foundation — development)
 
-> Requires Docker, Node 20+, pnpm 9+.
+> Requires Docker, Node 20+, pnpm 9+. v0.0 Foundation is the deployable skeleton: login + GitHub Connector OAuth roundtrip, no ingestion or retrieval yet. See [`docs/superpowers/specs/2026-04-29-v0.0-foundation-design.md`](./docs/superpowers/specs/2026-04-29-v0.0-foundation-design.md).
 
 ```bash
 git clone https://github.com/your-org/holo.git
 cd holo
 pnpm install
+
+# Set up env
 cp .env.example .env
+# Generate the two secrets:
+echo "HOLO_TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> .env
+echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> .env
+echo "BETTER_AUTH_URL=http://localhost:3030" >> .env
+# Then fill in GITHUB_LOGIN_CLIENT_ID/SECRET and GITHUB_CONNECTOR_CLIENT_ID/SECRET
+# from the two GitHub OAuth apps you registered (see below).
+
+# Bring up Postgres + Redis, run migrations
 docker compose up -d postgres redis
-pnpm db:migrate
+DATABASE_URL=postgresql://holo:holo@localhost:5436/holo pnpm db:migrate
+
+# Start dev servers
 pnpm dev
+# apps/web    → http://localhost:3030
+# apps/api    → http://localhost:4000
+# apps/mcp    → http://localhost:8091
+# apps/worker → background, logs heartbeat every 60s
 ```
 
-Open `http://localhost:3000`. The MCP server is at `http://localhost:8090/mcp`.
+> **Port note:** Postgres binds to host port `5436` and Redis to `6382` so holo can coexist with other local Postgres/Redis instances. apps/web runs on `3030`, apps/mcp on `8091`. Override via `MCP_PORT` and Next.js `-p` flag if needed.
 
-To connect Claude Desktop, add to your `claude_desktop_config.json`:
+Visit `http://localhost:3030`. Sign in via GitHub. Click "Connect" on the GitHub row in `/connections` to complete the connector OAuth roundtrip — the row flips to "Connected ✓" and your encrypted token is stored in `connector_credentials`.
+
+The MCP server is at `http://localhost:8091/health` (no MCP tools registered yet — those land in spec #2). To connect Claude Desktop later:
 
 ```json
 {
   "mcpServers": {
-    "holo": { "url": "http://localhost:8090/mcp" }
+    "holo": { "url": "http://localhost:8091/mcp" }
   }
 }
 ```
+
+### Registering the two GitHub OAuth apps
+
+GitHub Settings → Developer settings → OAuth Apps → New OAuth App. Register **two** apps:
+
+1. **Holo Login** — Authorization callback URL `http://localhost:3030/api/auth/callback/github`, scopes `read:user user:email`. Used as `GITHUB_LOGIN_CLIENT_ID/SECRET`.
+2. **Holo GitHub Connector** — Authorization callback URL `http://localhost:3030/api/connectors/github/callback`, scopes `repo read:org`. Used as `GITHUB_CONNECTOR_CLIENT_ID/SECRET`.
+
+The two-app split is intentional — login asks for minimal scopes; the connector asks for repo access. See [decision 0001](./docs/decisions/0001-connector-port-interface.md) and the Foundation spec for rationale.
 
 ## Quick start (self-host)
 
