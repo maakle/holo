@@ -98,7 +98,7 @@ export function ConnectorRow({ meta, status, connectedAs }: Props) {
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
               placeholder={placeholderForConnector(meta.id)}
-              className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900"
+              className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#3F47FF] dark:border-gray-700 dark:bg-gray-900"
               autoComplete="off"
               disabled={busy}
             />
@@ -109,6 +109,15 @@ export function ConnectorRow({ meta, status, connectedAs }: Props) {
             >
               Save
             </button>
+            {status === 'connected' ? (
+              <button
+                type="button"
+                onClick={() => { setShowApiKeyForm(false); setError(null); setTokenInput(''); }}
+                className="rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900"
+              >
+                Cancel
+              </button>
+            ) : null}
           </form>
         ) : null}
       </div>

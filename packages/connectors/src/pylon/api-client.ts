@@ -66,10 +66,17 @@ export function createPylonApiClient(
       headers: { ...defaultHeaders, ...(options.headers ?? {}) },
     });
     if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        throw holoError({
+          code: ErrorCode.HOLO_PYLON_KEY_INVALID,
+          problem: `Pylon API key is invalid or lacks permission (${res.status} at ${path})`,
+          fix: 'Verify the Pylon API key in the Pylon dashboard and re-enter it.',
+        });
+      }
       throw holoError({
         code: ErrorCode.HOLO_FETCH_FAILED,
         problem: `Pylon API error ${res.status} at ${path}`,
-        fix: 'Verify the Pylon API key and that the requested resource exists.',
+        fix: 'Verify the Pylon access token and that the requested resource exists.',
       });
     }
     return res.json() as Promise<T>;

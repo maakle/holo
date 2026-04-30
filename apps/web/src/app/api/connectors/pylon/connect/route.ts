@@ -82,7 +82,7 @@ export async function POST(req: Request) {
       const status =
         e.code === 'HOLO_AUTH_NO_SESSION'
           ? 401
-          : e.code === 'HOLO_FETCH_FAILED'
+          : e.code === 'HOLO_PYLON_KEY_INVALID'
             ? 400
             : 500;
       return NextResponse.json(e.toJSON(), { status });
