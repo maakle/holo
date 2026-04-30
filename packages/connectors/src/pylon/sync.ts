@@ -72,7 +72,7 @@ export async function runPylonSync(input: RunPylonSyncInput): Promise<RunPylonSy
         updatedAt: new Date(issue.updated_at),
         customerName: issue.requester?.email,
         customerEmail: issue.requester?.email,
-        companyName: issue.account?.id,
+        companyName: undefined,
         assigneeName: issue.assignee?.email,
         tags: issue.tags ?? [],
         messages: messages.map((m) => ({
