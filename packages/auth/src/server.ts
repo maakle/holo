@@ -33,6 +33,10 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
     }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
+    logger: { level: 'debug' },
+    advanced: {
+      generateId: () => crypto.randomUUID(),
+    },
     emailAndPassword: { enabled: false },
     socialProviders: {
       github: {
