@@ -1,0 +1,24 @@
+{
+  "name": "@holo/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "holo": "./dist/main.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@holo/db": "workspace:*",
+    "@holo/connectors": "workspace:*",
+    "@holo/errors": "workspace:*",
+    "commander": "^12.1.0",
+    "cli-table3": "^0.6.5",
+    "drizzle-orm": "^0.36.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
