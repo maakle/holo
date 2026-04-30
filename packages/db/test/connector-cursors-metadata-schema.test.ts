@@ -32,25 +32,28 @@ describe('connector_cursors.metadata schema', () => {
   });
 
   it('jsonb_set on metadata persists nested checkpoint values', async () => {
-    // Insert a probe source row (needed as FK for connector_cursors)
-    await sql`
+    // Insert a probe source row (needed as FK for connector_cursors). Assert
+    // exactly one row was produced so a missing seed org surfaces loudly
+    // instead of cascading into a confusing "expected 1, got 0" later.
+    const sourceRows = await sql<{ id: string }[]>`
       INSERT INTO sources (id, organization_id, provider, external_id, name)
       SELECT gen_random_uuid(), o.id, 'github', 'probe-metadata-test', 'probe-metadata-test'
         FROM organization o
-       WHERE o.slug = 'default'
        LIMIT 1
-      ON CONFLICT DO NOTHING
+      RETURNING id
     `;
+    expect(sourceRows.length).toBe(1);
 
     // Insert a probe connector_cursors row referencing the probe source
-    await sql`
+    const cursorRows = await sql<{ id: string }[]>`
       INSERT INTO connector_cursors (id, organization_id, source_id, scope, metadata)
       SELECT gen_random_uuid(), s.organization_id, s.id, 'probe-metadata-test', '{}'::jsonb
         FROM sources s
        WHERE s.external_id = 'probe-metadata-test'
        LIMIT 1
-      ON CONFLICT DO NOTHING
+      RETURNING id
     `;
+    expect(cursorRows.length).toBe(1);
 
     // Use jsonb_set to write a nested checkpoint value.
     // PostgreSQL's jsonb_set with create_missing=true only creates the final key,
