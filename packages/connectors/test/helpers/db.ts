@@ -55,6 +55,114 @@ export async function cleanAllowlistRows(
     );
 }
 
+// ─── Chunk helpers ────────────────────────────────────────────────────────────
+
+const CHUNK_SEED_PROVIDER = 'github';
+const CHUNK_SEED_SOURCE_EXTERNAL_ID = 'test-content-hash';
+const CHUNK_SEED_ARTIFACT_EXTERNAL_ID = 'test-content-hash-artifact';
+
+export interface ChunkRowInput {
+  contentHash: string;
+  kind: string;
+  content: string;
+}
+
+/**
+ * Seeds chunk rows for the given org.
+ * Idempotently creates one source + one source_artifact to satisfy FK constraints.
+ * Each chunk row points at that shared artifact.
+ */
+export async function seedChunks(
+  db: DB,
+  orgId: string,
+  rows: ChunkRowInput[],
+): Promise<void> {
+  if (rows.length === 0) return;
+
+  // 1. Upsert source (unique on org + provider + external_id)
+  await db
+    .insert(schema.sources)
+    .values({
+      organizationId: orgId,
+      provider: CHUNK_SEED_PROVIDER,
+      externalId: CHUNK_SEED_SOURCE_EXTERNAL_ID,
+      name: 'Test Content Hash Source',
+    })
+    .onConflictDoNothing();
+
+  const source = await db
+    .select({ id: schema.sources.id })
+    .from(schema.sources)
+    .where(
+      and(
+        eq(schema.sources.organizationId, orgId),
+        eq(schema.sources.provider, CHUNK_SEED_PROVIDER),
+        eq(schema.sources.externalId, CHUNK_SEED_SOURCE_EXTERNAL_ID),
+      ),
+    )
+    .limit(1);
+
+  const sourceId = source[0]!.id;
+
+  // 2. Upsert source_artifact (unique on source_id + external_id)
+  await db
+    .insert(schema.sourceArtifacts)
+    .values({
+      organizationId: orgId,
+      sourceId,
+      externalId: CHUNK_SEED_ARTIFACT_EXTERNAL_ID,
+      kind: 'github-pr',
+      payload: {},
+    })
+    .onConflictDoNothing();
+
+  const artifact = await db
+    .select({ id: schema.sourceArtifacts.id })
+    .from(schema.sourceArtifacts)
+    .where(
+      and(
+        eq(schema.sourceArtifacts.sourceId, sourceId),
+        eq(schema.sourceArtifacts.externalId, CHUNK_SEED_ARTIFACT_EXTERNAL_ID),
+      ),
+    )
+    .limit(1);
+
+  const sourceArtifactId = artifact[0]!.id;
+
+  // 3. Insert chunks
+  await db.insert(schema.chunks).values(
+    rows.map((r) => ({
+      organizationId: orgId,
+      sourceArtifactId,
+      sourceId,
+      provider: CHUNK_SEED_PROVIDER,
+      kind: r.kind,
+      content: r.content,
+      contentHash: r.contentHash,
+    })),
+  );
+}
+
+/**
+ * Remove all chunks (and their parent source_artifact + source) for a given org
+ * that were created by seedChunks. Because source_artifacts ON DELETE CASCADE
+ * propagates to chunks, deleting the source is sufficient.
+ */
+export async function cleanChunks(db: DB, orgId: string): Promise<void> {
+  // Delete source → cascades to source_artifacts → cascades to chunks
+  await db
+    .delete(schema.sources)
+    .where(
+      and(
+        eq(schema.sources.organizationId, orgId),
+        eq(schema.sources.provider, CHUNK_SEED_PROVIDER),
+        eq(schema.sources.externalId, CHUNK_SEED_SOURCE_EXTERNAL_ID),
+      ),
+    );
+}
+
+// ─── Org + user helper ────────────────────────────────────────────────────────
+
 /**
  * Ensure a test org + user exist, returning their IDs.
  * Uses a dedicated slug so tests never collide with real data.

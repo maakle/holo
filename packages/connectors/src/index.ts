@@ -2,5 +2,7 @@ export * from './contract';
 export * as shared from './shared/index';
 export { resolveAllowlist } from './shared/allowlist';
 export type { ResolveAllowlistInput, AllowlistResult, AllowlistRow } from './shared/allowlist';
+export { chunkHash, dedupeAgainstDb } from './shared/content-hash';
+export type { DedupeAgainstDbInput } from './shared/content-hash';
 export { createGithubConnector } from './github/index';
 export type { GithubConnectorOptions } from './github/index';
