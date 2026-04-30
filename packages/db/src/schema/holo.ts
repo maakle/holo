@@ -8,6 +8,7 @@ import {
   index,
   uniqueIndex,
   customType,
+  integer,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { encryptedText } from './encrypted-text';
@@ -193,6 +194,39 @@ export const connectorAllowlists = pgTable(
     orgProviderIdx: index('connector_allowlists_org_provider_idx').on(
       t.organizationId,
       t.provider,
+    ),
+  }),
+);
+
+export const skills = pgTable(
+  'skills',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    version: integer('version').notNull().default(1),
+    status: text('status', { enum: ['draft', 'active', 'archived'] })
+      .notNull()
+      .default('draft'),
+    content: text('content').notNull(),
+    sourceArtifactIds: uuid('source_artifact_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    fingerprint: text('fingerprint').notNull(),
+    staleAt: timestamp('stale_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => user.id),
+  },
+  (t) => ({
+    orgStatusIdx: index('skills_org_status_idx').on(t.organizationId, t.status),
+    orgSlugVersionUniq: uniqueIndex('skills_org_slug_version_uniq').on(
+      t.organizationId,
+      t.slug,
+      t.version,
     ),
   }),
 );
