@@ -7,7 +7,7 @@ export interface SearchInput {
   organizationId: string;
   q: string;
   topK?: number;
-  provider?: 'github' | 'slack' | 'notion';
+  provider?: 'github' | 'slack' | 'notion' | 'grain' | 'pylon';
   userSubjects?: string[];
 }
 

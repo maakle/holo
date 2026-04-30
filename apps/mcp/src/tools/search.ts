@@ -5,7 +5,7 @@ import { search, type SearchResult } from '@holo/retrieval-core';
 export const searchInputSchema = z.object({
   q: z.string().min(1),
   top_k: z.number().int().min(1).max(50).optional().default(10),
-  provider: z.enum(['github', 'slack', 'notion']).optional(),
+  provider: z.enum(['github', 'slack', 'notion', 'grain', 'pylon']).optional(),
 });
 
 export interface SearchToolContext {
