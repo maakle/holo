@@ -288,27 +288,22 @@ export function createGrainRunner(deps: RunnerDeps): SyncRunner {
 // ── Pylon ────────────────────────────────────────────────────────────────────
 export function createPylonRunner(deps: RunnerDeps): SyncRunner {
   const enqueueEmbed = makeEnqueueEmbed(deps.embedQueue);
-  const buildConnector = (): ReturnType<typeof createPylonConnector> =>
-    createPylonConnector({
-      clientId: process.env.PYLON_CONNECTOR_CLIENT_ID ?? '',
-      clientSecret: process.env.PYLON_CONNECTOR_CLIENT_SECRET ?? '',
-      db: deps.db,
-      enqueueEmbed,
-    });
 
   return {
     async full(payload: SyncJobPayload): Promise<SyncResult> {
-      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'pylon');
-      const result = await buildConnector().fullSync(
-        { accessToken },
+      const apiKey = await loadConnectorToken(deps.db, payload.organizationId, 'pylon');
+      const connector = createPylonConnector({ apiKey, db: deps.db, enqueueEmbed });
+      const result = await connector.fullSync(
+        { accessToken: apiKey },
         { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
       );
       return { artifactCount: result.artifactCount, newCursor: result.newCursor };
     },
     async incremental(payload: SyncJobPayload): Promise<SyncResult> {
-      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'pylon');
-      const result = await buildConnector().incrementalSync(
-        { accessToken },
+      const apiKey = await loadConnectorToken(deps.db, payload.organizationId, 'pylon');
+      const connector = createPylonConnector({ apiKey, db: deps.db, enqueueEmbed });
+      const result = await connector.incrementalSync(
+        { accessToken: apiKey },
         { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
       );
       return { artifactCount: result.artifactCount, newCursor: result.newCursor };
