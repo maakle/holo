@@ -161,6 +161,7 @@ export const connectorCursors = pgTable(
     latestSeenTs: timestamp('latest_seen_ts', { withTimezone: true }),
     lastRunAt: timestamp('last_run_at', { withTimezone: true }),
     lastStatus: text('last_status'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
   },
   (t) => ({
     sourceScopeIdx: index('connector_cursors_source_scope_idx').on(t.sourceId, t.scope),
