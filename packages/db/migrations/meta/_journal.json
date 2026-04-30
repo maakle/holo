@@ -36,6 +36,13 @@
       "when": 1777498776600,
       "tag": "0004_connector_cursors_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777498776700,
+      "tag": "0005_chunks_content_hash_unique",
+      "breakpoints": true
     }
   ]
 }

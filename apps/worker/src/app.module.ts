@@ -6,6 +6,7 @@ import { GithubCodeSyncModule } from './queues/github-code';
 import { GithubProseSyncModule } from './queues/github-prose';
 import { SlackSyncModule } from './queues/slack';
 import { NotionSyncModule } from './queues/notion';
+import { EmbedModule } from './queues/embed';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 
 function parseRedisUrl(url: string): { host: string; port: number } {
@@ -26,6 +27,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     GithubProseSyncModule,
     SlackSyncModule,
     NotionSyncModule,
+    EmbedModule,
     SyncSchedulerModule,
   ],
 })
