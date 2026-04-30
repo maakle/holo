@@ -2,6 +2,11 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { LoggerModule } from 'nestjs-pino';
 import { HeartbeatModule } from './heartbeat/heartbeat.module';
+import { GithubCodeSyncModule } from './queues/github-code';
+import { GithubProseSyncModule } from './queues/github-prose';
+import { SlackSyncModule } from './queues/slack';
+import { NotionSyncModule } from './queues/notion';
+import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 
 function parseRedisUrl(url: string): { host: string; port: number } {
   const u = new URL(url);
@@ -17,6 +22,11 @@ function parseRedisUrl(url: string): { host: string; port: number } {
       connection: parseRedisUrl(process.env.REDIS_URL ?? 'redis://localhost:6382'),
     }),
     HeartbeatModule,
+    GithubCodeSyncModule,
+    GithubProseSyncModule,
+    SlackSyncModule,
+    NotionSyncModule,
+    SyncSchedulerModule,
   ],
 })
 export class AppModule {}
