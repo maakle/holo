@@ -9,18 +9,38 @@ function mockClient(overrides: Partial<GrainApiClient> = {}): GrainApiClient {
         {
           id: 'rec-1',
           title: 'Weekly Sync',
-          started_at: '2024-09-01T10:00:00Z',
+          start_datetime: '2024-09-01T10:00:00Z',
+          end_datetime: '2024-09-01T10:30:00Z',
           duration_ms: 1800000,
-          participants: [{ name: 'Alice' }, { name: 'Bob' }],
-          summary: 'Discussed roadmap.',
-          updated_at: '2024-09-01T11:00:00Z',
+          url: 'https://grain.com/recordings/rec-1',
+          source: 'zoom',
+          media_type: 'video',
+          tags: [],
+          teams: [],
+          participants: [
+            {
+              id: 'p-1',
+              name: 'Alice',
+              email: 'alice@example.com',
+              scope: 'internal',
+              confirmed_attendee: true,
+            },
+            {
+              id: 'p-2',
+              name: 'Bob',
+              email: null,
+              scope: 'external',
+              confirmed_attendee: false,
+            },
+          ],
+          ai_summary: { text: 'Discussed roadmap.' },
         },
       ],
       nextCursor: undefined,
     }),
     getTranscript: vi.fn().mockResolvedValue([
-      { speaker: 'Alice', start_ms: 0, end_ms: 5000, text: 'Hello.' },
-      { speaker: 'Bob', start_ms: 5000, end_ms: 10000, text: 'Hi.' },
+      { speaker: 'Alice', start: 0, end: 5000, text: 'Hello.', participant_id: 'p-1' },
+      { speaker: 'Bob', start: 5000, end: 10000, text: 'Hi.', participant_id: null },
     ]),
     ...overrides,
   };
@@ -62,9 +82,9 @@ describe('runGrainSync', () => {
     expect(enqueueEmbed).not.toHaveBeenCalled();
   });
 
-  it('tracks latestUpdatedAt from recordings', async () => {
+  it('tracks latestStartedAt from recordings', async () => {
     const result = await runGrainSync(baseInput());
-    expect(result.latestUpdatedAt).toBe('2024-09-01T11:00:00Z');
+    expect(result.latestStartedAt).toBe('2024-09-01T10:00:00Z');
   });
 
   it('passes updatedAfter to client.listRecordings', async () => {
@@ -98,10 +118,15 @@ describe('runGrainSync', () => {
               {
                 id: `rec-${call}`,
                 title: 'Meeting A',
-                started_at: '2024-09-01T10:00:00Z',
+                start_datetime: '2024-09-01T10:00:00Z',
+                end_datetime: '2024-09-01T10:15:00Z',
                 duration_ms: 900000,
+                url: 'https://grain.com/recordings/rec-1',
+                source: 'zoom',
+                media_type: 'video',
+                tags: [],
+                teams: [],
                 participants: [],
-                updated_at: '2024-09-01T10:30:00Z',
               },
             ],
             nextCursor: 'cursor-2',
@@ -112,10 +137,15 @@ describe('runGrainSync', () => {
             {
               id: `rec-${call}`,
               title: 'Meeting B',
-              started_at: '2024-09-02T10:00:00Z',
+              start_datetime: '2024-09-02T10:00:00Z',
+              end_datetime: '2024-09-02T10:15:00Z',
               duration_ms: 900000,
+              url: 'https://grain.com/recordings/rec-2',
+              source: 'zoom',
+              media_type: 'video',
+              tags: [],
+              teams: [],
               participants: [],
-              updated_at: '2024-09-02T10:30:00Z',
             },
           ],
           nextCursor: undefined,

@@ -36,13 +36,12 @@ export function createGrainConnector(opts: GrainConnectorOptions): Connector {
         response_type: 'code',
         redirect_uri: input.redirectUri,
         state: input.state,
-        scope: 'recordings:read',
       });
-      return `https://grain.com/oauth/authorize?${params.toString()}`;
+      return `https://grain.com/_/public-api/oauth2/authorize?${params.toString()}`;
     },
 
     async exchangeCode(input: ExchangeCodeInput): Promise<ConnectorTokens> {
-      const res = await fetchImpl('https://api.grain.com/v1/oauth/token', {
+      const res = await fetchImpl('https://api.grain.com/_/public-api/oauth2/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -83,7 +82,7 @@ export function createGrainConnector(opts: GrainConnectorOptions): Connector {
     },
 
     async refresh(input: RefreshInput): Promise<ConnectorTokens> {
-      const res = await fetchImpl('https://api.grain.com/v1/oauth/token', {
+      const res = await fetchImpl('https://api.grain.com/_/public-api/oauth2/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -154,7 +153,7 @@ export function createGrainConnector(opts: GrainConnectorOptions): Connector {
         });
       }
       const cursor = await loadCursorMetadata(opts.db, ctx.sourceId);
-      const updatedAfter = cursor['latest_updated_at'] as string | undefined;
+      const updatedAfter = cursor['latest_started_at'] as string | undefined;
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
       const result = await runGrainSync({
         client: createGrainApiClient(tokens.accessToken, fetchImpl),

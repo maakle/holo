@@ -3,18 +3,33 @@ import { holoError, ErrorCode } from '@holo/errors';
 export interface GrainRecording {
   id: string;
   title: string;
-  started_at: string;
+  start_datetime: string;
+  end_datetime: string;
   duration_ms: number;
-  participants: Array<{ name: string; email?: string }>;
-  summary?: string;
-  updated_at: string;
+  url: string;
+  thumbnail_url?: string;
+  source: string;
+  media_type: string;
+  tags: string[];
+  teams: string[];
+  participants?: Array<{
+    id: string;
+    name: string;
+    email: string | null;
+    scope: string;
+    confirmed_attendee: boolean;
+  }>;
+  ai_summary?: {
+    text: string;
+  };
 }
 
 export interface GrainTranscriptTurn {
   speaker: string;
-  start_ms: number;
-  end_ms: number;
+  start: number;
+  end: number;
   text: string;
+  participant_id: string | null;
 }
 
 export interface GrainApiClient {
@@ -29,15 +44,22 @@ export function createGrainApiClient(
   accessToken: string,
   fetchImpl: typeof fetch = fetch,
 ): GrainApiClient {
-  const base = 'https://api.grain.com/v1';
+  const base = 'https://api.grain.com';
 
-  async function apiFetch<T>(path: string, params?: Record<string, string>): Promise<T> {
-    const url = new URL(`${base}${path}`);
-    if (params) {
-      for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-    }
-    const res = await fetchImpl(url.toString(), {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+  async function apiFetch<T>(
+    path: string,
+    options?: { method?: string; body?: unknown },
+  ): Promise<T> {
+    const url = `${base}${path}`;
+    const res = await fetchImpl(url, {
+      method: options?.method ?? 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Public-Api-Version': '2025-10-31',
+        Accept: 'application/json',
+        ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(options?.body ? { body: JSON.stringify(options.body) } : {}),
     });
     if (!res.ok) {
       throw holoError({
@@ -51,21 +73,23 @@ export function createGrainApiClient(
 
   return {
     async listRecordings(opts) {
-      const params: Record<string, string> = {};
-      if (opts.updatedAfter) params['updated_after'] = opts.updatedAfter;
-      if (opts.cursor) params['cursor'] = opts.cursor;
+      const body: Record<string, unknown> = {
+        include: { ai_summary: true, participants: true },
+      };
+      if (opts.updatedAfter) body['after_datetime'] = opts.updatedAfter;
+      if (opts.cursor) body['cursor'] = opts.cursor;
       const raw = await apiFetch<{
         recordings: GrainRecording[];
-        next_cursor?: string;
-      }>('/recordings', params);
-      return { recordings: raw.recordings ?? [], nextCursor: raw.next_cursor };
+        cursor: string | null;
+      }>('/_/public-api/v2/recordings', { method: 'POST', body });
+      return { recordings: raw.recordings ?? [], nextCursor: raw.cursor ?? undefined };
     },
 
     async getTranscript(recordingId) {
-      const raw = await apiFetch<{ turns: GrainTranscriptTurn[] }>(
-        `/recordings/${recordingId}/transcript`,
+      const turns = await apiFetch<GrainTranscriptTurn[]>(
+        `/_/public-api/v2/recordings/${recordingId}/transcript`,
       );
-      return raw.turns ?? [];
+      return turns ?? [];
     },
   };
 }

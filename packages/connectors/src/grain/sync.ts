@@ -34,14 +34,14 @@ export interface RunGrainSyncInput {
 
 export interface RunGrainSyncOutput {
   artifactCount: number;
-  latestUpdatedAt: string | null;
+  latestStartedAt: string | null;
 }
 
 export async function runGrainSync(input: RunGrainSyncInput): Promise<RunGrainSyncOutput> {
   const logger = input.logger ?? { warn: () => {} };
   let cursor: string | undefined;
   let totalArtifacts = 0;
-  let latestUpdatedAt: string | null = null;
+  let latestStartedAt: string | null = null;
 
   do {
     const page = await input.client.listRecordings({
@@ -61,14 +61,14 @@ export async function runGrainSync(input: RunGrainSyncInput): Promise<RunGrainSy
       const callInput = {
         recordingId: rec.id,
         title: rec.title,
-        startedAt: new Date(rec.started_at),
+        startedAt: new Date(rec.start_datetime),
         durationMs: rec.duration_ms,
-        participants: rec.participants.map((p) => p.name),
-        summary: rec.summary,
+        participants: rec.participants?.map((p) => p.name) ?? [],
+        summary: rec.ai_summary?.text,
         turns: turns.map((t) => ({
           speaker: t.speaker,
-          startMs: t.start_ms,
-          endMs: t.end_ms,
+          startMs: t.start,
+          endMs: t.end,
           text: t.text,
         })),
       };
@@ -107,8 +107,8 @@ export async function runGrainSync(input: RunGrainSyncInput): Promise<RunGrainSy
       }
 
       totalArtifacts++;
-      if (!latestUpdatedAt || rec.updated_at > latestUpdatedAt) {
-        latestUpdatedAt = rec.updated_at;
+      if (!latestStartedAt || rec.start_datetime > latestStartedAt) {
+        latestStartedAt = rec.start_datetime;
       }
     }
 
@@ -123,5 +123,5 @@ export async function runGrainSync(input: RunGrainSyncInput): Promise<RunGrainSy
     });
   }
 
-  return { artifactCount: totalArtifacts, latestUpdatedAt };
+  return { artifactCount: totalArtifacts, latestStartedAt };
 }
