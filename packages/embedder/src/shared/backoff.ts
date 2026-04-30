@@ -1,4 +1,5 @@
 import { APIError } from 'openai';
+import { VoyageAIError } from 'voyageai';
 import { holoError, ErrorCode } from '@holo/errors';
 
 export interface BackoffOptions {
@@ -21,6 +22,10 @@ const defaultSleep = (ms: number): Promise<void> =>
 function isRetryable(err: unknown): boolean {
   if (err instanceof APIError) {
     return err.status === 429 || (err.status >= 500 && err.status < 600);
+  }
+  if (err instanceof VoyageAIError) {
+    const s = err.statusCode;
+    return s === 429 || (s != null && s >= 500 && s < 600);
   }
   return false;
 }
