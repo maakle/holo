@@ -16,8 +16,7 @@ import type {
 import type { DB } from '@holo/db';
 
 export interface PylonConnectorOptions {
-  clientId: string;
-  clientSecret: string;
+  apiKey: string;
   db?: DB;
   enqueueEmbed?: PylonEmbedEnqueueFn;
   fetchImpl?: typeof fetch;
@@ -30,103 +29,42 @@ export function createPylonConnector(opts: PylonConnectorOptions): Connector {
     id: 'pylon',
     displayName: 'Pylon',
 
-    buildAuthorizeUrl(input: BuildAuthorizeUrlInput): string {
-      const params = new URLSearchParams({
-        client_id: opts.clientId,
-        response_type: 'code',
-        redirect_uri: input.redirectUri,
-        state: input.state,
-        scope: 'issues:read',
+    buildAuthorizeUrl(_input: BuildAuthorizeUrlInput): string {
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+        problem: 'Pylon uses API keys, not OAuth — buildAuthorizeUrl is not applicable.',
+        fix: 'Generate an API key in the Pylon dashboard and pass it as apiKey.',
       });
-      return `https://app.usepylon.com/oauth/authorize?${params.toString()}`;
     },
 
-    async exchangeCode(input: ExchangeCodeInput): Promise<ConnectorTokens> {
-      const res = await fetchImpl('https://api.usepylon.com/v1/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          grant_type: 'authorization_code',
-          code: input.code,
-          client_id: opts.clientId,
-          client_secret: opts.clientSecret,
-          redirect_uri: input.redirectUri,
-        }),
+    async exchangeCode(_input: ExchangeCodeInput): Promise<ConnectorTokens> {
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+        problem: 'Pylon uses API keys, not OAuth — exchangeCode is not applicable.',
+        fix: 'Generate an API key in the Pylon dashboard and pass it as apiKey.',
       });
-      if (!res.ok) {
-        throw holoError({
-          code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
-          problem: `Pylon OAuth code exchange failed with status ${res.status}`,
-          fix: 'Restart the connect flow. Verify Pylon OAuth app credentials.',
-        });
-      }
-      const json = (await res.json()) as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-      };
-      if (!json.access_token) {
-        throw holoError({
-          code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
-          problem: 'Pylon token response missing access_token',
-          fix: 'Check the Pylon OAuth app configuration.',
-        });
-      }
-      const expiresAt = json.expires_in
-        ? new Date(Date.now() + json.expires_in * 1000)
-        : undefined;
-      return {
-        accessToken: json.access_token,
-        refreshToken: json.refresh_token,
-        expiresAt,
-      };
     },
 
-    async refresh(input: RefreshInput): Promise<ConnectorTokens> {
-      const res = await fetchImpl('https://api.usepylon.com/v1/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          grant_type: 'refresh_token',
-          refresh_token: input.refreshToken,
-          client_id: opts.clientId,
-          client_secret: opts.clientSecret,
-        }),
+    async refresh(_input: RefreshInput): Promise<ConnectorTokens> {
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+        problem: 'Pylon uses static API keys, not OAuth — refresh is not applicable.',
+        fix: 'Pylon API keys are long-lived and do not require refresh.',
       });
-      if (!res.ok) {
-        throw holoError({
-          code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
-          problem: `Pylon token refresh failed with status ${res.status}`,
-          fix: 'Re-connect Pylon via the OAuth flow.',
-        });
-      }
-      const json = (await res.json()) as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-      };
-      const expiresAt = json.expires_in
-        ? new Date(Date.now() + json.expires_in * 1000)
-        : undefined;
-      return {
-        accessToken: json.access_token,
-        refreshToken: json.refresh_token ?? input.refreshToken,
-        expiresAt,
-      };
     },
 
-    async testConnection(tokens: ConnectorTokens): Promise<TestConnectionResult> {
-      const client = createPylonApiClient(tokens.accessToken, fetchImpl);
-      const { issues } = await client.listIssues({});
+    async testConnection(_tokens: ConnectorTokens): Promise<TestConnectionResult> {
+      const client = createPylonApiClient(opts.apiKey, fetchImpl);
+      const data = await client.testConnection();
       return {
         ok: true,
-        externalId: 'pylon',
-        name: 'Pylon',
-        raw: { issue_count: issues.length },
+        externalId: data.id,
+        name: data.name,
+        raw: { org_id: data.id, org_name: data.name },
       };
     },
 
-    async fullSync(tokens: ConnectorTokens, ctx: SyncContext): Promise<SyncResult> {
+    async fullSync(_tokens: ConnectorTokens, ctx: SyncContext): Promise<SyncResult> {
       if (!opts.db || !opts.enqueueEmbed) {
         throw holoError({
           code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
@@ -136,7 +74,7 @@ export function createPylonConnector(opts: PylonConnectorOptions): Connector {
       }
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
       const result = await runPylonSync({
-        client: createPylonApiClient(tokens.accessToken, fetchImpl),
+        client: createPylonApiClient(opts.apiKey, fetchImpl),
         organizationId: ctx.organizationId,
         sourceId: ctx.sourceId,
         existingHashes,
@@ -145,7 +83,7 @@ export function createPylonConnector(opts: PylonConnectorOptions): Connector {
       return { artifactCount: result.artifactCount, newCursor: new Date() };
     },
 
-    async incrementalSync(tokens: ConnectorTokens, ctx: SyncContext): Promise<SyncResult> {
+    async incrementalSync(_tokens: ConnectorTokens, ctx: SyncContext): Promise<SyncResult> {
       if (!opts.db || !opts.enqueueEmbed) {
         throw holoError({
           code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
@@ -157,7 +95,7 @@ export function createPylonConnector(opts: PylonConnectorOptions): Connector {
       const updatedAfter = cursor['latest_updated_at'] as string | undefined;
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
       const result = await runPylonSync({
-        client: createPylonApiClient(tokens.accessToken, fetchImpl),
+        client: createPylonApiClient(opts.apiKey, fetchImpl),
         updatedAfter,
         organizationId: ctx.organizationId,
         sourceId: ctx.sourceId,

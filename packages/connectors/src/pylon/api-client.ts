@@ -2,23 +2,37 @@ import { holoError, ErrorCode } from '@holo/errors';
 
 export interface PylonIssue {
   id: string;
+  number: number;
   title: string;
-  status: string;
-  priority?: string;
+  body_html: string;
+  type: 'conversation' | 'ticket';
+  state: string;
+  source: string;
   created_at: string;
   updated_at: string;
-  customer?: { name: string; email?: string };
-  company?: { name: string };
-  assignee?: { name: string };
+  latest_message_time?: string;
+  link: string;
+  account?: { id: string; external_ids: Array<{ external_id: string; label: string }> };
+  assignee?: { id: string; email: string };
+  requester?: { id: string; email: string };
+  team?: { id: string };
   tags: string[];
 }
 
-export interface PylonIssueMessage {
+export interface PylonMessage {
   id: string;
-  author: string;
-  author_type: 'customer' | 'agent' | 'bot';
-  created_at: string;
-  body: string;
+  thread_id: string;
+  message_html: string;
+  is_private: boolean;
+  source: string;
+  timestamp: string;
+  file_urls: string[];
+  author: {
+    name: string;
+    avatar_url: string;
+    user?: { id: string; email: string };
+    contact?: { id: string; email: string };
+  };
 }
 
 export interface PylonApiClient {
@@ -26,28 +40,36 @@ export interface PylonApiClient {
     issues: PylonIssue[];
     nextCursor?: string;
   }>;
-  getIssueMessages(issueId: string): Promise<PylonIssueMessage[]>;
+  getIssueMessages(issueId: string): Promise<PylonMessage[]>;
+  testConnection(): Promise<{ id: string; name: string }>;
 }
 
 export function createPylonApiClient(
-  accessToken: string,
+  apiKey: string,
   fetchImpl: typeof fetch = fetch,
 ): PylonApiClient {
-  const base = 'https://api.usepylon.com/v1';
+  const base = 'https://api.usepylon.com';
 
-  async function apiFetch<T>(path: string, params?: Record<string, string>): Promise<T> {
-    const url = new URL(`${base}${path}`);
-    if (params) {
-      for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-    }
-    const res = await fetchImpl(url.toString(), {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+  const defaultHeaders = {
+    Authorization: `Bearer ${apiKey}`,
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  };
+
+  async function apiFetch<T>(
+    path: string,
+    options: RequestInit = {},
+  ): Promise<T> {
+    const url = `${base}${path}`;
+    const res = await fetchImpl(url, {
+      ...options,
+      headers: { ...defaultHeaders, ...(options.headers ?? {}) },
     });
     if (!res.ok) {
       throw holoError({
         code: ErrorCode.HOLO_FETCH_FAILED,
         problem: `Pylon API error ${res.status} at ${path}`,
-        fix: 'Verify the Pylon access token and that the requested resource exists.',
+        fix: 'Verify the Pylon API key and that the requested resource exists.',
       });
     }
     return res.json() as Promise<T>;
@@ -55,21 +77,51 @@ export function createPylonApiClient(
 
   return {
     async listIssues(opts) {
-      const params: Record<string, string> = {};
-      if (opts.updatedAfter) params['updated_after'] = opts.updatedAfter;
-      if (opts.cursor) params['cursor'] = opts.cursor;
+      const body: Record<string, unknown> = { limit: 100 };
+      if (opts.cursor) body['cursor'] = opts.cursor;
+      if (opts.updatedAfter) {
+        body['filter'] = { updated_at: { time_is_after: opts.updatedAfter } };
+      }
       const raw = await apiFetch<{
-        issues: PylonIssue[];
-        next_cursor?: string;
-      }>('/issues', params);
-      return { issues: raw.issues ?? [], nextCursor: raw.next_cursor };
+        data: PylonIssue[];
+        pagination: { cursor: string | null; has_next_page: boolean };
+      }>('/issues/search', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      return {
+        issues: raw.data ?? [],
+        nextCursor: raw.pagination?.has_next_page && raw.pagination.cursor
+          ? raw.pagination.cursor
+          : undefined,
+      };
     },
 
     async getIssueMessages(issueId) {
-      const raw = await apiFetch<{ messages: PylonIssueMessage[] }>(
-        `/issues/${issueId}/messages`,
-      );
-      return raw.messages ?? [];
+      const allMessages: PylonMessage[] = [];
+      let cursor: string | undefined;
+
+      do {
+        const queryParams = new URLSearchParams({ limit: '100' });
+        if (cursor) queryParams.set('cursor', cursor);
+
+        const raw = await apiFetch<{
+          data: PylonMessage[];
+          pagination: { cursor: string | null; has_next_page: boolean };
+        }>(`/issues/${issueId}/messages?${queryParams.toString()}`);
+
+        allMessages.push(...(raw.data ?? []));
+        cursor = raw.pagination?.has_next_page && raw.pagination.cursor
+          ? raw.pagination.cursor
+          : undefined;
+      } while (cursor);
+
+      return allMessages;
+    },
+
+    async testConnection() {
+      const raw = await apiFetch<{ data: { id: string; name: string } }>('/me');
+      return { id: raw.data.id, name: raw.data.name };
     },
   };
 }

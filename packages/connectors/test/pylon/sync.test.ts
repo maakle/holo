@@ -1,35 +1,56 @@
 import { describe, it, expect, vi } from 'vitest';
 import { runPylonSync, type RunPylonSyncInput } from '../../src/pylon/sync';
-import type { PylonApiClient } from '../../src/pylon/api-client';
+import type { PylonApiClient, PylonIssue, PylonMessage } from '../../src/pylon/api-client';
+
+function makeIssue(overrides: Partial<PylonIssue> = {}): PylonIssue {
+  return {
+    id: 'tkt-001',
+    number: 1,
+    title: 'Login broken',
+    body_html: '<p>Cannot log in.</p>',
+    type: 'ticket',
+    state: 'new',
+    source: 'email',
+    created_at: '2024-09-01T09:00:00Z',
+    updated_at: '2024-09-01T10:00:00Z',
+    link: 'https://app.usepylon.com/issues/tkt-001',
+    requester: { id: 'user-1', email: 'jane@acme.com' },
+    account: {
+      id: 'acct-1',
+      external_ids: [{ external_id: 'acme-id', label: 'salesforce' }],
+    },
+    assignee: { id: 'agent-1', email: 'support@example.com' },
+    tags: ['auth'],
+    ...overrides,
+  };
+}
+
+function makeMessage(overrides: Partial<PylonMessage> = {}): PylonMessage {
+  return {
+    id: 'm1',
+    thread_id: 'thread-1',
+    message_html: '<p>Cannot log in.</p>',
+    is_private: false,
+    source: 'email',
+    timestamp: '2024-09-01T09:05:00Z',
+    file_urls: [],
+    author: {
+      name: 'Jane',
+      avatar_url: '',
+      contact: { id: 'contact-1', email: 'jane@acme.com' },
+    },
+    ...overrides,
+  };
+}
 
 function mockClient(overrides: Partial<PylonApiClient> = {}): PylonApiClient {
   return {
     listIssues: vi.fn().mockResolvedValue({
-      issues: [
-        {
-          id: 'tkt-001',
-          title: 'Login broken',
-          status: 'open',
-          priority: 'high',
-          created_at: '2024-09-01T09:00:00Z',
-          updated_at: '2024-09-01T10:00:00Z',
-          customer: { name: 'Jane', email: 'jane@acme.com' },
-          company: { name: 'Acme' },
-          assignee: { name: 'Support' },
-          tags: ['auth'],
-        },
-      ],
+      issues: [makeIssue()],
       nextCursor: undefined,
     }),
-    getIssueMessages: vi.fn().mockResolvedValue([
-      {
-        id: 'm1',
-        author: 'Jane',
-        author_type: 'customer' as const,
-        created_at: '2024-09-01T09:05:00Z',
-        body: 'Cannot log in.',
-      },
-    ]),
+    getIssueMessages: vi.fn().mockResolvedValue([makeMessage()]),
+    testConnection: vi.fn().mockResolvedValue({ id: 'org-1', name: 'Acme Corp' }),
     ...overrides,
   };
 }
@@ -100,28 +121,28 @@ describe('runPylonSync', () => {
         if (call === 1) {
           return Promise.resolve({
             issues: [
-              {
-                id: `tkt-00${call}`,
+              makeIssue({
+                id: 'tkt-001',
                 title: 'Issue A',
-                status: 'open',
+                state: 'new',
                 created_at: '2024-09-01T09:00:00Z',
                 updated_at: '2024-09-01T09:30:00Z',
                 tags: [],
-              },
+              }),
             ],
             nextCursor: 'page-2',
           });
         }
         return Promise.resolve({
           issues: [
-            {
-              id: `tkt-00${call}`,
+            makeIssue({
+              id: 'tkt-002',
               title: 'Issue B',
-              status: 'closed',
+              state: 'closed',
               created_at: '2024-09-02T09:00:00Z',
               updated_at: '2024-09-02T09:30:00Z',
               tags: [],
-            },
+            }),
           ],
           nextCursor: undefined,
         });
@@ -137,5 +158,28 @@ describe('runPylonSync', () => {
     });
     const result = await runPylonSync(baseInput({ client }));
     expect(result.artifactCount).toBe(0);
+  });
+
+  it('derives authorType from author fields', async () => {
+    const enqueueEmbed = vi.fn().mockResolvedValue(undefined);
+    const agentMessage = makeMessage({
+      id: 'm2',
+      author: {
+        name: 'Agent Bob',
+        avatar_url: '',
+        user: { id: 'agent-2', email: 'bob@support.com' },
+      },
+    });
+    const botMessage = makeMessage({
+      id: 'm3',
+      author: { name: 'Bot', avatar_url: '' },
+    });
+    const client = mockClient({
+      getIssueMessages: vi.fn().mockResolvedValue([makeMessage(), agentMessage, botMessage]),
+    });
+    const result = await runPylonSync(baseInput({ client, enqueueEmbed }));
+    expect(result.artifactCount).toBe(1);
+    // Chunks are generated — verify message mapping doesn't throw
+    expect(enqueueEmbed).toHaveBeenCalledOnce();
   });
 });

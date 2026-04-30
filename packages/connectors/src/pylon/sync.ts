@@ -1,6 +1,6 @@
 import { pylonTicketChunker } from '@holo/chunker';
 import { chunkHash } from '../shared/content-hash';
-import type { PylonApiClient } from './api-client';
+import type { PylonApiClient, PylonMessage } from './api-client';
 
 export type PylonChunkPayload = {
   kind: 'pylon-ticket';
@@ -36,6 +36,12 @@ export interface RunPylonSyncOutput {
   latestUpdatedAt: string | null;
 }
 
+function deriveAuthorType(author: PylonMessage['author']): 'agent' | 'customer' | 'bot' {
+  if (author.user) return 'agent';
+  if (author.contact) return 'customer';
+  return 'bot';
+}
+
 export async function runPylonSync(input: RunPylonSyncInput): Promise<RunPylonSyncOutput> {
   const logger = input.logger ?? { warn: () => {} };
   let cursor: string | undefined;
@@ -50,7 +56,7 @@ export async function runPylonSync(input: RunPylonSyncInput): Promise<RunPylonSy
 
     for (const issue of page.issues) {
       const artifactId = `pylon-ticket:${issue.id}`;
-      let messages: Awaited<ReturnType<PylonApiClient['getIssueMessages']>> = [];
+      let messages: PylonMessage[] = [];
       try {
         messages = await input.client.getIssueMessages(issue.id);
       } catch (err) {
@@ -60,21 +66,21 @@ export async function runPylonSync(input: RunPylonSyncInput): Promise<RunPylonSy
       const ticketInput = {
         ticketId: issue.id,
         title: issue.title,
-        status: issue.status,
-        priority: issue.priority,
+        status: issue.state,
+        priority: undefined,
         createdAt: new Date(issue.created_at),
         updatedAt: new Date(issue.updated_at),
-        customerName: issue.customer?.name,
-        customerEmail: issue.customer?.email,
-        companyName: issue.company?.name,
-        assigneeName: issue.assignee?.name,
+        customerName: issue.requester?.email,
+        customerEmail: issue.requester?.email,
+        companyName: issue.account?.id,
+        assigneeName: issue.assignee?.email,
         tags: issue.tags ?? [],
         messages: messages.map((m) => ({
           id: m.id,
-          author: m.author,
-          authorType: m.author_type,
-          createdAt: new Date(m.created_at),
-          body: m.body,
+          author: m.author.name,
+          authorType: deriveAuthorType(m.author),
+          createdAt: new Date(m.timestamp),
+          body: m.message_html,
         })),
       };
 
