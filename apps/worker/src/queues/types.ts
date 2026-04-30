@@ -3,6 +3,8 @@ export const QUEUE_NAMES = {
   GITHUB_PROSE_SYNC: 'github-prose-sync',
   SLACK_SYNC: 'slack-sync',
   NOTION_SYNC: 'notion-sync',
+  GRAIN_SYNC: 'grain-sync',
+  PYLON_SYNC: 'pylon-sync',
   EMBED: 'embed',
 } as const;
 
@@ -13,6 +15,8 @@ export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   'github-prose-sync': 3,
   'slack-sync': 3,
   'notion-sync': 2,
+  'grain-sync': 2,
+  'pylon-sync': 2,
   embed: 5,
 };
 

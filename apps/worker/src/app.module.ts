@@ -6,6 +6,8 @@ import { GithubCodeSyncModule } from './queues/github-code';
 import { GithubProseSyncModule } from './queues/github-prose';
 import { SlackSyncModule } from './queues/slack';
 import { NotionSyncModule } from './queues/notion';
+import { GrainSyncModule } from './queues/grain';
+import { PylonSyncModule } from './queues/pylon';
 import { EmbedModule } from './queues/embed';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 import { SyncRunnersModule } from './queues/runners.module';
@@ -28,6 +30,8 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     GithubProseSyncModule,
     SlackSyncModule,
     NotionSyncModule,
+    GrainSyncModule,
+    PylonSyncModule,
     EmbedModule,
     SyncRunnersModule,
     SyncSchedulerModule,

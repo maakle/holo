@@ -89,7 +89,18 @@ export function mountMcp(app: Hono, opts: MountMcpOpts): void {
               404,
             );
           }
+          const t0 = performance.now();
           const result = await tool.run(ctx, params.arguments);
+          const latencyMs = Math.round(performance.now() - t0);
+          console.log(
+            JSON.stringify({
+              event: 'mcp_tool_call',
+              tool: params.name,
+              org: ctx.organizationId,
+              latency_ms: latencyMs,
+              ts: new Date().toISOString(),
+            }),
+          );
           return c.json(
             jsonRpcResult(body.id, {
               content: [{ type: 'text', text: JSON.stringify(result) }],

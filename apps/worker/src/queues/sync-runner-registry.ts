@@ -25,6 +25,8 @@ const registry: Record<string, SyncRunner> = {
   'github-prose-sync': stubRunner('github-prose'),
   'slack-sync': stubRunner('slack'),
   'notion-sync': stubRunner('notion'),
+  'grain-sync': stubRunner('grain'),
+  'pylon-sync': stubRunner('pylon'),
 };
 
 export function getSyncRunner(queue: string): SyncRunner {

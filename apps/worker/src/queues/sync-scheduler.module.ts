@@ -3,10 +3,19 @@ import { GithubCodeSyncModule } from './github-code';
 import { GithubProseSyncModule } from './github-prose';
 import { SlackSyncModule } from './slack';
 import { NotionSyncModule } from './notion';
+import { GrainSyncModule } from './grain';
+import { PylonSyncModule } from './pylon';
 import { SyncSchedulerService } from './sync-scheduler.service';
 
 @Module({
-  imports: [GithubCodeSyncModule, GithubProseSyncModule, SlackSyncModule, NotionSyncModule],
+  imports: [
+    GithubCodeSyncModule,
+    GithubProseSyncModule,
+    SlackSyncModule,
+    NotionSyncModule,
+    GrainSyncModule,
+    PylonSyncModule,
+  ],
   providers: [SyncSchedulerService],
 })
 export class SyncSchedulerModule {}

@@ -19,6 +19,8 @@ import {
   createSlackConnector,
   createNotionConnector,
   createGithubApiClient,
+  createGrainConnector,
+  createPylonConnector,
   resolveAllowlist,
   runGithubProseSync,
   runGithubCodeSync,
@@ -39,7 +41,7 @@ export type RunnerDeps = {
 async function loadConnectorToken(
   db: DB,
   organizationId: string,
-  provider: 'github' | 'slack' | 'notion',
+  provider: 'github' | 'slack' | 'notion' | 'grain' | 'pylon',
 ): Promise<string> {
   const rows = await db
     .select({ accessToken: schema.connectorCredentials.accessToken })
@@ -250,4 +252,66 @@ export function createGithubCodeRunner(deps: RunnerDeps): SyncRunner {
 function pickRepresentativeSha(shas: Record<string, string>): string {
   const values = Object.values(shas);
   return values[0] ?? '';
+}
+
+// ── Grain ────────────────────────────────────────────────────────────────────
+export function createGrainRunner(deps: RunnerDeps): SyncRunner {
+  const enqueueEmbed = makeEnqueueEmbed(deps.embedQueue);
+  const buildConnector = (): ReturnType<typeof createGrainConnector> =>
+    createGrainConnector({
+      clientId: process.env.GRAIN_CONNECTOR_CLIENT_ID ?? '',
+      clientSecret: process.env.GRAIN_CONNECTOR_CLIENT_SECRET ?? '',
+      db: deps.db,
+      enqueueEmbed,
+    });
+
+  return {
+    async full(payload: SyncJobPayload): Promise<SyncResult> {
+      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'grain');
+      const result = await buildConnector().fullSync(
+        { accessToken },
+        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
+      );
+      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
+    },
+    async incremental(payload: SyncJobPayload): Promise<SyncResult> {
+      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'grain');
+      const result = await buildConnector().incrementalSync(
+        { accessToken },
+        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
+      );
+      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
+    },
+  };
+}
+
+// ── Pylon ────────────────────────────────────────────────────────────────────
+export function createPylonRunner(deps: RunnerDeps): SyncRunner {
+  const enqueueEmbed = makeEnqueueEmbed(deps.embedQueue);
+  const buildConnector = (): ReturnType<typeof createPylonConnector> =>
+    createPylonConnector({
+      clientId: process.env.PYLON_CONNECTOR_CLIENT_ID ?? '',
+      clientSecret: process.env.PYLON_CONNECTOR_CLIENT_SECRET ?? '',
+      db: deps.db,
+      enqueueEmbed,
+    });
+
+  return {
+    async full(payload: SyncJobPayload): Promise<SyncResult> {
+      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'pylon');
+      const result = await buildConnector().fullSync(
+        { accessToken },
+        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
+      );
+      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
+    },
+    async incremental(payload: SyncJobPayload): Promise<SyncResult> {
+      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'pylon');
+      const result = await buildConnector().incrementalSync(
+        { accessToken },
+        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
+      );
+      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
+    },
+  };
 }

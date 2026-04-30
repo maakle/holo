@@ -41,6 +41,8 @@ export class SyncSchedulerService implements OnModuleInit {
     @InjectQueue(QUEUE_NAMES.GITHUB_PROSE_SYNC) private readonly ghProse: Queue,
     @InjectQueue(QUEUE_NAMES.SLACK_SYNC) private readonly slack: Queue,
     @InjectQueue(QUEUE_NAMES.NOTION_SYNC) private readonly notion: Queue,
+    @InjectQueue(QUEUE_NAMES.GRAIN_SYNC) private readonly grain: Queue,
+    @InjectQueue(QUEUE_NAMES.PYLON_SYNC) private readonly pylon: Queue,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -80,6 +82,14 @@ export class SyncSchedulerService implements OnModuleInit {
     }
     if (s.provider === 'notion') {
       await this.notion.add('sync', payload, { repeat });
+      return;
+    }
+    if (s.provider === 'grain') {
+      await this.grain.add('sync', payload, { repeat });
+      return;
+    }
+    if (s.provider === 'pylon') {
+      await this.pylon.add('sync', payload, { repeat });
       return;
     }
     this.logger.warn(`unknown provider '${s.provider}' for source ${s.id}; skipping schedule`);

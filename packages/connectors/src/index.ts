@@ -10,6 +10,10 @@ export { createSlackConnector } from './slack/index';
 export type { SlackConnectorOptions } from './slack/index';
 export { createNotionConnector } from './notion/index';
 export type { NotionConnectorOptions } from './notion/index';
+export { createGrainConnector } from './grain/index';
+export type { GrainConnectorOptions } from './grain/index';
+export { createPylonConnector } from './pylon/index';
+export type { PylonConnectorOptions } from './pylon/index';
 
 // Underlying sync engines + API clients (used by the worker to bypass the
 // connector facade for github, where prose and code dispatch on different queues).

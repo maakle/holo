@@ -7,6 +7,8 @@ import {
 import { getPrInputSchema, runGetPrTool } from './get-pr.js';
 import { getThreadInputSchema, runGetThreadTool } from './get-thread.js';
 import { getDocInputSchema, runGetDocTool } from './get-doc.js';
+import { getCallInputSchema, runGetCallTool } from './get-call.js';
+import { getTicketInputSchema, runGetTicketTool } from './get-ticket.js';
 
 export interface ToolContext {
   db: DB;
@@ -54,6 +56,22 @@ export function listTools(): ToolDefinition[] {
       inputSchema: zodToJsonSchema(getDocInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
       async run(ctx, args) {
         return runGetDocTool(ctx, args);
+      },
+    },
+    {
+      name: 'get_call',
+      description: 'Fetch a Grain meeting recording (summary + full transcript) by recording_id.',
+      inputSchema: zodToJsonSchema(getCallInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      async run(ctx, args) {
+        return runGetCallTool(ctx, args);
+      },
+    },
+    {
+      name: 'get_ticket',
+      description: 'Fetch a Pylon support ticket (conversation history) by ticket_id.',
+      inputSchema: zodToJsonSchema(getTicketInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      async run(ctx, args) {
+        return runGetTicketTool(ctx, args);
       },
     },
   ];
