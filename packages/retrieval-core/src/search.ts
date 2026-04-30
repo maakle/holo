@@ -26,6 +26,12 @@ export interface SearchResult {
 const MIN_RESULTS_BEFORE_FALLBACK = 5;
 const RRF_K = 60;
 
+function formatTextArray(values: string[]): string {
+  // Postgres text[] literal: '{"a","b"}'. Quote each value and escape \\ and ".
+  const escaped = values.map((v) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
+  return `{${escaped.join(',')}}`;
+}
+
 interface ChunkRow {
   id: string;
   content: string;
@@ -52,7 +58,7 @@ async function searchOnce(
         FROM chunks
         WHERE organization_id = ${input.organizationId}
           AND embedding_model = ${input.model}
-          AND acl_subjects && ${input.userSubjects}::text[]
+          AND acl_subjects && ${formatTextArray(input.userSubjects)}::text[]
           AND (${provider}::text IS NULL OR provider = ${provider})
         ORDER BY embedding <=> (SELECT v FROM query_vec)
         LIMIT 100
@@ -64,7 +70,7 @@ async function searchOnce(
         FROM chunks
         WHERE organization_id = ${input.organizationId}
           AND content_tsvector @@ plainto_tsquery('english', ${input.q})
-          AND acl_subjects && ${input.userSubjects}::text[]
+          AND acl_subjects && ${formatTextArray(input.userSubjects)}::text[]
           AND (${provider}::text IS NULL OR provider = ${provider})
         ORDER BY ts_rank(content_tsvector, plainto_tsquery('english', ${input.q})) DESC
         LIMIT 100
