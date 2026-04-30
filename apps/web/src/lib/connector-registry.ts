@@ -12,7 +12,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     description: 'Pull requests, issues, repo metadata.',
     implemented: true,
   },
-  { id: 'slack', displayName: 'Slack', description: 'Channels, threads, DMs.', implemented: false },
+  { id: 'slack', displayName: 'Slack', description: 'Channels, threads, DMs.', implemented: true },
   {
     id: 'notion',
     displayName: 'Notion',

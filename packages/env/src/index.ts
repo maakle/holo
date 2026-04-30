@@ -11,6 +11,8 @@ const EnvSchema = z.object({
   GITHUB_LOGIN_CLIENT_SECRET: z.string().min(1),
   GITHUB_CONNECTOR_CLIENT_ID: z.string().min(1),
   GITHUB_CONNECTOR_CLIENT_SECRET: z.string().min(1),
+  SLACK_CONNECTOR_CLIENT_ID: z.string().optional(),
+  SLACK_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
