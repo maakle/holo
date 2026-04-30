@@ -221,6 +221,12 @@ importers:
 
   apps/worker:
     dependencies:
+      '@holo/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
+      '@holo/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@holo/env':
         specifier: workspace:*
         version: link:../../packages/env
@@ -239,6 +245,9 @@ importers:
       bullmq:
         specifier: 5.20.1
         version: 5.20.1
+      drizzle-orm:
+        specifier: 0.36.0
+        version: 0.36.0(@types/react@18.3.12)(kysely@0.27.6)(postgres@3.4.4)(react@18.3.1)
       ioredis:
         specifier: 5.4.1
         version: 5.4.1

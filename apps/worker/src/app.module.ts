@@ -8,6 +8,7 @@ import { SlackSyncModule } from './queues/slack';
 import { NotionSyncModule } from './queues/notion';
 import { EmbedModule } from './queues/embed';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
+import { SyncRunnersModule } from './queues/runners.module';
 
 function parseRedisUrl(url: string): { host: string; port: number } {
   const u = new URL(url);
@@ -28,6 +29,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     SlackSyncModule,
     NotionSyncModule,
     EmbedModule,
+    SyncRunnersModule,
     SyncSchedulerModule,
   ],
 })
