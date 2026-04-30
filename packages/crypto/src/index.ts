@@ -29,6 +29,8 @@ export function keyFromBase64(b64: string): Uint8Array {
   try {
     const raw = sodium.from_base64(b64, sodium.base64_variants.ORIGINAL);
     if (raw.length !== sodium.crypto_secretbox_KEYBYTES) {
+      // Caught by the try/catch below and rewrapped as a HoloError with cause.
+      // eslint-disable-next-line local/no-bare-throw-error
       throw new Error(`expected ${sodium.crypto_secretbox_KEYBYTES} bytes, got ${raw.length}`);
     }
     return raw;
@@ -58,6 +60,8 @@ export function decryptToken(ciphertext: string, key: Uint8Array): string {
     const combined = sodium.from_base64(ciphertext, sodium.base64_variants.ORIGINAL);
     const nonceBytes = sodium.crypto_secretbox_NONCEBYTES;
     if (combined.length < nonceBytes + sodium.crypto_secretbox_MACBYTES) {
+      // Caught by the try/catch below and rewrapped as a HoloError with cause.
+      // eslint-disable-next-line local/no-bare-throw-error
       throw new Error('ciphertext too short');
     }
     const nonce = combined.slice(0, nonceBytes);

@@ -3,6 +3,7 @@ import { createDb, type DB, schema } from '@holo/db';
 import { createAuth, type Auth } from '@holo/auth';
 import { sql } from 'drizzle-orm';
 import { parseEnv } from '@holo/env';
+import { holoError, ErrorCode } from '@holo/errors';
 
 const env = parseEnv(process.env);
 const db: DB = createDb(env.DATABASE_URL);
@@ -15,7 +16,13 @@ async function getAuth(): Promise<Auth> {
     .select({ id: schema.organization.id })
     .from(schema.organization)
     .where(sql`slug = 'default'`);
-  if (!orgs[0]) throw new Error('default organization not seeded; run pnpm db:migrate');
+  if (!orgs[0]) {
+    throw holoError({
+      code: ErrorCode.HOLO_ENV_INVALID,
+      problem: 'default organization not seeded',
+      fix: 'Run `pnpm db:migrate` to migrate the schema and seed the default org.',
+    });
+  }
   cachedAuth = createAuth({ db, env, defaultOrganizationId: orgs[0].id });
   return cachedAuth;
 }
