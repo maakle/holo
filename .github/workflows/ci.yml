@@ -1,0 +1,114 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  # Test-only secrets — fixed values so CI is deterministic. Real deployments use real secrets.
+  HOLO_TOKEN_ENCRYPTION_KEY: dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXk=
+  BETTER_AUTH_SECRET: dGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQ=
+  BETTER_AUTH_URL: http://localhost:3030
+  GITHUB_LOGIN_CLIENT_ID: test-login-cid
+  GITHUB_LOGIN_CLIENT_SECRET: test-login-csec
+  GITHUB_CONNECTOR_CLIENT_ID: test-conn-cid
+  GITHUB_CONNECTOR_CLIENT_SECRET: test-conn-csec
+  EMAIL_PROVIDER: console
+  NODE_ENV: test
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: holo
+          POSTGRES_PASSWORD: holo
+          POSTGRES_DB: holo
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U holo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # CI uses default Postgres/Redis ports (no other dev DBs to coexist with)
+      DATABASE_URL: postgresql://holo:holo@localhost:5432/holo
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -F @holo/db migrate
+      - run: pnpm -r test
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: holo
+          POSTGRES_PASSWORD: holo
+          POSTGRES_DB: holo
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U holo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://holo:holo@localhost:5432/holo
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -F @holo/db migrate
+      - run: pnpm -F @holo/e2e exec playwright install --with-deps chromium
+      - run: pnpm -F @holo/e2e test

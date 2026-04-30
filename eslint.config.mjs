@@ -42,9 +42,10 @@ export default tseslint.config(
     },
   },
 
-  // packages/errors itself defines the error infrastructure; bare throws allowed there
+  // packages/errors itself defines the error infrastructure; bare throws allowed there.
+  // tests/** are E2E fixtures (not shipped to users), bare throws acceptable.
   {
-    files: ['packages/errors/**/*.ts'],
+    files: ['packages/errors/**/*.ts', 'tests/**/*.ts'],
     rules: { 'local/no-bare-throw-error': 'off' },
   },
 
