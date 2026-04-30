@@ -1,0 +1,128 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Notes on secrets:
+# - HOLO_TOKEN_ENCRYPTION_KEY and BETTER_AUTH_SECRET are generated at runtime
+#   in the "secrets" step below so no literal base64 keys live in this file.
+# - Postgres credentials are also generated per-run; the postgres service env
+#   pulls them from $GITHUB_ENV.
+# - The four GITHUB_* fixture values are intentionally non-secret test placeholders
+#   (test-login-cid etc.) — apps require them to be non-empty at boot but no
+#   real OAuth flow is exercised in unit tests; the e2e job mocks GitHub.
+
+env:
+  BETTER_AUTH_URL: http://localhost:3030
+  GITHUB_LOGIN_CLIENT_ID: test-login-cid
+  GITHUB_LOGIN_CLIENT_SECRET: test-login-csec
+  GITHUB_CONNECTOR_CLIENT_ID: test-conn-cid
+  GITHUB_CONNECTOR_CLIENT_SECRET: test-conn-csec
+  EMAIL_PROVIDER: console
+  NODE_ENV: test
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: holo
+          # Per-run dynamic value (the GitHub Actions run ID, a number).
+          # No literal password string anywhere in this file.
+          POSTGRES_PASSWORD: ${{ github.run_id }}
+          POSTGRES_DB: holo
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U holo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate test secrets
+        run: |
+          {
+            echo "HOLO_TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)"
+            echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)"
+            echo "DATABASE_URL=postgresql://holo:${{ github.run_id }}@localhost:5432/holo"
+            echo "REDIS_URL=redis://localhost:6379"
+          } >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -F @holo/db migrate
+      # Excludes @holo/e2e — Playwright tests run in their own job with browsers installed.
+      - run: pnpm -r --filter '!@holo/e2e' test
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: holo
+          POSTGRES_PASSWORD: ${{ github.run_id }}
+          POSTGRES_DB: holo
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U holo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate test secrets
+        run: |
+          {
+            echo "HOLO_TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)"
+            echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)"
+            echo "DATABASE_URL=postgresql://holo:${{ github.run_id }}@localhost:5432/holo"
+            echo "REDIS_URL=redis://localhost:6379"
+          } >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -F @holo/db migrate
+      - run: pnpm -F @holo/e2e exec playwright install --with-deps chromium
+      - run: pnpm -F @holo/e2e test

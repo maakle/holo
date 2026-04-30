@@ -1,1 +1,17 @@
+node_modules/
+.next/
+.turbo/
+dist/
+build/
+coverage/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.tsbuildinfo
+playwright-report/
+test-results/
 .claude/worktrees/

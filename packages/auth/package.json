@@ -1,0 +1,31 @@
+{
+  "name": "@holo/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./client": "./src/client.ts",
+    "./mcp-session": "./src/mcp-session.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "better-auth": "1.1.6",
+    "@holo/db": "workspace:*",
+    "@holo/env": "workspace:*",
+    "@holo/errors": "workspace:*",
+    "drizzle-orm": "0.36.0"
+  },
+  "devDependencies": {
+    "postgres": "3.4.4",
+    "typescript": "5.6.3",
+    "vitest": "2.1.3"
+  }
+}

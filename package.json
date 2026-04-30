@@ -1,0 +1,35 @@
+{
+  "name": "holo",
+  "private": true,
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=20.18.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "eslint . && node eslint-plugin-local/test/no-bare-throw-error.test.js",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:migrate": "pnpm -F @holo/db migrate",
+    "db:generate": "pnpm -F @holo/db generate"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.11",
+    "@typescript-eslint/eslint-plugin": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.1",
+    "eslint": "^9.13.0",
+    "eslint-plugin-import-x": "^4.16.2",
+    "prettier": "3.3.3",
+    "turbo": "2.1.3",
+    "typescript": "5.6.3",
+    "typescript-eslint": "^8.59.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "zod": "3.25.76"
+    }
+  }
+}
