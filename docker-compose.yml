@@ -13,7 +13,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U holo"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -25,7 +25,68 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["pnpm", "-F", "@holo/db", "migrate"]
+    environment:
+      DATABASE_URL: postgresql://holo:holo@postgres:5432/holo
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment: &app_env
+      DATABASE_URL: postgresql://holo:holo@postgres:5432/holo
+      REDIS_URL: redis://redis:6379
+      HOLO_TOKEN_ENCRYPTION_KEY: ${HOLO_TOKEN_ENCRYPTION_KEY}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3030}
+      GITHUB_LOGIN_CLIENT_ID: ${GITHUB_LOGIN_CLIENT_ID}
+      GITHUB_LOGIN_CLIENT_SECRET: ${GITHUB_LOGIN_CLIENT_SECRET}
+      GITHUB_CONNECTOR_CLIENT_ID: ${GITHUB_CONNECTOR_CLIENT_ID}
+      GITHUB_CONNECTOR_CLIENT_SECRET: ${GITHUB_CONNECTOR_CLIENT_SECRET}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      NODE_ENV: production
+    ports:
+      - "4000:4000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment: *app_env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+  mcp:
+    build:
+      context: .
+      dockerfile: apps/mcp/Dockerfile
+    environment: *app_env
+    ports:
+      - "8091:8091"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment: *app_env
+    ports:
+      - "3030:3030"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
 
 volumes:
   holo_pg_data:
