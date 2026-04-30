@@ -29,6 +29,15 @@ export async function GET(req: Request) {
     }
 
     const { env, db } = await getServerContext();
+
+    if (!env.SLACK_CONNECTOR_CLIENT_ID || !env.SLACK_CONNECTOR_CLIENT_SECRET) {
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+        problem: 'Slack connector credentials are not configured',
+        fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET in the environment.',
+      });
+    }
+
     const claims = await shared.verifyState(state, env.BETTER_AUTH_SECRET);
 
     const cookieStore = await cookies();
@@ -41,14 +50,6 @@ export async function GET(req: Request) {
       });
     }
     cookieStore.delete(shared.CSRF_COOKIE_NAME);
-
-    if (!env.SLACK_CONNECTOR_CLIENT_ID || !env.SLACK_CONNECTOR_CLIENT_SECRET) {
-      throw holoError({
-        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
-        problem: 'Slack connector credentials are not configured',
-        fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET in the environment.',
-      });
-    }
 
     const redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/slack/callback`;
     const conn = createSlackConnector({

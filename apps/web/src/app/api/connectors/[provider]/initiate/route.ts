@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { headers, cookies } from 'next/headers';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
-import { shared, createGithubConnector, createSlackConnector } from '@holo/connectors';
+import { shared, createGithubConnector, createSlackConnector, type Connector } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ provider: string }> }) {
@@ -17,7 +17,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ provid
       });
     }
 
-    let conn: ReturnType<typeof createGithubConnector>;
+    let conn: Connector;
     let redirectUri: string;
 
     if (provider === 'github') {
