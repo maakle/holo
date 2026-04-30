@@ -1,3 +1,5 @@
+import { holoError, ErrorCode } from '@holo/errors';
+
 export interface GrainRecording {
   id: string;
   title: string;
@@ -38,7 +40,11 @@ export function createGrainApiClient(
       headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
     });
     if (!res.ok) {
-      throw new Error(`Grain API error ${res.status} at ${path}`);
+      throw holoError({
+        code: ErrorCode.HOLO_FETCH_FAILED,
+        problem: `Grain API error ${res.status} at ${path}`,
+        fix: 'Verify the Grain access token and that the requested resource exists.',
+      });
     }
     return res.json() as Promise<T>;
   }
