@@ -1,26 +1,25 @@
-## gstack (REQUIRED — global install)
+## gstack (required when invoking gstack skills)
 
-**Before doing ANY work, verify gstack is installed:**
+gstack provides the `/qa`, `/ship`, `/review`, `/investigate`, `/browse`, `/autoplan`, and related skills. It is **required before invoking any of those skills** — not for unrelated edits, reads, or commits.
+
+**When the user asks for `/qa`, `/ship`, `/review`, `/investigate`, `/browse`, `/autoplan`, or any other gstack-namespaced skill, verify gstack is installed first:**
 
 ```bash
 test -d ~/.claude/skills/gstack/bin && echo "GSTACK_OK" || echo "GSTACK_MISSING"
 ```
 
-If GSTACK_MISSING: STOP. Do not proceed. Tell the user:
+If GSTACK_MISSING: STOP and ask the user to install it before continuing:
 
-> gstack is required for all AI-assisted work in this repo.
-> Install it:
+> gstack is required for this skill. Install it:
 > ```bash
 > git clone --depth 1 https://github.com/garrytan/gstack.git ~/.claude/skills/gstack
 > cd ~/.claude/skills/gstack && ./setup --team
 > ```
-> Then restart your AI coding tool.
+> Then restart your AI coding tool. (For ephemeral cloud sandboxes, `./setup` without `--team` is sufficient.)
 
-Do not skip skills, ignore gstack errors, or work around missing gstack.
+Do not work around missing gstack by faking a gstack skill's behavior.
 
-Using gstack skills: After install, skills like /qa, /ship, /review, /investigate,
-and /browse are available. Use /browse for all web browsing.
-Use ~/.claude/skills/gstack/... for gstack file paths (the global path).
+Using gstack skills: use `/browse` for all web browsing. Reference gstack file paths as `~/.claude/skills/gstack/...` (the global path).
 
 ## Design System
 
