@@ -7,6 +7,7 @@ export const ErrorCode = {
   HOLO_ENV_INVALID: 'HOLO_ENV_INVALID',
   HOLO_ALLOWLIST_EMPTY: 'HOLO_ALLOWLIST_EMPTY',
   HOLO_ALLOWLIST_OVERSIZED: 'HOLO_ALLOWLIST_OVERSIZED',
+  HOLO_INGESTION_RATE_LIMITED: 'HOLO_INGESTION_RATE_LIMITED',
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
