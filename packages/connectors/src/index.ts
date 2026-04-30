@@ -6,3 +6,5 @@ export { chunkHash, dedupeAgainstDb } from './shared/content-hash';
 export type { DedupeAgainstDbInput } from './shared/content-hash';
 export { createGithubConnector } from './github/index';
 export type { GithubConnectorOptions } from './github/index';
+export { createSlackConnector } from './slack/index';
+export type { SlackConnectorOptions } from './slack/index';
