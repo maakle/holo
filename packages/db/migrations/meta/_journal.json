@@ -22,6 +22,13 @@
       "when": 1777498776400,
       "tag": "0002_connector_allowlists",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777498776500,
+      "tag": "0003_chunks_content_hash",
+      "breakpoints": true
     }
   ]
 }

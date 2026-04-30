@@ -121,6 +121,8 @@ export const chunks = pgTable(
     parentId: uuid('parent_id'),
     kind: text('kind').notNull(),
     content: text('content').notNull(),
+    contentHash: text('content_hash').notNull(),
+    embeddingModel: text('embedding_model').notNull().default('openai-3-large'),
     contentTsvector: tsvector('content_tsvector'),
     embedding: vector('embedding', { dimensions: 1024 }),
     aclSubjects: text('acl_subjects')
@@ -140,6 +142,8 @@ export const chunks = pgTable(
       t.kind,
     ),
     orgIdx: index('chunks_org_idx').on(t.organizationId),
+    contentHashIdx: index('chunks_content_hash_idx').on(t.organizationId, t.contentHash),
+    metadataPrIdx: index('chunks_metadata_pr_idx').using('gin', sql`${t.metadata} jsonb_path_ops`),
   }),
 );
 
