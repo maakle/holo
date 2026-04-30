@@ -71,7 +71,8 @@ jobs:
         with: { node-version: 20, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm -F @holo/db migrate
-      - run: pnpm -r test
+      # Excludes @holo/e2e — Playwright tests run in their own job with browsers installed.
+      - run: pnpm -r --filter '!@holo/e2e' test
 
   e2e:
     runs-on: ubuntu-latest
