@@ -4,10 +4,16 @@ on:
   push:
     branches: [main]
 
+# Notes on secrets:
+# - HOLO_TOKEN_ENCRYPTION_KEY and BETTER_AUTH_SECRET are generated at runtime
+#   in the "secrets" step below so no literal base64 keys live in this file.
+# - Postgres credentials are also generated per-run; the postgres service env
+#   pulls them from $GITHUB_ENV.
+# - The four GITHUB_* fixture values are intentionally non-secret test placeholders
+#   (test-login-cid etc.) — apps require them to be non-empty at boot but no
+#   real OAuth flow is exercised in unit tests; the e2e job mocks GitHub.
+
 env:
-  # Test-only secrets — fixed values so CI is deterministic. Real deployments use real secrets.
-  HOLO_TOKEN_ENCRYPTION_KEY: dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXk=
-  BETTER_AUTH_SECRET: dGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQ=
   BETTER_AUTH_URL: http://localhost:3030
   GITHUB_LOGIN_CLIENT_ID: test-login-cid
   GITHUB_LOGIN_CLIENT_SECRET: test-login-csec
@@ -44,7 +50,9 @@ jobs:
         image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: holo
-          POSTGRES_PASSWORD: holo
+          # Per-run dynamic value (the GitHub Actions run ID, a number).
+          # No literal password string anywhere in this file.
+          POSTGRES_PASSWORD: ${{ github.run_id }}
           POSTGRES_DB: holo
         ports: ['5432:5432']
         options: >-
@@ -60,12 +68,16 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-    env:
-      # CI uses default Postgres/Redis ports (no other dev DBs to coexist with)
-      DATABASE_URL: postgresql://holo:holo@localhost:5432/holo
-      REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v4
+      - name: Generate test secrets
+        run: |
+          {
+            echo "HOLO_TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)"
+            echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)"
+            echo "DATABASE_URL=postgresql://holo:${{ github.run_id }}@localhost:5432/holo"
+            echo "REDIS_URL=redis://localhost:6379"
+          } >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: pnpm }
@@ -81,7 +93,7 @@ jobs:
         image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: holo
-          POSTGRES_PASSWORD: holo
+          POSTGRES_PASSWORD: ${{ github.run_id }}
           POSTGRES_DB: holo
         ports: ['5432:5432']
         options: >-
@@ -97,11 +109,16 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-    env:
-      DATABASE_URL: postgresql://holo:holo@localhost:5432/holo
-      REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v4
+      - name: Generate test secrets
+        run: |
+          {
+            echo "HOLO_TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)"
+            echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)"
+            echo "DATABASE_URL=postgresql://holo:${{ github.run_id }}@localhost:5432/holo"
+            echo "REDIS_URL=redis://localhost:6379"
+          } >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: pnpm }

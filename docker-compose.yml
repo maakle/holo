@@ -1,16 +1,18 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
+    # Localhost-only dev DB. All credentials come from .env; nothing literal here.
+    # See .env.example — POSTGRES_PASSWORD must be set (compose fails fast otherwise).
     environment:
-      POSTGRES_USER: holo
-      POSTGRES_PASSWORD: holo
-      POSTGRES_DB: holo
+      POSTGRES_USER: ${POSTGRES_USER:-holo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-holo}
     ports:
       - "5436:5432"
     volumes:
       - holo_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U holo"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-holo}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -33,7 +35,7 @@ services:
       dockerfile: apps/api/Dockerfile
     command: ["pnpm", "-F", "@holo/db", "migrate"]
     environment:
-      DATABASE_URL: postgresql://holo:holo@postgres:5432/holo
+      DATABASE_URL: postgresql://${POSTGRES_USER:-holo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-holo}
     depends_on:
       postgres: { condition: service_healthy }
 
@@ -42,7 +44,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     environment: &app_env
-      DATABASE_URL: postgresql://holo:holo@postgres:5432/holo
+      DATABASE_URL: postgresql://${POSTGRES_USER:-holo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-holo}
       REDIS_URL: redis://redis:6379
       HOLO_TOKEN_ENCRYPTION_KEY: ${HOLO_TOKEN_ENCRYPTION_KEY}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
