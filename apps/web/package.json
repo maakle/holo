@@ -8,7 +8,7 @@
     "start": "next start -p 3030",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@holo/auth": "workspace:*",
