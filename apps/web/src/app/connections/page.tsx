@@ -46,8 +46,7 @@ export default async function ConnectionsPage({
       <div>
         <h1 className="text-xl font-semibold">Connections</h1>
         <p className="text-sm text-gray-500">
-          Connect the tools your team's work lives in. Only GitHub is implemented in v0.0
-          Foundation.
+          Connect the tools your team's work lives in.
         </p>
       </div>
       {sp.connect_error ? (
