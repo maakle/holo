@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { resolveAllowlist } from '../../src/shared/allowlist';
 import {
   makeTestDb,
@@ -10,20 +10,25 @@ import type { DB } from '@holo/db';
 
 const PROVIDER = 'github' as const;
 
-let db: DB;
-let orgId: string;
-let userId: string;
-
-beforeAll(async () => {
-  db = makeTestDb();
-  ({ orgId, userId } = await ensureTestOrgAndUser(db));
-});
-
-afterEach(async () => {
-  await cleanAllowlistRows(db, orgId, PROVIDER);
-});
-
 describe('resolveAllowlist', () => {
+  let db: DB;
+  let orgId: string;
+  let userId: string;
+
+  beforeAll(async () => {
+    db = makeTestDb();
+    ({ orgId, userId } = await ensureTestOrgAndUser(db));
+  });
+
+  afterEach(async () => {
+    await cleanAllowlistRows(db, orgId, PROVIDER);
+  });
+
+  afterAll(async () => {
+    // Final sweep in case a test crashed mid-run before afterEach fired.
+    await cleanAllowlistRows(db, orgId, PROVIDER);
+  });
+
   it('(a) glob include only — matches included pattern, rejects non-matching', async () => {
     await seedAllowlistRows(db, orgId, userId, PROVIDER, [
       { pattern: 'acme/*', patternKind: 'glob', decision: 'include' },
