@@ -166,3 +166,28 @@ export const connectorCursors = pgTable(
     ),
   }),
 );
+
+export const connectorAllowlists = pgTable(
+  'connector_allowlists',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    provider: text('provider').notNull(),
+    pattern: text('pattern').notNull(),
+    patternKind: text('pattern_kind', { enum: ['glob', 'exact_id'] }).notNull(),
+    decision: text('decision', { enum: ['include', 'exclude'] }).notNull().default('include'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => user.id),
+    notes: text('notes'),
+  },
+  (t) => ({
+    orgProviderIdx: index('connector_allowlists_org_provider_idx').on(
+      t.organizationId,
+      t.provider,
+    ),
+  }),
+);
