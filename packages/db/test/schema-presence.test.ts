@@ -22,6 +22,7 @@ const REQUIRED_TABLES = [
   'session',
   'account',
   'verification',
+  'connector_allowlists',
   'connector_credentials',
   'sources',
   'source_artifacts',

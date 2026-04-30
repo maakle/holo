@@ -18,7 +18,7 @@ describe('connector_allowlists schema', () => {
     >`
       SELECT column_name, data_type, is_nullable
         FROM information_schema.columns
-       WHERE table_name = 'connector_allowlists'
+       WHERE table_schema = 'public' AND table_name = 'connector_allowlists'
        ORDER BY column_name
     `;
     const names = rows.map((r) => r.column_name).sort();
@@ -39,7 +39,7 @@ describe('connector_allowlists schema', () => {
 
   it('has the org+provider index', async () => {
     const rows = await sql<{ indexname: string }[]>`
-      SELECT indexname FROM pg_indexes WHERE tablename = 'connector_allowlists'
+      SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'connector_allowlists'
     `;
     expect(rows.map((r) => r.indexname)).toContain('connector_allowlists_org_provider_idx');
   });
