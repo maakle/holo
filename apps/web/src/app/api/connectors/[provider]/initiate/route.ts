@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { headers, cookies } from 'next/headers';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
-import { shared, createGithubConnector, createSlackConnector, type Connector } from '@holo/connectors';
+import { shared, createGithubConnector, createSlackConnector, createGrainConnector, type Connector } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ provider: string }> }) {
@@ -39,11 +39,24 @@ export async function POST(_req: Request, { params }: { params: Promise<{ provid
         clientId: env.SLACK_CONNECTOR_CLIENT_ID,
         clientSecret: env.SLACK_CONNECTOR_CLIENT_SECRET,
       });
+    } else if (provider === 'grain') {
+      if (!env.GRAIN_CONNECTOR_CLIENT_ID || !env.GRAIN_CONNECTOR_CLIENT_SECRET) {
+        throw holoError({
+          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+          problem: 'Grain connector credentials are not configured',
+          fix: 'Set GRAIN_CONNECTOR_CLIENT_ID and GRAIN_CONNECTOR_CLIENT_SECRET in the environment.',
+        });
+      }
+      redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/grain/callback`;
+      conn = createGrainConnector({
+        clientId: env.GRAIN_CONNECTOR_CLIENT_ID,
+        clientSecret: env.GRAIN_CONNECTOR_CLIENT_SECRET,
+      });
     } else {
       throw holoError({
         code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: `${provider} connector is not implemented`,
-        fix: 'Only GitHub and Slack are available. Other connectors land in subsequent specs.',
+        fix: 'Only GitHub, Slack, and Grain are available. Other connectors land in subsequent specs.',
       });
     }
 

@@ -23,7 +23,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'grain',
     displayName: 'Grain',
     description: 'Meeting recordings + transcripts.',
-    implemented: false,
+    implemented: true,
   },
   {
     id: 'pylon',
