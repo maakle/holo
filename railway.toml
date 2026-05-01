@@ -1,0 +1,30 @@
+[build]
+builder = "DOCKERFILE"
+watchPatterns = ["apps/web/**", "packages/**"]
+
+[[services]]
+name = "holo-web"
+source = "apps/web/Dockerfile"
+healthcheckPath = "/api/health"
+startCommand = "node apps/web/server.js"
+
+[services.variables]
+PORT = "3030"
+NODE_ENV = "production"
+
+[[services]]
+name = "holo-mcp"
+source = "apps/mcp/Dockerfile"
+healthcheckPath = "/health"
+startCommand = "node apps/mcp/dist/main.js"
+
+[services.variables]
+MCP_PORT = "8091"
+NODE_ENV = "production"
+
+[[services]]
+name = "postgres"
+image = "pgvector/pgvector:pg16"
+
+[services.variables]
+POSTGRES_DB = "holo"

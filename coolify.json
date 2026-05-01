@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "name": "holo",
+  "description": "Self-hosted AI context layer + skill execution",
+  "services": [
+    {
+      "name": "holo-web",
+      "type": "dockerfile",
+      "dockerfilePath": "apps/web/Dockerfile",
+      "port": 3030,
+      "healthcheck": "/api/health",
+      "env": ["DATABASE_URL", "REDIS_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "ANTHROPIC_API_KEY", "GITHUB_LOGIN_CLIENT_ID", "GITHUB_LOGIN_CLIENT_SECRET", "HOLO_TOKEN_ENCRYPTION_KEY"]
+    },
+    {
+      "name": "holo-mcp",
+      "type": "dockerfile",
+      "dockerfilePath": "apps/mcp/Dockerfile",
+      "port": 8091,
+      "healthcheck": "/health",
+      "env": ["DATABASE_URL", "MCP_PUBLIC_URL", "WEB_PUBLIC_URL"]
+    }
+  ]
+}

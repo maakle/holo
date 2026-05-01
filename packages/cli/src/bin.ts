@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import { initCommand } from './commands/init.js';
+import { doctorCommand } from './commands/doctor.js';
 import { buildProgram } from './main.js';
 
 const [, , command, ...args] = process.argv;
 
 if (command === 'init' || !command) {
   await initCommand(args);
+} else if (command === 'doctor') {
+  await doctorCommand();
 } else {
   // Delegate to the commander-based program for other subcommands
   try {
