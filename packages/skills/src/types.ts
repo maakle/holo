@@ -3,6 +3,8 @@ export interface SkillFrontmatter {
   description: string;
   tools: string[];
   when_to_use?: string;
+  tool_allowlist?: string[];  // explicit allowlist for execute_skill enforcement
+  executable?: boolean;       // false = read-only skill reference, true = can be executed
   [key: string]: unknown;
 }
 
