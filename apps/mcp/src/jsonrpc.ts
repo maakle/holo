@@ -2,6 +2,7 @@ import { Hono, type Context, type Next } from 'hono';
 import { type DB, schema } from '@holo/db';
 import { HoloError } from '@holo/errors';
 import { listTools, type ToolContext } from './tools/index.js';
+import { checkToolAllowed } from './middleware/allowlist.js';
 
 interface JsonRpcRequest {
   jsonrpc?: string;
@@ -87,6 +88,18 @@ export function mountMcp(app: Hono, opts: MountMcpOpts): void {
             return c.json(
               jsonRpcError(body.id, -32601, `Unknown tool: ${params.name}`),
               404,
+            );
+          }
+          const activeAllowlist: string[] = (ctx as { activeToolAllowlist?: string[] }).activeToolAllowlist ?? [];
+          if (!checkToolAllowed(params.name, activeAllowlist)) {
+            return c.json(
+              jsonRpcError(
+                body.id,
+                -32001,
+                `Tool '${params.name}' is not in the active skill's tool allowlist`,
+                { allowlist: activeAllowlist },
+              ),
+              403,
             );
           }
           const agentIdentity =
