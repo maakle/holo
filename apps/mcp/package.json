@@ -15,6 +15,7 @@
     "@holo/audit": "workspace:*",
     "@holo/auth": "workspace:*",
     "@holo/crypto": "workspace:*",
+    "@holo/custom-tools": "workspace:*",
     "@holo/db": "workspace:*",
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",

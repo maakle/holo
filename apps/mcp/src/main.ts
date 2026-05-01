@@ -118,6 +118,7 @@ async function main() {
       return {
         db,
         organizationId: user.organizationId,
+        userId: user.id,
         userSubjects: [`org:${user.organizationId}`],
         activeToolAllowlist,
       };

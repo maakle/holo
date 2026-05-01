@@ -68,7 +68,8 @@ export function mountMcp(app: Hono, opts: MountMcpOpts): void {
             }),
           );
         case 'tools/list': {
-          const tools = listTools().map((t) => ({
+          const allTools = await listTools(ctx);
+          const tools = allTools.map((t) => ({
             name: t.name,
             description: t.description,
             inputSchema: t.inputSchema,
@@ -83,7 +84,8 @@ export function mountMcp(app: Hono, opts: MountMcpOpts): void {
               400,
             );
           }
-          const tool = listTools().find((t) => t.name === params.name);
+          const allTools = await listTools(ctx);
+          const tool = allTools.find((t) => t.name === params.name);
           if (!tool) {
             return c.json(
               jsonRpcError(body.id, -32601, `Unknown tool: ${params.name}`),

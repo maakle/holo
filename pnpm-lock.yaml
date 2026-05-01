@@ -117,6 +117,9 @@ importers:
       '@holo/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
+      '@holo/custom-tools':
+        specifier: workspace:*
+        version: link:../../packages/custom-tools
       '@holo/db':
         specifier: workspace:*
         version: link:../../packages/db
