@@ -9,6 +9,8 @@ import { getThreadInputSchema, runGetThreadTool } from './get-thread.js';
 import { getDocInputSchema, runGetDocTool } from './get-doc.js';
 import { getCallInputSchema, runGetCallTool } from './get-call.js';
 import { getTicketInputSchema, runGetTicketTool } from './get-ticket.js';
+import { listSkillsInputSchema, runListSkillsTool } from './list-skills.js';
+import { getSkillInputSchema, runGetSkillTool } from './get-skill.js';
 
 export interface ToolContext {
   db: DB;
@@ -72,6 +74,24 @@ export function listTools(): ToolDefinition[] {
       inputSchema: zodToJsonSchema(getTicketInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
       async run(ctx, args) {
         return runGetTicketTool(ctx, args);
+      },
+    },
+    {
+      name: 'list_skills',
+      description:
+        'List skills available to agents in this organization. Returns name, slug, version, status, and description. Filter by status (default: active).',
+      inputSchema: zodToJsonSchema(listSkillsInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      async run(ctx, args) {
+        return runListSkillsTool(ctx, args);
+      },
+    },
+    {
+      name: 'get_skill',
+      description:
+        'Retrieve the full content of a skill by id or slug. Returns the complete Anthropic Skill format including procedure and examples.',
+      inputSchema: zodToJsonSchema(getSkillInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      async run(ctx, args) {
+        return runGetSkillTool(ctx, args);
       },
     },
   ];
