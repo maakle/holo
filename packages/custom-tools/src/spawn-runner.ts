@@ -58,9 +58,16 @@ export function runCommand(input: RunCommandInput): Promise<RunResult> {
       }
     }, timeoutMs);
 
-    child.on('error', (err) => {
+    let resolved = false;
+    const finish = (r: RunResult): void => {
+      if (resolved) return;
+      resolved = true;
       clearTimeout(timer);
-      resolveP({
+      resolveP(r);
+    };
+
+    child.on('error', (err) => {
+      finish({
         stdout,
         stderr: stderr + `\n[spawn error] ${err.message}`,
         exitCode: -1,
@@ -70,8 +77,7 @@ export function runCommand(input: RunCommandInput): Promise<RunResult> {
     });
 
     child.on('close', (code, signal) => {
-      clearTimeout(timer);
-      resolveP({
+      finish({
         stdout,
         stderr,
         exitCode: code ?? (signal ? -1 : 0),
