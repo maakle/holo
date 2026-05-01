@@ -80,7 +80,7 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/holo/main/docker-compose.ym
 docker compose up -d
 
 # 4. Open the dashboard
-open http://localhost:3000
+open http://localhost:3030
 ```
 
 **Requirements:** Docker 24+, Node.js 20+ (only needed to run `npx`)
@@ -96,7 +96,7 @@ open http://localhost:3000
   }
 }
 ```
-Get your token at `http://localhost:3000/connect-agent`.
+Get your token at `http://localhost:3030/connect-agent`.
 
 ---
 

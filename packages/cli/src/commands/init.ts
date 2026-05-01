@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import * as readline from 'node:readline';
 
 function randomAlphanumeric(length: number): string {
@@ -27,7 +27,7 @@ function randomHex(bytes: number): string {
 
 function isCommandAvailable(cmd: string): boolean {
   try {
-    execSync(`which ${cmd}`, { stdio: 'ignore' });
+    execFileSync('which', [cmd], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -36,7 +36,7 @@ function isCommandAvailable(cmd: string): boolean {
 
 function isDockerComposeAvailable(): boolean {
   try {
-    execSync('docker compose version', { stdio: 'ignore' });
+    execFileSync('docker', ['compose', 'version'], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -114,13 +114,13 @@ export async function initCommand(_args: string[]): Promise<void> {
     `DATABASE_URL=postgresql://holo:${postgresPassword}@localhost:5436/holo`,
     `REDIS_URL=redis://localhost:6382`,
     `BETTER_AUTH_SECRET=${betterAuthSecret}`,
-    `BETTER_AUTH_URL=http://localhost:3000`,
+    `BETTER_AUTH_URL=http://localhost:3030`,
     `HOLO_TOKEN_ENCRYPTION_KEY=${tokenEncryptionKey}`,
     `ANTHROPIC_API_KEY=<REPLACE_ME>`,
     `GITHUB_LOGIN_CLIENT_ID=<REPLACE_ME>`,
     `GITHUB_LOGIN_CLIENT_SECRET=<REPLACE_ME>`,
     `MCP_PUBLIC_URL=http://localhost:8091`,
-    `WEB_PUBLIC_URL=http://localhost:3000`,
+    `WEB_PUBLIC_URL=http://localhost:3030`,
     '',
   ].join('\n');
 
@@ -140,7 +140,7 @@ export async function initCommand(_args: string[]): Promise<void> {
     console.log('Next steps:');
     console.log('  1. Fill in ANTHROPIC_API_KEY, GITHUB_LOGIN_CLIENT_ID, GITHUB_LOGIN_CLIENT_SECRET in .env');
     console.log('  2. Run: docker compose up -d');
-    console.log('  3. Open: http://localhost:3000');
+    console.log('  3. Open: http://localhost:3030');
   } else {
     console.log('✓ .env generated');
     console.log('');
@@ -151,6 +151,6 @@ export async function initCommand(_args: string[]): Promise<void> {
     );
     console.log('  2. Fill in ANTHROPIC_API_KEY, GITHUB_LOGIN_CLIENT_ID, GITHUB_LOGIN_CLIENT_SECRET in .env');
     console.log('  3. Run: docker compose up -d');
-    console.log('  4. Open: http://localhost:3000');
+    console.log('  4. Open: http://localhost:3030');
   }
 }
