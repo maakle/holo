@@ -349,7 +349,9 @@ export const auditEvents = pgTable(
   'audit_events',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    organizationId: uuid('organization_id').notNull(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
     userId: uuid('user_id').references(() => user.id),
     eventType: text('event_type').notNull(),
     resourceType: text('resource_type').notNull(),
@@ -358,7 +360,7 @@ export const auditEvents = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    orgCreatedAtIdx: index('audit_events_org_created_at_idx').on(t.organizationId, t.createdAt),
+    orgCreatedAtIdx: index('audit_events_org_created_at_idx').on(t.organizationId, t.createdAt.desc()),
     eventTypeIdx: index('audit_events_event_type_idx').on(t.organizationId, t.eventType),
   }),
 );
