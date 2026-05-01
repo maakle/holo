@@ -277,3 +277,24 @@ export const mcpInvocations = pgTable(
     orgToolIdx: index('mcp_invocations_org_tool_idx').on(t.organizationId, t.toolName),
   }),
 );
+
+export const apiTokens = pgTable(
+  'api_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id),
+    tokenHash: text('token_hash').notNull().unique(),
+    label: text('label').notNull().default('default'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => ({
+    orgUserIdx: index('api_tokens_org_user_idx').on(t.organizationId, t.userId),
+  }),
+);
