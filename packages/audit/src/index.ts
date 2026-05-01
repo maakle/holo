@@ -9,7 +9,8 @@ export type AuditEventType =
   | 'api_token.revoked'
   | 'skill.published'
   | 'skill.synthesized'
-  | 'member.invited';
+  | 'member.invited'
+  | 'custom_tool.invoked';
 
 export interface EmitAuditEventInput {
   db: DB;

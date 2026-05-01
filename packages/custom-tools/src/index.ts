@@ -10,3 +10,5 @@ export {
   deleteCustomToolByName,
 } from './repository.js';
 export type { CreateCustomToolInput } from './repository.js';
+export { emitCustomToolInvocation } from './audit.js';
+export type { EmitInvocationInput } from './audit.js';
