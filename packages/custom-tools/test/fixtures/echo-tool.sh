@@ -7,3 +7,4 @@ done
 printf -- '---ENV---\n'
 printf 'CUSTOM_TOOLS_TEST_FOO=%s\n' "${CUSTOM_TOOLS_TEST_FOO-}"
 printf 'CUSTOM_TOOLS_TEST_BAR=%s\n' "${CUSTOM_TOOLS_TEST_BAR-}"
+printf 'CUSTOM_TOOLS_TEST_SECRET=%s\n' "${CUSTOM_TOOLS_TEST_SECRET-}"

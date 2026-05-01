@@ -33,6 +33,26 @@ describe('runCommand', () => {
     expect(r.stdout).toContain('CUSTOM_TOOLS_TEST_BAR=also');
   });
 
+  it('strips env vars NOT in the allowlist (security control)', async () => {
+    process.env.CUSTOM_TOOLS_TEST_SECRET = 'leak';
+    try {
+      const r = await runCommand({
+        command: ECHO,
+        argv: [],
+        env: { CUSTOM_TOOLS_TEST_FOO: 'allowed' },
+        timeoutMs: 5000,
+        maxOutputBytes: 65536,
+      });
+      // Allowlisted var is present
+      expect(r.stdout).toContain('CUSTOM_TOOLS_TEST_FOO=allowed');
+      // Non-allowlisted var is absent (printed as empty value, not 'leak')
+      expect(r.stdout).toContain('CUSTOM_TOOLS_TEST_SECRET=\n');
+      expect(r.stdout).not.toContain('CUSTOM_TOOLS_TEST_SECRET=leak');
+    } finally {
+      delete process.env.CUSTOM_TOOLS_TEST_SECRET;
+    }
+  });
+
   it('does NOT shell-interpret argv (security control)', async () => {
     const r = await runCommand({
       command: ECHO,
