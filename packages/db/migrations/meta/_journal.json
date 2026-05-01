@@ -43,6 +43,13 @@
       "when": 1777498776700,
       "tag": "0005_chunks_content_hash_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1746388800000,
+      "tag": "0006_skills",
+      "breakpoints": true
     }
   ]
 }

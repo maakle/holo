@@ -44,17 +44,21 @@ export async function runListSkillsTool(
       ),
     );
 
-  return {
-    skills: rows.map((r) => {
+  const skills = [];
+  for (const r of rows) {
+    try {
       const parsed = parseSkill(r.content);
-      return {
+      skills.push({
         id: r.id,
         name: r.name,
         slug: r.slug,
         version: r.version,
         status: r.status,
         description: parsed.frontmatter.description,
-      };
-    }),
-  };
+      });
+    } catch {
+      // Skip rows with malformed content — synthesis may produce invalid YAML during weeks 8-10.
+    }
+  }
+  return { skills };
 }
