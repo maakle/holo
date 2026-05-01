@@ -27,6 +27,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             <Link href="/skills" className="text-sm text-gray-600 dark:text-gray-300">
               Skills
             </Link>
+            <Link href="/observability" className="text-sm text-gray-600 dark:text-gray-300">
+              Observability
+            </Link>
             <Link href="/connect-agent" className="text-sm text-gray-600 dark:text-gray-300">
               Connect Agent
             </Link>
