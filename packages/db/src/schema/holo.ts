@@ -230,3 +230,29 @@ export const skills = pgTable(
     ),
   }),
 );
+
+export const skillLabels = pgTable(
+  'skill_labels',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id),
+    sourceArtifactId: uuid('source_artifact_id')
+      .notNull()
+      .references(() => sourceArtifacts.id, { onDelete: 'cascade' }),
+    skillSlug: text('skill_slug').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgSlugIdx: index('skill_labels_org_slug_idx').on(t.organizationId, t.skillSlug),
+    orgArtifactSlugUniq: uniqueIndex('skill_labels_org_artifact_slug_uniq').on(
+      t.organizationId,
+      t.sourceArtifactId,
+      t.skillSlug,
+    ),
+  }),
+);
