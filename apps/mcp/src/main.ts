@@ -4,13 +4,19 @@ import { initCrypto } from '@holo/crypto';
 import { parseEnv } from '@holo/env';
 import { createDb } from '@holo/db';
 import { HoloError } from '@holo/errors';
-import { createSessionMiddleware } from './middleware/session';
+import { createSessionMiddleware } from './middleware/session.js';
 import { mountMcp } from './jsonrpc.js';
+import { createRestRouter } from './rest/router.js';
+import { openApiDoc } from './rest/openapi.js';
 
 async function main() {
   const env = parseEnv(process.env);
   await initCrypto();
   const db = createDb(env.DATABASE_URL);
+
+  const mcpPublicUrl = process.env.MCP_PUBLIC_URL ?? 'http://localhost:8091';
+  const webPublicUrl =
+    process.env.WEB_PUBLIC_URL ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:3000';
 
   const app = new Hono();
 
@@ -36,6 +42,46 @@ async function main() {
   app.get('/_session-check', createSessionMiddleware(db), (c) =>
     c.json({ user: c.get('user' as never) }),
   );
+
+  // OAuth 2.1 Authorization Server Metadata (RFC 8414)
+  app.get('/.well-known/oauth-authorization-server', (c) =>
+    c.json({
+      issuer: mcpPublicUrl,
+      authorization_endpoint: `${webPublicUrl}/oauth/authorize`,
+      token_endpoint: `${webPublicUrl}/oauth/token`,
+      response_types_supported: ['code'],
+      grant_types_supported: ['authorization_code'],
+      code_challenge_methods_supported: ['S256'],
+      token_endpoint_auth_methods_supported: ['none'],
+    }),
+  );
+
+  // OAuth 2.1 Protected Resource Metadata (RFC 9728)
+  app.get('/.well-known/oauth-protected-resource', (c) =>
+    c.json({
+      resource: mcpPublicUrl,
+      authorization_servers: [webPublicUrl],
+      bearer_methods_supported: ['header'],
+      scopes_supported: ['search', 'skills:read', 'skills:write'],
+    }),
+  );
+
+  // OpenAPI spec (no auth)
+  app.get('/openapi.json', (c) => c.json(openApiDoc));
+
+  // REST API surface — /v1/health is public, all others require auth
+  const sessionMiddleware = createSessionMiddleware(db);
+  const restRouter = createRestRouter(db);
+
+  // Mount public health endpoint without auth
+  app.get('/v1/health', (c) => c.json({ status: 'ok', version: '0.1' }));
+
+  // Mount authenticated REST routes
+  app.use('/v1/skills', sessionMiddleware);
+  app.use('/v1/skills/*', sessionMiddleware);
+  app.use('/v1/search', sessionMiddleware);
+
+  app.route('/', restRouter);
 
   mountMcp(app, {
     db,

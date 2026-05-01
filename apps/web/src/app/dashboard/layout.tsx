@@ -33,6 +33,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             <Link href="/connect-agent" className="text-sm text-gray-600 dark:text-gray-300">
               Connect Agent
             </Link>
+            <Link href="/dashboard/team" className="text-sm text-gray-600 dark:text-gray-300">
+              Team
+            </Link>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500">{session.user.email}</span>
