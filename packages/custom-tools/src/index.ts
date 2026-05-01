@@ -12,3 +12,5 @@ export {
 export type { CreateCustomToolInput } from './repository.js';
 export { emitCustomToolInvocation } from './audit.js';
 export type { EmitInvocationInput } from './audit.js';
+export { buildCustomToolDefinition } from './mcp-tool-factory.js';
+export type { CustomToolDefinition } from './mcp-tool-factory.js';
