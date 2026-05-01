@@ -15,6 +15,41 @@
       "when": 1777498776300,
       "tag": "0001_specialized_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777498776400,
+      "tag": "0002_connector_allowlists",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777498776500,
+      "tag": "0003_chunks_content_hash",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777498776600,
+      "tag": "0004_connector_cursors_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777498776700,
+      "tag": "0005_chunks_content_hash_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1746388800000,
+      "tag": "0006_skills",
+      "breakpoints": true
     }
   ]
 }

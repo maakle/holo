@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { headers, cookies } from 'next/headers';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
-import { shared, createGithubConnector } from '@holo/connectors';
+import { shared, createGithubConnector, createSlackConnector, createGrainConnector, type Connector } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ provider: string }> }) {
@@ -17,11 +17,46 @@ export async function POST(_req: Request, { params }: { params: Promise<{ provid
       });
     }
 
-    if (provider !== 'github') {
+    let conn: Connector;
+    let redirectUri: string;
+
+    if (provider === 'github') {
+      redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/github/callback`;
+      conn = createGithubConnector({
+        clientId: env.GITHUB_CONNECTOR_CLIENT_ID,
+        clientSecret: env.GITHUB_CONNECTOR_CLIENT_SECRET,
+      });
+    } else if (provider === 'slack') {
+      if (!env.SLACK_CONNECTOR_CLIENT_ID || !env.SLACK_CONNECTOR_CLIENT_SECRET) {
+        throw holoError({
+          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+          problem: 'Slack connector credentials are not configured',
+          fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET in the environment.',
+        });
+      }
+      redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/slack/callback`;
+      conn = createSlackConnector({
+        clientId: env.SLACK_CONNECTOR_CLIENT_ID,
+        clientSecret: env.SLACK_CONNECTOR_CLIENT_SECRET,
+      });
+    } else if (provider === 'grain') {
+      if (!env.GRAIN_CONNECTOR_CLIENT_ID || !env.GRAIN_CONNECTOR_CLIENT_SECRET) {
+        throw holoError({
+          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+          problem: 'Grain connector credentials are not configured',
+          fix: 'Set GRAIN_CONNECTOR_CLIENT_ID and GRAIN_CONNECTOR_CLIENT_SECRET in the environment.',
+        });
+      }
+      redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/grain/callback`;
+      conn = createGrainConnector({
+        clientId: env.GRAIN_CONNECTOR_CLIENT_ID,
+        clientSecret: env.GRAIN_CONNECTOR_CLIENT_SECRET,
+      });
+    } else {
       throw holoError({
         code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
-        problem: `${provider} connector is not implemented in Foundation`,
-        fix: 'Only GitHub is available in v0.0. Other connectors land in subsequent specs.',
+        problem: `${provider} connector is not implemented`,
+        fix: 'Only GitHub, Slack, and Grain are available. Other connectors land in subsequent specs.',
       });
     }
 
@@ -36,11 +71,6 @@ export async function POST(_req: Request, { params }: { params: Promise<{ provid
       env.BETTER_AUTH_SECRET,
     );
 
-    const redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/github/callback`;
-    const conn = createGithubConnector({
-      clientId: env.GITHUB_CONNECTOR_CLIENT_ID,
-      clientSecret: env.GITHUB_CONNECTOR_CLIENT_SECRET,
-    });
     const authorizeUrl = conn.buildAuthorizeUrl({ redirectUri, state });
 
     const cookieStore = await cookies();

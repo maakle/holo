@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsx watch src/main.ts",
-    "start": "tsx src/main.ts",
+    "dev": "tsx watch --env-file=../../.env src/main.ts",
+    "start": "tsx --env-file=../../.env src/main.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
@@ -18,9 +18,13 @@
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",
     "@holo/retrieval-core": "workspace:*",
-    "hono": "4.6.7",
+    "@holo/skills": "workspace:^",
     "@hono/node-server": "1.13.2",
-    "pino": "9.5.0"
+    "drizzle-orm": "^0.36.0",
+    "hono": "4.6.7",
+    "pino": "9.5.0",
+    "zod": "3.25.76",
+    "zod-to-json-schema": "^3.23.5"
   },
   "devDependencies": {
     "drizzle-orm": "0.36.0",

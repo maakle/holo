@@ -6,6 +6,8 @@ const REQUIRED_INDEXES: Array<{ table: string; index: string; method: string }> 
   { table: 'chunks', index: 'chunks_content_tsvector_gin_idx', method: 'gin' },
   { table: 'chunks', index: 'chunks_acl_subjects_gin_idx', method: 'gin' },
   { table: 'chunks', index: 'chunks_provider_source_kind_idx', method: 'btree' },
+  { table: 'chunks', index: 'chunks_content_hash_idx', method: 'btree' },
+  { table: 'chunks', index: 'chunks_metadata_pr_idx', method: 'gin' },
   { table: 'connector_cursors', index: 'connector_cursors_source_scope_idx', method: 'btree' },
   { table: 'source_artifacts', index: 'source_artifacts_source_kind_fetched_idx', method: 'btree' },
   {
@@ -22,6 +24,7 @@ const REQUIRED_TABLES = [
   'session',
   'account',
   'verification',
+  'connector_allowlists',
   'connector_credentials',
   'sources',
   'source_artifacts',

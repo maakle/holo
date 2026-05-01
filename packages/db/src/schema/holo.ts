@@ -8,6 +8,7 @@ import {
   index,
   uniqueIndex,
   customType,
+  integer,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { encryptedText } from './encrypted-text';
@@ -121,6 +122,8 @@ export const chunks = pgTable(
     parentId: uuid('parent_id'),
     kind: text('kind').notNull(),
     content: text('content').notNull(),
+    contentHash: text('content_hash').notNull(),
+    embeddingModel: text('embedding_model').notNull().default('openai-3-large'),
     contentTsvector: tsvector('content_tsvector'),
     embedding: vector('embedding', { dimensions: 1024 }),
     aclSubjects: text('acl_subjects')
@@ -140,6 +143,8 @@ export const chunks = pgTable(
       t.kind,
     ),
     orgIdx: index('chunks_org_idx').on(t.organizationId),
+    contentHashIdx: uniqueIndex('chunks_content_hash_idx').on(t.organizationId, t.contentHash),
+    metadataPrIdx: index('chunks_metadata_pr_idx').using('gin', sql`${t.metadata} jsonb_path_ops`),
   }),
 );
 
@@ -157,12 +162,71 @@ export const connectorCursors = pgTable(
     latestSeenTs: timestamp('latest_seen_ts', { withTimezone: true }),
     lastRunAt: timestamp('last_run_at', { withTimezone: true }),
     lastStatus: text('last_status'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
   },
   (t) => ({
     sourceScopeIdx: index('connector_cursors_source_scope_idx').on(t.sourceId, t.scope),
     sourceScopeUniq: uniqueIndex('connector_cursors_source_scope_uniq').on(
       t.sourceId,
       t.scope,
+    ),
+  }),
+);
+
+export const connectorAllowlists = pgTable(
+  'connector_allowlists',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    provider: text('provider').notNull(),
+    pattern: text('pattern').notNull(),
+    patternKind: text('pattern_kind', { enum: ['glob', 'exact_id'] }).notNull(),
+    decision: text('decision', { enum: ['include', 'exclude'] }).notNull().default('include'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => user.id),
+    notes: text('notes'),
+  },
+  (t) => ({
+    orgProviderIdx: index('connector_allowlists_org_provider_idx').on(
+      t.organizationId,
+      t.provider,
+    ),
+  }),
+);
+
+export const skills = pgTable(
+  'skills',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    version: integer('version').notNull().default(1),
+    status: text('status', { enum: ['draft', 'active', 'archived'] })
+      .notNull()
+      .default('draft'),
+    content: text('content').notNull(),
+    sourceArtifactIds: uuid('source_artifact_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    fingerprint: text('fingerprint').notNull(),
+    staleAt: timestamp('stale_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => user.id),
+  },
+  (t) => ({
+    orgStatusIdx: index('skills_org_status_idx').on(t.organizationId, t.status),
+    orgSlugVersionUniq: uniqueIndex('skills_org_slug_version_uniq').on(
+      t.organizationId,
+      t.slug,
+      t.version,
     ),
   }),
 );

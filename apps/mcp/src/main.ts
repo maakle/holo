@@ -5,6 +5,7 @@ import { parseEnv } from '@holo/env';
 import { createDb } from '@holo/db';
 import { HoloError } from '@holo/errors';
 import { createSessionMiddleware } from './middleware/session';
+import { mountMcp } from './jsonrpc.js';
 
 async function main() {
   const env = parseEnv(process.env);
@@ -32,11 +33,31 @@ async function main() {
 
   app.get('/health', (c) => c.json({ status: 'ok', service: 'mcp' }));
 
-  // Session middleware exists and is testable, but no MCP endpoints in Foundation.
-  // Spec #2 will mount the JSON-RPC handler with createSessionMiddleware(db).
   app.get('/_session-check', createSessionMiddleware(db), (c) =>
     c.json({ user: c.get('user' as never) }),
   );
+
+  mountMcp(app, {
+    db,
+    middleware: createSessionMiddleware(db),
+    async resolveContext(c) {
+      const user = c.get('user' as never) as
+        | { organizationId: string; id: string }
+        | undefined;
+      if (!user) {
+        throw new HoloError({
+          code: 'HOLO_AUTH_NO_SESSION',
+          problem: 'no session attached to MCP request',
+          fix: 'Authenticate via Better Auth and pass the session cookie or token.',
+        });
+      }
+      return {
+        db,
+        organizationId: user.organizationId,
+        userSubjects: [`org:${user.organizationId}`],
+      };
+    },
+  });
 
   const port = Number(process.env.MCP_PORT ?? 8091);
   serve({ fetch: app.fetch, port });
