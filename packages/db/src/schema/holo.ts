@@ -364,3 +364,22 @@ export const auditEvents = pgTable(
     eventTypeIdx: index('audit_events_event_type_idx').on(t.organizationId, t.eventType),
   }),
 );
+
+export const oauthClients = pgTable(
+  'oauth_clients',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    clientId: text('client_id').notNull(),
+    clientName: text('client_name').notNull(),
+    redirectUris: text('redirect_uris').array().notNull().default(sql`'{}'::text[]`),
+    scopes: text('scopes').array().notNull().default(sql`'{}'::text[]`),
+    registeredAt: timestamp('registered_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    clientIdUniq: uniqueIndex('oauth_clients_client_id_uniq').on(t.clientId),
+    orgIdx: index('oauth_clients_org_idx').on(t.organizationId),
+  }),
+);

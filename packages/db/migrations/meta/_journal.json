@@ -113,6 +113,13 @@
       "when": 1746561600100,
       "tag": "0014b_audit_events_org_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1746648000000,
+      "tag": "0016_oauth_clients",
+      "breakpoints": true
     }
   ]
 }
