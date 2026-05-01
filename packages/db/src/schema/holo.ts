@@ -323,13 +323,15 @@ export const skillRuns = pgTable(
   'skill_runs',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    organizationId: uuid('organization_id').notNull(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
     skillId: uuid('skill_id')
       .notNull()
       .references(() => skills.id, { onDelete: 'cascade' }),
     triggeredBy: uuid('triggered_by').references(() => user.id),
-    input: jsonb('input').notNull().default(sql`'{}'::jsonb`),
-    steps: jsonb('steps').notNull().default(sql`'[]'::jsonb`),
+    input: jsonb('input').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    steps: jsonb('steps').$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
     status: text('status', { enum: ['running', 'completed', 'failed'] })
       .notNull()
       .default('running'),
