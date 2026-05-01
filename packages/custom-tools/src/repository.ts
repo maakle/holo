@@ -4,6 +4,19 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
 import type { CustomToolRow } from './types.js';
 
+// keep in sync with apps/mcp/src/tools/index.ts
+const BUILTIN_TOOL_NAMES = new Set([
+  'search',
+  'get_pr',
+  'get_thread',
+  'get_doc',
+  'get_call',
+  'get_ticket',
+  'list_skills',
+  'get_skill',
+  'execute_skill',
+]);
+
 export async function listCustomTools(
   db: DB,
   organizationId: string,
@@ -54,6 +67,13 @@ export async function createCustomTool(db: DB, input: CreateCustomToolInput): Pr
       code: ErrorCode.HOLO_INVALID_INPUT,
       problem: `Custom tool name '${input.name}' is invalid`,
       fix: 'Use 3-64 chars, lowercase letters/digits/underscore, starting with a letter.',
+    });
+  }
+  if (BUILTIN_TOOL_NAMES.has(input.name)) {
+    throw holoError({
+      code: ErrorCode.HOLO_INVALID_INPUT,
+      problem: `Custom tool name '${input.name}' collides with a built-in MCP tool`,
+      fix: 'Pick a different name; built-in tool names are reserved.',
     });
   }
   if (input.timeoutMs > 60000) {
