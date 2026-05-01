@@ -10,8 +10,8 @@ describe('clusterInvocations', () => {
     ];
     const clusters = clusterInvocations(invocations);
     expect(clusters).toHaveLength(2);
-    expect(clusters[0].toolName).toBe('search');
-    expect(clusters[0].count).toBe(2);
+    expect(clusters[0]!.toolName).toBe('search');
+    expect(clusters[0]!.count).toBe(2);
   });
 
   it('returns empty array for no invocations', () => {
@@ -24,6 +24,6 @@ describe('clusterInvocations', () => {
       inputJson: { query: `query-${i}` },
     }));
     const clusters = clusterInvocations(invocations);
-    expect(clusters[0].examples.length).toBeLessThanOrEqual(3);
+    expect(clusters[0]!.examples.length).toBeLessThanOrEqual(3);
   });
 });
