@@ -50,6 +50,34 @@
       "when": 1746388800000,
       "tag": "0006_skills",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1746432000000,
+      "tag": "0007_skill_labels",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1746475200000,
+      "tag": "0008_mcp_invocations",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1746518400000,
+      "tag": "0009_api_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777498777000,
+      "tag": "0010_published_skills",
+      "breakpoints": true
     }
   ]
 }

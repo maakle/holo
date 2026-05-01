@@ -63,6 +63,43 @@ Full reasoning, alternatives considered, and migration paths in [`docs/ARCHITECT
 
 ---
 
+## Quickstart
+
+Self-host holo in under 5 minutes:
+
+```bash
+# 1. Create a directory and run the setup wizard
+mkdir my-holo && cd my-holo
+npx @holo/cli init
+
+# 2. Fill in the placeholders the wizard printed
+#    ANTHROPIC_API_KEY, GITHUB_LOGIN_CLIENT_ID, GITHUB_LOGIN_CLIENT_SECRET
+
+# 3. Bring it up
+curl -fsSL https://raw.githubusercontent.com/<owner>/holo/main/docker-compose.yml -o docker-compose.yml
+docker compose up -d
+
+# 4. Open the dashboard
+open http://localhost:3030
+```
+
+**Requirements:** Docker 24+, Node.js 20+ (only needed to run `npx`)
+
+**Connect your agent (Cursor):**
+```json
+{
+  "mcpServers": {
+    "holo": {
+      "url": "http://localhost:8091/mcp",
+      "headers": { "Authorization": "Bearer <your-token-from-dashboard>" }
+    }
+  }
+}
+```
+Get your token at `http://localhost:3030/connect-agent`.
+
+---
+
 ## Quick start (v0.0 Foundation — development)
 
 > Requires Docker, Node 20+, pnpm 9+. v0.0 Foundation is the deployable skeleton: login + GitHub Connector OAuth roundtrip, no ingestion or retrieval yet. See [`docs/superpowers/specs/2026-04-29-v0.0-foundation-design.md`](./docs/superpowers/specs/2026-04-29-v0.0-foundation-design.md).

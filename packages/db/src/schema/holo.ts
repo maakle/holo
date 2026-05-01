@@ -230,3 +230,88 @@ export const skills = pgTable(
     ),
   }),
 );
+
+export const skillLabels = pgTable(
+  'skill_labels',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id),
+    sourceArtifactId: uuid('source_artifact_id')
+      .notNull()
+      .references(() => sourceArtifacts.id, { onDelete: 'cascade' }),
+    skillSlug: text('skill_slug').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgSlugIdx: index('skill_labels_org_slug_idx').on(t.organizationId, t.skillSlug),
+    orgArtifactSlugUniq: uniqueIndex('skill_labels_org_artifact_slug_uniq').on(
+      t.organizationId,
+      t.sourceArtifactId,
+      t.skillSlug,
+    ),
+  }),
+);
+
+export const mcpInvocations = pgTable(
+  'mcp_invocations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    agentIdentity: text('agent_identity'),
+    toolName: text('tool_name').notNull(),
+    inputJson: jsonb('input_json').$type<Record<string, unknown>>().notNull(),
+    outputJson: jsonb('output_json').$type<Record<string, unknown>>(),
+    errorCode: text('error_code'),
+    latencyMs: integer('latency_ms').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index('mcp_invocations_org_created_idx').on(t.organizationId, t.createdAt),
+    orgToolIdx: index('mcp_invocations_org_tool_idx').on(t.organizationId, t.toolName),
+  }),
+);
+
+export const apiTokens = pgTable(
+  'api_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id),
+    tokenHash: text('token_hash').notNull().unique(),
+    label: text('label').notNull().default('default'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => ({
+    orgUserIdx: index('api_tokens_org_user_idx').on(t.organizationId, t.userId),
+  }),
+);
+
+export const publishedSkills = pgTable(
+  'published_skills',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id').notNull(),
+    skillId: uuid('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'cascade' }),
+    redactedContent: text('redacted_content').notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    publishedAtIdx: index('published_skills_published_at_idx').on(t.publishedAt),
+    skillIdUniq: uniqueIndex('published_skills_skill_id_uniq').on(t.skillId),
+  }),
+);

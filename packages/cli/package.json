@@ -1,13 +1,13 @@
 {
   "name": "@holo/cli",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
-  "bin": { "holo": "./dist/main.js" },
+  "bin": { "holo": "./dist/bin.js" },
   "scripts": {
-    "build": "tsc -p tsconfig.json && chmod +x dist/main.js",
+    "build": "tsc -p tsconfig.json && chmod +x dist/bin.js dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev": "tsx src/bin.ts"
   },
   "dependencies": {
     "@holo/db": "workspace:*",

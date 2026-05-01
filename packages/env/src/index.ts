@@ -18,6 +18,7 @@ const EnvSchema = z.object({
   EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  ANTHROPIC_API_KEY: z.string().optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });
 
