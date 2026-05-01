@@ -143,4 +143,76 @@ describe('custom tool roundtrip', () => {
     );
     expect(res.status).toBe(403);
   });
+
+  it('writes audit row for non-zero exit', async () => {
+    const failName = 'echo_argv_fail';
+    await deleteCustomToolByName(db, orgId, failName).catch(() => {});
+    await createCustomTool(db, {
+      organizationId: orgId,
+      createdBy: userId,
+      name: failName,
+      description: 'always fails',
+      command: '/bin/sh',
+      argsTemplate: ['-c', 'exit 7'],
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+      envAllowlist: [],
+      scope: null,
+      readOnly: true,
+      timeoutMs: 5000,
+      maxOutputBytes: 4096,
+    });
+
+    const failApp = new Hono();
+    mountMcp(failApp, {
+      db,
+      async resolveContext() {
+        return {
+          db,
+          organizationId: orgId,
+          userId,
+          userSubjects: [`org:${orgId}`],
+          activeToolAllowlist: [failName],
+        };
+      },
+    });
+
+    const res = await failApp.fetch(
+      new Request('http://test/mcp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: failName, arguments: {} },
+        }),
+      }),
+    );
+    const body = (await res.json()) as { result: { content: Array<{ text: string }> } };
+    const payload = JSON.parse(body.result.content[0]!.text) as { exit_code: number };
+    expect(payload.exit_code).toBe(7);
+
+    // Poll up to 1s for the audit row, mirroring the success-case poll.
+    let auditRow: { meta: Record<string, unknown> } | undefined;
+    for (let i = 0; i < 20 && !auditRow; i++) {
+      const rows = await sql<{ meta: Record<string, unknown> }[]>`
+        SELECT meta FROM audit_events
+         WHERE organization_id = ${orgId}
+           AND event_type = 'custom_tool.invoked'
+           AND meta->>'tool_name' = ${failName}
+         ORDER BY created_at DESC
+         LIMIT 1
+      `;
+      auditRow = rows[0];
+      if (!auditRow) await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(auditRow).toBeDefined();
+    expect(auditRow!.meta.exit_code).toBe(7);
+
+    await deleteCustomToolByName(db, orgId, failName);
+  });
 });
