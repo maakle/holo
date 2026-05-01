@@ -85,6 +85,9 @@ export function mountMcp(app: Hono, opts: MountMcpOpts): void {
             );
           }
           const allTools = await listTools(ctx);
+          const customToolNames = new Set(
+            allTools.filter((t) => t.isCustom).map((t) => t.name),
+          );
           const tool = allTools.find((t) => t.name === params.name);
           if (!tool) {
             return c.json(
@@ -93,7 +96,7 @@ export function mountMcp(app: Hono, opts: MountMcpOpts): void {
             );
           }
           const activeAllowlist: string[] = (ctx as { activeToolAllowlist?: string[] }).activeToolAllowlist ?? [];
-          if (!checkToolAllowed(params.name, activeAllowlist)) {
+          if (!checkToolAllowed(params.name, activeAllowlist, { customToolNames })) {
             return c.json(
               jsonRpcError(
                 body.id,
