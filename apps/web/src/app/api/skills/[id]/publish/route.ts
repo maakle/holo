@@ -71,7 +71,14 @@ export async function POST(
       })
       .returning({ id: schema.publishedSkills.id });
 
-    return NextResponse.json({ publishedId: inserted!.id });
+    if (!inserted) {
+      throw holoError({
+        code: ErrorCode.HOLO_INTERNAL,
+        problem: 'Insert did not return a row',
+        fix: 'Retry the publish operation.',
+      });
+    }
+    return NextResponse.json({ publishedId: inserted.id });
   } catch (e) {
     if (e instanceof HoloError) {
       const status =

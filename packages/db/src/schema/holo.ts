@@ -303,14 +303,15 @@ export const publishedSkills = pgTable(
   'published_skills',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    organizationId: text('organization_id').notNull(),
-    skillId: text('skill_id')
+    organizationId: uuid('organization_id').notNull(),
+    skillId: uuid('skill_id')
       .notNull()
       .references(() => skills.id, { onDelete: 'cascade' }),
     redactedContent: text('redacted_content').notNull(),
-    publishedAt: timestamp('published_at', { withTimezone: false }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     publishedAtIdx: index('published_skills_published_at_idx').on(t.publishedAt),
+    skillIdUniq: uniqueIndex('published_skills_skill_id_uniq').on(t.skillId),
   }),
 );

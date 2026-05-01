@@ -30,7 +30,10 @@ export function PublishButton({ skillId }: PublishButtonProps) {
 
   if (state === 'published') {
     return (
-      <span className="text-xs font-medium uppercase tracking-wide text-green-500 dark:text-green-400">
+      <span
+        className="text-xs font-medium uppercase tracking-wide"
+        style={{ color: 'var(--success)' }}
+      >
         Published
       </span>
     );
@@ -48,7 +51,8 @@ export function PublishButton({ skillId }: PublishButtonProps) {
     return (
       <button
         onClick={handlePublish}
-        className="text-xs text-red-500 dark:text-red-400 hover:underline"
+        className="text-xs hover:underline"
+        style={{ color: 'var(--error)' }}
       >
         Failed — retry
       </button>
@@ -62,8 +66,9 @@ export function PublishButton({ skillId }: PublishButtonProps) {
       className={
         state === 'loading'
           ? 'text-xs text-gray-400 dark:text-gray-500 cursor-not-allowed'
-          : 'text-xs text-indigo-500 dark:text-indigo-400 hover:underline cursor-pointer'
+          : 'text-xs hover:underline cursor-pointer'
       }
+      style={state !== 'loading' ? { color: 'var(--accent)' } : undefined}
     >
       {state === 'loading' ? 'Publishing…' : 'Publish'}
     </button>

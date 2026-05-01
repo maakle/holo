@@ -1,20 +1,10 @@
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 
-interface ParsedSkillMeta {
-  name: string;
-  description: string;
-}
-
-function parseSkillMeta(redactedContent: string): ParsedSkillMeta {
-  // Extract frontmatter fields without a full YAML parser to keep this lightweight
-  const nameMatch = redactedContent.match(/^name:\s*(.+)$/m);
+function parseDescription(redactedContent: string): string {
   const descMatch = redactedContent.match(/^description:\s*(.+)$/m);
-  return {
-    name: nameMatch?.[1]?.trim() ?? 'Untitled Skill',
-    description: descMatch?.[1]?.trim() ?? '',
-  };
+  return descMatch?.[1]?.trim() ?? '';
 }
 
 export default async function MarketplacePage() {
@@ -25,8 +15,11 @@ export default async function MarketplacePage() {
       id: schema.publishedSkills.id,
       redactedContent: schema.publishedSkills.redactedContent,
       publishedAt: schema.publishedSkills.publishedAt,
+      name: schema.skills.name,
+      slug: schema.skills.slug,
     })
     .from(schema.publishedSkills)
+    .innerJoin(schema.skills, eq(schema.publishedSkills.skillId, schema.skills.id))
     .orderBy(desc(schema.publishedSkills.publishedAt))
     .limit(50);
 
@@ -47,7 +40,7 @@ export default async function MarketplacePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {published.map((row) => {
-              const meta = parseSkillMeta(row.redactedContent);
+              const description = parseDescription(row.redactedContent);
               const formattedDate = row.publishedAt.toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'short',
@@ -58,10 +51,10 @@ export default async function MarketplacePage() {
                   key={row.id}
                   className="rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 >
-                  <h2 className="text-sm font-semibold mb-1">{meta.name}</h2>
-                  {meta.description && (
+                  <h2 className="text-sm font-semibold mb-1">{row.name}</h2>
+                  {description && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-relaxed">
-                      {meta.description}
+                      {description}
                     </p>
                   )}
                   <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums uppercase tracking-wide font-medium">

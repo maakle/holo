@@ -14,10 +14,18 @@ export async function redactSkill(content: string, apiKey: string): Promise<stri
 
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2000,
+    max_tokens: 4096,
     system: REDACTION_SYSTEM,
     messages: [{ role: 'user', content: truncated }],
   });
+
+  if (response.stop_reason !== 'end_turn') {
+    throw holoError({
+      code: ErrorCode.HOLO_INTERNAL,
+      problem: 'Redaction output was truncated',
+      fix: 'Retry the publish operation. If the skill content is very long, consider reducing it.',
+    });
+  }
 
   const raw = response.content[0];
   if (!raw || raw.type !== 'text') {
