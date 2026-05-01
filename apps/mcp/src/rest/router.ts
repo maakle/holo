@@ -10,9 +10,6 @@ type RestEnv = { Variables: McpSessionVars };
 export function createRestRouter(db: DB) {
   const router = new Hono<RestEnv>();
 
-  // GET /v1/health — no auth required
-  router.get('/v1/health', (c) => c.json({ status: 'ok', version: '0.1' }));
-
   // GET /v1/skills — list active skills
   router.get('/v1/skills', async (c) => {
     const user = c.get('user');

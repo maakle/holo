@@ -6,7 +6,7 @@ import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 
 export interface McpSessionVars {
-  user: { userId: string; organizationId: string; email: string };
+  user: { userId: string; organizationId: string; email?: string };
 }
 
 export function createSessionMiddleware(

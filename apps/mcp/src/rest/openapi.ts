@@ -232,6 +232,14 @@ export const openApiDoc = {
               },
             },
           },
+          '400': {
+            description: 'Invalid input',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Error' },
+              },
+            },
+          },
           '401': {
             description: 'Unauthorized',
             content: {

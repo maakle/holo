@@ -134,7 +134,7 @@ export default function TeamPage() {
               fontFamily: 'var(--font-geist, "Geist", sans-serif)',
               fontSize: 14,
               fontWeight: 500,
-              color: '#FFFFFF',
+              color: 'var(--accent-fg, #FFFFFF)',
               background: 'var(--accent, #3F47FF)',
               border: 'none',
               borderRadius: 6,
