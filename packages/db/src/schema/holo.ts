@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   customType,
   integer,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { encryptedText } from './encrypted-text';
@@ -220,6 +221,8 @@ export const skills = pgTable(
     createdBy: uuid('created_by')
       .notNull()
       .references(() => user.id),
+    toolAllowlist: text('tool_allowlist').array().notNull().default(sql`'{}'::text[]`),
+    executable: boolean('executable').notNull().default(false),
   },
   (t) => ({
     orgStatusIdx: index('skills_org_status_idx').on(t.organizationId, t.status),
@@ -313,5 +316,29 @@ export const publishedSkills = pgTable(
   (t) => ({
     publishedAtIdx: index('published_skills_published_at_idx').on(t.publishedAt),
     skillIdUniq: uniqueIndex('published_skills_skill_id_uniq').on(t.skillId),
+  }),
+);
+
+export const skillRuns = pgTable(
+  'skill_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id').notNull(),
+    skillId: uuid('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'cascade' }),
+    triggeredBy: uuid('triggered_by').references(() => user.id),
+    input: jsonb('input').notNull().default(sql`'{}'::jsonb`),
+    steps: jsonb('steps').notNull().default(sql`'[]'::jsonb`),
+    status: text('status', { enum: ['running', 'completed', 'failed'] })
+      .notNull()
+      .default('running'),
+    errorMessage: text('error_message'),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (t) => ({
+    orgStatusIdx: index('skill_runs_org_status_idx').on(t.organizationId, t.startedAt),
+    skillIdx: index('skill_runs_skill_idx').on(t.skillId),
   }),
 );
