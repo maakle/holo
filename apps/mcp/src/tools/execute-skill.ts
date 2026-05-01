@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import { parseSkill, executeSkill } from '@holo/skills';
@@ -49,7 +49,7 @@ export async function runExecuteSkillTool(
     .select()
     .from(schema.skills)
     .where(and(...conditions))
-    .orderBy(schema.skills.version)
+    .orderBy(desc(schema.skills.version))
     .limit(1);
 
   const row = rows[0];

@@ -21,4 +21,8 @@ describe('checkToolAllowed', () => {
   it('always allows list_skills regardless of allowlist', () => {
     expect(checkToolAllowed('list_skills', ['search'])).toBe(true);
   });
+
+  it('always allows get_skill regardless of allowlist', () => {
+    expect(checkToolAllowed('get_skill', ['search'])).toBe(true);
+  });
 });

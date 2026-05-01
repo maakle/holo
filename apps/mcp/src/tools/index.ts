@@ -17,6 +17,7 @@ export interface ToolContext {
   db: DB;
   organizationId: string;
   userSubjects?: string[];
+  activeToolAllowlist?: string[];
 }
 
 export interface ToolDefinition {

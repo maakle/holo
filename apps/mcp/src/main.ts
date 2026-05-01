@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { initCrypto } from '@holo/crypto';
 import { parseEnv } from '@holo/env';
-import { createDb } from '@holo/db';
+import { createDb, schema } from '@holo/db';
 import { HoloError } from '@holo/errors';
 import { createSessionMiddleware } from './middleware/session.js';
 import { mountMcp } from './jsonrpc.js';
@@ -87,9 +87,7 @@ async function main() {
     db,
     middleware: createSessionMiddleware(db),
     async resolveContext(c) {
-      const user = c.get('user' as never) as
-        | { organizationId: string; id: string }
-        | undefined;
+      const user = c.get('user' as never) as { organizationId: string; id: string } | undefined;
       if (!user) {
         throw new HoloError({
           code: 'HOLO_AUTH_NO_SESSION',
@@ -97,10 +95,31 @@ async function main() {
           fix: 'Authenticate via Better Auth and pass the session cookie or token.',
         });
       }
+
+      // Optional: if caller passes x-active-skill-slug header, load that skill's toolAllowlist
+      let activeToolAllowlist: string[] = [];
+      const activeSkillSlug = c.req.header('x-active-skill-slug');
+      if (activeSkillSlug) {
+        const { eq, and } = await import('drizzle-orm');
+        const skillRows = await db
+          .select({ toolAllowlist: schema.skills.toolAllowlist })
+          .from(schema.skills)
+          .where(
+            and(
+              eq(schema.skills.organizationId, user.organizationId),
+              eq(schema.skills.slug, activeSkillSlug),
+              eq(schema.skills.status, 'active'),
+            ),
+          )
+          .limit(1);
+        activeToolAllowlist = skillRows[0]?.toolAllowlist ?? [];
+      }
+
       return {
         db,
         organizationId: user.organizationId,
         userSubjects: [`org:${user.organizationId}`],
+        activeToolAllowlist,
       };
     },
   });
