@@ -344,3 +344,21 @@ export const skillRuns = pgTable(
     skillIdx: index('skill_runs_skill_idx').on(t.skillId),
   }),
 );
+
+export const auditEvents = pgTable(
+  'audit_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id').notNull(),
+    userId: uuid('user_id').references(() => user.id),
+    eventType: text('event_type').notNull(),
+    resourceType: text('resource_type').notNull(),
+    resourceId: text('resource_id'),
+    meta: jsonb('meta').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedAtIdx: index('audit_events_org_created_at_idx').on(t.organizationId, t.createdAt),
+    eventTypeIdx: index('audit_events_event_type_idx').on(t.organizationId, t.eventType),
+  }),
+);

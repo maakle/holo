@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@holo/audit": "workspace:*",
     "@holo/auth": "workspace:*",
     "@holo/connectors": "workspace:*",
     "@holo/crypto": "workspace:*",

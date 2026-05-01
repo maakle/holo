@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@holo/audit": "workspace:*",
     "@holo/auth": "workspace:*",
     "@holo/crypto": "workspace:*",
     "@holo/db": "workspace:*",
