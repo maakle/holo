@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import { eq } from 'drizzle-orm';
+import { getServerContext } from '@/lib/server-context';
+import { schema } from '@holo/db';
 
 export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
@@ -7,6 +10,22 @@ export async function GET(req: Request): Promise<Response> {
 
   if (!clientId || !redirectUri) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+  }
+
+  const { db } = await getServerContext();
+  const clients = await db
+    .select()
+    .from(schema.oauthClients)
+    .where(eq(schema.oauthClients.clientId, clientId))
+    .limit(1);
+
+  const client = clients[0];
+  if (!client) {
+    return NextResponse.json({ error: 'invalid_client' }, { status: 400 });
+  }
+
+  if (!client.redirectUris.includes(redirectUri)) {
+    return NextResponse.json({ error: 'invalid_redirect_uri' }, { status: 400 });
   }
 
   const consentUrl = new URL('/oauth/authorize', req.url);

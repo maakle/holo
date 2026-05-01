@@ -71,7 +71,7 @@ export default async function OAuthConsentPage({ searchParams }: Props) {
         <div style={{ display: 'flex', gap: 12 }}>
           <a
             href={callbackUrl}
-            style={{ flex: 1, display: 'block', textAlign: 'center', padding: '10px', background: 'var(--accent)', color: 'var(--accent-fg, #fff)', borderRadius: 6, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}
+            style={{ flex: 1, display: 'block', textAlign: 'center', padding: '10px', background: 'var(--accent)', color: 'var(--accent-fg)', borderRadius: 6, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}
           >
             Approve
           </a>
