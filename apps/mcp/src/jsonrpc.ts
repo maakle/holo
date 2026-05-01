@@ -1,5 +1,5 @@
 import { Hono, type Context, type Next } from 'hono';
-import type { DB } from '@holo/db';
+import { type DB, schema } from '@holo/db';
 import { HoloError } from '@holo/errors';
 import { listTools, type ToolContext } from './tools/index.js';
 
@@ -89,6 +89,8 @@ export function mountMcp(app: Hono, opts: MountMcpOpts): void {
               404,
             );
           }
+          const agentIdentity =
+            c.req.header('x-agent-id') ?? c.req.header('user-agent') ?? null;
           const t0 = performance.now();
           const result = await tool.run(ctx, params.arguments);
           const latencyMs = Math.round(performance.now() - t0);
@@ -101,6 +103,20 @@ export function mountMcp(app: Hono, opts: MountMcpOpts): void {
               ts: new Date().toISOString(),
             }),
           );
+          // Fire-and-forget invocation log
+          ctx.db
+            .insert(schema.mcpInvocations)
+            .values({
+              organizationId: ctx.organizationId,
+              agentIdentity,
+              toolName: params.name,
+              inputJson: (params.arguments ?? {}) as Record<string, unknown>,
+              outputJson: result as Record<string, unknown>,
+              latencyMs,
+            })
+            .catch((err: unknown) =>
+              console.error('Failed to log MCP invocation:', err),
+            );
           return c.json(
             jsonRpcResult(body.id, {
               content: [{ type: 'text', text: JSON.stringify(result) }],

@@ -57,6 +57,13 @@
       "when": 1746432000000,
       "tag": "0007_skill_labels",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1746475200000,
+      "tag": "0008_mcp_invocations",
+      "breakpoints": true
     }
   ]
 }

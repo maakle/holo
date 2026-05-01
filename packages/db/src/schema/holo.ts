@@ -256,3 +256,24 @@ export const skillLabels = pgTable(
     ),
   }),
 );
+
+export const mcpInvocations = pgTable(
+  'mcp_invocations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    agentIdentity: text('agent_identity'),
+    toolName: text('tool_name').notNull(),
+    inputJson: jsonb('input_json').$type<Record<string, unknown>>().notNull(),
+    outputJson: jsonb('output_json').$type<Record<string, unknown>>(),
+    errorCode: text('error_code'),
+    latencyMs: integer('latency_ms').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index('mcp_invocations_org_created_idx').on(t.organizationId, t.createdAt),
+    orgToolIdx: index('mcp_invocations_org_tool_idx').on(t.organizationId, t.toolName),
+  }),
+);
