@@ -181,6 +181,12 @@ importers:
       '@holo/errors':
         specifier: workspace:*
         version: link:../../packages/errors
+      '@holo/retrieval-core':
+        specifier: workspace:^
+        version: link:../../packages/retrieval-core
+      '@holo/skills':
+        specifier: workspace:^
+        version: link:../../packages/skills
       better-auth:
         specifier: 1.1.6
         version: 1.1.6
