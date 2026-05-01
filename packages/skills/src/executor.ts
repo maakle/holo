@@ -98,7 +98,7 @@ For each step I give you, explain concisely (1-3 sentences) what you would do fo
       stepIndex,
       stepText: stepResult.stepText,
       llmResponse: llmText,
-      toolCalls: [],
+      toolCalls: [], // populated via real tool-use round-trip in v0.3
     });
   }
 
