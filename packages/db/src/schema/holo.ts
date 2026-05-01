@@ -298,3 +298,19 @@ export const apiTokens = pgTable(
     orgUserIdx: index('api_tokens_org_user_idx').on(t.organizationId, t.userId),
   }),
 );
+
+export const publishedSkills = pgTable(
+  'published_skills',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull(),
+    skillId: text('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'cascade' }),
+    redactedContent: text('redacted_content').notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: false }).notNull().defaultNow(),
+  },
+  (t) => ({
+    publishedAtIdx: index('published_skills_published_at_idx').on(t.publishedAt),
+  }),
+);

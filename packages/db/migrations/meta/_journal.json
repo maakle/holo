@@ -71,6 +71,13 @@
       "when": 1746518400000,
       "tag": "0009_api_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777498777000,
+      "tag": "0010_published_skills",
+      "breakpoints": true
     }
   ]
 }

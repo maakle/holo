@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { SkillLabelPanel } from '@/components/skill-label-panel';
+import { PublishButton } from '@/components/publish-button';
 
 export default async function SkillsPage() {
   const { auth, db } = await getServerContext();
@@ -56,6 +57,7 @@ export default async function SkillsPage() {
                 <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">Status</th>
                 <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">Labels</th>
                 <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">Updated</th>
+                <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">Marketplace</th>
               </tr>
             </thead>
             <tbody>
@@ -82,6 +84,9 @@ export default async function SkillsPage() {
                   </td>
                   <td className="px-4 py-2 text-gray-400 dark:text-gray-500 text-xs">
                     {s.updatedAt.toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-2">
+                    <PublishButton skillId={s.id} />
                   </td>
                 </tr>
               ))}
