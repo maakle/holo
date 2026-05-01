@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import Link from 'next/link';
 
 interface Invocation {
@@ -24,8 +24,8 @@ function StatusBadge({ errorCode }: { errorCode: string | null }) {
       <span
         className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
         style={{
-          background: 'color-mix(in srgb, #EF4444 12%, transparent)',
-          color: '#EF4444',
+          background: 'color-mix(in srgb, var(--error) 12%, transparent)',
+          color: 'var(--error)',
         }}
       >
         error
@@ -36,8 +36,8 @@ function StatusBadge({ errorCode }: { errorCode: string | null }) {
     <span
       className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
       style={{
-        background: 'color-mix(in srgb, #10B981 12%, transparent)',
-        color: '#10B981',
+        background: 'color-mix(in srgb, var(--success) 12%, transparent)',
+        color: 'var(--success)',
       }}
     >
       success
@@ -106,9 +106,8 @@ export function InvocationTable({ invocations }: InvocationTableProps) {
           {invocations.map((inv) => {
             const isExpanded = expandedId === inv.id;
             return (
-              <>
+              <Fragment key={inv.id}>
                 <tr
-                  key={inv.id}
                   onClick={() => setExpandedId(isExpanded ? null : inv.id)}
                   className="border-b last:border-0 cursor-pointer transition-colors"
                   style={{
@@ -196,7 +195,7 @@ export function InvocationTable({ invocations }: InvocationTableProps) {
                             className="rounded p-3 overflow-auto text-xs leading-5 font-mono"
                             style={{
                               background: 'var(--code-bg)',
-                              color: inv.errorCode ? '#EF4444' : 'var(--text)',
+                              color: inv.errorCode ? 'var(--error)' : 'var(--text)',
                               borderRadius: '4px',
                               maxHeight: '320px',
                             }}
@@ -212,7 +211,7 @@ export function InvocationTable({ invocations }: InvocationTableProps) {
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             );
           })}
         </tbody>
