@@ -1,5 +1,8 @@
 import type { Command } from 'commander';
 import { runToolRegister } from './tool-register.js';
+import { runToolList } from './tool-list.js';
+import { runToolShow } from './tool-show.js';
+import { runToolUnregister } from './tool-unregister.js';
 import { resolveDeps } from '../deps.js';
 
 export function registerToolCommand(program: Command): void {
@@ -37,5 +40,34 @@ export function registerToolCommand(program: Command): void {
       console.log(`registered ${id}`);
     });
 
-  // list/show/unregister subcommands added in Task 12
+  tool
+    .command('list')
+    .description('list registered custom tools')
+    .action(async () => {
+      const deps = resolveDeps();
+      process.stdout.write(await runToolList({ db: deps.db, organizationId: deps.organizationId }));
+    });
+
+  tool
+    .command('show')
+    .argument('<name>')
+    .action(async (name: string) => {
+      const deps = resolveDeps();
+      process.stdout.write(
+        await runToolShow({ db: deps.db, organizationId: deps.organizationId, name }),
+      );
+    });
+
+  tool
+    .command('unregister')
+    .argument('<name>')
+    .action(async (name: string) => {
+      const deps = resolveDeps();
+      const ok = await runToolUnregister({
+        db: deps.db,
+        organizationId: deps.organizationId,
+        name,
+      });
+      console.log(ok ? `unregistered ${name}` : `not found: ${name}`);
+    });
 }
