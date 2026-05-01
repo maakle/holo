@@ -10,7 +10,8 @@ export default async function ObservabilityPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
-  const orgId = (session.user as unknown as { organizationId: string }).organizationId;
+  const orgId = (session.user as unknown as { organizationId?: string }).organizationId;
+  if (!orgId) redirect('/sign-in');
 
   const invocations = await db
     .select({

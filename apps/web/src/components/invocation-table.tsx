@@ -57,6 +57,7 @@ function formatUtc(date: Date): string {
 
 export function InvocationTable({ invocations }: InvocationTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   if (invocations.length === 0) {
     return (
@@ -109,21 +110,13 @@ export function InvocationTable({ invocations }: InvocationTableProps) {
               <Fragment key={inv.id}>
                 <tr
                   onClick={() => setExpandedId(isExpanded ? null : inv.id)}
+                  onMouseEnter={() => setHoveredId(inv.id)}
+                  onMouseLeave={() => setHoveredId(null)}
                   className="border-b last:border-0 cursor-pointer transition-colors"
                   style={{
                     borderColor: 'var(--border)',
-                    background: isExpanded ? 'var(--surface-2)' : undefined,
+                    background: isExpanded || hoveredId === inv.id ? 'var(--surface-2)' : undefined,
                     borderLeft: isExpanded ? '2px solid #3F47FF' : '2px solid transparent',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isExpanded) {
-                      (e.currentTarget as HTMLTableRowElement).style.background = 'var(--surface-2)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isExpanded) {
-                      (e.currentTarget as HTMLTableRowElement).style.background = '';
-                    }
                   }}
                 >
                   <td
