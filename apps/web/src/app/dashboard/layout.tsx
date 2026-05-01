@@ -27,6 +27,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             <Link href="/skills" className="text-sm text-gray-600 dark:text-gray-300">
               Skills
             </Link>
+            <Link href="/skills/runs" className="text-sm text-gray-600 dark:text-gray-300">
+              Skill Runs
+            </Link>
             <Link href="/observability" className="text-sm text-gray-600 dark:text-gray-300">
               Observability
             </Link>
@@ -35,6 +38,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             </Link>
             <Link href="/dashboard/team" className="text-sm text-gray-600 dark:text-gray-300">
               Team
+            </Link>
+            <Link href="/audit" className="text-sm text-gray-600 dark:text-gray-300">
+              Audit
             </Link>
           </div>
           <div className="flex items-center gap-3">

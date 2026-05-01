@@ -65,9 +65,9 @@ export async function initCommand(_args: string[]): Promise<void> {
   // Detect OS
   const platform = process.platform;
   if (platform === 'win32') {
-    console.log('⚠  Windows detected. holo init does not currently support Windows.');
-    console.log('   Windows support is planned for v0.2. Use WSL2 in the meantime.');
-    console.log('');
+    console.log('\n⚠️  Windows detected.');
+    console.log('   holo runs best on WSL2. Install WSL2 first, then re-run inside the WSL2 terminal.');
+    console.log('   Guide: https://learn.microsoft.com/en-us/windows/wsl/install\n');
   } else if (platform === 'darwin') {
     // macOS is fully supported, no note needed
   } else if (platform === 'linux') {

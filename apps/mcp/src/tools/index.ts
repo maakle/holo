@@ -11,11 +11,13 @@ import { getCallInputSchema, runGetCallTool } from './get-call.js';
 import { getTicketInputSchema, runGetTicketTool } from './get-ticket.js';
 import { listSkillsInputSchema, runListSkillsTool } from './list-skills.js';
 import { getSkillInputSchema, runGetSkillTool } from './get-skill.js';
+import { executeSkillInputSchema, runExecuteSkillTool } from './execute-skill.js';
 
 export interface ToolContext {
   db: DB;
   organizationId: string;
   userSubjects?: string[];
+  activeToolAllowlist?: string[];
 }
 
 export interface ToolDefinition {
@@ -92,6 +94,18 @@ export function listTools(): ToolDefinition[] {
       inputSchema: zodToJsonSchema(getSkillInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
       async run(ctx, args) {
         return runGetSkillTool(ctx, args);
+      },
+    },
+    {
+      name: 'execute_skill',
+      description:
+        'Execute a skill procedure step-by-step using the skill\'s written playbook. The skill must have executable=true in its frontmatter. Returns a run ID, per-step LLM responses, and a summary. This tool creates a skill_run record — it is NOT read-only.',
+      inputSchema: zodToJsonSchema(executeSkillInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      async run(ctx, args) {
+        return runExecuteSkillTool(
+          { ...ctx, anthropicApiKey: process.env.ANTHROPIC_API_KEY },
+          args,
+        );
       },
     },
   ];

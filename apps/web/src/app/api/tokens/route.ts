@@ -4,6 +4,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { randomBytes, createHash } from 'node:crypto';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
+import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 
 export async function GET() {
@@ -71,7 +72,19 @@ export async function POST(req: Request) {
     const rawToken = `holo_${randomBytes(32).toString('hex')}`;
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
 
-    await db.insert(schema.apiTokens).values({ organizationId: orgId, userId, tokenHash, label });
+    const [inserted] = await db
+      .insert(schema.apiTokens)
+      .values({ organizationId: orgId, userId, tokenHash, label })
+      .returning({ id: schema.apiTokens.id });
+
+    emitAuditEvent({
+      db,
+      organizationId: orgId,
+      userId,
+      eventType: 'api_token.created',
+      resourceType: 'api_token',
+      resourceId: inserted?.id,
+    });
 
     return NextResponse.json({ token: rawToken, label });
   } catch (e) {
