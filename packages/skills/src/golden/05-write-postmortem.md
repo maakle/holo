@@ -5,6 +5,7 @@ tools:
   - search
   - get_thread
   - get_pr
+  - get_doc
 when_to_use: After a P0 or P1 incident has been resolved and the on-call engineer is ready to document what happened
 ---
 
