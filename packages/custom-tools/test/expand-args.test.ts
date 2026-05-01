@@ -35,4 +35,14 @@ describe('expandArgs', () => {
     // A bare `{{` with no closing `}}` is invalid.
     expect(() => expandArgs(['{{unclosed'], { unclosed: 'x' })).toThrow();
   });
+
+  it('does not reject values that legitimately contain {{ or }}', () => {
+    expect(expandArgs(['{{x}}'], { x: 'has {{ in value' })).toEqual(['has {{ in value']);
+    expect(expandArgs(['{{x}}'], { x: 'and }} too' })).toEqual(['and }} too']);
+  });
+
+  it('handles empty template and empty values', () => {
+    expect(expandArgs([], {})).toEqual([]);
+    expect(expandArgs(['static'], {})).toEqual(['static']);
+  });
 });

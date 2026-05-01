@@ -9,13 +9,21 @@ export function expandArgs(
   values: Readonly<Record<string, unknown>>,
 ): string[] {
   return template.map((part) => {
-    // Handle the {{{{ ... }}}} literal escape: temporarily replace the doubled
-    // braces with sentinels so the placeholder regex doesn't match them.
     const protectedPart = part
       .replace(/\{\{\{\{/g, ESCAPED_OPEN)
       .replace(/\}\}\}\}/g, ESCAPED_CLOSE);
 
-    // Detect any remaining unbalanced `{{` or `}}` after placeholders.
+    // Malformed-brace check: any `{{` or `}}` that isn't a valid placeholder
+    // and isn't a literal-escape sentinel is malformed. Compute residue first.
+    const residue = protectedPart.replace(PLACEHOLDER, '');
+    if (residue.includes('{{') || residue.includes('}}')) {
+      throw holoError({
+        code: ErrorCode.HOLO_INVALID_INPUT,
+        problem: `Malformed template fragment: ${part}`,
+        fix: 'Use {{name}} for placeholders or {{{{ }}}} for literal braces.',
+      });
+    }
+
     const expanded = protectedPart.replace(PLACEHOLDER, (_match, name: string) => {
       if (!(name in values)) {
         throw holoError({
@@ -27,16 +35,8 @@ export function expandArgs(
       return String(values[name]);
     });
 
-    if (expanded.includes('{{') || expanded.includes('}}')) {
-      throw holoError({
-        code: ErrorCode.HOLO_INVALID_INPUT,
-        problem: `Malformed template fragment: ${part}`,
-        fix: 'Use {{name}} for placeholders or {{{{ }}}} for literal braces.',
-      });
-    }
-
     return expanded
-      .replace(new RegExp(ESCAPED_OPEN, 'g'), '{{')
-      .replace(new RegExp(ESCAPED_CLOSE, 'g'), '}}');
+      .replaceAll(ESCAPED_OPEN, '{{')
+      .replaceAll(ESCAPED_CLOSE, '}}');
   });
 }
