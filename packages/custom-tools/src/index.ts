@@ -3,3 +3,10 @@ export { expandArgs } from './expand-args.js';
 export { validateInput } from './validate-input.js';
 export { runCommand } from './spawn-runner.js';
 export type { RunCommandInput } from './spawn-runner.js';
+export {
+  listCustomTools,
+  getCustomToolByName,
+  createCustomTool,
+  deleteCustomToolByName,
+} from './repository.js';
+export type { CreateCustomToolInput } from './repository.js';
