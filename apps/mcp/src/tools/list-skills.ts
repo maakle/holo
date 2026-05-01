@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { eq, and } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
+import { parseSkill } from '@holo/skills';
 
 export const listSkillsInputSchema = z.object({
   status: z.enum(['draft', 'active', 'archived']).optional().default('active'),
@@ -45,9 +46,15 @@ export async function runListSkillsTool(
 
   return {
     skills: rows.map((r) => {
-      const descMatch = r.content.match(/^description:\s*(.+)$/m);
-      const description = descMatch ? (descMatch[1] ?? '').trim() : '';
-      return { id: r.id, name: r.name, slug: r.slug, version: r.version, status: r.status, description };
+      const parsed = parseSkill(r.content);
+      return {
+        id: r.id,
+        name: r.name,
+        slug: r.slug,
+        version: r.version,
+        status: r.status,
+        description: parsed.frontmatter.description,
+      };
     }),
   };
 }
