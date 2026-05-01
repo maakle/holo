@@ -126,6 +126,9 @@ importers:
       '@holo/retrieval-core':
         specifier: workspace:*
         version: link:../../packages/retrieval-core
+      '@holo/skills':
+        specifier: workspace:^
+        version: link:../../packages/skills
       '@hono/node-server':
         specifier: 1.13.2
         version: 1.13.2(hono@4.6.7)
@@ -543,6 +546,9 @@ importers:
 
   packages/skills:
     dependencies:
+      '@holo/errors':
+        specifier: workspace:^
+        version: link:../errors
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
