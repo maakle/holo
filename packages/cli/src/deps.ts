@@ -4,6 +4,7 @@ import { holoError, ErrorCode } from '@holo/errors';
 export interface CliDeps {
   db: DB;
   organizationId: string;
+  userId: string;
 }
 
 let cached: CliDeps | undefined;
@@ -27,7 +28,15 @@ export function resolveDeps(): CliDeps {
       fix: 'Set HOLO_ORGANIZATION_ID in your .env (the seeded default org id printed by `pnpm db:migrate`).',
     });
   }
+  const userId = process.env.HOLO_USER_ID;
+  if (!userId) {
+    throw holoError({
+      code: ErrorCode.HOLO_ENV_INVALID,
+      problem: 'HOLO_USER_ID not set',
+      fix: 'Set HOLO_USER_ID in your .env (the user id used as createdBy for CLI-issued mutations; in single-tenant v0.2 this is the org owner).',
+    });
+  }
 
-  cached = { db: createDb(dbUrl), organizationId: orgId };
+  cached = { db: createDb(dbUrl), organizationId: orgId, userId };
   return cached;
 }

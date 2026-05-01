@@ -12,6 +12,7 @@
   "dependencies": {
     "@holo/db": "workspace:*",
     "@holo/connectors": "workspace:*",
+    "@holo/custom-tools": "workspace:*",
     "@holo/errors": "workspace:*",
     "commander": "^12.1.0",
     "cli-table3": "^0.6.5",
