@@ -383,3 +383,31 @@ export const oauthClients = pgTable(
     orgIdx: index('oauth_clients_org_idx').on(t.organizationId),
   }),
 );
+
+export const customTools = pgTable(
+  'custom_tools',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    command: text('command').notNull(),
+    argsTemplate: text('args_template').array().notNull().default(sql`'{}'::text[]`),
+    inputSchema: jsonb('input_schema').$type<Record<string, unknown>>().notNull(),
+    envAllowlist: text('env_allowlist').array().notNull().default(sql`'{}'::text[]`),
+    scope: text('scope'),
+    readOnly: boolean('read_only').notNull().default(false),
+    timeoutMs: integer('timeout_ms').notNull().default(30000),
+    maxOutputBytes: integer('max_output_bytes').notNull().default(262144),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => user.id),
+  },
+  (t) => ({
+    orgNameUniq: uniqueIndex('custom_tools_org_name_uniq').on(t.organizationId, t.name),
+    orgIdx: index('custom_tools_org_idx').on(t.organizationId),
+  }),
+);

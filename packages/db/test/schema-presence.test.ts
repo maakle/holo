@@ -30,6 +30,7 @@ const REQUIRED_TABLES = [
   'source_artifacts',
   'chunks',
   'connector_cursors',
+  'custom_tools',
 ];
 
 const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';
