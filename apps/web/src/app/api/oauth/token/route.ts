@@ -12,7 +12,8 @@ export async function POST(req: Request): Promise<Response> {
   const code = body.get('code')?.toString();
   if (!code) return NextResponse.json({ error: 'invalid_grant' }, { status: 400 });
 
-  // v0.2 stub: pass code through as access token. Full PKCE verify is v0.3.
+  // v0.2 stub: code is passed through as access token with no verification.
+  // WARNING: no code binding, expiry, or PKCE check — do NOT expose to untrusted networks before v0.3.
   return NextResponse.json({
     access_token: `holo_${code}`,
     token_type: 'Bearer',

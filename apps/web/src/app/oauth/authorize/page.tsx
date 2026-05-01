@@ -20,7 +20,9 @@ export default async function OAuthConsentPage({ searchParams }: Props) {
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session) {
-    const qs = new URLSearchParams(params as Record<string, string>).toString();
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined)) as Record<string, string>,
+    ).toString();
     redirect(`/sign-in?next=${encodeURIComponent(`/oauth/authorize?${qs}`)}`);
   }
 
@@ -48,8 +50,21 @@ export default async function OAuthConsentPage({ searchParams }: Props) {
     );
   }
 
-  const code = crypto.randomUUID().replace(/-/g, '');
   const redirectUri = params.redirect_uri ?? client.redirectUris[0] ?? '/';
+  if (params.redirect_uri && !client.redirectUris.includes(params.redirect_uri)) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div style={{ maxWidth: 480, width: '100%', padding: '2rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
+          <h1 style={{ color: 'var(--error)', fontSize: 18, fontWeight: 600 }}>Invalid redirect URI</h1>
+          <p style={{ color: 'var(--text-muted)', marginTop: 8, fontSize: 14 }}>
+            The redirect_uri is not registered for this client.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const code = crypto.randomUUID().replace(/-/g, '');
   const state = params.state ?? '';
   const callbackUrl = `${redirectUri}?code=${code}&state=${encodeURIComponent(state)}`;
 

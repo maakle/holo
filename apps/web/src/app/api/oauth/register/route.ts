@@ -30,6 +30,7 @@ export async function POST(req: Request): Promise<Response> {
   const clientId = `holo_client_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
   const scopes = parsed.data.scope.split(' ').filter(Boolean);
 
+  // v0.2 stub: single-tenant placeholder; replace with session.organizationId in v0.3
   await db.insert(schema.oauthClients).values({
     organizationId: '00000000-0000-0000-0000-000000000000',
     clientId,

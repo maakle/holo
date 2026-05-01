@@ -340,7 +340,7 @@ export const skillRuns = pgTable(
     completedAt: timestamp('completed_at', { withTimezone: true }),
   },
   (t) => ({
-    orgStatusIdx: index('skill_runs_org_status_idx').on(t.organizationId, t.startedAt),
+    orgStartedAtIdx: index('skill_runs_org_started_at_idx').on(t.organizationId, t.startedAt),
     skillIdx: index('skill_runs_skill_idx').on(t.skillId),
   }),
 );
