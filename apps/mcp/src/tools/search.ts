@@ -11,7 +11,7 @@ export const searchInputSchema = z.object({
 export interface SearchToolContext {
   db: DB;
   organizationId: string;
-  userSubjects?: string[];
+  userSubjects: string[];
 }
 
 function deriveSnippetUrl(result: SearchResult): string | undefined {

@@ -16,7 +16,7 @@ import { executeSkillInputSchema, runExecuteSkillTool } from './execute-skill.js
 export interface ToolContext {
   db: DB;
   organizationId: string;
-  userSubjects?: string[];
+  userSubjects: string[];
   activeToolAllowlist?: string[];
 }
 
