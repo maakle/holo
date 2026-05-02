@@ -612,6 +612,9 @@ importers:
 
   packages/user-subjects:
     dependencies:
+      '@holo/audit':
+        specifier: workspace:*
+        version: link:../audit
       '@holo/db':
         specifier: workspace:*
         version: link:../db
