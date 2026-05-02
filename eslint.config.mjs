@@ -15,7 +15,10 @@ export default tseslint.config(
       'eslint-plugin-local/**',
       'docs/**',
       '**/migrations/**',
-      // Plan/spec markdown files contain Memex/holo references that aren't code
+      '.claude/**',
+      // Plan/spec markdown files contain Memex/holo references that aren't code.
+      // .claude/ holds local agent state (worktrees, hooks, scheduled-tasks lock)
+      // that may include checked-out source from sibling branches; never lint it.
     ],
   },
 
@@ -43,9 +46,16 @@ export default tseslint.config(
   },
 
   // packages/errors itself defines the error infrastructure; bare throws allowed there.
-  // tests/** are E2E fixtures (not shipped to users), bare throws acceptable.
+  // Test files (root tests/**, plus per-package and per-app test dirs) use bare
+  // throws for fixture guards ("seed missing — bail loudly"); the rule's intent
+  // is to catch production throws, not test-internal sentinels.
   {
-    files: ['packages/errors/**/*.ts', 'tests/**/*.ts'],
+    files: [
+      'packages/errors/**/*.ts',
+      'tests/**/*.ts',
+      'packages/*/test/**/*.ts',
+      'apps/*/test/**/*.ts',
+    ],
     rules: { 'local/no-bare-throw-error': 'off' },
   },
 
