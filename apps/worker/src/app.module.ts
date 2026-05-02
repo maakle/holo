@@ -11,6 +11,7 @@ import { PylonSyncModule } from './queues/pylon';
 import { EmbedModule } from './queues/embed';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 import { SyncRunnersModule } from './queues/runners.module';
+import { SlackSubjectsModule } from './slack-subjects/slack-subjects.module';
 
 function parseRedisUrl(url: string): { host: string; port: number } {
   const u = new URL(url);
@@ -26,6 +27,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
       connection: parseRedisUrl(process.env.REDIS_URL ?? 'redis://localhost:6382'),
     }),
     HeartbeatModule,
+    SlackSubjectsModule,
     GithubCodeSyncModule,
     GithubProseSyncModule,
     SlackSyncModule,

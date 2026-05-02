@@ -263,6 +263,9 @@ importers:
       '@holo/errors':
         specifier: workspace:*
         version: link:../../packages/errors
+      '@holo/user-subjects':
+        specifier: workspace:*
+        version: link:../../packages/user-subjects
       '@nestjs/bullmq':
         specifier: 10.2.3
         version: 10.2.3(@nestjs/common@10.4.15(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.4.15)(bullmq@5.20.1)
