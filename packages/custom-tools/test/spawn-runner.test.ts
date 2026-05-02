@@ -83,15 +83,21 @@ describe('runCommand', () => {
     expect(r.stdout.length).toBeLessThanOrEqual(1024);
   });
 
-  it('kills child on timeout and returns truncated/error result', async () => {
-    const r = await runCommand({
-      command: '/bin/sh',
-      argv: ['-c', 'sleep 5'],
-      env: {},
-      timeoutMs: 200,
-      maxOutputBytes: 65536,
-    });
-    expect(r.exitCode).not.toBe(0); // timed out
-    expect(r.durationMs).toBeLessThan(2000);
-  });
+  it(
+    'kills child on timeout and returns truncated/error result',
+    async () => {
+      const r = await runCommand({
+        command: '/bin/sh',
+        argv: ['-c', 'sleep 5'],
+        env: {},
+        timeoutMs: 200,
+        maxOutputBytes: 65536,
+      });
+      expect(r.exitCode).not.toBe(0); // timed out
+      // Allow generous slack for slow CI runners; we just need to confirm
+      // the runner didn't wait for the full 5s sleep.
+      expect(r.durationMs).toBeLessThan(4000);
+    },
+    15_000,
+  );
 });

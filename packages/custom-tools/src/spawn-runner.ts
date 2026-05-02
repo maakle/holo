@@ -76,7 +76,13 @@ export function runCommand(input: RunCommandInput): Promise<RunResult> {
       });
     });
 
-    child.on('close', (code, signal) => {
+    // Resolve on `exit` (process ended) rather than `close` (stdio pipes drained).
+    // After SIGKILL, the kernel may take a noticeable moment to flush/close pipes —
+    // observable as multi-second lag between SIGKILL and `close` on slow runners.
+    // `exit` fires as soon as the process is gone; data we cared about already
+    // arrived via earlier `data` events. The `resolved` guard makes a later
+    // `close` a no-op.
+    const onEnd = (code: number | null, signal: NodeJS.Signals | null): void => {
       finish({
         stdout,
         stderr,
@@ -84,6 +90,8 @@ export function runCommand(input: RunCommandInput): Promise<RunResult> {
         truncated,
         durationMs: Date.now() - start,
       });
-    });
+    };
+    child.on('exit', onEnd);
+    child.on('close', onEnd);
   });
 }
