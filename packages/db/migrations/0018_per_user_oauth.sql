@@ -2,8 +2,8 @@ CREATE TABLE IF NOT EXISTS "oauth_auth_codes" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "code" text NOT NULL,
   "client_id" text NOT NULL REFERENCES "oauth_clients"("client_id"),
-  "user_id" uuid NOT NULL REFERENCES "user"("id"),
-  "organization_id" uuid NOT NULL REFERENCES "organization"("id"),
+  "user_id" uuid NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "organization_id" uuid NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
   "redirect_uri" text NOT NULL,
   "scopes" text[] NOT NULL DEFAULT '{}',
   "code_challenge" text NOT NULL,
@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS "oauth_access_tokens" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "token_hash" text NOT NULL,
   "client_id" text NOT NULL REFERENCES "oauth_clients"("client_id"),
-  "user_id" uuid NOT NULL REFERENCES "user"("id"),
-  "organization_id" uuid NOT NULL REFERENCES "organization"("id"),
+  "user_id" uuid NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "organization_id" uuid NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
   "scopes" text[] NOT NULL DEFAULT '{}',
   "expires_at" timestamptz NOT NULL,
   "revoked_at" timestamptz,
@@ -31,8 +31,8 @@ CREATE INDEX IF NOT EXISTS "oauth_access_tokens_user_expires_idx" ON "oauth_acce
 
 CREATE TABLE IF NOT EXISTS "slack_user_credentials" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  "user_id" uuid NOT NULL REFERENCES "user"("id"),
-  "organization_id" uuid NOT NULL REFERENCES "organization"("id"),
+  "user_id" uuid NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "organization_id" uuid NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
   "slack_user_id" text NOT NULL,
   "access_token_encrypted" text NOT NULL,
   "scopes" text[] NOT NULL DEFAULT '{}',
@@ -43,8 +43,8 @@ CREATE INDEX IF NOT EXISTS "slack_user_credentials_org_idx" ON "slack_user_crede
 
 CREATE TABLE IF NOT EXISTS "user_subjects_cache" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  "user_id" uuid NOT NULL REFERENCES "user"("id"),
-  "organization_id" uuid NOT NULL REFERENCES "organization"("id"),
+  "user_id" uuid NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "organization_id" uuid NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
   "subject" text NOT NULL,
   "source" text NOT NULL,
   "refreshed_at" timestamptz NOT NULL DEFAULT now()

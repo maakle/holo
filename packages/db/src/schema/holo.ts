@@ -394,10 +394,10 @@ export const oauthAuthCodes = pgTable(
       .references(() => oauthClients.clientId),
     userId: uuid('user_id')
       .notNull()
-      .references(() => user.id),
+      .references(() => user.id, { onDelete: 'cascade' }),
     organizationId: uuid('organization_id')
       .notNull()
-      .references(() => organization.id),
+      .references(() => organization.id, { onDelete: 'cascade' }),
     redirectUri: text('redirect_uri').notNull(),
     scopes: text('scopes').array().notNull().default(sql`'{}'::text[]`),
     codeChallenge: text('code_challenge').notNull(),
@@ -422,10 +422,10 @@ export const oauthAccessTokens = pgTable(
       .references(() => oauthClients.clientId),
     userId: uuid('user_id')
       .notNull()
-      .references(() => user.id),
+      .references(() => user.id, { onDelete: 'cascade' }),
     organizationId: uuid('organization_id')
       .notNull()
-      .references(() => organization.id),
+      .references(() => organization.id, { onDelete: 'cascade' }),
     scopes: text('scopes').array().notNull().default(sql`'{}'::text[]`),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
@@ -443,10 +443,10 @@ export const slackUserCredentials = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     userId: uuid('user_id')
       .notNull()
-      .references(() => user.id),
+      .references(() => user.id, { onDelete: 'cascade' }),
     organizationId: uuid('organization_id')
       .notNull()
-      .references(() => organization.id),
+      .references(() => organization.id, { onDelete: 'cascade' }),
     slackUserId: text('slack_user_id').notNull(),
     accessTokenEncrypted: encryptedText('access_token_encrypted').notNull(),
     scopes: text('scopes').array().notNull().default(sql`'{}'::text[]`),
@@ -464,10 +464,10 @@ export const userSubjectsCache = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     userId: uuid('user_id')
       .notNull()
-      .references(() => user.id),
+      .references(() => user.id, { onDelete: 'cascade' }),
     organizationId: uuid('organization_id')
       .notNull()
-      .references(() => organization.id),
+      .references(() => organization.id, { onDelete: 'cascade' }),
     subject: text('subject').notNull(),
     source: text('source').notNull(),
     refreshedAt: timestamp('refreshed_at', { withTimezone: true }).notNull().defaultNow(),
