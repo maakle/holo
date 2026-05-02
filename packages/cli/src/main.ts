@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { registerAllowlistCommand } from './commands/allowlist.js';
 import { registerSyncCommand } from './commands/sync.js';
+import { registerToolCommand } from './commands/tool.js';
 
 export function buildProgram(): Command {
   const program = new Command();
@@ -14,6 +15,7 @@ export function buildProgram(): Command {
 
   registerAllowlistCommand(program);
   registerSyncCommand(program);
+  registerToolCommand(program);
 
   return program;
 }
