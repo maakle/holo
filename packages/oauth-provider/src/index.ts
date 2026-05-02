@@ -12,3 +12,10 @@ export type {
   ConsumeAuthCodeInput,
   ConsumeAuthCodeResult,
 } from './codes.js';
+
+export { mintAccessToken, validateAccessToken, revokeAccessToken } from './tokens.js';
+export type {
+  MintAccessTokenInput,
+  MintedAccessToken,
+  ValidatedToken,
+} from './tokens.js';
