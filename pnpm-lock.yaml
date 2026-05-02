@@ -196,6 +196,9 @@ importers:
       '@holo/skills':
         specifier: workspace:^
         version: link:../../packages/skills
+      '@holo/user-subjects':
+        specifier: workspace:*
+        version: link:../../packages/user-subjects
       better-auth:
         specifier: 1.1.6
         version: 1.1.6
