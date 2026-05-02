@@ -4,6 +4,7 @@ import { initCrypto } from '@holo/crypto';
 import { parseEnv } from '@holo/env';
 import { createDb, schema } from '@holo/db';
 import { HoloError } from '@holo/errors';
+import { getSubjectsForUser } from '@holo/user-subjects';
 import { createSessionMiddleware } from './middleware/session.js';
 import { mountMcp } from './jsonrpc.js';
 import { createRestRouter } from './rest/router.js';
@@ -87,7 +88,9 @@ async function main() {
     db,
     middleware: createSessionMiddleware(db),
     async resolveContext(c) {
-      const user = c.get('user' as never) as { organizationId: string; id: string } | undefined;
+      const user = c.get('user' as never) as
+        | { organizationId: string; userId: string }
+        | undefined;
       if (!user) {
         throw new HoloError({
           code: 'HOLO_AUTH_NO_SESSION',
@@ -115,10 +118,16 @@ async function main() {
         activeToolAllowlist = skillRows[0]?.toolAllowlist ?? [];
       }
 
+      const extraSubjects = await getSubjectsForUser(db, user.userId);
       return {
         db,
         organizationId: user.organizationId,
-        userSubjects: [`org:${user.organizationId}`],
+        userId: user.userId,
+        userSubjects: [
+          `org:${user.organizationId}`,
+          `user:${user.userId}`,
+          ...extraSubjects,
+        ],
         activeToolAllowlist,
       };
     },

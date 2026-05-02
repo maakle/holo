@@ -8,6 +8,8 @@ export { createGithubConnector } from './github/index';
 export type { GithubConnectorOptions } from './github/index';
 export { createSlackConnector } from './slack/index';
 export type { SlackConnectorOptions } from './slack/index';
+export { createSlackUserApiClient } from './slack/user-client';
+export type { SlackUserApiClient } from './slack/user-client';
 export { createNotionConnector } from './notion/index';
 export type { NotionConnectorOptions } from './notion/index';
 export { createGrainConnector } from './grain/index';

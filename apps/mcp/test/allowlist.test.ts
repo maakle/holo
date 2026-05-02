@@ -26,3 +26,25 @@ describe('checkToolAllowed', () => {
     expect(checkToolAllowed('get_skill', ['search'])).toBe(true);
   });
 });
+
+describe('checkToolAllowed (custom tools)', () => {
+  const customs = new Set(['bigquery_analytics_query']);
+
+  it('blocks custom tool when allowlist is empty (no auto-allow)', () => {
+    expect(checkToolAllowed('bigquery_analytics_query', [], { customToolNames: customs })).toBe(false);
+  });
+
+  it('allows custom tool when listed in allowlist', () => {
+    expect(
+      checkToolAllowed('bigquery_analytics_query', ['bigquery_analytics_query'], { customToolNames: customs }),
+    ).toBe(true);
+  });
+
+  it('still allows built-in with empty allowlist (regression)', () => {
+    expect(checkToolAllowed('search', [], { customToolNames: customs })).toBe(true);
+  });
+
+  it('blocks unknown custom tool not in allowlist', () => {
+    expect(checkToolAllowed('bigquery_analytics_query', ['search'], { customToolNames: customs })).toBe(false);
+  });
+});

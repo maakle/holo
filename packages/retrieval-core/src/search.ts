@@ -8,7 +8,7 @@ export interface SearchInput {
   q: string;
   topK?: number;
   provider?: 'github' | 'slack' | 'notion' | 'grain' | 'pylon';
-  userSubjects?: string[];
+  userSubjects: string[];
 }
 
 export interface SearchResult {
@@ -140,7 +140,7 @@ function rrfFuse(sets: SearchResult[][], topK: number): SearchResult[] {
 
 export async function search(input: SearchInput): Promise<SearchResult[]> {
   const topK = input.topK ?? 10;
-  const userSubjects = input.userSubjects ?? [`org:${input.organizationId}`];
+  const userSubjects = input.userSubjects;
 
   const primary = await embedQuery(input.q);
   const firstResults = await searchOnce({

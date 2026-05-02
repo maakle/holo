@@ -4,6 +4,7 @@ import { eq, isNull, and } from 'drizzle-orm';
 import { validateSessionCookie } from '@holo/auth';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
+import { validateAccessToken } from '@holo/oauth-provider';
 
 export interface McpSessionVars {
   user: { userId: string; organizationId: string; email?: string };
@@ -13,12 +14,24 @@ export function createSessionMiddleware(
   db: DB,
 ): MiddlewareHandler<{ Variables: McpSessionVars }> {
   return async (c, next) => {
-    // Check Bearer token first — takes precedence over cookie
     const authHeader = c.req.header('authorization');
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice('Bearer '.length).trim();
-      const tokenHash = createHash('sha256').update(token).digest('hex');
 
+      // 1) OAuth access token (v0.3+ canonical path)
+      const oauth = await validateAccessToken(db, token);
+      if (oauth) {
+        c.set('user', {
+          userId: oauth.userId,
+          organizationId: oauth.organizationId,
+          email: '',
+        });
+        await next();
+        return;
+      }
+
+      // 2) v0.1 REST API token (legacy)
+      const tokenHash = createHash('sha256').update(token).digest('hex');
       const rows = await db
         .select({
           userId: schema.apiTokens.userId,
@@ -32,7 +45,6 @@ export function createSessionMiddleware(
           ),
         )
         .limit(1);
-
       const row = rows[0];
       if (row) {
         // Fire-and-forget lastUsedAt update
@@ -40,9 +52,8 @@ export function createSessionMiddleware(
           .set({ lastUsedAt: new Date() })
           .where(eq(schema.apiTokens.tokenHash, tokenHash))
           .catch(() => {
-            // Ignore update errors — this is best-effort telemetry
+            // Ignore update errors — best-effort telemetry
           });
-
         c.set('user', {
           userId: row.userId,
           organizationId: row.organizationId,
@@ -53,7 +64,7 @@ export function createSessionMiddleware(
       }
     }
 
-    // Fall back to session cookie
+    // 3) Session cookie (first-party web)
     const cookie = c.req.header('cookie');
     const session = await validateSessionCookie(db, cookie);
     c.set('user', session);

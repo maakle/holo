@@ -1,5 +1,6 @@
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { DB } from '@holo/db';
+import { listCustomTools, buildCustomToolDefinition } from '@holo/custom-tools';
 import {
   searchInputSchema,
   runSearchTool,
@@ -16,19 +17,21 @@ import { executeSkillInputSchema, runExecuteSkillTool } from './execute-skill.js
 export interface ToolContext {
   db: DB;
   organizationId: string;
-  userSubjects?: string[];
+  userSubjects: string[];
   activeToolAllowlist?: string[];
+  userId?: string;
 }
 
 export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  isCustom?: boolean;
   run(ctx: ToolContext, args: unknown): Promise<unknown>;
 }
 
-export function listTools(): ToolDefinition[] {
-  return [
+export async function listTools(ctx: ToolContext): Promise<ToolDefinition[]> {
+  const builtIns: ToolDefinition[] = [
     {
       name: 'search',
       description:
@@ -109,4 +112,23 @@ export function listTools(): ToolDefinition[] {
       },
     },
   ];
+
+  const customRows = await listCustomTools(ctx.db, ctx.organizationId);
+  const customDefs: ToolDefinition[] = customRows.map((row) => {
+    const def = buildCustomToolDefinition(row);
+    return {
+      name: def.name,
+      description: def.description,
+      inputSchema: def.inputSchema,
+      isCustom: true,
+      async run(toolCtx: ToolContext, args: unknown) {
+        return def.run(
+          { db: toolCtx.db, organizationId: toolCtx.organizationId, userId: toolCtx.userId },
+          args,
+        );
+      },
+    };
+  });
+
+  return [...builtIns, ...customDefs];
 }

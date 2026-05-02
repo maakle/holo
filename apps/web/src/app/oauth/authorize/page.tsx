@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { eq } from 'drizzle-orm';
 import { getServerContext } from '@/lib/server-context';
 import { schema } from '@holo/db';
+import { mintAuthCode } from '@holo/oauth-provider';
 
 interface Props {
   searchParams: Promise<{
@@ -12,6 +13,51 @@ interface Props {
     code_challenge?: string;
     code_challenge_method?: string;
   }>;
+}
+
+async function approveAction(formData: FormData) {
+  'use server';
+  const clientId = formData.get('client_id') as string;
+  const redirectUri = formData.get('redirect_uri') as string;
+  const state = (formData.get('state') as string) ?? '';
+  const codeChallenge = formData.get('code_challenge') as string;
+  const codeChallengeMethod = formData.get('code_challenge_method') as string;
+  const scopes = ((formData.get('scopes') as string) ?? '').split(' ').filter(Boolean);
+
+  const { auth, db } = await getServerContext();
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) {
+    redirect('/sign-in');
+  }
+
+  if (codeChallengeMethod !== 'S256' || !codeChallenge) {
+    // Should never happen — the authorize route validates before redirect.
+    redirect('/');
+  }
+
+  const sessionUser = session!.user as { id: string; organizationId?: string };
+  let organizationId = sessionUser.organizationId;
+  if (!organizationId) {
+    const rows = await db
+      .select({ organizationId: schema.user.organizationId })
+      .from(schema.user)
+      .where(eq(schema.user.id, sessionUser.id))
+      .limit(1);
+    if (!rows[0]) redirect('/sign-in');
+    organizationId = rows[0]!.organizationId;
+  }
+
+  const code = await mintAuthCode(db, {
+    clientId,
+    userId: sessionUser.id,
+    organizationId,
+    redirectUri,
+    scopes,
+    codeChallenge,
+    codeChallengeMethod: 'S256',
+  });
+
+  redirect(`${redirectUri}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);
 }
 
 export default async function OAuthConsentPage({ searchParams }: Props) {
@@ -64,10 +110,6 @@ export default async function OAuthConsentPage({ searchParams }: Props) {
     );
   }
 
-  const code = crypto.randomUUID().replace(/-/g, '');
-  const state = params.state ?? '';
-  const callbackUrl = `${redirectUri}?code=${code}&state=${encodeURIComponent(state)}`;
-
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div style={{ maxWidth: 480, width: '100%', padding: '2rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
@@ -84,12 +126,20 @@ export default async function OAuthConsentPage({ searchParams }: Props) {
           ))}
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
-          <a
-            href={callbackUrl}
-            style={{ flex: 1, display: 'block', textAlign: 'center', padding: '10px', background: 'var(--accent)', color: 'var(--accent-fg)', borderRadius: 6, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}
-          >
-            Approve
-          </a>
+          <form action={approveAction} style={{ flex: 1 }}>
+            <input type="hidden" name="client_id" value={clientId!} />
+            <input type="hidden" name="redirect_uri" value={redirectUri} />
+            <input type="hidden" name="state" value={params.state ?? ''} />
+            <input type="hidden" name="code_challenge" value={params.code_challenge ?? ''} />
+            <input type="hidden" name="code_challenge_method" value={params.code_challenge_method ?? 'S256'} />
+            <input type="hidden" name="scopes" value={client.scopes.join(' ')} />
+            <button
+              type="submit"
+              style={{ width: '100%', display: 'block', textAlign: 'center', padding: '10px', background: 'var(--accent)', color: 'var(--accent-fg)', borderRadius: 6, fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer' }}
+            >
+              Approve
+            </button>
+          </form>
           <a
             href="/"
             style={{ flex: 1, display: 'block', textAlign: 'center', padding: '10px', background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}

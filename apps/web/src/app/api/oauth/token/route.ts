@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerContext } from '@/lib/server-context';
+import { consumeAuthCode, mintAccessToken } from '@holo/oauth-provider';
 
 export async function POST(req: Request): Promise<Response> {
   const body = await req.formData().catch(() => null);
@@ -10,14 +12,36 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const code = body.get('code')?.toString();
-  if (!code) return NextResponse.json({ error: 'invalid_grant' }, { status: 400 });
+  const codeVerifier = body.get('code_verifier')?.toString();
+  const redirectUri = body.get('redirect_uri')?.toString();
+  const clientId = body.get('client_id')?.toString();
 
-  // v0.2 stub: code is passed through as access token with no verification.
-  // WARNING: no code binding, expiry, or PKCE check — do NOT expose to untrusted networks before v0.3.
+  if (!code || !codeVerifier || !redirectUri || !clientId) {
+    return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+  }
+
+  const { db } = await getServerContext();
+
+  let consumed;
+  try {
+    consumed = await consumeAuthCode(db, { code, clientId, redirectUri, codeVerifier });
+  } catch {
+    return NextResponse.json({ error: 'invalid_grant' }, { status: 400 });
+  }
+
+  const { accessToken, expiresAt } = await mintAccessToken(db, {
+    clientId: consumed.clientId,
+    userId: consumed.userId,
+    organizationId: consumed.organizationId,
+    scopes: consumed.scopes,
+  });
+
+  const expiresIn = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+
   return NextResponse.json({
-    access_token: `holo_${code}`,
+    access_token: accessToken,
     token_type: 'Bearer',
-    expires_in: 86400,
-    scope: 'search skills:read',
+    expires_in: expiresIn,
+    scope: consumed.scopes.join(' '),
   });
 }

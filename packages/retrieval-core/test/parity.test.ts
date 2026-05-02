@@ -147,6 +147,7 @@ describe('parity smoke test (v0.0 dogfood gate)', () => {
       organizationId: orgId,
       q: 'MFA retention metrics',
       topK: 5,
+      userSubjects: [`org:${orgId}`],
     });
     const elapsedMs = Date.now() - t0;
 
@@ -162,6 +163,7 @@ describe('parity smoke test (v0.0 dogfood gate)', () => {
       organizationId: orgId,
       q: 'workable ID lookup',
       topK: 5,
+      userSubjects: [`org:${orgId}`],
     });
     const top3Contents = results.slice(0, 3).map((r) => r.content);
     const found = top3Contents.some((c) => c.includes('workable ID'));
@@ -174,6 +176,7 @@ describe('parity smoke test (v0.0 dogfood gate)', () => {
       organizationId: orgId,
       q: 'UKG Pro integration setup',
       topK: 5,
+      userSubjects: [`org:${orgId}`],
     });
     const top3Contents = results.slice(0, 3).map((r) => r.content);
     const found = top3Contents.some((c) => c.includes('UKG Pro'));

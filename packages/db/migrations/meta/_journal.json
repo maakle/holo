@@ -120,6 +120,20 @@
       "when": 1746648000000,
       "tag": "0016_oauth_clients",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1777633122501,
+      "tag": "0017_custom_tools",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1777682362224,
+      "tag": "0018_per_user_oauth",
+      "breakpoints": true
     }
   ]
 }
