@@ -18,6 +18,7 @@
     "@holo/db": "workspace:*",
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",
+    "@holo/oauth-provider": "workspace:*",
     "@holo/retrieval-core": "workspace:^",
     "@holo/skills": "workspace:^",
     "better-auth": "1.1.6",

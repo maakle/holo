@@ -187,6 +187,9 @@ importers:
       '@holo/errors':
         specifier: workspace:*
         version: link:../../packages/errors
+      '@holo/oauth-provider':
+        specifier: workspace:*
+        version: link:../../packages/oauth-provider
       '@holo/retrieval-core':
         specifier: workspace:^
         version: link:../../packages/retrieval-core
