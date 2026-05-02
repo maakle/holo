@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { DB } from '@holo/db';
+import { getSubjectsForUser } from '@holo/user-subjects';
 import type { McpSessionVars } from '../middleware/session.js';
 import { runListSkillsTool } from '../tools/list-skills.js';
 import { runGetSkillTool } from '../tools/get-skill.js';
@@ -61,11 +62,16 @@ export function createRestRouter(db: DB) {
       );
     }
 
+    const extraSubjects = await getSubjectsForUser(db, user.userId);
     const result = await runSearchTool(
       {
         db,
         organizationId: user.organizationId,
-        userSubjects: [`org:${user.organizationId}`],
+        userSubjects: [
+          `org:${user.organizationId}`,
+          `user:${user.userId}`,
+          ...extraSubjects,
+        ],
       },
       { q: body.query, top_k: body.limit ?? 10 },
     );

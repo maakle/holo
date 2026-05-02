@@ -13,6 +13,7 @@
   "dependencies": {
     "@holo/connectors": "workspace:*",
     "@holo/db": "workspace:*",
+    "@holo/user-subjects": "workspace:*",
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",
     "@nestjs/bullmq": "10.2.3",

@@ -31,6 +31,10 @@ const REQUIRED_TABLES = [
   'chunks',
   'connector_cursors',
   'custom_tools',
+  'oauth_auth_codes',
+  'oauth_access_tokens',
+  'slack_user_credentials',
+  'user_subjects_cache',
 ];
 
 const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';

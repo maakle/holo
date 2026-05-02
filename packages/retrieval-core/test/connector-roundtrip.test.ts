@@ -191,6 +191,7 @@ describe('connector roundtrip (Phase 12.2)', () => {
         organizationId: orgId,
         q: 'MFA retention dashboard',
         topK: 5,
+        userSubjects: [`org:${orgId}`],
       });
 
       const top3 = results.slice(0, 3).map((r) => r.content);

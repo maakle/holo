@@ -7,9 +7,25 @@ export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const clientId = url.searchParams.get('client_id');
   const redirectUri = url.searchParams.get('redirect_uri');
+  const codeChallenge = url.searchParams.get('code_challenge');
+  const codeChallengeMethod = url.searchParams.get('code_challenge_method');
 
   if (!clientId || !redirectUri) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+  }
+
+  if (!codeChallenge) {
+    return NextResponse.json(
+      { error: 'invalid_request', error_description: 'code_challenge is required (PKCE)' },
+      { status: 400 },
+    );
+  }
+
+  if (codeChallengeMethod !== 'S256') {
+    return NextResponse.json(
+      { error: 'invalid_request', error_description: 'code_challenge_method must be S256' },
+      { status: 400 },
+    );
   }
 
   const { db } = await getServerContext();

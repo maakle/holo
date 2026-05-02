@@ -10,7 +10,8 @@ export type AuditEventType =
   | 'skill.published'
   | 'skill.synthesized'
   | 'member.invited'
-  | 'custom_tool.invoked';
+  | 'custom_tool.invoked'
+  | 'user_subjects.refreshed';
 
 export interface EmitAuditEventInput {
   db: DB;

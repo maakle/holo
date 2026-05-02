@@ -132,12 +132,18 @@ importers:
       '@holo/errors':
         specifier: workspace:*
         version: link:../../packages/errors
+      '@holo/oauth-provider':
+        specifier: workspace:*
+        version: link:../../packages/oauth-provider
       '@holo/retrieval-core':
         specifier: workspace:*
         version: link:../../packages/retrieval-core
       '@holo/skills':
         specifier: workspace:^
         version: link:../../packages/skills
+      '@holo/user-subjects':
+        specifier: workspace:*
+        version: link:../../packages/user-subjects
       '@hono/node-server':
         specifier: 1.13.2
         version: 1.13.2(hono@4.6.7)
@@ -193,12 +199,18 @@ importers:
       '@holo/errors':
         specifier: workspace:*
         version: link:../../packages/errors
+      '@holo/oauth-provider':
+        specifier: workspace:*
+        version: link:../../packages/oauth-provider
       '@holo/retrieval-core':
         specifier: workspace:^
         version: link:../../packages/retrieval-core
       '@holo/skills':
         specifier: workspace:^
         version: link:../../packages/skills
+      '@holo/user-subjects':
+        specifier: workspace:*
+        version: link:../../packages/user-subjects
       better-auth:
         specifier: 1.1.6
         version: 1.1.6
@@ -257,6 +269,9 @@ importers:
       '@holo/errors':
         specifier: workspace:*
         version: link:../../packages/errors
+      '@holo/user-subjects':
+        specifier: workspace:*
+        version: link:../../packages/user-subjects
       '@nestjs/bullmq':
         specifier: 10.2.3
         version: 10.2.3(@nestjs/common@10.4.15(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.4.15)(bullmq@5.20.1)
@@ -572,6 +587,28 @@ importers:
         specifier: 2.1.3
         version: 2.1.3(@types/node@22.19.17)(msw@2.4.9(typescript@5.6.3))
 
+  packages/oauth-provider:
+    dependencies:
+      '@holo/db':
+        specifier: workspace:*
+        version: link:../db
+      '@holo/errors':
+        specifier: workspace:*
+        version: link:../errors
+      drizzle-orm:
+        specifier: 0.36.0
+        version: 0.36.0(@types/react@18.3.12)(kysely@0.27.6)(postgres@3.4.4)(react@18.3.1)
+    devDependencies:
+      postgres:
+        specifier: 3.4.4
+        version: 3.4.4
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: 2.1.3
+        version: 2.1.3(@types/node@22.19.17)(msw@2.4.9(typescript@5.6.3))
+
   packages/plans:
     devDependencies:
       typescript:
@@ -620,6 +657,31 @@ importers:
         version: 5.6.3
       vitest:
         specifier: ^2.1.3
+        version: 2.1.3(@types/node@22.19.17)(msw@2.4.9(typescript@5.6.3))
+
+  packages/user-subjects:
+    dependencies:
+      '@holo/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@holo/db':
+        specifier: workspace:*
+        version: link:../db
+      '@holo/errors':
+        specifier: workspace:*
+        version: link:../errors
+      drizzle-orm:
+        specifier: 0.36.0
+        version: 0.36.0(@types/react@18.3.12)(kysely@0.27.6)(postgres@3.4.4)(react@18.3.1)
+    devDependencies:
+      postgres:
+        specifier: 3.4.4
+        version: 3.4.4
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: 2.1.3
         version: 2.1.3(@types/node@22.19.17)(msw@2.4.9(typescript@5.6.3))
 
   tests/e2e:
