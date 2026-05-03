@@ -754,3 +754,14 @@ Plan complete and saved to `docs/superpowers/plans/2026-05-03-gateway-mcp-modern
 
 Which approach?
 
+
+## Follow-ups (deferred from Task 5)
+
+**RFC 8707 token audience binding.** The original Task 5 called for rejecting OAuth access tokens whose audience ≠ `MCP_PUBLIC_URL`. The current `oauth_access_tokens` schema (`packages/db/src/schema/holo.ts:443`) has no `audience` / `resource` column, so this requires:
+
+1. Add `audience text` (or `resource text`) column to `oauth_access_tokens`, with a migration.
+2. Update `mintAccessToken` (`packages/oauth-provider/src/tokens.ts:20`) to take an `audience` param and persist it.
+3. Update `validateAccessToken` to return the `audience`, and have `apps/gateway/src/middleware/session.ts` reject tokens whose `audience` doesn't match `env.MCP_PUBLIC_URL`.
+4. Update the `/oauth/authorize` and `/oauth/token` routes in the web app to accept and bind the `resource` parameter (RFC 8707 §2).
+
+This is a meaningful expansion of the OAuth flow and warrants its own ticket so it can be discussed and rolled out with backwards-compatibility considerations (existing tokens have no audience and would be rejected — need a grace period or a one-time backfill).
