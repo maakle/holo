@@ -135,7 +135,7 @@ async function main() {
 
   const port = Number(process.env.MCP_PORT ?? 8080);
   serve({ fetch: app.fetch, port });
-  console.log(`apps/mcp listening on :${port}`);
+  console.log(`apps/gateway listening on :${port}`);
 }
 
 main().catch((e) => {
