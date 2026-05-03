@@ -6,12 +6,12 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3030',
+    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3000',
     trace: 'on-first-retry',
   },
   webServer: {
     command: 'pnpm -F @holo/web dev',
-    url: process.env.E2E_BASE_URL ?? 'http://localhost:3030',
+    url: process.env.E2E_BASE_URL ?? 'http://localhost:3000',
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',
@@ -23,7 +23,7 @@ export default defineConfig({
         process.env.HOLO_TOKEN_ENCRYPTION_KEY ?? 'dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXk=',
       BETTER_AUTH_SECRET:
         process.env.BETTER_AUTH_SECRET ?? 'dGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQ=',
-      BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3030',
+      BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
       GITHUB_LOGIN_CLIENT_ID: 'test-login-cid',
       GITHUB_LOGIN_CLIENT_SECRET: 'test-login-csec',
       GITHUB_CONNECTOR_CLIENT_ID: 'test-conn-cid',

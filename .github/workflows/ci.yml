@@ -14,7 +14,7 @@ on:
 #   real OAuth flow is exercised in unit tests; the e2e job mocks GitHub.
 
 env:
-  BETTER_AUTH_URL: http://localhost:3030
+  BETTER_AUTH_URL: http://localhost:3000
   GITHUB_LOGIN_CLIENT_ID: test-login-cid
   GITHUB_LOGIN_CLIENT_SECRET: test-login-csec
   GITHUB_CONNECTOR_CLIENT_ID: test-conn-cid
