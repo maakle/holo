@@ -16,9 +16,8 @@ async function main() {
   await initCrypto();
   const db = createDb(env.DATABASE_URL);
 
-  const mcpPublicUrl = process.env.MCP_PUBLIC_URL ?? 'http://localhost:8080';
-  const webPublicUrl =
-    process.env.WEB_PUBLIC_URL ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:3000';
+  const mcpPublicUrl = env.MCP_PUBLIC_URL;
+  const webPublicUrl = env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL;
 
   const app = new Hono<{ Variables: McpSessionVars }>();
 
@@ -128,11 +127,12 @@ async function main() {
           ...extraSubjects,
         ],
         activeToolAllowlist,
+        anthropicApiKey: env.ANTHROPIC_API_KEY,
       };
     },
   });
 
-  const port = Number(process.env.MCP_PORT ?? 8080);
+  const port = env.MCP_PORT;
   serve({ fetch: app.fetch, port });
   logger.info({ port }, 'gateway listening');
 }

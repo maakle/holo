@@ -17,6 +17,7 @@ export interface ToolContext {
   userSubjects: string[];
   activeToolAllowlist?: string[];
   userId?: string;
+  anthropicApiKey?: string;
 }
 
 export interface ToolDefinition {
@@ -43,7 +44,7 @@ const BUILTINS: BuiltinSpec[] = [
   { name: 'get_ticket', description: 'Fetch a Pylon support ticket (conversation history) by ticket_id.', schema: getTicketInputSchema, run: (ctx, a) => runGetTicketTool(ctx, a) },
   { name: 'list_skills', description: 'List skills available to agents in this organization. Returns name, slug, version, status, and description. Filter by status (default: active).', schema: listSkillsInputSchema, run: (ctx, a) => runListSkillsTool(ctx, a) },
   { name: 'get_skill', description: 'Retrieve the full content of a skill by id or slug. Returns the complete Anthropic Skill format including procedure and examples.', schema: getSkillInputSchema, run: (ctx, a) => runGetSkillTool(ctx, a) },
-  { name: 'execute_skill', description: "Execute a skill procedure step-by-step using the skill's written playbook. The skill must have executable=true in its frontmatter. Returns a run ID, per-step LLM responses, and a summary. This tool creates a skill_run record — it is NOT read-only.", schema: executeSkillInputSchema, run: (ctx, a) => runExecuteSkillTool({ ...ctx, anthropicApiKey: process.env.ANTHROPIC_API_KEY }, a) },
+  { name: 'execute_skill', description: "Execute a skill procedure step-by-step using the skill's written playbook. The skill must have executable=true in its frontmatter. Returns a run ID, per-step LLM responses, and a summary. This tool creates a skill_run record — it is NOT read-only.", schema: executeSkillInputSchema, run: (ctx, a) => runExecuteSkillTool({ ...ctx, anthropicApiKey: ctx.anthropicApiKey }, a) },
 ];
 
 export async function listTools(ctx: ToolContext): Promise<ToolDefinition[]> {
