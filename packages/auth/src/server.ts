@@ -4,6 +4,7 @@ import { emailOTP } from 'better-auth/plugins';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import type { Env } from '@holo/env';
+import { holoError, ErrorCode } from '@holo/errors';
 
 export interface CreateAuthOpts {
   db: DB;
@@ -26,7 +27,6 @@ async function sendOtpEmail(
   type: string,
 ): Promise<void> {
   if (env.EMAIL_PROVIDER === 'console' || !env.RESEND_API_KEY) {
-    // eslint-disable-next-line no-console
     console.log(`[email:${type}] to=${email} otp=${otp}`);
     return;
   }
@@ -45,7 +45,12 @@ async function sendOtpEmail(
     }),
   });
   if (!res.ok) {
-    throw new Error(`Resend API ${res.status}: ${await res.text()}`);
+    throw holoError({
+      code: ErrorCode.HOLO_INTERNAL,
+      problem: `Resend API rejected OTP email (status ${res.status})`,
+      cause: await res.text(),
+      fix: 'Verify RESEND_API_KEY is valid and the from-domain is verified in Resend.',
+    });
   }
 }
 
