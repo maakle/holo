@@ -9,6 +9,7 @@ import { HoloError } from '@holo/errors';
 import { listTools, type ToolContext } from './registry.js';
 import { checkToolAllowed } from '../middleware/allowlist.js';
 import type { McpSessionVars } from '../middleware/session.js';
+import { logger } from '../logger.js';
 
 export interface MountMcpOpts {
   db: DB;
@@ -64,14 +65,14 @@ function buildServer(getCtx: () => ToolContext): Server {
     const t0 = performance.now();
     const result = await tool.run(ctx, req.params.arguments);
     const latencyMs = Math.round(performance.now() - t0);
-    console.log(
-      JSON.stringify({
+    logger.info(
+      {
         event: 'mcp_tool_call',
         tool: req.params.name,
         org: ctx.organizationId,
-        latency_ms: latencyMs,
-        ts: new Date().toISOString(),
-      }),
+        latencyMs,
+      },
+      'mcp tool call',
     );
 
     ctx.db
@@ -84,7 +85,7 @@ function buildServer(getCtx: () => ToolContext): Server {
         outputJson: result as Record<string, unknown>,
         latencyMs,
       })
-      .catch((err: unknown) => console.error('Failed to log MCP invocation:', err));
+      .catch((err: unknown) => logger.error({ err }, 'mcp invocation log failed'));
 
     return { content: [{ type: 'text', text: JSON.stringify(result) }] };
   });

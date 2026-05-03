@@ -9,6 +9,7 @@ import { createSessionMiddleware, type McpSessionVars } from './middleware/sessi
 import { mountMcp } from './mcp/transport.js';
 import { apiReference } from '@scalar/hono-api-reference';
 import { createRestRouter, openApiConfig } from './rest/router.js';
+import { logger } from './logger.js';
 
 async function main() {
   const env = parseEnv(process.env);
@@ -31,7 +32,7 @@ async function main() {
             : 500;
       return c.json(err.toJSON(), status);
     }
-    console.error(err);
+    logger.error({ err }, 'unhandled gateway error');
     return c.json(
       { code: 'HOLO_INTERNAL', problem: 'unexpected error', fix: 'check server logs' },
       500,
@@ -133,10 +134,10 @@ async function main() {
 
   const port = Number(process.env.MCP_PORT ?? 8080);
   serve({ fetch: app.fetch, port });
-  console.log(`apps/gateway listening on :${port}`);
+  logger.info({ port }, 'gateway listening');
 }
 
 main().catch((e) => {
-  console.error(e);
+  logger.fatal({ err: e }, 'gateway boot failed');
   process.exit(1);
 });
