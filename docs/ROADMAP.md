@@ -105,7 +105,7 @@ Expanded after [/plan-ceo-review](../docs/designs/holo-v01-yc-prep.md) accepted 
 - [ ] `/skills` route in `apps/web` — public registry browse page (no auth required to read)
 - [ ] "Publish anonymized" button on extracted skills (GitHub OAuth required to publish)
 - [ ] **Two-stage publish:** automated LLM-redaction pass produces a diff; human reviews and confirms before anything goes public
-- [ ] Apache-2.0 contribution license; takedown email + rate limit (5 publishes/day per user)
+- [ ] AGPL-3.0 contribution license; takedown email + rate limit (5 publishes/day per user)
 - [ ] Define "skill" = YAML doc + redacted example outputs
 
 ### Weeks 13–14: Agent observability dashboard + read-only replay diff (CP2) + Connect-your-agent UX (DX D45)
