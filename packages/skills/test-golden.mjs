@@ -14,7 +14,7 @@ try {
     const usedTools = [...new Set(usedToolsMatch.map(m => m.match(/`([^`]+)`/)[1]))];
     
     const declared = new Set(tools);
-    const used = new Set(usedTools);
+    const _used = new Set(usedTools);
     
     let match = '✓';
     if (usedTools.some(t => !declared.has(t))) {
