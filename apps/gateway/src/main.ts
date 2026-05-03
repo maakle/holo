@@ -7,8 +7,8 @@ import { HoloError } from '@holo/errors';
 import { getSubjectsForUser } from '@holo/user-subjects';
 import { createSessionMiddleware } from './middleware/session.js';
 import { mountMcp } from './jsonrpc.js';
-import { createRestRouter } from './rest/router.js';
-import { openApiDoc } from './rest/openapi.js';
+import { apiReference } from '@scalar/hono-api-reference';
+import { createRestRouter, openApiConfig } from './rest/router.js';
 
 async function main() {
   const env = parseEnv(process.env);
@@ -67,20 +67,20 @@ async function main() {
     }),
   );
 
-  // OpenAPI spec (no auth)
-  app.get('/openapi.json', (c) => c.json(openApiDoc));
-
-  // REST API surface — /v1/health is public, all others require auth
+  // REST API surface — /v1/health is public, all others require auth.
+  // Routes + their schemas live in ./rest/router.ts (zod-openapi).
   const sessionMiddleware = createSessionMiddleware(db);
   const restRouter = createRestRouter(db);
 
-  // Mount public health endpoint without auth
-  app.get('/v1/health', (c) => c.json({ status: 'ok', version: '0.1' }));
-
-  // Mount authenticated REST routes
+  // Auth middleware applies to authenticated REST paths only — NOT /v1/health.
   app.use('/v1/skills', sessionMiddleware);
   app.use('/v1/skills/*', sessionMiddleware);
   app.use('/v1/search', sessionMiddleware);
+
+  // Expose the auto-generated OpenAPI document and a Scalar-rendered docs UI.
+  // Both are public (no auth) so OSS users can introspect the API surface.
+  restRouter.doc('/openapi.json', openApiConfig);
+  app.get('/docs', apiReference({ url: '/openapi.json', theme: 'default' }));
 
   app.route('/', restRouter);
 
