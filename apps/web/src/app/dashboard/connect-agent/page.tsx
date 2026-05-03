@@ -7,23 +7,24 @@ import { ConnectClient } from './connect-client';
 import { revokeToken } from './actions';
 
 function deriveBaseUrls(authUrl: string): { mcpUrl: string; restUrl: string } {
-  // BETTER_AUTH_URL points at apps/web (default :3030). The MCP server is a sibling
-  // service (default :8091). For self-hosters running both behind a single domain,
-  // override these in env later — for v0.0 we derive a reasonable default and let
-  // the user copy/edit if their topology differs.
+  // BETTER_AUTH_URL points at apps/web (default :3030). The MCP / REST surfaces
+  // both live on the sibling Hono service (default :8091) — JSON-RPC at /mcp,
+  // OpenAPI REST under /v1/*. For self-hosters running both behind a single
+  // domain, override these via env.
   try {
     const u = new URL(authUrl);
-    const mcpHost = u.hostname;
-    const mcpProto = u.protocol;
-    const mcpPort = process.env.MCP_PUBLIC_PORT ?? '8091';
+    const proto = u.protocol;
+    const host = u.hostname;
+    const port = process.env.MCP_PUBLIC_PORT ?? '8091';
+    const base = `${proto}//${host}:${port}`;
     return {
-      mcpUrl: `${mcpProto}//${mcpHost}:${mcpPort}/mcp`,
-      restUrl: `${u.origin}/api`,
+      mcpUrl: `${base}/mcp`,
+      restUrl: base,
     };
   } catch {
     return {
       mcpUrl: 'http://localhost:8091/mcp',
-      restUrl: 'http://localhost:3030/api',
+      restUrl: 'http://localhost:8091',
     };
   }
 }

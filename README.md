@@ -46,29 +46,31 @@ Holo is the open-source, self-hostable take that doesn't require building the ag
 
 ## Architecture (the short version)
 
+Three apps. No NestJS.
+
 | Layer | Choice |
 |---|---|
-| Web/API | NestJS 11 (API) + Next.js 15 App Router (dashboard) |
+| Dashboard | **`apps/web`** — Next.js 15 App Router. Marketing landing, sign-in (GitHub + email/password), `/dashboard/connections`, `/dashboard/team`, `/dashboard/connect-agent`. Auth callback + connector OAuth callbacks live here too as Next.js route handlers. |
+| MCP + REST | **`apps/mcp`** — Hono. Hosts the MCP JSON-RPC handler at `POST /mcp` *and* the REST/OpenAPI surface (`POST /v1/search`, spec at `/openapi.json`, Swagger UI at `/docs`). Same backend; the protocol is the agent's choice. |
+| Worker | **`apps/worker`** — plain Node + BullMQ + Redis. Per-connector ingestion jobs land here; `jobs/<connector>.ts` is the seam. |
 | ORM | Drizzle on Postgres + pgvector ≥ 0.8 |
-| Auth | Better Auth — single-user mode in v0.0, `organization` plugin in v0.1, `oauthProvider` for MCP DCR in v0.2 |
-| Workers | BullMQ on Redis, NestJS-wrapped, with a `step()` checkpoint helper |
-| Connectors | Hand-written behind a `Connector<>` interface, official SDKs |
-| Vector + search | pgvector + tsvector + pg_trgm fused with RRF; opt-in `pg_search` (ParadeDB) |
-| Embeddings | `text-embedding-3-large` truncated to 1024 dims (cloud) / BGE-M3 (self-host) |
-| MCP | Sibling Hono service sharing a `retrieval-core` package with the API |
-| Skills | Synthesizer worker that turns artifacts into `SKILL.md` files; MCP exposes `list_skills`, `get_skill`, `execute_skill` |
+| Auth | Better Auth — GitHub OAuth + email/password (verification off until email infra lands); `member` + `invitation` tables for team management; bearer-token validation against `api_token` for agents. |
+| Connectors | Hand-written behind a `Connector<>` interface (`packages/connectors`), official SDKs. CSRF + signed-state JWT for the OAuth round-trip; tokens encrypted at rest via `@holo/crypto`. |
+| Vector + search | `packages/retrieval-core` — single-CTE BM25 (`websearch_to_tsquery` + `ts_rank_cd`) with a placeholder RRF shape that lights up once vector embeddings start landing. |
+| Embeddings | `text-embedding-3-large` truncated to 1024 dims (cloud) / BGE-M3 (self-host) — wired in via the worker once ingestion lands. |
+| Skills | `packages/skills` placeholder; MCP will expose `list_skills`, `get_skill`, `execute_skill` once synthesis ships. |
 | Monorepo | pnpm workspaces + Turborepo |
 
 Full reasoning, alternatives considered, and migration paths in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md). Read it before opening a "why not X" issue.
 
 ---
 
-## Quick start (v0.0 Foundation — development)
+## Quick start (development)
 
-> Requires Docker, Node 20+, pnpm 9+. v0.0 Foundation is the deployable skeleton: login + GitHub Connector OAuth roundtrip, no ingestion or retrieval yet. See [`docs/superpowers/specs/2026-04-29-v0.0-foundation-design.md`](./docs/superpowers/specs/2026-04-29-v0.0-foundation-design.md).
+> Requires Docker, Node 20+, pnpm 9+. v0.0 ships the public marketing landing, GitHub + email/password sign-in, team management with invites, an API-token + connect-agent surface, and the MCP `search` tool over BM25. Ingestion and embeddings are next.
 
 ```bash
-git clone https://github.com/your-org/holo.git
+git clone https://github.com/maakle/holo.git
 cd holo
 pnpm install
 
@@ -87,25 +89,42 @@ DATABASE_URL=postgresql://holo:holo@localhost:5436/holo pnpm db:migrate
 
 # Start dev servers
 pnpm dev
-# apps/web    → http://localhost:3030
-# apps/api    → http://localhost:4000
-# apps/mcp    → http://localhost:8091
+# apps/web    → http://localhost:3030  (dashboard, marketing, auth)
+# apps/mcp    → http://localhost:8091  (MCP JSON-RPC at /mcp; REST at /v1/*; OpenAPI at /openapi.json; Swagger UI at /docs)
 # apps/worker → background, logs heartbeat every 60s
 ```
 
 > **Port note:** Postgres binds to host port `5436` and Redis to `6382` so holo can coexist with other local Postgres/Redis instances. apps/web runs on `3030`, apps/mcp on `8091`. Override via `MCP_PORT` and Next.js `-p` flag if needed.
 
-Visit `http://localhost:3030`. Sign in via GitHub. Click "Connect" on the GitHub row in `/connections` to complete the connector OAuth roundtrip — the row flips to "Connected ✓" and your encrypted token is stored in `connector_credentials`.
+Visit `http://localhost:3030`. Sign up with email/password or GitHub. From the dashboard:
 
-The MCP server is at `http://localhost:8091/health` (no MCP tools registered yet — those land in spec #2). To connect Claude Desktop later:
+- **`/dashboard/connections`** — connect GitHub (full OAuth round-trip with CSRF + signed state). Other connectors return `HOLO_CONNECTOR_NOT_IMPLEMENTED` until ingestion ships.
+- **`/dashboard/team`** — invite members, list, remove, leave workspace. Invite emails aren't sent yet; copy the link from the pending-invitations table.
+- **`/dashboard/connect-agent`** — generate API tokens and copy-paste config for Claude Desktop, Cursor, Cline, curl, Python, TypeScript.
+
+To connect Claude Desktop:
 
 ```json
 {
   "mcpServers": {
-    "holo": { "url": "http://localhost:8091/mcp" }
+    "holo": {
+      "url": "http://localhost:8091/mcp",
+      "headers": { "Authorization": "Bearer <YOUR_TOKEN>" }
+    }
   }
 }
 ```
+
+REST equivalent (the OpenAPI surface mirrors the MCP tools):
+
+```bash
+curl -X POST http://localhost:8091/v1/search \
+  -H "Authorization: Bearer <YOUR_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "how do we onboard a new ATS partner?", "limit": 5}'
+```
+
+Browse the live API spec at `http://localhost:8091/docs`.
 
 ### Registering the two GitHub OAuth apps
 

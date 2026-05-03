@@ -26,14 +26,13 @@ Layers ship in order. v0.1–v0.4 build the context layer. v0.5 adds skills. v0.
 
 | Layer | Choice |
 |---|---|
-| Web | Next.js 15 App Router |
-| API | NestJS 11 |
-| Workers | NestJS standalone + BullMQ |
-| MCP | Hono on Node |
+| Web | **`apps/web`** — Next.js 15 App Router. Dashboard, marketing landing, sign-in, all OAuth callbacks (login + connector), team management, connect-agent. |
+| MCP + REST | **`apps/mcp`** — Hono on Node. MCP JSON-RPC at `POST /mcp` and OpenAPI 3.x REST at `/v1/*` (`@hono/zod-openapi`). Spec at `/openapi.json`, Swagger UI at `/docs`. Same backend; protocol is the agent's choice. |
+| Worker | **`apps/worker`** — plain Node + BullMQ + Redis. Per-connector ingestion jobs (`jobs/<connector>.ts`). |
 | ORM | Drizzle |
 | DB | Postgres 16 + pgvector ≥ 0.8 + pg_trgm |
 | Cache/Queue | Redis 7 |
-| Auth | Better Auth (organization + apiKey + oauthProvider) |
+| Auth | Better Auth — GitHub OAuth + email/password; `member` + `invitation` tables for team management; `api_token` (SHA-256 hashed) for agent bearer auth. |
 | Embeddings | `text-embedding-3-large` @ 1024 dims default; BGE-M3 self-host |
 | LLM provider | Anthropic Claude default (skill synthesis, contextual chunking, redaction). Pluggable per workspace config — switch to OpenAI / Mistral / local model without code changes. |
 | Reranker | bge-reranker-v2-m3 (opt-in) |
@@ -42,15 +41,17 @@ Layers ship in order. v0.1–v0.4 build the context layer. v0.5 adds skills. v0.
 
 ## Why these choices
 
-### NestJS for the API, Next.js for the dashboard
+### Three apps, no framework on the backend
 
-The Next.js-monolith pattern (Cal.com, Dub, Documenso, Langfuse) is beautiful at small scale and degrades past ~30 modules. Cal.com themselves are migrating *toward* a Repository + Service convention to recover what NestJS gives for free.
+Earlier drafts of this doc proposed NestJS for the API and worker. We dropped it. Reality at v0.0:
 
-For our domain — connectors, retrieval, skills, plans, evals, auth, billing, webhooks — DI and the module system pay off concretely. Each connector module declares its dependencies explicitly (`OAuthClient`, `Normalizer`, `QueueProducer`, `SyncStateRepo`, `AclExtractor`). Guards (`ApiKeyGuard`, `WorkspaceScopeGuard`), interceptors (rate limiting, audit logging, OTel spans), and pipes (Zod validation) compose across all modules. Request-scoped DI carries `workspaceId` and `traceId` automatically.
+- **`apps/web`** owns auth callbacks and connector OAuth round-trips as plain Next.js route handlers — no separate API tier needed for those.
+- **`apps/mcp`** owns the agent-facing surface (MCP JSON-RPC + OpenAPI/REST). Hono + `@hono/zod-openapi` gives us routing, Zod validation, error mapping, and the spec — without the DI weight.
+- **`apps/worker`** owns ingestion jobs as a plain Node process registering BullMQ workers. ~40 lines of bootstrap; new jobs are `jobs/<name>.ts`.
 
-Twenty CRM is the closest analog and validates the structure. **Copy Twenty's module layout. Refuse to copy its TypeORM choice** — that's where their self-host pain lives (issues #19863, #14705, #12936 — TypeORM migrations missing `IF NOT EXISTS` guards).
+What we lose: opinionated DI, decorator-based guards, request-scoped tracing context. What we gain: ~3,000 fewer lines of dependency tree, faster cold starts, no NestJS upgrade churn, simpler local dev. Cross-cutting concerns (auth, ACL scoping, logging) live as Hono middleware or shared helpers in `packages/*` — same intent, less ceremony. See [`decisions/0005-drop-nestjs.md`](./decisions/0005-drop-nestjs.md).
 
-Next.js for the frontend (not Vite SPA) because we want marketing + docs + dashboard at one URL with server components.
+Next.js (not Vite SPA) for the frontend because we want marketing + docs + dashboard at one URL with server components.
 
 ### Drizzle, not Prisma
 
@@ -275,35 +276,34 @@ This layer is deferred to v0.6. The context layer and skills must be solid first
 
 ## Process topology
 
-Five long-lived containers in v1, growing to seven once skills and the loop ship:
+Three long-lived containers in v0.x, growing if/when synthesis warrants its own scaling axis:
 
 ```
-┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐
-│   web   │  │   api   │  │ worker  │  │   mcp   │
-│ Next.js │  │ NestJS  │  │ NestJS  │  │  Hono   │
-└────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘
-     │            │            │            │
-     └────────────┴────────────┴────────────┘
-                       │
-            ┌──────────┴──────────┐
-            │                     │
-       ┌────▼────┐          ┌─────▼────┐
-       │postgres │          │  redis   │
-       │+pgvector│          │noeviction│
-       └─────────┘          └──────────┘
+┌─────────┐         ┌─────────┐         ┌─────────┐
+│   web   │         │   mcp   │         │ worker  │
+│ Next.js │         │  Hono   │         │  Node   │
+└────┬────┘         └────┬────┘         └────┬────┘
+     │                   │                   │
+     └───────────────────┼───────────────────┘
+                         │
+              ┌──────────┴──────────┐
+              │                     │
+         ┌────▼────┐          ┌─────▼────┐
+         │postgres │          │  redis   │
+         │+pgvector│          │noeviction│
+         └─────────┘          └──────────┘
 ```
 
-In v0.5, `worker` may split into `sync-worker` and `synthesis-worker` for independent scaling — skill synthesis is LLM-heavy and shouldn't compete with connector pulls for CPU.
+`apps/mcp` hosts both MCP JSON-RPC and the OpenAPI/REST surface. In v0.5, `worker` may split into `sync-worker` and `synthesis-worker` for independent scaling — skill synthesis is LLM-heavy and shouldn't compete with connector pulls for CPU.
 
 ## Repo layout
 
 ```
 holo/
 ├── apps/
-│   ├── web/              # Next.js 15 — UI + marketing + docs + dashboard
-│   ├── api/              # NestJS 11 — REST + OpenAPI + domain modules
-│   ├── worker/           # NestJS standalone — BullMQ processors
-│   └── mcp/              # Hono — Streamable HTTP MCP server, OAuth 2.1
+│   ├── web/              # Next.js 15 — marketing + dashboard + auth callbacks
+│   ├── mcp/              # Hono — MCP JSON-RPC + OpenAPI/REST (single service)
+│   └── worker/           # Plain Node + BullMQ — ingestion jobs
 ├── packages/
 │   ├── core/             # Domain entities, use-cases (clean-architecture core)
 │   ├── connectors/       # Connector<> interface + adapters

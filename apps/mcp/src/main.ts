@@ -1,11 +1,14 @@
-import { Hono } from 'hono';
+import { OpenAPIHono } from '@hono/zod-openapi';
+import { swaggerUI } from '@hono/swagger-ui';
 import { serve } from '@hono/node-server';
 import { initCrypto } from '@holo/crypto';
 import { parseEnv } from '@holo/env';
 import { createDb, type DB } from '@holo/db';
 import { HoloError } from '@holo/errors';
+import { hybridSearch } from '@holo/retrieval-core';
 import { createAuthMiddleware, type RequestIdentity } from './middleware/auth';
 import { TOOLS, callSearchTool } from './tools';
+import { searchRoute } from './openapi/search';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -43,7 +46,6 @@ async function handleJsonRpc(
         };
 
       case 'notifications/initialized':
-        // Notifications have no response.
         return null;
 
       case 'tools/list':
@@ -95,7 +97,7 @@ async function main() {
   await initCrypto();
   const db = createDb(env.DATABASE_URL);
 
-  const app = new Hono<{ Variables: { identity: RequestIdentity } }>();
+  const app = new OpenAPIHono<{ Variables: { identity: RequestIdentity } }>();
 
   app.onError((err, c) => {
     if (err instanceof HoloError) {
@@ -120,8 +122,41 @@ async function main() {
 
   app.get('/health', (c) => c.json({ status: 'ok', service: 'mcp' }));
 
-  // Single-message JSON-RPC over HTTP. Streamable-HTTP transport (server-sent events
-  // + multi-message sessions) lands when we ship long-running tools.
+  // ── REST surface (OpenAPI 3.x) ──────────────────────────────────────────────
+  // Same backend as the MCP search tool; for agents that prefer plain HTTP.
+  app.use('/v1/*', createAuthMiddleware(db));
+  app.openapi(searchRoute, async (c) => {
+    const identity = c.get('identity');
+    const body = c.req.valid('json');
+    const hits = await hybridSearch(db, {
+      query: body.query,
+      organizationId: identity.organizationId,
+      limit: body.limit,
+    });
+    return c.json({ hits }, 200);
+  });
+
+  app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
+    type: 'http',
+    scheme: 'bearer',
+    description: 'Holo API token from /dashboard/connect-agent',
+  });
+
+  app.doc('/openapi.json', {
+    openapi: '3.1.0',
+    info: {
+      title: 'holo REST API',
+      version: '0.0.0',
+      description:
+        'REST surface mirroring the MCP tool set. Same backend, same data, same skills — ' +
+        'the protocol is the agent\'s choice.',
+    },
+    servers: [{ url: env.BETTER_AUTH_URL.replace(':3030', ':8091') }],
+  });
+
+  app.get('/docs', swaggerUI({ url: '/openapi.json' }));
+
+  // ── MCP JSON-RPC surface ────────────────────────────────────────────────────
   app.post('/mcp', createAuthMiddleware(db), async (c) => {
     const identity = c.get('identity');
     const body = (await c.req.json()) as JsonRpcRequest | JsonRpcRequest[];
@@ -137,6 +172,8 @@ async function main() {
   const port = Number(process.env.MCP_PORT ?? 8091);
   serve({ fetch: app.fetch, port });
   console.log(`apps/mcp listening on :${port}`);
+  console.log(`  MCP JSON-RPC:  POST /mcp`);
+  console.log(`  REST (OpenAPI): POST /v1/search   (spec at /openapi.json, UI at /docs)`);
 }
 
 main().catch((e) => {

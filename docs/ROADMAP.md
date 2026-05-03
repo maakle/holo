@@ -25,10 +25,10 @@ This roadmap was substantially restructured on 2026-04-29. The earlier v0.1→v0
 ### Week 1: Skeleton + codebase+KB cluster (revised after /plan-eng-review)
 - [ ] Day 1–2: Verify Grain and Pylon have read APIs with sufficient rate limits for incremental ingestion. If either fails, replace with a stopgap (manual export script) or drop from v0.0 scope before any other work.
 - [ ] Monorepo (`apps/`, `packages/`, pnpm workspaces, Turborepo)
-- [ ] `apps/api` (NestJS) + `apps/worker` (NestJS standalone, BullMQ) + `apps/mcp` (Hono) + `apps/web` (Next.js, minimal)
-- [ ] `packages/db` — Drizzle schema, initial migration. **Day-1 migration MUST include: HNSW index on embeddings vector, GIN on tsvector, GIN on `acl_subjects`, btree on `(source_type, ...)` composite.** Without these, queries silently degrade past 100K chunks.
-- [ ] `packages/retrieval-core` — shared package between MCP and (v0.1) REST. **ESLint boundary rule: `apps/mcp` and `apps/api` cannot import `packages/db` directly; only via `packages/retrieval-core`.** Enforces DRY by construction (Issue 1B from /plan-eng-review).
-- [ ] **`packages/errors` — `HoloError` class (DX D46):** structured error format used everywhere (apps/mcp, apps/api, apps/worker, packages/retrieval-core). Each error has `code`, `problem`, `cause`, `fix`, `docs_url`. ESLint rule against bare `throw new Error()` outside `packages/errors`. Foundational pattern; lands week 1 so every subsequent error site uses it.
+- [x] `apps/web` (Next.js — dashboard + marketing + auth callbacks) + `apps/mcp` (Hono — MCP JSON-RPC + OpenAPI/REST) + `apps/worker` (plain Node + BullMQ). NestJS dropped 2026-05-03; see [`decisions/0005-drop-nestjs.md`](./decisions/0005-drop-nestjs.md).
+- [x] `packages/db` — Drizzle schema, initial migration. **Day-1 migration includes: HNSW index on embeddings vector, GIN on tsvector, GIN on `acl_subjects`, btree on `(source_type, ...)` composite.** Without these, queries silently degrade past 100K chunks.
+- [x] `packages/retrieval-core` — shared package between MCP and REST. **ESLint boundary rule: `apps/mcp` cannot import `packages/db` directly; only via `packages/retrieval-core`.** Enforces DRY by construction (Issue 1B from /plan-eng-review).
+- [x] **`packages/errors` — `HoloError` class (DX D46):** structured error format used everywhere (apps/mcp, apps/web, apps/worker, packages/retrieval-core). Each error has `code`, `problem`, `cause`, `fix`, `docs_url`. ESLint rule against bare `throw new Error()` outside `packages/errors` (`eslint-plugin-local/rules/no-bare-throw-error.js`). Foundational pattern; lands week 1 so every subsequent error site uses it.
 - [ ] `packages/skills` and `packages/plans` exist as architectural placeholders
 - [ ] `docker-compose.yml` runs Postgres + pgvector + Redis + the four apps
 - [ ] CI runs lint + typecheck + tests on every PR
@@ -95,7 +95,7 @@ Expanded after [/plan-ceo-review](../docs/designs/holo-v01-yc-prep.md) accepted 
 ### Weeks 11–12: External onboarding + BYO-agent reach
 - [ ] Better Auth `organization` plugin — multi-tenant signup, workspace creation, invite flow
 - [ ] OAuth 2.1 with PKCE on the MCP server (static client; DCR optional, deferred to v0.2)
-- [ ] **REST + OpenAPI surface** — auto-generated from NestJS controllers, sharing `packages/retrieval-core` with the MCP server. Endpoints mirror the MCP tool surface (`POST /v1/search`, `GET /v1/threads/:id`, `GET /v1/skills`, etc.). Static API key auth for v0.1; unified OAuth in v0.2.
+- [x] **REST + OpenAPI surface** — generated from `@hono/zod-openapi` schemas in `apps/mcp`, sharing `packages/retrieval-core` with the MCP JSON-RPC handler. Endpoints mirror the MCP tool surface (`POST /v1/search` shipped; `GET /v1/threads/:id`, `GET /v1/skills`, etc. as the corresponding tools land). Static API key auth (`api_token` table) for v0.1; unified OAuth in v0.2.
 - [ ] **Verified BYO-agent reach end-to-end:** demo a ChatGPT Action and a Gemini function call hitting the same holo instance an MCP client is using
 - [ ] First 3+ external CTOs (selected from cold-DM responders during v0.0) onboarded
 - [ ] Per-customer telemetry on agent retention and tool-call patterns
