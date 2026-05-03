@@ -166,3 +166,27 @@ export const connectorCursors = pgTable(
     ),
   }),
 );
+
+export const apiToken = pgTable(
+  'api_token',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    // First 8 chars of the plaintext token (after the "holo_" prefix), for display.
+    prefix: text('prefix').notNull(),
+    // SHA-256 of the plaintext token. Plaintext is shown to the user once at creation.
+    hashedToken: text('hashed_token').notNull().unique(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => ({
+    orgUserIdx: index('api_token_org_user_idx').on(t.organizationId, t.userId),
+  }),
+);
