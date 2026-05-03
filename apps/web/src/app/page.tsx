@@ -264,7 +264,7 @@ const PILLARS = [
   {
     label: 'Governance',
     title: 'Scoped access. Full observability.',
-    body: 'Personas bound what each agent sees: connection scopes, tool scopes, data scopes. Every call is logged, attributable, and replayable. The dashboard shows what every agent on your data has actually done — the difference between a useful demo and a tool the company will let into the loop.',
+    body: 'Allowlist-scoped at ingestion: channels, repos, and pages can never reach an agent if they never reached holo. Every call is logged, attributable, and replayable. Per-agent tool allowlists and row-level data scopes round out the personas model — the difference between a useful demo and a tool the company will let into the loop.',
   },
 ] as const;
 
