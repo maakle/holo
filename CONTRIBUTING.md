@@ -87,6 +87,15 @@ Format: Context, Decision, Consequences. Under a page.
 
 Be kind. Be technical. Be specific. Disagreement is welcome; condescension is not.
 
-## License
+## License & CLA
 
-By submitting a PR you agree to license your contribution under AGPL-3.0-or-later.
+By submitting a PR you agree to license your contribution under **AGPL-3.0-or-later**.
+
+For your first PR, the CLA bot will comment with a link to the [Contributor License
+Agreement](./CLA.md) and a one-line sign-off you can paste back as a comment. The CLA
+gives the project the right to offer dual licensing (AGPL for the public repo, commercial
+license to SaaS providers who can't comply with AGPL). Your contributions remain under
+AGPL-3.0 in this repo regardless.
+
+If you're contributing on behalf of an employer, ask them to sign a Corporate CLA before
+your PR is merged — open an issue tagged `cla-corporate` and we'll send the form.
