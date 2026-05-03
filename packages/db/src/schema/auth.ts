@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, jsonb, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, jsonb, uuid, uniqueIndex, index } from 'drizzle-orm/pg-core';
 import { encryptedText } from './encrypted-text';
 
 // organization MUST be defined first because user.organization_id references it.
@@ -61,4 +61,45 @@ export const verification = pgTable('verification', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const memberRole = ['owner', 'admin', 'member'] as const;
+export type MemberRole = (typeof memberRole)[number];
+
+export const member = pgTable(
+  'member',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: memberRole }).notNull().default('member'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgUserUniq: uniqueIndex('member_org_user_uniq').on(t.organizationId, t.userId),
+    orgIdx: index('member_org_idx').on(t.organizationId),
+  }),
+);
+
+export const invitationStatus = ['pending', 'accepted', 'revoked', 'expired'] as const;
+export type InvitationStatus = (typeof invitationStatus)[number];
+
+export const invitation = pgTable('invitation', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  role: text('role', { enum: memberRole }).notNull().default('member'),
+  status: text('status', { enum: invitationStatus }).notNull().default('pending'),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  inviterId: uuid('inviter_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

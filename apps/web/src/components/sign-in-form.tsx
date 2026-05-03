@@ -1,11 +1,22 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { signIn, signUp } from '@holo/auth/client';
 
 type Mode = 'sign-in' | 'sign-up';
 
+// Only allow same-origin paths through the callbackURL to avoid open-redirects.
+function safeCallbackURL(raw: string | null): string {
+  if (!raw) return '/dashboard';
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/dashboard';
+  return raw;
+}
+
 export function SignInForm() {
+  const params = useSearchParams();
+  const callbackURL = safeCallbackURL(params.get('callbackURL'));
+
   const [mode, setMode] = useState<Mode>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,7 +28,7 @@ export function SignInForm() {
     setBusy(true);
     setError(null);
     try {
-      await signIn.social({ provider: 'github', callbackURL: '/dashboard' });
+      await signIn.social({ provider: 'github', callbackURL });
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -31,19 +42,19 @@ export function SignInForm() {
     try {
       const result =
         mode === 'sign-in'
-          ? await signIn.email({ email, password, callbackURL: '/dashboard' })
+          ? await signIn.email({ email, password, callbackURL })
           : await signUp.email({
               email,
               password,
               name: name || email.split('@')[0] || email,
-              callbackURL: '/dashboard',
+              callbackURL,
             });
       if ('error' in result && result.error) {
         setError(result.error.message ?? 'Authentication failed.');
         setBusy(false);
         return;
       }
-      window.location.href = '/dashboard';
+      window.location.href = callbackURL;
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);

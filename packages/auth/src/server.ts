@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { sql } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import type { Env } from '@holo/env';
@@ -52,6 +53,23 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
           required: true,
           defaultValue: defaultOrganizationId,
           input: false,
+        },
+      },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          // Every new user gets a member-row for their assigned org. Default role is
+          // 'member'; invite-accepting users get their role upgraded by the /invite handler.
+          // Idempotent via the (org, user) unique index.
+          after: async (created: { id: string; organizationId?: string }) => {
+            const orgId = created.organizationId ?? defaultOrganizationId;
+            await db.execute(sql`
+              INSERT INTO "member" ("organization_id", "user_id", "role")
+              VALUES (${orgId}::uuid, ${created.id}::uuid, 'member')
+              ON CONFLICT ("organization_id", "user_id") DO NOTHING
+            `);
+          },
         },
       },
     },

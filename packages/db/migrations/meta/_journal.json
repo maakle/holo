@@ -15,6 +15,13 @@
       "when": 1777498776300,
       "tag": "0001_specialized_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777817434940,
+      "tag": "0002_great_lady_ursula",
+      "breakpoints": true
     }
   ]
 }
