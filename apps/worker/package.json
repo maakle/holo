@@ -22,7 +22,7 @@
     "@nestjs/core": "10.4.15",
     "bullmq": "5.20.1",
     "ioredis": "5.4.1",
-    "postgres": "3.4.4",
+    "postgres": "3.4.9",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.1",
     "pino": "9.5.0",
