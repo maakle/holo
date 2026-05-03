@@ -5,7 +5,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
-import { HoloError } from '@holo/errors';
+import { HoloError, holoError, ErrorCode } from '@holo/errors';
 import { listTools, type ToolContext } from './registry.js';
 import { checkToolAllowed } from '../middleware/allowlist.js';
 import type { McpSessionVars } from '../middleware/session.js';
@@ -51,7 +51,13 @@ function buildServer(getCtx: () => ToolContext): Server {
     const ctx = getCtx();
     const all = await listTools(ctx);
     const tool = all.find((t) => t.name === req.params.name);
-    if (!tool) throw new Error(`Unknown tool: ${req.params.name}`);
+    if (!tool) {
+      throw holoError({
+        code: ErrorCode.HOLO_NOT_FOUND,
+        problem: `Unknown tool: ${req.params.name}`,
+        fix: 'Call tools/list to see available tools.',
+      });
+    }
 
     const customNames = new Set(all.filter((t) => t.isCustom).map((t) => t.name));
     if (
@@ -59,7 +65,11 @@ function buildServer(getCtx: () => ToolContext): Server {
         customToolNames: customNames,
       })
     ) {
-      throw new Error(`Tool '${req.params.name}' not in active skill allowlist`);
+      throw holoError({
+        code: ErrorCode.HOLO_ALLOWLIST_EMPTY,
+        problem: `Tool '${req.params.name}' not in active skill allowlist`,
+        fix: 'Add the tool to the active skill\'s toolAllowlist, or activate a different skill.',
+      });
     }
 
     const t0 = performance.now();
