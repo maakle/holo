@@ -1,5 +1,5 @@
 export interface ConnectorMeta {
-  id: 'github' | 'slack' | 'notion' | 'grain' | 'pylon';
+  id: 'github' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot';
   displayName: string;
   description: string;
   implemented: boolean;
@@ -41,5 +41,12 @@ export const CONNECTORS: ConnectorMeta[] = [
     description: 'Customer support tickets.',
     implemented: true,
     flowType: 'apikey',
+  },
+  {
+    id: 'hubspot',
+    displayName: 'HubSpot',
+    description: 'CRM contacts, deals, companies.',
+    implemented: true,
+    flowType: 'oauth',
   },
 ];
