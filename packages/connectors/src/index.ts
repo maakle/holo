@@ -16,6 +16,8 @@ export { createGrainConnector } from './grain/index';
 export type { GrainConnectorOptions } from './grain/index';
 export { createPylonConnector } from './pylon/index';
 export type { PylonConnectorOptions } from './pylon/index';
+export { createHubspotConnector } from './hubspot/index';
+export type { HubspotConnectorOptions } from './hubspot/index';
 
 // Underlying sync engines + API clients (used by the worker to bypass the
 // connector facade for github, where prose and code dispatch on different queues).
