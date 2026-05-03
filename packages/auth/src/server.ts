@@ -1,8 +1,10 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { emailOTP } from 'better-auth/plugins';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import type { Env } from '@holo/env';
+import { holoError, ErrorCode } from '@holo/errors';
 
 export interface CreateAuthOpts {
   db: DB;
@@ -12,14 +14,46 @@ export interface CreateAuthOpts {
     | 'BETTER_AUTH_URL'
     | 'GITHUB_LOGIN_CLIENT_ID'
     | 'GITHUB_LOGIN_CLIENT_SECRET'
+    | 'EMAIL_PROVIDER'
+    | 'RESEND_API_KEY'
   >;
   defaultOrganizationId: string;
 }
 
-// v0.0 Foundation: GitHub OAuth login only (per spec's "if running long, cut email OTP" guidance).
-// Email OTP plugin is deferred — fights better-auth's bundled Zod types in this version pin.
-// Add back when migrating to a Zod-compatible better-auth version, or by writing a thin
-// passwordless-via-magic-link route handler in apps/web that doesn't go through the plugin.
+async function sendOtpEmail(
+  env: Pick<Env, 'EMAIL_PROVIDER' | 'RESEND_API_KEY' | 'BETTER_AUTH_URL'>,
+  email: string,
+  otp: string,
+  type: string,
+): Promise<void> {
+  if (env.EMAIL_PROVIDER === 'console' || !env.RESEND_API_KEY) {
+    console.log(`[email:${type}] to=${email} otp=${otp}`);
+    return;
+  }
+  const fromHost = new URL(env.BETTER_AUTH_URL).host;
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `Holo <noreply@${fromHost}>`,
+      to: email,
+      subject: `Your sign-in code: ${otp}`,
+      text: `Your verification code is ${otp}. It expires in 5 minutes.`,
+    }),
+  });
+  if (!res.ok) {
+    throw holoError({
+      code: ErrorCode.HOLO_INTERNAL,
+      problem: `Resend API rejected OTP email (status ${res.status})`,
+      cause: await res.text(),
+      fix: 'Verify RESEND_API_KEY is valid and the from-domain is verified in Resend.',
+    });
+  }
+}
+
 export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
   return betterAuth({
     database: drizzleAdapter(db, {
@@ -35,16 +69,25 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
     baseURL: env.BETTER_AUTH_URL,
     logger: { level: 'debug' },
     advanced: {
-      generateId: () => crypto.randomUUID(),
+      database: {
+        generateId: () => crypto.randomUUID(),
+      },
     },
     emailAndPassword: { enabled: false },
     socialProviders: {
       github: {
         clientId: env.GITHUB_LOGIN_CLIENT_ID,
         clientSecret: env.GITHUB_LOGIN_CLIENT_SECRET,
-        scopes: ['read:user', 'user:email'],
+        scope: ['read:user', 'user:email'],
       },
     },
+    plugins: [
+      emailOTP({
+        async sendVerificationOTP({ email, otp, type }) {
+          await sendOtpEmail(env, email, otp, type);
+        },
+      }),
+    ],
     user: {
       additionalFields: {
         organizationId: {

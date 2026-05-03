@@ -16,7 +16,7 @@
     "@holo/errors": "workspace:*",
     "commander": "^12.1.0",
     "cli-table3": "^0.6.5",
-    "drizzle-orm": "^0.36.0"
+    "drizzle-orm": "0.45.2"
   },
   "devDependencies": {
     "tsx": "4.19.1",

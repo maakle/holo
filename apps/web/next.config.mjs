@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  experimental: { typedRoutes: false },
+  typedRoutes: false,
   // Native modules (use node-gyp-build / prebuilds) — must NOT be bundled by
   // webpack; load from node_modules at runtime instead.
   serverExternalPackages: [
@@ -34,8 +34,6 @@ const nextConfig = {
       '.mjs': ['.mts', '.mjs'],
     };
     if (isServer) {
-      // Belt-and-suspenders: also add as webpack externals so server bundles
-      // require() these from node_modules instead of trying to bundle them.
       const treeSitterPackages = [
         'tree-sitter',
         'tree-sitter-typescript',

@@ -17,11 +17,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "better-auth": "1.1.6",
+    "better-auth": "1.6.9",
     "@holo/db": "workspace:*",
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",
-    "drizzle-orm": "0.36.0"
+    "drizzle-orm": "0.45.2"
   },
   "devDependencies": {
     "postgres": "3.4.4",

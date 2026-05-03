@@ -1,4 +1,4 @@
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from 'zod';
 import type { DB } from '@holo/db';
 import { listCustomTools, buildCustomToolDefinition } from '@holo/custom-tools';
 import {
@@ -36,7 +36,7 @@ export async function listTools(ctx: ToolContext): Promise<ToolDefinition[]> {
       name: 'search',
       description:
         'Hybrid search across all ingested artifacts (vector + BM25, fused via RRF).',
-      inputSchema: zodToJsonSchema(searchInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      inputSchema: z.toJSONSchema(searchInputSchema) as Record<string, unknown>,
       async run(ctx, args) {
         return runSearchTool(ctx, args);
       },
@@ -44,7 +44,7 @@ export async function listTools(ctx: ToolContext): Promise<ToolDefinition[]> {
     {
       name: 'get_pr',
       description: 'Reassemble a GitHub PR (title + diff + review) by owner/repo/number.',
-      inputSchema: zodToJsonSchema(getPrInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      inputSchema: z.toJSONSchema(getPrInputSchema) as Record<string, unknown>,
       async run(ctx, args) {
         return runGetPrTool(ctx, args);
       },
@@ -52,7 +52,7 @@ export async function listTools(ctx: ToolContext): Promise<ToolDefinition[]> {
     {
       name: 'get_thread',
       description: 'Fetch a Slack thread by channel and ts.',
-      inputSchema: zodToJsonSchema(getThreadInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      inputSchema: z.toJSONSchema(getThreadInputSchema) as Record<string, unknown>,
       async run(ctx, args) {
         return runGetThreadTool(ctx, args);
       },
@@ -60,7 +60,7 @@ export async function listTools(ctx: ToolContext): Promise<ToolDefinition[]> {
     {
       name: 'get_doc',
       description: 'Fetch a doc by artifact id, notion page id, or repo+path.',
-      inputSchema: zodToJsonSchema(getDocInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      inputSchema: z.toJSONSchema(getDocInputSchema) as Record<string, unknown>,
       async run(ctx, args) {
         return runGetDocTool(ctx, args);
       },
@@ -68,7 +68,7 @@ export async function listTools(ctx: ToolContext): Promise<ToolDefinition[]> {
     {
       name: 'get_call',
       description: 'Fetch a Grain meeting recording (summary + full transcript) by recording_id.',
-      inputSchema: zodToJsonSchema(getCallInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      inputSchema: z.toJSONSchema(getCallInputSchema) as Record<string, unknown>,
       async run(ctx, args) {
         return runGetCallTool(ctx, args);
       },
@@ -76,7 +76,7 @@ export async function listTools(ctx: ToolContext): Promise<ToolDefinition[]> {
     {
       name: 'get_ticket',
       description: 'Fetch a Pylon support ticket (conversation history) by ticket_id.',
-      inputSchema: zodToJsonSchema(getTicketInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      inputSchema: z.toJSONSchema(getTicketInputSchema) as Record<string, unknown>,
       async run(ctx, args) {
         return runGetTicketTool(ctx, args);
       },
@@ -85,7 +85,7 @@ export async function listTools(ctx: ToolContext): Promise<ToolDefinition[]> {
       name: 'list_skills',
       description:
         'List skills available to agents in this organization. Returns name, slug, version, status, and description. Filter by status (default: active).',
-      inputSchema: zodToJsonSchema(listSkillsInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      inputSchema: z.toJSONSchema(listSkillsInputSchema) as Record<string, unknown>,
       async run(ctx, args) {
         return runListSkillsTool(ctx, args);
       },
@@ -94,7 +94,7 @@ export async function listTools(ctx: ToolContext): Promise<ToolDefinition[]> {
       name: 'get_skill',
       description:
         'Retrieve the full content of a skill by id or slug. Returns the complete Anthropic Skill format including procedure and examples.',
-      inputSchema: zodToJsonSchema(getSkillInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      inputSchema: z.toJSONSchema(getSkillInputSchema) as Record<string, unknown>,
       async run(ctx, args) {
         return runGetSkillTool(ctx, args);
       },
@@ -103,7 +103,7 @@ export async function listTools(ctx: ToolContext): Promise<ToolDefinition[]> {
       name: 'execute_skill',
       description:
         'Execute a skill procedure step-by-step using the skill\'s written playbook. The skill must have executable=true in its frontmatter. Returns a run ID, per-step LLM responses, and a summary. This tool creates a skill_run record — it is NOT read-only.',
-      inputSchema: zodToJsonSchema(executeSkillInputSchema, { target: 'jsonSchema7' }) as Record<string, unknown>,
+      inputSchema: z.toJSONSchema(executeSkillInputSchema) as Record<string, unknown>,
       async run(ctx, args) {
         return runExecuteSkillTool(
           { ...ctx, anthropicApiKey: process.env.ANTHROPIC_API_KEY },

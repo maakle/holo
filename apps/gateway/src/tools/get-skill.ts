@@ -5,7 +5,7 @@ import { schema } from '@holo/db';
 
 export const getSkillInputSchema = z
   .object({
-    id: z.string().uuid().optional(),
+    id: z.uuid().optional(),
     slug: z.string().optional(),
     version: z.number().int().positive().optional(),
   })

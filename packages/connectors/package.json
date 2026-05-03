@@ -20,7 +20,7 @@
     "@holo/chunker": "workspace:*",
     "@holo/db": "workspace:*",
     "@holo/errors": "workspace:*",
-    "drizzle-orm": "0.36.0",
+    "drizzle-orm": "0.45.2",
     "jose": "5.9.6",
     "minimatch": "^9.0.5"
   },

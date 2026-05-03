@@ -16,7 +16,7 @@
     "@holo/db": "workspace:*",
     "@holo/errors": "workspace:*",
     "@holo/audit": "workspace:*",
-    "drizzle-orm": "0.36.0"
+    "drizzle-orm": "0.45.2"
   },
   "devDependencies": {
     "vitest": "2.1.3",
