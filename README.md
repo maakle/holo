@@ -13,7 +13,7 @@
 1. **Connect** the tools your work lives in (Slack, GitHub, Notion, Grain, Pylon, HubSpot — more on the roadmap). One OAuth per source, allowlist-scoped at ingestion.
 2. **Unify.** Holo ingests, chunks, embeds, and indexes. Hybrid retrieval (pgvector + tsvector fused with RRF) over a single ACL-aware index.
 3. **Expose.** A small set of MCP tools and a parallel REST/OpenAPI surface let any agent — internal or external — search, fetch, and invoke learned procedures.
-4. **Observe.** Every agent call is logged, attributable, and replayable. Scoped personas (connection / tool / data scopes) bound what each agent can see and do.
+4. **Observe.** Every agent call is logged, attributable, and replayable. Today: ingestion-time allowlists bound which channels, repos, and pages enter Holo at all. Next: per-agent tool allowlists and row-level data scopes finish the personas model.
 
 **The wedge in one sentence:** stop re-implementing context fetchers per agent, and stop letting agents see everything just because the OAuth token does.
 
