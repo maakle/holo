@@ -4,9 +4,11 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/server-context', () => ({
-  getServerContext: vi.fn(async () => {
-    throw new Error('server context should not be reached for invalid input');
-  }),
+  getServerContext: vi.fn(() =>
+    Promise.reject(
+      new Error('server context should not be reached for invalid input'),
+    ),
+  ),
 }));
 
 import { inviteMember } from './actions';
