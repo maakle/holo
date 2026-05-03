@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  experimental: { typedRoutes: false },
+  typedRoutes: false,
   // Native modules (use node-gyp-build / prebuilds) — must NOT be bundled by
   // webpack; load from node_modules at runtime instead.
   serverExternalPackages: [
@@ -16,6 +16,8 @@ const nextConfig = {
     'tree-sitter-php',
     'tree-sitter-c',
     'tree-sitter-cpp',
+    'better-auth',
+    '@better-auth/core',
   ],
   transpilePackages: [
     '@holo/auth',

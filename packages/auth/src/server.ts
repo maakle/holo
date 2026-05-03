@@ -16,10 +16,6 @@ export interface CreateAuthOpts {
   defaultOrganizationId: string;
 }
 
-// v0.0 Foundation: GitHub OAuth login only (per spec's "if running long, cut email OTP" guidance).
-// Email OTP plugin is deferred — fights better-auth's bundled Zod types in this version pin.
-// Add back when migrating to a Zod-compatible better-auth version, or by writing a thin
-// passwordless-via-magic-link route handler in apps/web that doesn't go through the plugin.
 export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
   return betterAuth({
     database: drizzleAdapter(db, {
@@ -35,14 +31,16 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
     baseURL: env.BETTER_AUTH_URL,
     logger: { level: 'debug' },
     advanced: {
-      generateId: () => crypto.randomUUID(),
+      database: {
+        generateId: () => crypto.randomUUID(),
+      },
     },
     emailAndPassword: { enabled: false },
     socialProviders: {
       github: {
         clientId: env.GITHUB_LOGIN_CLIENT_ID,
         clientSecret: env.GITHUB_LOGIN_CLIENT_SECRET,
-        scopes: ['read:user', 'user:email'],
+        scope: ['read:user', 'user:email'],
       },
     },
     user: {
