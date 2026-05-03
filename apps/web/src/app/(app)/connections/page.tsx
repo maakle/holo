@@ -42,29 +42,32 @@ export default async function ConnectionsPage({
   const sourceName = new Map(sourceRows.map((r) => [r.provider, r.name]));
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Connections</h1>
-        <p className="text-sm text-gray-500">
-          Connect the tools your team's work lives in.
+    <div className="space-y-8">
+      <header className="flex flex-col gap-2">
+        <span className="caption">Connections</span>
+        <h1 className="font-display text-h1 font-semibold tracking-tight">Connect your tools</h1>
+        <p className="max-w-2xl text-[15px] leading-6 text-text-muted">
+          Connect the tools your team&apos;s work lives in. holo ingests and indexes them so
+          your agents can retrieve real context.
         </p>
-      </div>
+      </header>
       {sp.connect_error ? (
-        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm dark:border-red-800 dark:bg-red-950">
-          <div className="font-medium text-red-700 dark:text-red-200">{sp.connect_error}</div>
+        <div className="rounded-md border border-error/30 bg-[color-mix(in_srgb,var(--error)_10%,transparent)] p-4 text-[13px]">
+          <div className="font-medium text-error">{sp.connect_error}</div>
           {sp.connect_fix ? (
-            <div className="text-red-700 dark:text-red-300">{sp.connect_fix}</div>
+            <div className="mt-1 text-error/80">{sp.connect_fix}</div>
           ) : null}
         </div>
       ) : null}
-      <div className="space-y-2">
-        {CONNECTORS.map((meta) => (
-          <ConnectorRow
-            key={meta.id}
-            meta={meta}
-            status={connected.get(meta.id) ? 'connected' : 'disconnected'}
-            connectedAs={sourceName.get(meta.id)}
-          />
+      <div className="overflow-hidden rounded-md border border-border bg-surface">
+        {CONNECTORS.map((meta, idx) => (
+          <div key={meta.id} className={idx > 0 ? 'border-t border-border' : undefined}>
+            <ConnectorRow
+              meta={meta}
+              status={connected.get(meta.id) ? 'connected' : 'disconnected'}
+              connectedAs={sourceName.get(meta.id)}
+            />
+          </div>
         ))}
       </div>
     </div>

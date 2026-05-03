@@ -37,11 +37,14 @@ export default async function SkillRunsPage() {
     .limit(100);
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 1.5rem' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Skill Runs</h1>
-      <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: 14 }}>
-        Last 100 skill executions. Click a row to see the step trace.
-      </p>
+    <div className="space-y-8">
+      <header className="flex flex-col gap-2">
+        <span className="caption">Skill runs</span>
+        <h1 className="font-display text-h1 font-semibold tracking-tight">Skill execution log</h1>
+        <p className="max-w-2xl text-[15px] leading-6 text-text-muted">
+          Last 100 skill executions. Click a row to see the step trace.
+        </p>
+      </header>
       <SkillRunsTable
         runs={runs.map((r) => ({
           id: r.id,

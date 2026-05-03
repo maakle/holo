@@ -30,13 +30,15 @@ export default async function ObservabilityPage() {
     .limit(100);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Observability</h1>
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          Last 100 MCP tool invocations from your connected agents.
+    <div className="space-y-8">
+      <header className="flex flex-col gap-2">
+        <span className="caption">Observability</span>
+        <h1 className="font-display text-h1 font-semibold tracking-tight">Agent invocations</h1>
+        <p className="max-w-2xl text-[15px] leading-6 text-text-muted">
+          Last 100 MCP tool invocations from your connected agents. Click a row to inspect
+          input and output payloads.
         </p>
-      </div>
+      </header>
 
       <InvocationTable invocations={invocations} />
     </div>
