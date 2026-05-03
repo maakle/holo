@@ -18,7 +18,9 @@ export default async function Home() {
       <SiteHeader isAuthed={isAuthed} />
       <Hero isAuthed={isAuthed} />
       <ConnectorsStrip />
+      <PillarsBand />
       <CodeShowcase />
+      <ObservabilityBand />
       <VisionBand />
       <FinalCTA isAuthed={isAuthed} />
       <SiteFooter />
@@ -72,13 +74,14 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
           Open-source · AGPL-3.0 · Self-hostable
         </p>
         <h1 className="mx-auto mt-6 max-w-[920px] text-balance font-display text-[44px] font-semibold leading-[1.05] tracking-tight md:text-[60px]">
-          Shared agent context.
+          The agent context layer
           <br />
-          The OS underneath.
+          for your company.
         </h1>
-        <p className="mx-auto mt-6 max-w-[620px] text-balance text-[15px] leading-6 text-text-muted">
-          One context layer over the tools your team&apos;s work lives in. Every agent you
-          ship — support, interview-prep, customer-success — queries the same source of truth.
+        <p className="mx-auto mt-6 max-w-[640px] text-balance text-[15px] leading-6 text-text-muted">
+          Connect your tools once. Holo unifies the data, learns your team&apos;s repeatable
+          procedures, and exposes them as callable tools over MCP and OpenAPI. Bring your own
+          agent — Claude, Cursor, ChatGPT, anything — and plug it into the same layer.
           <span className="text-text"> Layer today. Agent OS tomorrow.</span>
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -141,13 +144,13 @@ function CodeShowcase() {
     <section className="border-b border-border">
       <div className="mx-auto grid max-w-[1024px] gap-10 px-6 py-20 md:grid-cols-2 md:gap-14 md:items-center">
         <div>
-          <p className="caption text-text-subtle">One context layer · many agents</p>
+          <p className="caption text-text-subtle">Bring your own agent</p>
           <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
-            Every agent. Same context. Same skills.
+            One layer. Every agent. Same procedures.
           </h2>
           <p className="mt-4 text-balance text-[15px] leading-6 text-text-muted">
             MCP for Claude, Cursor, Cline. REST + OpenAPI for ChatGPT Actions, Gemini, n8n.
-            Same backend, same data, same procedural skills — the protocol is the agent&apos;s
+            Same backend, same data, same learned procedures — the protocol is the agent&apos;s
             choice, not yours.
           </p>
         </div>
@@ -243,6 +246,103 @@ function SiteFooter() {
         </div>
       </div>
     </footer>
+  );
+}
+
+// ── Pillars band ──────────────────────────────────────────────────────────
+const PILLARS = [
+  {
+    label: 'Context layer',
+    title: 'Connect once. Index everything.',
+    body: 'Slack, GitHub, Notion, Grain, Pylon, HubSpot — six connectors live, more on the way. Hybrid retrieval (pgvector + tsvector, RRF-fused) over a single ACL-aware index. One ingestion pipeline; every agent reads the same source of truth.',
+  },
+  {
+    label: 'Procedures',
+    title: 'Not just search. Callable skills.',
+    body: 'Holo learns the procedures your team has already proven out — how a refund is approved, how a security review unfolds — and exposes them as MCP-invokable skills. Agents do not just look things up; they invoke what the company has done before.',
+  },
+  {
+    label: 'Governance',
+    title: 'Scoped access. Full observability.',
+    body: 'Personas bound what each agent sees: connection scopes, tool scopes, data scopes. Every call is logged, attributable, and replayable. The dashboard shows what every agent on your data has actually done — the difference between a useful demo and a tool the company will let into the loop.',
+  },
+] as const;
+
+function PillarsBand() {
+  return (
+    <section className="border-b border-border">
+      <div className="mx-auto max-w-[1280px] px-6 py-20">
+        <div className="mx-auto max-w-[760px] text-center">
+          <p className="caption text-text-subtle">What Holo gives you</p>
+          <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
+            Three things, one layer.
+          </h2>
+        </div>
+        <div className="mt-12 grid gap-6 md:grid-cols-3">
+          {PILLARS.map((p) => (
+            <div
+              key={p.label}
+              className="rounded-lg border border-border bg-surface p-6"
+            >
+              <p className="caption text-text-subtle">{p.label}</p>
+              <h3 className="mt-3 font-display text-[18px] font-semibold leading-snug tracking-tight text-text">
+                {p.title}
+              </h3>
+              <p className="mt-3 text-[14px] leading-6 text-text-muted">{p.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Observability band ────────────────────────────────────────────────────
+const OBSERVABILITY_ITEMS = [
+  {
+    title: 'Tool traffic',
+    body: 'Which procedures get called, by which agent, how often, p50/p95 latency, error rates. The load-bearing surface, made visible.',
+  },
+  {
+    title: 'Failed queries',
+    body: 'What agents tried to ask but got nothing. Every gap is a candidate for the next learned procedure — the feedback loop that makes the layer improve over time.',
+  },
+  {
+    title: 'Audit & replay',
+    body: 'Per-call attribution: which agent, which user, which records. Replay any past invocation side-by-side. The artifact your security buyer needs before signing off.',
+  },
+  {
+    title: 'Anomaly signals',
+    body: 'Sudden spikes, exfiltration shapes, prompt-injection-shaped tool calls. The dashboard surfaces them before they become incidents.',
+  },
+] as const;
+
+function ObservabilityBand() {
+  return (
+    <section className="border-b border-border">
+      <div className="mx-auto max-w-[1280px] px-6 py-20">
+        <div className="mx-auto max-w-[760px] text-center">
+          <p className="caption text-text-subtle">Observability</p>
+          <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
+            See what every agent did.
+          </h2>
+          <p className="mx-auto mt-4 max-w-[600px] text-balance text-[15px] leading-6 text-text-muted">
+            You handed agents the keys to your CRM and Slack. The dashboard is how you keep track
+            of what they did with them — and how you make the layer better the longer it runs.
+          </p>
+        </div>
+        <div className="mt-12 grid gap-6 sm:grid-cols-2 md:grid-cols-4">
+          {OBSERVABILITY_ITEMS.map((it) => (
+            <div key={it.title} className="rounded-lg border border-border bg-surface p-5">
+              <h3 className="font-display text-[15px] font-semibold tracking-tight text-text">
+                {it.title}
+              </h3>
+              <p className="mt-2 text-[13px] leading-5 text-text-muted">{it.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 

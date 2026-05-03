@@ -4,6 +4,16 @@ The plan is to ship v0.0 internally at the founder's company in 5–6 weeks, the
 
 This roadmap was substantially restructured on 2026-04-29. The earlier v0.1→v0.5 context layer-then-skills sequencing was abandoned. See [`decisions/0004-multi-agent-shared-context-wedge.md`](./decisions/0004-multi-agent-shared-context-wedge.md) for the reasoning.
 
+## Three pillars
+
+Every milestone below advances one of three pillars. Each pillar must be visibly present at v0.1 launch, even if shallowly:
+
+1. **Context layer** — connectors, ingestion, hybrid search, MCP + REST/OpenAPI surface. The thing every agent plugs into.
+2. **Procedures** — labeled-template synthesis, eval harness, public marketplace. The differentiator over generic unified-search.
+3. **Governance** — scoped personas (connection / tool / data scopes), observability, audit, replay. The reason a security-conscious buyer will let agents near production data.
+
+If a milestone slips, cut scope inside a pillar. Do not drop a pillar.
+
 ## Guiding principles
 
 - **Multi-agent dogfood first.** v0.0 must successfully migrate the founder's two existing custom agents (a Slack-triggered Cursor support-question agent and a Notion-based interview-prep agent) off their bespoke context fetchers onto holo's MCP endpoint. If it can't do that, the wedge isn't real.

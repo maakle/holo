@@ -1,10 +1,21 @@
 # Holo
 
-> **Shared agent context. The OS underneath.** One open-source, self-hostable layer over the tools your team's work lives in. Every agent you ship — support, interview-prep, customer-success — queries the same source of truth.
+> **The agent context layer for your company.** Connect your tools once. Holo unifies the data, learns the procedures your team actually runs, and exposes them as callable tools over MCP and OpenAPI — so any agent (Claude, Cursor, ChatGPT, your own) plugs into the same foundation, with scoped access and full observability.
 >
-> **Layer today. Agent OS tomorrow.**
+> **Bring your own agent. Layer today. Agent OS tomorrow.**
 
 **Status:** Pre-alpha. 6/6 connectors live, hybrid RRF search, MCP + REST/OpenAPI, DCR OAuth provider, observability + audit + skill marketplace shipped. Not yet ready for production traffic; internal dogfood underway.
+
+---
+
+## How it works
+
+1. **Connect** the tools your work lives in (Slack, GitHub, Notion, Grain, Pylon, HubSpot — more on the roadmap). One OAuth per source, allowlist-scoped at ingestion.
+2. **Unify.** Holo ingests, chunks, embeds, and indexes. Hybrid retrieval (pgvector + tsvector fused with RRF) over a single ACL-aware index.
+3. **Expose.** A small set of MCP tools and a parallel REST/OpenAPI surface let any agent — internal or external — search, fetch, and invoke learned procedures.
+4. **Observe.** Every agent call is logged, attributable, and replayable. Scoped personas (connection / tool / data scopes) bound what each agent can see and do.
+
+**The wedge in one sentence:** stop re-implementing context fetchers per agent, and stop letting agents see everything just because the OAuth token does.
 
 ---
 
@@ -24,7 +35,9 @@ The cost compounds with every new agent. Cross-agent context is impossible becau
 
 Holo is the missing shared layer — the **queryable context layer** under all your team's agent operations and the **procedural extraction layer** that turns scattered artifacts into invokable skills. Two adjacent YC RFSs ([AI Operating System for Companies](https://www.ycombinator.com/rfs#ai-operating-system-for-companies), Diana Hu; [Company Brain](https://www.ycombinator.com/rfs#company-brain), Tom Blomfield) describe the bet. Holo is the open-source, self-hostable take.
 
-**Built for:** CTOs and lead engineers at 30–80-person tech companies maintaining 2+ custom agents in production. Buyer = builder = sufferer collapsed into one role.
+**Who runs Holo:** CTOs and lead engineers at 30–80-person tech companies maintaining 2+ custom agents in production. Buyer = builder = sufferer collapsed into one role.
+
+**Who consumes Holo:** every agent on their team. Claude in Cursor over the codebase. A custom Slack bot for support. ChatGPT Actions for an external partner. An internal copilot for customer success. None of them re-implement the retrieval layer; all of them inherit the same scopes, the same audit trail, and the same set of learned procedures.
 
 ---
 
