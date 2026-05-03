@@ -3,8 +3,56 @@
 @tailwind utilities;
 
 :root {
+  --bg: #fafaf7;
+  --surface: #ffffff;
+  --surface-2: #f4f4f0;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --text: #0a0a0a;
+  --text-muted: #71717a;
+  --text-subtle: #a1a1aa;
+  --accent: #3f47ff;
+  --accent-fg: #ffffff;
+  --success: #059669;
+  --warning: #d97706;
+  --error: #dc2626;
+  --code-bg: #f4f4f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface-2: #1c1c1e;
+    --border: #27272a;
+    --border-strong: #3f3f46;
+    --text: #fafaf7;
+    --text-muted: #a1a1aa;
+    --text-subtle: #71717a;
+    --accent: #3f47ff;
+    --accent-fg: #ffffff;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --code-bg: #0f0f11;
+  }
+}
+
+html {
   color-scheme: light dark;
 }
+
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
+  line-height: 24px;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-fg);
 }
