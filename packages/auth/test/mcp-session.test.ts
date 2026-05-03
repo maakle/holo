@@ -11,6 +11,7 @@ let pg: ReturnType<typeof postgres>;
 let db: ReturnType<typeof drizzle>;
 let userId: string;
 let orgId: string;
+let secondOrgId: string;
 
 beforeAll(async () => {
   pg = postgres(url, { max: 1 });
@@ -29,6 +30,14 @@ beforeAll(async () => {
     .returning({ id: schema.user.id });
   userId = inserted[0]!.id;
 
+  // Second org for multi-tenancy tests; the test user is *not* a member here.
+  await db.delete(schema.organization).where(drizzleSql`slug = 'mcp-test-secondary'`);
+  const second = await db
+    .insert(schema.organization)
+    .values({ name: 'Secondary', slug: 'mcp-test-secondary' })
+    .returning({ id: schema.organization.id });
+  secondOrgId = second[0]!.id;
+
   await db.delete(schema.session).where(drizzleSql`token = 'test-token-abc'`);
   await db.insert(schema.session).values({
     userId,
@@ -39,7 +48,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.delete(schema.session).where(drizzleSql`token = 'test-token-abc'`);
+  await db.delete(schema.member).where(drizzleSql`user_id = ${userId}`);
   await db.delete(schema.user).where(drizzleSql`email = 'mcp-test@example.com'`);
+  await db.delete(schema.organization).where(drizzleSql`slug = 'mcp-test-secondary'`);
   await pg.end();
 });
 
@@ -72,5 +83,46 @@ describe('validateSessionCookie', () => {
     await expect(
       validateSessionCookie(db as never, 'better-auth.session_token=does-not-exist'),
     ).rejects.toThrow(HoloError);
+  });
+
+  it('honors session.activeOrganizationId when user is a member of that org', async () => {
+    // Make the test user a member of the secondary org and switch active org.
+    await db.insert(schema.member).values({
+      userId,
+      organizationId: secondOrgId,
+      role: 'owner',
+    });
+    await db
+      .update(schema.session)
+      .set({ activeOrganizationId: secondOrgId })
+      .where(drizzleSql`token = 'test-token-abc'`);
+
+    const cookie = 'better-auth.session_token=test-token-abc.signature-ignored';
+    const result = await validateSessionCookie(db as never, cookie);
+    expect(result.organizationId).toBe(secondOrgId);
+
+    // Reset for subsequent tests.
+    await db
+      .update(schema.session)
+      .set({ activeOrganizationId: null })
+      .where(drizzleSql`token = 'test-token-abc'`);
+    await db.delete(schema.member).where(drizzleSql`user_id = ${userId}`);
+  });
+
+  it('falls back to home org when active org is set but user is not a member', async () => {
+    // Stale activeOrganizationId pointing at an org the user does not belong to.
+    await db
+      .update(schema.session)
+      .set({ activeOrganizationId: secondOrgId })
+      .where(drizzleSql`token = 'test-token-abc'`);
+
+    const cookie = 'better-auth.session_token=test-token-abc.signature-ignored';
+    const result = await validateSessionCookie(db as never, cookie);
+    expect(result.organizationId).toBe(orgId);
+
+    await db
+      .update(schema.session)
+      .set({ activeOrganizationId: null })
+      .where(drizzleSql`token = 'test-token-abc'`);
   });
 });

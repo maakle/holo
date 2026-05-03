@@ -5,6 +5,11 @@ import { holoError, ErrorCode } from '@holo/errors';
 
 export interface SessionUser {
   userId: string;
+  /**
+   * The org the request is scoped to. This is the session's
+   * `activeOrganizationId` if set (and the user is a verified member),
+   * otherwise the user's home org (`user.organization_id`).
+   */
   organizationId: string;
   email: string;
 }
@@ -46,7 +51,8 @@ export async function validateSessionCookie(
     .select({
       userId: schema.session.userId,
       email: schema.user.email,
-      organizationId: schema.user.organizationId,
+      homeOrganizationId: schema.user.organizationId,
+      activeOrganizationId: schema.session.activeOrganizationId,
     })
     .from(schema.session)
     .innerJoin(schema.user, eq(schema.user.id, schema.session.userId))
@@ -61,5 +67,26 @@ export async function validateSessionCookie(
       fix: 'Sign in again at the dashboard URL.',
     });
   }
-  return row;
+
+  // Prefer the session's active org, but only after confirming the user is
+  // still a member. A stale activeOrganizationId (e.g. removed from the org)
+  // must not grant access — fall back to the home org.
+  let organizationId = row.homeOrganizationId;
+  if (row.activeOrganizationId && row.activeOrganizationId !== row.homeOrganizationId) {
+    const memberRows = await db
+      .select({ id: schema.member.id })
+      .from(schema.member)
+      .where(
+        and(
+          eq(schema.member.userId, row.userId),
+          eq(schema.member.organizationId, row.activeOrganizationId),
+        ),
+      )
+      .limit(1);
+    if (memberRows[0]) {
+      organizationId = row.activeOrganizationId;
+    }
+  }
+
+  return { userId: row.userId, email: row.email, organizationId };
 }
