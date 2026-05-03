@@ -35,8 +35,8 @@ export default async function ObservabilityPage() {
         <span className="caption">Observability</span>
         <h1 className="font-display text-h1 font-semibold tracking-tight">Agent invocations</h1>
         <p className="max-w-2xl text-[15px] leading-6 text-text-muted">
-          Last 100 MCP tool invocations from your connected agents. Click a row to inspect
-          input and output payloads.
+          Last 100 MCP tool invocations from your connected agents. Click a row to preview
+          input and output, or open the full replay for a shareable, deep-linkable view.
         </p>
       </header>
 

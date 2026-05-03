@@ -201,6 +201,16 @@ export function InvocationTable({ invocations }: InvocationTableProps) {
                           </pre>
                         </div>
                       </div>
+                      <div className="mt-4 flex justify-end">
+                        <Link
+                          href={`/observability/${inv.id}`}
+                          className="text-xs font-medium"
+                          style={{ color: '#3F47FF' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Open replay →
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 )}
