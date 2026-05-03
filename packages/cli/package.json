@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json && chmod +x dist/bin.js dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "dev": "tsx src/bin.ts"
+    "start": "tsx src/bin.ts"
   },
   "dependencies": {
     "@holo/db": "workspace:*",

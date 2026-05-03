@@ -21,7 +21,21 @@ function parseRedisUrl(url: string): { host: string; port: number } {
 @Module({
   imports: [
     LoggerModule.forRoot({
-      pinoHttp: {},
+      pinoHttp: {
+        level: process.env.LOG_LEVEL ?? 'info',
+        ...(process.env.NODE_ENV !== 'production' && {
+          transport: {
+            target: 'pino-pretty',
+            options: {
+              colorize: true,
+              singleLine: true,
+              translateTime: 'HH:MM:ss.l',
+              ignore: 'pid,hostname,context',
+              messageFormat: '{context} {msg}',
+            },
+          },
+        }),
+      },
     }),
     BullModule.forRoot({
       connection: parseRedisUrl(process.env.REDIS_URL ?? 'redis://localhost:6382'),
