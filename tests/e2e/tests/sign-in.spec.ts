@@ -1,10 +1,24 @@
 import { test, expect } from '@playwright/test';
 
-test('unauthenticated home page redirects to /sign-in', async ({ page }) => {
+test('home page renders the public marketing landing', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveURL(/\/sign-in$/);
+  await expect(page).toHaveURL(/\/$/);
+  // Hero headline
+  await expect(
+    page.getByRole('heading', { name: /Shared context for the agents/i }),
+  ).toBeVisible();
+  // Primary CTA routes to /sign-in for unauthed visitors
+  await expect(page.getByRole('link', { name: /Get started/i }).first()).toBeVisible();
+  // Footer status indicator
+  await expect(page.getByText(/All systems normal/i)).toBeVisible();
+});
+
+test('sign-in page exposes both auth methods', async ({ page }) => {
+  await page.goto('/sign-in');
   await expect(page.getByRole('heading', { name: /Welcome to holo/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /Continue with GitHub/i })).toBeVisible();
+  // Email OTP step 1 input
+  await expect(page.getByPlaceholder(/you@company.com/i)).toBeVisible();
 });
 
 test('protected initiate route returns HOLO_AUTH_NO_SESSION without a session', async ({
