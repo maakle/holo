@@ -19,6 +19,7 @@ export default async function Home() {
       <Hero isAuthed={isAuthed} />
       <ConnectorsStrip />
       <CodeShowcase />
+      <VisionBand />
       <FinalCTA isAuthed={isAuthed} />
       <SiteFooter />
     </div>
@@ -70,12 +71,15 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
         <p className="caption text-text-subtle">
           Open-source · AGPL-3.0 · Self-hostable
         </p>
-        <h1 className="mx-auto mt-6 max-w-[900px] text-balance font-display text-[44px] font-semibold leading-[1.05] tracking-tight md:text-[56px]">
-          Shared context for the agents your team is shipping.
+        <h1 className="mx-auto mt-6 max-w-[920px] text-balance font-display text-[44px] font-semibold leading-[1.05] tracking-tight md:text-[60px]">
+          Shared agent context.
+          <br />
+          The OS underneath.
         </h1>
-        <p className="mx-auto mt-6 max-w-[560px] text-balance text-[15px] leading-6 text-text-muted">
-          One MCP endpoint over the tools your work lives in. Every agent queries the same
-          source of truth.
+        <p className="mx-auto mt-6 max-w-[620px] text-balance text-[15px] leading-6 text-text-muted">
+          One context layer over the tools your team&apos;s work lives in. Every agent you
+          ship — support, interview-prep, customer-success — queries the same source of truth.
+          <span className="text-text"> Layer today. Agent OS tomorrow.</span>
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
@@ -137,13 +141,14 @@ function CodeShowcase() {
     <section className="border-b border-border">
       <div className="mx-auto grid max-w-[1024px] gap-10 px-6 py-20 md:grid-cols-2 md:gap-14 md:items-center">
         <div>
-          <p className="caption text-text-subtle">Bring your own agent</p>
+          <p className="caption text-text-subtle">One context layer · many agents</p>
           <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
-            One endpoint. Every agent.
+            Every agent. Same context. Same skills.
           </h2>
           <p className="mt-4 text-balance text-[15px] leading-6 text-text-muted">
-            MCP for Claude, Cursor, Cline. REST + OpenAPI for everything else. Same backend,
-            same data, same skills — the protocol is the agent&apos;s choice.
+            MCP for Claude, Cursor, Cline. REST + OpenAPI for ChatGPT Actions, Gemini, n8n.
+            Same backend, same data, same procedural skills — the protocol is the agent&apos;s
+            choice, not yours.
           </p>
         </div>
         <CodeCard
@@ -159,16 +164,37 @@ function CodeShowcase() {
   );
 }
 
+// ── Vision band ───────────────────────────────────────────────────────────
+function VisionBand() {
+  return (
+    <section className="border-b border-border bg-surface-2/40">
+      <div className="mx-auto max-w-[820px] px-6 py-16 text-center md:py-20">
+        <p className="caption text-text-subtle">Building toward</p>
+        <p className="mt-4 text-balance font-display text-[22px] leading-snug tracking-tight text-text md:text-[26px]">
+          The <span className="text-accent">AI operating system for companies</span> and the{' '}
+          <span className="text-accent">company brain</span> — the queryable context layer
+          underneath all your team&apos;s agent operations, and the procedural extraction
+          layer that turns scattered artifacts into invokable skills.
+        </p>
+        <p className="mx-auto mt-4 max-w-[560px] text-[12px] text-text-subtle">
+          Two adjacent YC Requests for Startups. Holo is the open-source, self-hostable take.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 // ── Final CTA ─────────────────────────────────────────────────────────────
 function FinalCTA({ isAuthed }: { isAuthed: boolean }) {
   return (
     <section className="border-b border-border">
       <div className="mx-auto max-w-[1024px] px-6 py-20 text-center md:py-24">
         <h2 className="mx-auto max-w-none text-balance font-display text-[34px] font-semibold leading-tight tracking-tight md:text-[44px]">
-          Built for teams shipping more than one agent.
+          One brain. Every agent. Self-hostable.
         </h2>
-        <p className="mx-auto mt-5 max-w-[520px] text-balance text-[15px] leading-6 text-text-muted">
-          Star the repo, run it locally, or sign in to start dogfooding.
+        <p className="mx-auto mt-5 max-w-[560px] text-balance text-[15px] leading-6 text-text-muted">
+          If your team is already paying the per-agent integration tax, holo is the shared
+          context layer that makes it stop. Star the repo, run it locally, or sign in.
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
