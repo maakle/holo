@@ -11,8 +11,8 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
-  await app.listen(4000);
-  console.log('apps/api listening on :4000');
+  await app.listen(3001);
+  console.log('apps/api listening on :3001');
 }
 
 bootstrap().catch((e) => {

@@ -48,7 +48,7 @@ services:
       REDIS_URL: redis://redis:6379
       HOLO_TOKEN_ENCRYPTION_KEY: ${HOLO_TOKEN_ENCRYPTION_KEY}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3030}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       GITHUB_LOGIN_CLIENT_ID: ${GITHUB_LOGIN_CLIENT_ID}
       GITHUB_LOGIN_CLIENT_SECRET: ${GITHUB_LOGIN_CLIENT_SECRET}
       GITHUB_CONNECTOR_CLIENT_ID: ${GITHUB_CONNECTOR_CLIENT_ID}
@@ -57,7 +57,7 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       NODE_ENV: production
     ports:
-      - "4000:4000"
+      - "3001:3001"
     depends_on:
       migrate: { condition: service_completed_successfully }
 
@@ -76,7 +76,7 @@ services:
       dockerfile: apps/mcp/Dockerfile
     environment: *app_env
     ports:
-      - "8091:8091"
+      - "8080:8080"
     depends_on:
       migrate: { condition: service_completed_successfully }
 
@@ -86,7 +86,7 @@ services:
       dockerfile: apps/web/Dockerfile
     environment: *app_env
     ports:
-      - "3030:3030"
+      - "3000:3000"
     depends_on:
       migrate: { condition: service_completed_successfully }
 

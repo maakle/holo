@@ -9,7 +9,7 @@ healthcheckPath = "/api/health"
 startCommand = "node apps/web/server.js"
 
 [services.variables]
-PORT = "3030"
+PORT = "3000"
 NODE_ENV = "production"
 
 [[services]]

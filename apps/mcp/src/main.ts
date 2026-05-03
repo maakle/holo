@@ -15,7 +15,7 @@ async function main() {
   await initCrypto();
   const db = createDb(env.DATABASE_URL);
 
-  const mcpPublicUrl = process.env.MCP_PUBLIC_URL ?? 'http://localhost:8091';
+  const mcpPublicUrl = process.env.MCP_PUBLIC_URL ?? 'http://localhost:8080';
   const webPublicUrl =
     process.env.WEB_PUBLIC_URL ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:3000';
 
@@ -133,7 +133,7 @@ async function main() {
     },
   });
 
-  const port = Number(process.env.MCP_PORT ?? 8091);
+  const port = Number(process.env.MCP_PORT ?? 8080);
   serve({ fetch: app.fetch, port });
   console.log(`apps/mcp listening on :${port}`);
 }

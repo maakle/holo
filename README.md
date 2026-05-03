@@ -80,7 +80,7 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/holo/main/docker-compose.ym
 docker compose up -d
 
 # 4. Open the dashboard
-open http://localhost:3030
+open http://localhost:3000
 ```
 
 **Requirements:** Docker 24+, Node.js 20+ (only needed to run `npx`)
@@ -90,13 +90,13 @@ open http://localhost:3030
 {
   "mcpServers": {
     "holo": {
-      "url": "http://localhost:8091/mcp",
+      "url": "http://localhost:8080/mcp",
       "headers": { "Authorization": "Bearer <your-token-from-dashboard>" }
     }
   }
 }
 ```
-Get your token at `http://localhost:3030/connect-agent`.
+Get your token at `http://localhost:3000/connect-agent`.
 
 ---
 
@@ -114,7 +114,7 @@ cp .env.example .env
 # Generate the two secrets:
 echo "HOLO_TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> .env
 echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> .env
-echo "BETTER_AUTH_URL=http://localhost:3030" >> .env
+echo "BETTER_AUTH_URL=http://localhost:3000" >> .env
 # Then fill in GITHUB_LOGIN_CLIENT_ID/SECRET and GITHUB_CONNECTOR_CLIENT_ID/SECRET
 # from the two GitHub OAuth apps you registered (see below).
 
@@ -124,22 +124,22 @@ DATABASE_URL=postgresql://holo:holo@localhost:5436/holo pnpm db:migrate
 
 # Start dev servers
 pnpm dev
-# apps/web    → http://localhost:3030
-# apps/api    → http://localhost:4000
-# apps/mcp    → http://localhost:8091
+# apps/web    → http://localhost:3000
+# apps/api    → http://localhost:3001
+# apps/mcp    → http://localhost:8080
 # apps/worker → background, logs heartbeat every 60s
 ```
 
-> **Port note:** Postgres binds to host port `5436` and Redis to `6382` so holo can coexist with other local Postgres/Redis instances. apps/web runs on `3030`, apps/mcp on `8091`. Override via `MCP_PORT` and Next.js `-p` flag if needed.
+> **Port note:** Postgres binds to host port `5436` and Redis to `6382` so holo can coexist with other local Postgres/Redis instances. apps/web runs on `3000`, apps/api on `3001`, apps/mcp on `8080`. Override via `MCP_PORT` and Next.js `-p` flag if needed.
 
-Visit `http://localhost:3030`. Sign in via GitHub. Click "Connect" on the GitHub row in `/connections` to complete the connector OAuth roundtrip — the row flips to "Connected ✓" and your encrypted token is stored in `connector_credentials`.
+Visit `http://localhost:3000`. Sign in via GitHub. Click "Connect" on the GitHub row in `/connections` to complete the connector OAuth roundtrip — the row flips to "Connected ✓" and your encrypted token is stored in `connector_credentials`.
 
-The MCP server is at `http://localhost:8091/health` (no MCP tools registered yet — those land in spec #2). To connect Claude Desktop later:
+The MCP server is at `http://localhost:8080/health` (no MCP tools registered yet — those land in spec #2). To connect Claude Desktop later:
 
 ```json
 {
   "mcpServers": {
-    "holo": { "url": "http://localhost:8091/mcp" }
+    "holo": { "url": "http://localhost:8080/mcp" }
   }
 }
 ```
@@ -148,8 +148,8 @@ The MCP server is at `http://localhost:8091/health` (no MCP tools registered yet
 
 GitHub Settings → Developer settings → OAuth Apps → New OAuth App. Register **two** apps:
 
-1. **Holo Login** — Authorization callback URL `http://localhost:3030/api/auth/callback/github`, scopes `read:user user:email`. Used as `GITHUB_LOGIN_CLIENT_ID/SECRET`.
-2. **Holo GitHub Connector** — Authorization callback URL `http://localhost:3030/api/connectors/github/callback`, scopes `repo read:org`. Used as `GITHUB_CONNECTOR_CLIENT_ID/SECRET`.
+1. **Holo Login** — Authorization callback URL `http://localhost:3000/api/auth/callback/github`, scopes `read:user user:email`. Used as `GITHUB_LOGIN_CLIENT_ID/SECRET`.
+2. **Holo GitHub Connector** — Authorization callback URL `http://localhost:3000/api/connectors/github/callback`, scopes `repo read:org`. Used as `GITHUB_CONNECTOR_CLIENT_ID/SECRET`.
 
 The two-app split is intentional — login asks for minimal scopes; the connector asks for repo access. See [decision 0001](./docs/decisions/0001-connector-port-interface.md) and the Foundation spec for rationale.
 
