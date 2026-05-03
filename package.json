@@ -14,7 +14,10 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "db:migrate": "pnpm -F @holo/db migrate",
-    "db:generate": "pnpm -F @holo/db generate"
+    "db:generate": "pnpm -F @holo/db generate",
+    "db:studio": "pnpm -F @holo/db studio",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@types/node": "20.16.11",
