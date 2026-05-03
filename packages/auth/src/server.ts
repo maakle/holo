@@ -21,14 +21,21 @@ export interface CreateAuthOpts {
   defaultOrganizationId: string;
 }
 
-async function sendOtpEmail(
+interface ResendEmail {
+  to: string;
+  subject: string;
+  text: string;
+}
+
+async function sendEmail(
   env: Pick<Env, 'EMAIL_PROVIDER' | 'RESEND_API_KEY' | 'BETTER_AUTH_URL'>,
-  email: string,
-  otp: string,
-  type: string,
+  tag: string,
+  email: ResendEmail,
 ): Promise<void> {
   if (env.EMAIL_PROVIDER === 'console' || !env.RESEND_API_KEY) {
-    console.log(`[email:${type}] to=${email} otp=${otp}`);
+    console.log(
+      `[email:${tag}] to=${email.to} subject=${JSON.stringify(email.subject)}\n${email.text}`,
+    );
     return;
   }
   const fromHost = new URL(env.BETTER_AUTH_URL).host;
@@ -40,19 +47,52 @@ async function sendOtpEmail(
     },
     body: JSON.stringify({
       from: `Holo <noreply@${fromHost}>`,
-      to: email,
-      subject: `Your sign-in code: ${otp}`,
-      text: `Your verification code is ${otp}. It expires in 5 minutes.`,
+      to: email.to,
+      subject: email.subject,
+      text: email.text,
     }),
   });
   if (!res.ok) {
     throw holoError({
       code: ErrorCode.HOLO_INTERNAL,
-      problem: `Resend API rejected OTP email (status ${res.status})`,
+      problem: `Resend API rejected ${tag} email (status ${res.status})`,
       cause: await res.text(),
       fix: 'Verify RESEND_API_KEY is valid and the from-domain is verified in Resend.',
     });
   }
+}
+
+async function sendOtpEmail(
+  env: Pick<Env, 'EMAIL_PROVIDER' | 'RESEND_API_KEY' | 'BETTER_AUTH_URL'>,
+  email: string,
+  otp: string,
+  type: string,
+): Promise<void> {
+  await sendEmail(env, type, {
+    to: email,
+    subject: `Your sign-in code: ${otp}`,
+    text: `Your verification code is ${otp}. It expires in 5 minutes.`,
+  });
+}
+
+async function sendInvitationEmail(
+  env: Pick<Env, 'EMAIL_PROVIDER' | 'RESEND_API_KEY' | 'BETTER_AUTH_URL'>,
+  args: {
+    inviteeEmail: string;
+    inviterName: string;
+    organizationName: string;
+    invitationId: string;
+  },
+): Promise<void> {
+  const acceptUrl = `${env.BETTER_AUTH_URL}/accept-invite?id=${encodeURIComponent(args.invitationId)}`;
+  await sendEmail(env, 'invitation', {
+    to: args.inviteeEmail,
+    subject: `${args.inviterName} invited you to ${args.organizationName} on Holo`,
+    text:
+      `${args.inviterName} invited you to join the "${args.organizationName}" workspace on Holo.\n\n` +
+      `Accept the invite:\n${acceptUrl}\n\n` +
+      `If you didn't expect this, you can safely ignore this email.`,
+  });
 }
 
 export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
@@ -139,6 +179,14 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
         // A user can belong to many orgs but defaults to a single home org
         // until they create or are invited to additional ones.
         allowUserToCreateOrganization: true,
+        async sendInvitationEmail(data) {
+          await sendInvitationEmail(env, {
+            inviteeEmail: data.email,
+            inviterName: data.inviter.user.name ?? data.inviter.user.email,
+            organizationName: data.organization.name,
+            invitationId: data.id,
+          });
+        },
       }),
     ],
     user: {
