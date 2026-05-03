@@ -4,7 +4,7 @@
 
 > **Layer today, OS tomorrow.** Today: context layer + procedural skills. Tomorrow: an agent operating system — context, observability, replay, marketplace.
 
-**Status:** Pre-alpha. Building in public. Not ready for production.
+**Status:** Pre-alpha. Building in public. The context layer is wired (5/6 connectors, hybrid RRF search, MCP + REST/OpenAPI, OAuth provider for DCR), the skill layer is on early, observability + audit log + skill marketplace ship today. Not yet ready for production traffic; internal dogfood underway.
 
 ---
 
@@ -46,77 +46,92 @@ Holo is the open-source, self-hostable take that doesn't require building the ag
 
 ## Architecture (the short version)
 
+Three apps. Sixteen packages. No NestJS in the API tier (gone since [PR #10](#) — `apps/api` removed, REST + MCP folded into `apps/gateway`).
+
 | Layer | Choice |
 |---|---|
-| Web/API | NestJS 11 (API) + Next.js 15 App Router (dashboard) |
-| ORM | Drizzle on Postgres + pgvector ≥ 0.8 |
-| Auth | Better Auth — single-user mode in v0.0, `organization` plugin in v0.1, `oauthProvider` for MCP DCR in v0.2 |
-| Workers | BullMQ on Redis, NestJS-wrapped, with a `step()` checkpoint helper |
-| Connectors | Hand-written behind a `Connector<>` interface, official SDKs |
-| Vector + search | pgvector + tsvector + pg_trgm fused with RRF; opt-in `pg_search` (ParadeDB) |
-| Embeddings | `text-embedding-3-large` truncated to 1024 dims (cloud) / BGE-M3 (self-host) |
-| MCP | Sibling Hono service sharing a `retrieval-core` package with the API |
-| Skills | Synthesizer worker that turns artifacts into `SKILL.md` files; MCP exposes `list_skills`, `get_skill`, `execute_skill` |
+| Dashboard | **`apps/web`** — Next.js 16 + React 19 App Router. Marketing entry, sign-in, sidebar app shell with `/dashboard`, `/connections`, `/dashboard/team`, `/connect-agent`, `/observability`, `/audit`, `/skills`, `/skills/runs`, `/profile`. All connector OAuth callbacks live here as Next route handlers. The OAuth-provider authorize/register/token endpoints (DCR for MCP clients) live here too. |
+| Gateway | **`apps/gateway`** — Hono. MCP JSON-RPC at `POST /mcp` *and* OpenAPI/REST at `/v1/*` (Scalar API reference at `/docs`). One process, two protocols, same backend. Default port `8080`. |
+| Worker | **`apps/worker`** — NestJS standalone + BullMQ on Redis. Per-connector ingestion queues (github-prose, github-code, slack, notion, grain, pylon), embedding pipeline (embed → embed-insert → embed-runner), sync scheduler with cursor store, slack-subjects ACL extractor. `step()` checkpoint helper for crash-resumable jobs. |
+| ORM | Drizzle 0.45 |
+| DB | Postgres 16 + pgvector ≥ 0.8 + pg_trgm |
+| Cache/Queue | Redis 7 (`maxmemory-policy=noeviction`) |
+| Auth | Better Auth 1.6 — GitHub OAuth + email OTP (Resend); `organization` plugin (multi-tenant); custom OAuth-provider routes for MCP DCR (RFC 7591 + 9728 + 8414). |
+| Vector + search | `packages/retrieval-core`: pgvector + tsvector fused with RRF in a single SQL CTE; dual-model embedding fallback (OpenAI + Voyage); ACL-filtered via `acl_subjects && user_subjects`. |
+| Embeddings | `text-embedding-3-large` @ 1024 dims (default), `voyage-code-3` for code chunks |
+| Skills | `packages/skills` — Anthropic skill format, golden-set + ROUGE-L eval harness, marketplace publish flow with redaction pass. MCP exposes `list_skills`, `get_skill`, `execute_skill`. |
+| Connectors | `packages/connectors` — 5 of 6 wired: Slack, GitHub, Notion, Grain, Pylon. **HubSpot pending.** Allowlist enforcement via `connector_allowlists` table (DB-driven, glob or exact-id, per-org). |
+| Custom tools | `packages/custom-tools` — CLI-as-tool registration (v0.3); register `bq query`, `psql -c …` etc. as scoped MCP tools without writing a connector. |
+| CLI | `packages/cli` — `npx @holo/cli init` scaffolds a self-host install. |
 | Monorepo | pnpm workspaces + Turborepo |
 
-Full reasoning, alternatives considered, and migration paths in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md). Read it before opening a "why not X" issue.
+Full reasoning, alternatives considered, and migration paths in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 ---
 
-## Quickstart
-
-Self-host holo in under 5 minutes:
+## Quickstart (self-host)
 
 ```bash
-# 1. Create a directory and run the setup wizard
+# 1. Scaffold a fresh install
 mkdir my-holo && cd my-holo
 npx @holo/cli init
 
-# 2. Fill in the placeholders the wizard printed
-#    ANTHROPIC_API_KEY, GITHUB_LOGIN_CLIENT_ID, GITHUB_LOGIN_CLIENT_SECRET
+# 2. Fill the placeholders the wizard printed (.env)
+#    HOLO_TOKEN_ENCRYPTION_KEY, BETTER_AUTH_SECRET (auto-generated)
+#    GITHUB_LOGIN_CLIENT_ID/SECRET, GITHUB_CONNECTOR_CLIENT_ID/SECRET (you register)
+#    Optional: ANTHROPIC_API_KEY, OPENAI_API_KEY, VOYAGE_API_KEY, RESEND_API_KEY
 
 # 3. Bring it up
-curl -fsSL https://raw.githubusercontent.com/<owner>/holo/main/docker-compose.yml -o docker-compose.yml
 docker compose up -d
 
 # 4. Open the dashboard
 open http://localhost:3000
 ```
 
-**Requirements:** Docker 24+, Node.js 20+ (only needed to run `npx`)
+**Requirements:** Docker 24+, Node 20+ (only needed to run `npx`).
 
-**Connect your agent (Cursor):**
+Once up:
+- **Dashboard** at `http://localhost:3000`
+- **MCP / REST gateway** at `http://localhost:8080` — JSON-RPC at `/mcp`, REST at `/v1/*`, API reference at `/docs`
+- Sign in via GitHub at `/sign-in`; connect sources at `/connections`; generate an agent token at `/connect-agent`
+
+**Connect your agent:**
 ```json
 {
   "mcpServers": {
     "holo": {
       "url": "http://localhost:8080/mcp",
-      "headers": { "Authorization": "Bearer <your-token-from-dashboard>" }
+      "headers": { "Authorization": "Bearer <token-from-/connect-agent>" }
     }
   }
 }
 ```
-Get your token at `http://localhost:3000/connect-agent`.
+
+REST equivalent:
+```bash
+curl -X POST http://localhost:8080/v1/search \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"q": "how do we onboard a new ATS partner?", "topK": 5}'
+```
 
 ---
 
-## Quick start (v0.0 Foundation — development)
+## Development (contributors)
 
-> Requires Docker, Node 20+, pnpm 9+. v0.0 Foundation is the deployable skeleton: login + GitHub Connector OAuth roundtrip, no ingestion or retrieval yet. See [`docs/superpowers/specs/2026-04-29-v0.0-foundation-design.md`](./docs/superpowers/specs/2026-04-29-v0.0-foundation-design.md).
+> Requires Docker, Node 20+, pnpm 9+.
 
 ```bash
-git clone https://github.com/your-org/holo.git
+git clone https://github.com/maakle/holo.git
 cd holo
 pnpm install
 
-# Set up env
+# Generate secrets + fill in OAuth credentials
 cp .env.example .env
-# Generate the two secrets:
 echo "HOLO_TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> .env
 echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> .env
 echo "BETTER_AUTH_URL=http://localhost:3000" >> .env
-# Then fill in GITHUB_LOGIN_CLIENT_ID/SECRET and GITHUB_CONNECTOR_CLIENT_ID/SECRET
-# from the two GitHub OAuth apps you registered (see below).
+# Register two GitHub OAuth apps (see below) and fill in their IDs/secrets.
 
 # Bring up Postgres + Redis, run migrations
 docker compose up -d postgres redis
@@ -124,54 +139,53 @@ DATABASE_URL=postgresql://holo:holo@localhost:5436/holo pnpm db:migrate
 
 # Start dev servers
 pnpm dev
-# apps/web    → http://localhost:3000
-# apps/gateway → http://localhost:8080
-# apps/worker → background, logs heartbeat every 60s
+# apps/web     → http://localhost:3000  (dashboard, marketing, auth)
+# apps/gateway → http://localhost:8080  (MCP /mcp, REST /v1/*, API ref /docs)
+# apps/worker  → background (BullMQ workers + heartbeat)
 ```
 
-> **Port note:** Postgres binds to host port `5436` and Redis to `6382` so holo can coexist with other local Postgres/Redis instances. apps/web runs on `3000`, apps/gateway on `8080`. Override via `MCP_PORT` and Next.js `-p` flag if needed.
-
-Visit `http://localhost:3000`. Sign in via GitHub. Click "Connect" on the GitHub row in `/connections` to complete the connector OAuth roundtrip — the row flips to "Connected ✓" and your encrypted token is stored in `connector_credentials`.
-
-The MCP server is at `http://localhost:8080/health` (no MCP tools registered yet — those land in spec #2). To connect Claude Desktop later:
-
-```json
-{
-  "mcpServers": {
-    "holo": { "url": "http://localhost:8080/mcp" }
-  }
-}
-```
+> **Port note:** Postgres binds to host port `5436` and Redis to `6382` so holo can coexist with other local instances. Override the gateway port via `MCP_PORT`.
 
 ### Registering the two GitHub OAuth apps
 
 GitHub Settings → Developer settings → OAuth Apps → New OAuth App. Register **two** apps:
 
-1. **Holo Login** — Authorization callback URL `http://localhost:3000/api/auth/callback/github`, scopes `read:user user:email`. Used as `GITHUB_LOGIN_CLIENT_ID/SECRET`.
-2. **Holo GitHub Connector** — Authorization callback URL `http://localhost:3000/api/connectors/github/callback`, scopes `repo read:org`. Used as `GITHUB_CONNECTOR_CLIENT_ID/SECRET`.
+1. **Holo Login** — callback `http://localhost:3000/api/auth/callback/github`, scopes `read:user user:email`. → `GITHUB_LOGIN_CLIENT_ID/SECRET`.
+2. **Holo GitHub Connector** — callback `http://localhost:3000/api/connectors/github/callback`, scopes `repo read:org`. → `GITHUB_CONNECTOR_CLIENT_ID/SECRET`.
 
-The two-app split is intentional — login asks for minimal scopes; the connector asks for repo access. See [decision 0001](./docs/decisions/0001-connector-port-interface.md) and the Foundation spec for rationale.
-
-## Quick start (self-host)
-
-```bash
-docker compose -f deploy/docker-compose.yml up -d
-```
-
-Or one-click on Railway: *(coming once v0.1 ships)*
+The split is intentional — login asks for minimal scopes; the connector asks for repo access. See [decision 0001](./docs/decisions/0001-connector-port-interface.md).
 
 ---
 
-## Roadmap
+## Where we are today
 
-See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the full plan and [`docs/decisions/0004-multi-agent-shared-context-wedge.md`](./docs/decisions/0004-multi-agent-shared-context-wedge.md) for why this changed from earlier docs.
+The core platform is built. What's shipped vs. pending:
 
-- **v0.0 — Internal context layer** *(weeks 0–6)* — 6 connectors (Slack, GitHub, Notion, Grain, Pylon, HubSpot), MCP server with 6 tools, hybrid RRF search, ingestion-time allowlists, dogfooded against the founder's own existing custom agents. Not public yet.
-- **v0.1 — Skills + public release + OS surface** *(weeks 7–17, ~10–11 weeks)* — labeled-template skill synthesis with eval harness; **skill marketplace stub** (publish anonymized skills to a public registry); **agent observability dashboard with read-only replay diff** (the OS-tomorrow surface, made concrete); **`npx holo init` single-line install** (macOS + Linux); REST + OpenAPI surface for ChatGPT Actions / Gemini; week-10 skill quality kill-switch; public Apache-2.0 release on GitHub Releases / GHCR.
-- **v0.2 — Self-host polish + free-form skills + managed cloud** *(weeks 18+)* — Railway / Coolify one-click templates, per-user OAuth ACL fan-out, free-form unsupervised skill extraction, replay live-execution (gated on tool-effect classification), Windows support for `npx holo init`, managed cloud beta, audit log.
-- **Beyond** — drift detection (intent-vs-reality), more connectors, agent templates marketplace, inferred org chart. No fixed dates.
+**Shipped on `main`:**
+- ✅ Dashboard shell (`apps/web`) with sidebar, theme switcher, design system per `DESIGN.md`
+- ✅ Sign-in via GitHub OAuth; multi-tenancy via Better Auth `organization` plugin
+- ✅ 5 of 6 connectors with full OAuth + ingestion (Slack, GitHub, Notion, Grain, Pylon)
+- ✅ Hybrid RRF search (vector + BM25, single SQL CTE) with dual-model embedding fallback
+- ✅ MCP gateway with 7 tools (`search`, `get_pr`, `get_thread`, `get_doc`, `get_call`, `get_ticket`, `list_skills`)
+- ✅ REST/OpenAPI surface mirroring the MCP tools, Scalar API reference at `/docs`
+- ✅ DB-driven `connector_allowlists` (glob + exact-id, per-org, audit-trailed)
+- ✅ MCP DCR — OAuth provider routes (`/api/oauth/{authorize,register,token}`) for agents that self-register
+- ✅ `api_token` table + `/connect-agent` page with copy-paste configs (Cursor / Claude Desktop / curl / Python / TypeScript)
+- ✅ Observability dashboard (`mcp_invocations` log, last-100 view, latency / error stats)
+- ✅ Audit log (`/audit`)
+- ✅ Skill eval harness (golden set + ROUGE-L gate) and skill marketplace (`/marketplace`) with redaction-pass publish flow
+- ✅ Custom-tool registration (CLI-as-tool, e.g. `bq query`) — `packages/custom-tools` (v0.3)
+- ✅ Per-user OAuth ACL fan-out (`packages/user-subjects`) — `acl_subjects && user_subjects` enforced on every search
+- ✅ `npx @holo/cli init` self-host scaffold
 
-See [`docs/designs/holo-v01-yc-prep.md`](./docs/designs/holo-v01-yc-prep.md) for the full v0.1 expansion plan.
+**Still pending before public launch:**
+- ⏳ **Public marketing landing page** — `/` still redirects to `/sign-in`. Needs a real top-of-funnel surface.
+- ⏳ **Email OTP form** — backend wired (`emailOTP` plugin + Resend), but `sign-in-form.tsx` only renders the GitHub button. Unblocks non-GitHub users.
+- ⏳ **HubSpot connector** — last of the v0.0 six.
+- ⏳ **Team invites with email delivery** — `/api/team/invite` is a v0.1 stub (token generated but not persisted, no email sent).
+- ⏳ **Cleanup** — empty `apps/mcp/` directory leftover from the rename to `apps/gateway`.
+
+See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the full plan and [`docs/decisions/0004-multi-agent-shared-context-wedge.md`](./docs/decisions/0004-multi-agent-shared-context-wedge.md) for the wedge framing.
 
 ---
 
