@@ -5,7 +5,7 @@ import { parseEnv } from '@holo/env';
 import { createDb, schema } from '@holo/db';
 import { HoloError } from '@holo/errors';
 import { getSubjectsForUser } from '@holo/user-subjects';
-import { createSessionMiddleware } from './middleware/session.js';
+import { createSessionMiddleware, type McpSessionVars } from './middleware/session.js';
 import { mountMcp } from './mcp/transport.js';
 import { apiReference } from '@scalar/hono-api-reference';
 import { createRestRouter, openApiConfig } from './rest/router.js';
@@ -19,7 +19,7 @@ async function main() {
   const webPublicUrl =
     process.env.WEB_PUBLIC_URL ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:3000';
 
-  const app = new Hono();
+  const app = new Hono<{ Variables: McpSessionVars }>();
 
   app.onError((err, c) => {
     if (err instanceof HoloError) {
@@ -41,7 +41,7 @@ async function main() {
   app.get('/health', (c) => c.json({ status: 'ok', service: 'mcp' }));
 
   app.get('/_session-check', createSessionMiddleware(db), (c) =>
-    c.json({ user: c.get('user' as never) }),
+    c.json({ user: c.get('user') }),
   );
 
   // OAuth 2.1 Authorization Server Metadata (RFC 8414)
@@ -88,9 +88,7 @@ async function main() {
     db,
     middleware: createSessionMiddleware(db),
     async resolveContext(c) {
-      const user = c.get('user' as never) as
-        | { organizationId: string; userId: string }
-        | undefined;
+      const user = c.get('user');
       if (!user) {
         throw new HoloError({
           code: 'HOLO_AUTH_NO_SESSION',

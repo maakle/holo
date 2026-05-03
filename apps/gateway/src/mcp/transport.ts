@@ -8,11 +8,15 @@ import { schema } from '@holo/db';
 import { HoloError } from '@holo/errors';
 import { listTools, type ToolContext } from './registry.js';
 import { checkToolAllowed } from '../middleware/allowlist.js';
+import type { McpSessionVars } from '../middleware/session.js';
 
 export interface MountMcpOpts {
   db: DB;
-  resolveContext(c: Context): Promise<ToolContext> | ToolContext;
-  middleware?: (c: Context, next: Next) => Promise<void | Response>;
+  resolveContext(c: Context<{ Variables: McpSessionVars }>): Promise<ToolContext> | ToolContext;
+  middleware?: (
+    c: Context<{ Variables: McpSessionVars }>,
+    next: Next,
+  ) => Promise<void | Response>;
 }
 
 const SESSION_IDLE_MS = 30 * 60 * 1000; // 30 minutes
@@ -88,7 +92,7 @@ function buildServer(getCtx: () => ToolContext): Server {
   return server;
 }
 
-export function mountMcp(app: Hono, opts: MountMcpOpts): void {
+export function mountMcp(app: Hono<{ Variables: McpSessionVars }>, opts: MountMcpOpts): void {
   const handler = async (c: Context) => {
     let ctx: ToolContext;
     try {
