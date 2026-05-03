@@ -1,14 +1,30 @@
+import Link from 'next/link';
 import { SignInForm } from '@/components/sign-in-form';
 
 export default function SignInPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center p-6">
-      <div className="w-full max-w-sm space-y-6">
-        <div>
-          <h1 className="text-xl font-semibold">Sign in to holo</h1>
-          <p className="text-sm text-gray-500">Single-user mode (v0.0).</p>
+    <main className="relative flex min-h-screen flex-col bg-bg text-text">
+      <header className="px-6 py-4">
+        <Link
+          href="/"
+          className="font-display text-[15px] font-semibold tracking-tight"
+        >
+          holo
+        </Link>
+      </header>
+      <div className="flex flex-1 items-center justify-center px-6 pb-16">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="flex flex-col gap-2">
+            <span className="caption">Sign in</span>
+            <h1 className="font-display text-h1 font-semibold tracking-tight">
+              Welcome to holo
+            </h1>
+            <p className="text-[13px] leading-5 text-text-muted">
+              Open-source MCP context layer. Self-hostable, Apache-2.0.
+            </p>
+          </div>
+          <SignInForm />
         </div>
-        <SignInForm />
       </div>
     </main>
   );

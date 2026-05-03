@@ -21,11 +21,14 @@ export default async function AuditPage() {
     .limit(200);
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 1.5rem' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Audit Log</h1>
-      <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: 14 }}>
-        Last 200 security and data-access events for this organization.
-      </p>
+    <div className="space-y-8">
+      <header className="flex flex-col gap-2">
+        <span className="caption">Audit log</span>
+        <h1 className="font-display text-h1 font-semibold tracking-tight">Security & access events</h1>
+        <p className="max-w-2xl text-[15px] leading-6 text-text-muted">
+          Last 200 security and data-access events for this organization.
+        </p>
+      </header>
       <AuditLogTable
         events={events.map((e) => ({
           id: e.id,

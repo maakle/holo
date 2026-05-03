@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { HoloError, holoError, ErrorCode } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
 
-export async function POST(req: Request) {
+export async function POST() {
   try {
     const { auth } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
@@ -14,28 +14,11 @@ export async function POST(req: Request) {
         fix: 'Sign in.',
       });
 
-    const body = (await req.json().catch(() => ({}))) as { email?: string };
-    const email = body.email?.trim();
-    if (!email) {
-      return NextResponse.json(
-        {
-          code: 'HOLO_INVALID_INPUT',
-          problem: 'email is required',
-          fix: 'Provide { email: string } in the request body.',
-        },
-        { status: 400 },
-      );
-    }
-
     // v0.1 stub — token is generated but not persisted.
-    // Full invite email + DB persistence comes in v0.2.
+    // Full DB-backed invites + email delivery come in v0.2.
     const inviteToken = crypto.randomUUID();
 
-    return NextResponse.json({
-      status: 'invite_queued',
-      message: `Full invite email in v0.2 — share this link: /accept-invite?token=${inviteToken}`,
-      inviteToken,
-    });
+    return NextResponse.json({ inviteToken });
   } catch (e) {
     if (e instanceof HoloError)
       return NextResponse.json(e.toJSON(), {

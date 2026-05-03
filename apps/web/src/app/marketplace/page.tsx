@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { desc, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
@@ -24,21 +25,42 @@ export default async function MarketplacePage() {
     .limit(50);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
-      <div className="max-w-5xl mx-auto px-6 py-16">
-        <div className="mb-12">
-          <h1 className="text-2xl font-semibold tracking-tight">Skill Marketplace</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-            Community-contributed agent skills, ready to use.
+    <div className="min-h-screen bg-bg text-text">
+      <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur supports-[backdrop-filter]:bg-bg/70">
+        <div className="mx-auto flex h-14 max-w-[1024px] items-center justify-between px-6">
+          <Link href="/" className="font-display text-[15px] font-semibold tracking-tight">
+            holo
+          </Link>
+          <nav className="flex items-center gap-5 text-[13px] text-text-muted">
+            <Link href="/marketplace" className="text-text">
+              Marketplace
+            </Link>
+            <Link href="/sign-in" className="hover:text-text">
+              Sign in
+            </Link>
+          </nav>
+        </div>
+      </header>
+      <div className="mx-auto max-w-[1024px] px-6 py-16">
+        <div className="mb-12 flex flex-col gap-2">
+          <span className="caption">Marketplace</span>
+          <h1 className="font-display text-display-2 font-semibold tracking-tight">
+            Skill Marketplace
+          </h1>
+          <p className="max-w-2xl text-[15px] leading-6 text-text-muted">
+            Community-contributed agent skills, ready to use. Procedures distilled from real
+            production work, redacted and reviewed.
           </p>
         </div>
 
         {published.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-gray-500">
-            No skills published yet. Be the first.
-          </p>
+          <div className="rounded-md border border-border bg-surface px-5 py-10 text-center">
+            <p className="text-[13px] text-text-muted">
+              No skills published yet. Be the first.
+            </p>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {published.map((row) => {
               const description = parseDescription(row.redactedContent);
               const formattedDate = row.publishedAt.toLocaleDateString('en-US', {
@@ -47,20 +69,23 @@ export default async function MarketplacePage() {
                 day: 'numeric',
               });
               return (
-                <div
+                <article
                   key={row.id}
-                  className="rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                  className="group rounded-md border border-border bg-surface p-5 transition-colors duration-micro hover:border-border-strong"
                 >
-                  <h2 className="text-sm font-semibold mb-1">{row.name}</h2>
+                  <h2 className="font-display text-[15px] font-semibold tracking-tight">
+                    {row.name}
+                  </h2>
                   {description && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-relaxed">
+                    <p className="mt-2 line-clamp-3 text-[13px] leading-5 text-text-muted">
                       {description}
                     </p>
                   )}
-                  <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums uppercase tracking-wide font-medium">
-                    {formattedDate}
-                  </span>
-                </div>
+                  <div className="mt-4 flex items-center justify-between">
+                    <span className="caption text-text-subtle">{formattedDate}</span>
+                    <span className="font-mono text-[12px] text-text-subtle">/{row.slug}</span>
+                  </div>
+                </article>
               );
             })}
           </div>

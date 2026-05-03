@@ -1,16 +1,18 @@
 'use client';
 import { signOut } from '@holo/auth/client';
+import { Button } from '@/components/ui/button';
 
 export function SignOutButton() {
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="sm"
       onClick={async () => {
         await signOut();
         window.location.href = '/sign-in';
       }}
-      className="text-xs text-gray-500 underline"
     >
       Sign out
-    </button>
+    </Button>
   );
 }

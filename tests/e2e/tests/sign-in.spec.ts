@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('unauthenticated home page redirects to /sign-in', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/sign-in$/);
-  await expect(page.getByRole('heading', { name: /Sign in to holo/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Welcome to holo/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /Continue with GitHub/i })).toBeVisible();
 });
 
