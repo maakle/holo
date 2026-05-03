@@ -32,17 +32,17 @@ services:
   migrate:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: apps/worker/Dockerfile
     command: ["pnpm", "-F", "@holo/db", "migrate"]
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-holo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-holo}
     depends_on:
       postgres: { condition: service_healthy }
 
-  api:
+  worker:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: apps/worker/Dockerfile
     environment: &app_env
       DATABASE_URL: postgresql://${POSTGRES_USER:-holo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-holo}
       REDIS_URL: redis://redis:6379
@@ -56,16 +56,6 @@ services:
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       NODE_ENV: production
-    ports:
-      - "3001:3001"
-    depends_on:
-      migrate: { condition: service_completed_successfully }
-
-  worker:
-    build:
-      context: .
-      dockerfile: apps/worker/Dockerfile
-    environment: *app_env
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }

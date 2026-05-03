@@ -125,12 +125,11 @@ DATABASE_URL=postgresql://holo:holo@localhost:5436/holo pnpm db:migrate
 # Start dev servers
 pnpm dev
 # apps/web    → http://localhost:3000
-# apps/api    → http://localhost:3001
 # apps/mcp    → http://localhost:8080
 # apps/worker → background, logs heartbeat every 60s
 ```
 
-> **Port note:** Postgres binds to host port `5436` and Redis to `6382` so holo can coexist with other local Postgres/Redis instances. apps/web runs on `3000`, apps/api on `3001`, apps/mcp on `8080`. Override via `MCP_PORT` and Next.js `-p` flag if needed.
+> **Port note:** Postgres binds to host port `5436` and Redis to `6382` so holo can coexist with other local Postgres/Redis instances. apps/web runs on `3000`, apps/mcp on `8080`. Override via `MCP_PORT` and Next.js `-p` flag if needed.
 
 Visit `http://localhost:3000`. Sign in via GitHub. Click "Connect" on the GitHub row in `/connections` to complete the connector OAuth roundtrip — the row flips to "Connected ✓" and your encrypted token is stored in `connector_credentials`.
 

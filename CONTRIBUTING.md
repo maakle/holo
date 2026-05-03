@@ -25,7 +25,7 @@ pnpm dev
 ## Project shape
 
 - **Monorepo:** pnpm workspaces + Turborepo
-- **Apps:** `apps/web` (Next.js), `apps/api` (NestJS), `apps/worker` (NestJS standalone), `apps/mcp` (Hono)
+- **Apps:** `apps/web` (Next.js), `apps/worker` (NestJS standalone), `apps/mcp` (Hono)
 - **Packages:** `packages/db` (Drizzle), `packages/auth` (Better Auth), `packages/connectors`, `packages/retrieval-core`, `packages/skills` (v0.5), `packages/plans` (v0.6), `packages/jobs`, `packages/contracts`, `packages/api-client`, `packages/ui`
 
 ## Conventions
