@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
 import { type McpSessionVars } from '../src/middleware/session.js';
 import { mountMcp } from '../src/mcp/transport.js';
+import { init, call } from './helpers/mcp-client.js';
 
 const db = {
   select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }),
@@ -87,5 +88,80 @@ describe('MCP streamable HTTP transport', () => {
       body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
     });
     expect(res.status).toBe(202);
+  });
+
+  it('reuses session but reads the latest ctx on each request (no stale closure)', async () => {
+    // Each call to resolveContext returns a different allowlist. The second
+    // tools/call against the SAME session id must observe the new allowlist
+    // — with the stale-closure bug the old ctx (which permitted `search`)
+    // would still be in effect and the call would succeed.
+    // For built-ins, an empty allowlist means "all allowed". To prove the
+    // closure reads the latest ctx, the second allowlist must be NON-EMPTY
+    // and exclude `search` (so checkToolAllowed actually rejects).
+    const allowlists: string[][] = [
+      ['search'],   // init request: doesn't matter
+      ['search'],   // first tools/call: allowed
+      ['get_pr'],   // second tools/call: search NOT in list ⇒ must reject
+    ];
+    let resolveCalls = 0;
+
+    // Mock db where `.where(...)` is itself awaitable to `[]` (listCustomTools
+    // awaits the where clause directly without .limit()).
+    const dynDb = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([]),
+        }),
+      }),
+      insert: () => ({ values: () => ({ catch: () => Promise.resolve() }) }),
+    } as unknown as Parameters<typeof mountMcp>[1]['db'];
+
+    const dynApp = new Hono<{ Variables: McpSessionVars }>();
+    mountMcp(dynApp, {
+      db: dynDb,
+      middleware: async (c, next) => {
+        c.set('user', { userId: 'u1', organizationId: 'o1', email: '' });
+        await next();
+      },
+      async resolveContext() {
+        const list = allowlists[Math.min(resolveCalls, allowlists.length - 1)]!;
+        resolveCalls += 1;
+        return {
+          db: dynDb,
+          organizationId: 'o1',
+          userId: 'u1',
+          userSubjects: ['org:o1'],
+          activeToolAllowlist: list,
+        };
+      },
+    });
+
+    const sid = await init(dynApp);
+
+    // Call #1: allowlist permits `search`. We don't care about the result
+    // (the mock db will make the tool throw inside .run); we only need to
+    // confirm the allowlist gate let it through.
+    const first = (await call(dynApp, sid, 'tools/call', {
+      name: 'search',
+      arguments: { query: 'x' },
+    })).body as {
+      result?: { content?: Array<{ text?: string }>; isError?: boolean };
+      error?: { message?: string };
+    };
+    const firstMsg = first.error?.message ?? first.result?.content?.[0]?.text ?? '';
+    expect(firstMsg).not.toMatch(/allowlist/i);
+
+    // Call #2: allowlist is now empty. If the closure is stale, the gate
+    // still sees ['search'] and lets the call through. With the fix, the
+    // ctx ref is updated and the gate rejects.
+    const second = (await call(dynApp, sid, 'tools/call', {
+      name: 'search',
+      arguments: { query: 'x' },
+    })).body as {
+      result?: { content?: Array<{ text?: string }>; isError?: boolean };
+      error?: { message?: string };
+    };
+    const secondMsg = second.error?.message ?? second.result?.content?.[0]?.text ?? '';
+    expect(String(secondMsg)).toMatch(/allowlist/i);
   });
 });

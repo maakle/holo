@@ -11,6 +11,7 @@ import {
   computeS256Challenge,
 } from '@holo/oauth-provider';
 import { mountMcp } from '../src/mcp/transport.js';
+import { init, call } from './helpers/mcp-client.js';
 import { createSessionMiddleware } from '../src/middleware/session.js';
 import type { ToolContext } from '../src/tools/index.js';
 
@@ -121,37 +122,14 @@ async function fullFlow(): Promise<string> {
 
 /** Initialize an MCP session over the new Streamable HTTP transport. */
 async function initSession(token: string | null): Promise<{ status: number; sessionId: string | null }> {
-  const headers: Record<string, string> = {
-    'content-type': 'application/json',
-    accept: 'application/json, text/event-stream',
-  };
-  if (token) headers.authorization = `Bearer ${token}`;
-  const res = await app.fetch(
-    new Request('http://test/mcp', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 0,
-        method: 'initialize',
-        params: {
-          protocolVersion: '2025-06-18',
-          capabilities: {},
-          clientInfo: { name: 't', version: '0' },
-        },
-      }),
-    }),
-  );
-  return { status: res.status, sessionId: res.headers.get('mcp-session-id') };
-}
-
-/** Parse an SSE stream body and pull out the first JSON-RPC message. */
-async function parseSseJson(res: Response): Promise<unknown> {
-  const text = await res.text();
-  for (const line of text.split('\n')) {
-    if (line.startsWith('data: ')) return JSON.parse(line.slice('data: '.length));
+  try {
+    const sid = await init(app, { token: token ?? undefined });
+    return { status: 200, sessionId: sid };
+  } catch (err) {
+    // init() throws "init failed: <status> <body>" on non-200 — recover the status.
+    const m = /^init failed: (\d+)/.exec(String((err as Error).message));
+    return { status: m ? Number(m[1]) : 500, sessionId: null };
   }
-  return JSON.parse(text);
 }
 
 async function callMethod(
@@ -160,22 +138,7 @@ async function callMethod(
   method: string,
   params: unknown,
 ): Promise<{ status: number; body: unknown }> {
-  const headers: Record<string, string> = {
-    'content-type': 'application/json',
-    accept: 'application/json, text/event-stream',
-    'mcp-session-id': sessionId,
-    'mcp-protocol-version': '2025-06-18',
-  };
-  if (token) headers.authorization = `Bearer ${token}`;
-  const res = await app.fetch(
-    new Request('http://test/mcp', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-    }),
-  );
-  if (res.status !== 200) return { status: res.status, body: null };
-  return { status: res.status, body: await parseSseJson(res) };
+  return call(app, sessionId, method, params, { token: token ?? undefined });
 }
 
 describe('oauth roundtrip', () => {

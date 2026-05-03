@@ -15,7 +15,15 @@ export interface MountMcpOpts {
   middleware?: (c: Context, next: Next) => Promise<void | Response>;
 }
 
-const transports = new Map<string, WebStandardStreamableHTTPServerTransport>();
+const SESSION_IDLE_MS = 30 * 60 * 1000; // 30 minutes
+
+interface SessionEntry {
+  transport: WebStandardStreamableHTTPServerTransport;
+  ctxRef: { current: ToolContext };
+  lastUsed: number;
+}
+
+const sessions = new Map<string, SessionEntry>();
 
 function buildServer(getCtx: () => ToolContext): Server {
   const server = new Server(
@@ -96,19 +104,36 @@ export function mountMcp(app: Hono, opts: MountMcpOpts): void {
     }
 
     const sessionId = c.req.header('mcp-session-id');
-    let transport = sessionId ? transports.get(sessionId) : undefined;
+    const existing = sessionId ? sessions.get(sessionId) : undefined;
 
-    if (!transport) {
+    // Inline idle sweep — drop sessions that haven't been touched recently.
+    const now = Date.now();
+    for (const [sid, entry] of sessions) {
+      if (now - entry.lastUsed > SESSION_IDLE_MS) {
+        entry.transport.close().catch(() => {});
+        sessions.delete(sid);
+      }
+    }
+
+    let transport: WebStandardStreamableHTTPServerTransport;
+    if (existing) {
+      // Refresh the per-session ctx so the buildServer closure sees the
+      // latest allowlist / user / etc. on every request.
+      existing.ctxRef.current = ctx;
+      existing.lastUsed = now;
+      transport = existing.transport;
+    } else {
+      const ctxRef = { current: ctx };
       const created = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sid) => {
-          transports.set(sid, created);
+          sessions.set(sid, { transport: created, ctxRef, lastUsed: Date.now() });
         },
       });
       created.onclose = () => {
-        if (created.sessionId) transports.delete(created.sessionId);
+        if (created.sessionId) sessions.delete(created.sessionId);
       };
-      const server = buildServer(() => ctx);
+      const server = buildServer(() => ctxRef.current);
       await server.connect(created);
       transport = created;
     }
