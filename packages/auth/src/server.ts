@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { emailOTP } from 'better-auth/plugins';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import type { Env } from '@holo/env';
@@ -12,8 +13,40 @@ export interface CreateAuthOpts {
     | 'BETTER_AUTH_URL'
     | 'GITHUB_LOGIN_CLIENT_ID'
     | 'GITHUB_LOGIN_CLIENT_SECRET'
+    | 'EMAIL_PROVIDER'
+    | 'RESEND_API_KEY'
   >;
   defaultOrganizationId: string;
+}
+
+async function sendOtpEmail(
+  env: Pick<Env, 'EMAIL_PROVIDER' | 'RESEND_API_KEY' | 'BETTER_AUTH_URL'>,
+  email: string,
+  otp: string,
+  type: string,
+): Promise<void> {
+  if (env.EMAIL_PROVIDER === 'console' || !env.RESEND_API_KEY) {
+    // eslint-disable-next-line no-console
+    console.log(`[email:${type}] to=${email} otp=${otp}`);
+    return;
+  }
+  const fromHost = new URL(env.BETTER_AUTH_URL).host;
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `Holo <noreply@${fromHost}>`,
+      to: email,
+      subject: `Your sign-in code: ${otp}`,
+      text: `Your verification code is ${otp}. It expires in 5 minutes.`,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Resend API ${res.status}: ${await res.text()}`);
+  }
 }
 
 export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
@@ -43,6 +76,13 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
         scope: ['read:user', 'user:email'],
       },
     },
+    plugins: [
+      emailOTP({
+        async sendVerificationOTP({ email, otp, type }) {
+          await sendOtpEmail(env, email, otp, type);
+        },
+      }),
+    ],
     user: {
       additionalFields: {
         organizationId: {

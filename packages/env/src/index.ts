@@ -2,11 +2,11 @@ import { z } from 'zod';
 import { holoError, ErrorCode } from '@holo/errors';
 
 const EnvSchema = z.object({
-  DATABASE_URL: z.string().url(),
-  REDIS_URL: z.string().url(),
+  DATABASE_URL: z.url(),
+  REDIS_URL: z.url(),
   HOLO_TOKEN_ENCRYPTION_KEY: z.string().min(40),
   BETTER_AUTH_SECRET: z.string().min(32),
-  BETTER_AUTH_URL: z.string().url(),
+  BETTER_AUTH_URL: z.url(),
   GITHUB_LOGIN_CLIENT_ID: z.string().min(1),
   GITHUB_LOGIN_CLIENT_SECRET: z.string().min(1),
   GITHUB_CONNECTOR_CLIENT_ID: z.string().min(1),

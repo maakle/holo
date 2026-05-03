@@ -17,7 +17,7 @@ export const SkillStatusSchema = z
 
 export const SkillSchema = z
   .object({
-    id: z.string().uuid().openapi({ example: '5f3e0b0e-...' }),
+    id: z.uuid().openapi({ example: '5f3e0b0e-...' }),
     name: z.string(),
     slug: z.string(),
     version: z.number().int().positive(),
@@ -28,7 +28,7 @@ export const SkillSchema = z
 
 export const SkillDetailSchema = z
   .object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     name: z.string(),
     slug: z.string(),
     version: z.number().int().positive(),
@@ -47,7 +47,7 @@ export const SearchHitSchema = z
       artifact_kind: z.string(),
       metadata: z.record(z.string(), z.unknown()),
     }),
-    snippet_url: z.string().url().optional(),
+    snippet_url: z.url().optional(),
   })
   .openapi('SearchHit');
 

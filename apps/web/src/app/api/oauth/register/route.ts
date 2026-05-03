@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 const registrationSchema = z.object({
   client_name: z.string().min(1).max(100),
-  redirect_uris: z.array(z.string().url()).min(1).max(5),
+  redirect_uris: z.array(z.url()).min(1).max(5),
   scope: z.string().optional().default('search skills:read'),
   token_endpoint_auth_method: z.string().optional().default('none'),
   grant_types: z.array(z.string()).optional().default(['authorization_code']),
