@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 type Step = 'email' | 'otp';
 
 const inputClass =
-  'h-10 w-full rounded-md border border-border bg-transparent px-3 text-[13px] text-text outline-none placeholder:text-text-subtle focus:border-transparent focus:outline focus:outline-2 focus:outline-accent disabled:opacity-50';
+  'h-10 w-full rounded-md border border-border bg-transparent px-3 text-[13px] text-text outline-hidden placeholder:text-text-subtle focus:border-transparent focus:outline-solid focus:outline-2 focus:outline-accent disabled:opacity-50';
 
 export function SignInForm() {
   const [step, setStep] = useState<Step>('email');

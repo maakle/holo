@@ -84,9 +84,9 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
 
   const config = getConfig(activeTab, mcpUrl, token);
   const inputCls =
-    'rounded-[4px] border border-gray-300 bg-white px-3 py-1.5 text-sm font-mono dark:border-gray-700 dark:bg-gray-950';
+    'rounded-sm border border-gray-300 bg-white px-3 py-1.5 text-sm font-mono dark:border-gray-700 dark:bg-gray-950';
   const btnPrimary =
-    'rounded-[6px] bg-[#3F47FF] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#3038e0] disabled:opacity-50 transition-colors';
+    'rounded-md bg-[#3F47FF] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#3038e0] disabled:opacity-50 transition-colors';
 
   return (
     <div className="space-y-6">
@@ -112,7 +112,7 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
           API token
         </p>
         {token ? (
-          <div className="rounded-[6px] border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3 space-y-2">
+          <div className="rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3 space-y-2">
             <p className="text-xs text-amber-600 dark:text-amber-400">
               Save this token now — it won&apos;t be shown again.
             </p>
@@ -158,7 +158,7 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
             </button>
           ))}
         </div>
-        <div className="relative rounded-[4px] bg-[#0F0F11] dark:bg-[#0F0F11] border border-gray-800">
+        <div className="relative rounded-sm bg-[#0F0F11] dark:bg-[#0F0F11] border border-gray-800">
           <pre className="p-4 text-xs font-mono text-gray-200 overflow-x-auto whitespace-pre-wrap">
             {config}
           </pre>

@@ -26,7 +26,7 @@ export default async function MarketplacePage() {
 
   return (
     <div className="min-h-screen bg-bg text-text">
-      <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur supports-[backdrop-filter]:bg-bg/70">
+      <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur-sm supports-backdrop-filter:bg-bg/70">
         <div className="mx-auto flex h-14 max-w-[1024px] items-center justify-between px-6">
           <Link href="/" className="font-display text-[15px] font-semibold tracking-tight">
             holo

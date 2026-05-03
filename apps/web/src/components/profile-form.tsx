@@ -62,7 +62,7 @@ export function ProfileForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Your name"
-          className="h-9 w-full rounded-md border border-border bg-bg px-3 text-[13px] text-text outline-none transition-colors focus:border-border-strong focus-visible:focus-ring"
+          className="h-9 w-full rounded-md border border-border bg-bg px-3 text-[13px] text-text outline-hidden transition-colors focus:border-border-strong focus-visible:focus-ring"
         />
       </div>
 

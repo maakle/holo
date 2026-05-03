@@ -95,7 +95,7 @@ export function ConnectorRow({ meta, status, connectedAs }: Props) {
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
               placeholder={placeholderForConnector(meta.id)}
-              className="flex-1 rounded-md border border-border bg-bg px-2.5 py-1.5 text-[13px] text-text placeholder:text-text-subtle focus:outline-none focus:focus-ring"
+              className="flex-1 rounded-md border border-border bg-bg px-2.5 py-1.5 text-[13px] text-text placeholder:text-text-subtle focus:outline-hidden focus:focus-ring"
               autoComplete="off"
               disabled={busy}
             />

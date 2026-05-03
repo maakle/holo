@@ -1,6 +1,128 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
+
+@custom-variant dark (&:is(.dark *));
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1280px) {
+    max-width: 1280px;
+  }
+}
+
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-code-bg: var(--code-bg);
+
+  --font-sans:
+    Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    sans-serif;
+  --font-display: General Sans, Geist, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-display-1: 48px;
+  --text-display-1--line-height: 56px;
+  --text-display-1--letter-spacing: -0.01em;
+  --text-display-1--font-weight: 600;
+  --text-display-2: 36px;
+  --text-display-2--line-height: 44px;
+  --text-display-2--letter-spacing: -0.01em;
+  --text-display-2--font-weight: 600;
+  --text-h1: 28px;
+  --text-h1--line-height: 36px;
+  --text-h1--letter-spacing: -0.01em;
+  --text-h1--font-weight: 600;
+  --text-h2: 22px;
+  --text-h2--line-height: 30px;
+  --text-h2--font-weight: 500;
+  --text-h3: 18px;
+  --text-h3--line-height: 28px;
+  --text-h3--font-weight: 600;
+  --text-body: 15px;
+  --text-body--line-height: 24px;
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 20px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption--letter-spacing: 0.04em;
+  --text-caption--font-weight: 500;
+  --text-mono: 13px;
+  --text-mono--line-height: 20px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
+
+  --transition-duration-micro: 100ms;
+  --transition-duration-short: 200ms;
+  --transition-duration-medium: 300ms;
+
+  --animate-accordion-down: accordion-down 200ms ease-out;
+  --animate-accordion-up: accordion-up 200ms ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility focus-ring {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
 
 /*
  * holo design tokens — see DESIGN.md
@@ -123,12 +245,5 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--border-strong);
-  }
-}
-
-@layer components {
-  .focus-ring {
-    outline: 2px solid var(--accent);
-    outline-offset: -1px;
   }
 }
