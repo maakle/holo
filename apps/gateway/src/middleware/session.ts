@@ -5,6 +5,7 @@ import { validateSessionCookie } from '@holo/auth';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import { validateAccessToken } from '@holo/oauth-provider';
+import { logger } from '../logger.js';
 
 export interface McpSessionVars {
   user: { userId: string; organizationId: string; email?: string };
@@ -51,9 +52,7 @@ export function createSessionMiddleware(
         db.update(schema.apiTokens)
           .set({ lastUsedAt: new Date() })
           .where(eq(schema.apiTokens.tokenHash, tokenHash))
-          .catch(() => {
-            // Ignore update errors — best-effort telemetry
-          });
+          .catch((err) => logger.warn({ err }, 'lastUsedAt update failed'));
         c.set('user', {
           userId: row.userId,
           organizationId: row.organizationId,

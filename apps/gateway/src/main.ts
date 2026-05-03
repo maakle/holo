@@ -5,21 +5,21 @@ import { parseEnv } from '@holo/env';
 import { createDb, schema } from '@holo/db';
 import { HoloError } from '@holo/errors';
 import { getSubjectsForUser } from '@holo/user-subjects';
-import { createSessionMiddleware } from './middleware/session.js';
-import { mountMcp } from './jsonrpc.js';
+import { createSessionMiddleware, type McpSessionVars } from './middleware/session.js';
+import { mountMcp } from './mcp/transport.js';
 import { apiReference } from '@scalar/hono-api-reference';
 import { createRestRouter, openApiConfig } from './rest/router.js';
+import { logger } from './logger.js';
 
 async function main() {
   const env = parseEnv(process.env);
   await initCrypto();
   const db = createDb(env.DATABASE_URL);
 
-  const mcpPublicUrl = process.env.MCP_PUBLIC_URL ?? 'http://localhost:8080';
-  const webPublicUrl =
-    process.env.WEB_PUBLIC_URL ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:3000';
+  const mcpPublicUrl = env.MCP_PUBLIC_URL;
+  const webPublicUrl = env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL;
 
-  const app = new Hono();
+  const app = new Hono<{ Variables: McpSessionVars }>();
 
   app.onError((err, c) => {
     if (err instanceof HoloError) {
@@ -31,7 +31,7 @@ async function main() {
             : 500;
       return c.json(err.toJSON(), status);
     }
-    console.error(err);
+    logger.error({ err }, 'unhandled gateway error');
     return c.json(
       { code: 'HOLO_INTERNAL', problem: 'unexpected error', fix: 'check server logs' },
       500,
@@ -41,7 +41,7 @@ async function main() {
   app.get('/health', (c) => c.json({ status: 'ok', service: 'mcp' }));
 
   app.get('/_session-check', createSessionMiddleware(db), (c) =>
-    c.json({ user: c.get('user' as never) }),
+    c.json({ user: c.get('user') }),
   );
 
   // OAuth 2.1 Authorization Server Metadata (RFC 8414)
@@ -88,9 +88,7 @@ async function main() {
     db,
     middleware: createSessionMiddleware(db),
     async resolveContext(c) {
-      const user = c.get('user' as never) as
-        | { organizationId: string; userId: string }
-        | undefined;
+      const user = c.get('user');
       if (!user) {
         throw new HoloError({
           code: 'HOLO_AUTH_NO_SESSION',
@@ -129,16 +127,17 @@ async function main() {
           ...extraSubjects,
         ],
         activeToolAllowlist,
+        anthropicApiKey: env.ANTHROPIC_API_KEY,
       };
     },
   });
 
-  const port = Number(process.env.MCP_PORT ?? 8080);
+  const port = env.MCP_PORT;
   serve({ fetch: app.fetch, port });
-  console.log(`apps/gateway listening on :${port}`);
+  logger.info({ port }, 'gateway listening');
 }
 
 main().catch((e) => {
-  console.error(e);
+  logger.fatal({ err: e }, 'gateway boot failed');
   process.exit(1);
 });

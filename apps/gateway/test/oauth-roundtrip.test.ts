@@ -10,7 +10,8 @@ import {
   revokeAccessToken,
   computeS256Challenge,
 } from '@holo/oauth-provider';
-import { mountMcp } from '../src/jsonrpc.js';
+import { mountMcp } from '../src/mcp/transport.js';
+import { init, call } from './helpers/mcp-client.js';
 import { createSessionMiddleware } from '../src/middleware/session.js';
 import type { ToolContext } from '../src/tools/index.js';
 
@@ -119,36 +120,49 @@ async function fullFlow(): Promise<string> {
   return accessToken;
 }
 
-async function jsonRpc(token: string | null, method: string, params: unknown): Promise<Response> {
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
-  if (token) headers.authorization = `Bearer ${token}`;
-  return app.fetch(
-    new Request('http://test/mcp', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-    }),
-  );
+/** Initialize an MCP session over the new Streamable HTTP transport. */
+async function initSession(token: string | null): Promise<{ status: number; sessionId: string | null }> {
+  try {
+    const sid = await init(app, { token: token ?? undefined });
+    return { status: 200, sessionId: sid };
+  } catch (err) {
+    // init() throws "init failed: <status> <body>" on non-200 — recover the status.
+    const m = /^init failed: (\d+)/.exec(String((err as Error).message));
+    return { status: m ? Number(m[1]) : 500, sessionId: null };
+  }
+}
+
+async function callMethod(
+  token: string | null,
+  sessionId: string,
+  method: string,
+  params: unknown,
+): Promise<{ status: number; body: unknown }> {
+  return call(app, sessionId, method, params, { token: token ?? undefined });
 }
 
 describe('oauth roundtrip', () => {
   it('full flow: code → token → MCP tools/list returns built-ins', async () => {
     const token = await fullFlow();
-    const res = await jsonRpc(token, 'tools/list', {});
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { result: { tools: Array<{ name: string }> } };
-    const names = body.result.tools.map((t) => t.name);
+    const { sessionId } = await initSession(token);
+    expect(sessionId).toBeTruthy();
+    const { status, body } = await callMethod(token, sessionId!, 'tools/list', {});
+    expect(status).toBe(200);
+    const result = (body as { result: { tools: Array<{ name: string }> } }).result;
+    const names = result.tools.map((t) => t.name);
     expect(names).toContain('search');
     expect(names.length).toBeGreaterThanOrEqual(6);
   });
 
   it('token validates against MCP — search tool is listed', async () => {
     const token = await fullFlow();
-    const res = await jsonRpc(token, 'tools/list', {});
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { result: { tools: Array<{ name: string }> } };
-    expect(body.result.tools.length).toBeGreaterThan(0);
-    expect(body.result.tools.map((t) => t.name)).toContain('search');
+    const { sessionId } = await initSession(token);
+    expect(sessionId).toBeTruthy();
+    const { status, body } = await callMethod(token, sessionId!, 'tools/list', {});
+    expect(status).toBe(200);
+    const result = (body as { result: { tools: Array<{ name: string }> } }).result;
+    expect(result.tools.length).toBeGreaterThan(0);
+    expect(result.tools.map((t) => t.name)).toContain('search');
   });
 
   it('reused code is rejected', async () => {
@@ -177,16 +191,16 @@ describe('oauth roundtrip', () => {
     ).rejects.toThrow();
   });
 
-  it('unknown bearer token is rejected by MCP (not 200)', async () => {
-    const res = await jsonRpc('totally-not-a-real-token', 'tools/list', {});
-    expect(res.status).not.toBe(200);
+  it('unknown bearer token is rejected by MCP (initialize fails)', async () => {
+    const { status } = await initSession('totally-not-a-real-token');
+    expect(status).not.toBe(200);
   });
 
-  it('revoked bearer token is rejected by MCP (not 200)', async () => {
+  it('revoked bearer token is rejected by MCP (initialize fails)', async () => {
     const token = await fullFlow();
     const ok = await revokeAccessToken(db, token);
     expect(ok).toBe(true);
-    const res = await jsonRpc(token, 'tools/list', {});
-    expect(res.status).not.toBe(200);
+    const { status } = await initSession(token);
+    expect(status).not.toBe(200);
   });
 });
