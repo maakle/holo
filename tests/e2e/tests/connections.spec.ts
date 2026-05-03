@@ -51,7 +51,7 @@ test.skip('GitHub Connect: with mocked GitHub, row flips to "Connected ✓"', as
     {
       name: 'better-auth.session_token',
       value: token,
-      url: 'http://localhost:3030',
+      url: 'http://localhost:3000',
     },
   ]);
 
