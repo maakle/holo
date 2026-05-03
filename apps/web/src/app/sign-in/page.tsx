@@ -20,7 +20,7 @@ export default function SignInPage() {
               Welcome to holo
             </h1>
             <p className="text-[13px] leading-5 text-text-muted">
-              Open-source MCP context layer. Self-hostable, Apache-2.0.
+              Open-source MCP context layer. Self-hostable, AGPL-3.0.
             </p>
           </div>
           <SignInForm />

@@ -4,7 +4,7 @@
 
 ## Self-hosted (always free)
 
-`docker compose up` and `npx holo init` give you the same holo that runs in our cloud. **Apache-2.0. No "open core" gating** — every feature in this repo is in the self-hostable build, including:
+`docker compose up` and `npx holo init` give you the same holo that runs in our cloud. **AGPL-3.0. No "open core" gating** — every feature in this repo is in the self-hostable build, including:
 
 - All connectors (Slack, GitHub, Notion, Grain, Pylon, HubSpot at v0.1; more to come)
 - Hybrid search across every ingested source

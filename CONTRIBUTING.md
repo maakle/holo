@@ -89,4 +89,4 @@ Be kind. Be technical. Be specific. Disagreement is welcome; condescension is no
 
 ## License
 
-By submitting a PR you agree to license your contribution under Apache-2.0.
+By submitting a PR you agree to license your contribution under AGPL-3.0-or-later.
