@@ -29,7 +29,9 @@ jobs:
           path-to-signatures: 'cla-signatures/v1.json'
           path-to-document: 'https://github.com/maakle/holo/blob/main/CLA.md'
           branch: 'cla-signatures'
-          allowlist: dependabot[bot],renovate[bot]
+          # Project owner is allowlisted (signing your own CLA is mostly ceremonial).
+          # External contributors still get prompted to sign on first PR.
+          allowlist: dependabot[bot],renovate[bot],maakle
           custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
           remote-organization-name: maakle
           remote-repository-name: holo
