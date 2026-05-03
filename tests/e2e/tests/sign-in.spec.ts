@@ -3,9 +3,9 @@ import { test, expect } from '@playwright/test';
 test('home page renders the public marketing landing', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/$/);
-  // Hero headline (two-line: "Shared agent context. / The OS underneath.")
+  // Hero headline (two-line: "The agent context layer / for your company.")
   await expect(
-    page.getByRole('heading', { name: /Shared agent context/i }),
+    page.getByRole('heading', { name: /The agent context layer/i }),
   ).toBeVisible();
   // Primary CTA routes to /sign-in for unauthed visitors
   await expect(page.getByRole('link', { name: /Get started/i }).first()).toBeVisible();
