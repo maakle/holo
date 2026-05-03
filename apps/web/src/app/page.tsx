@@ -31,7 +31,7 @@ export default async function Home() {
 // ── Header ─────────────────────────────────────────────────────────────────
 function SiteHeader({ isAuthed }: { isAuthed: boolean }) {
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-bg/80 backdrop-blur supports-[backdrop-filter]:bg-bg/60">
+    <header className="sticky top-0 z-20 border-b border-border bg-bg/80 backdrop-blur-sm supports-backdrop-filter:bg-bg/60">
       <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between px-6">
         <Link href="/" className="font-display text-[15px] font-semibold tracking-tight">
           holo
@@ -110,7 +110,7 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
 function BackdropGrid() {
   return (
     <div
-      className="pointer-events-none absolute inset-0 bg-[linear-gradient(var(--border)_1px,transparent_1px),linear-gradient(90deg,var(--border)_1px,transparent_1px)] bg-[size:48px_48px] opacity-30 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_70%)]"
+      className="pointer-events-none absolute inset-0 bg-[linear-gradient(var(--border)_1px,transparent_1px),linear-gradient(90deg,var(--border)_1px,transparent_1px)] bg-size-[48px_48px] opacity-30 mask-[radial-gradient(ellipse_at_center,black_30%,transparent_70%)]"
       aria-hidden
     />
   );
@@ -349,7 +349,7 @@ function ObservabilityBand() {
 // ── Code card ──────────────────────────────────────────────────────────────
 function CodeCard({ title, lang, code }: { title: string; lang: string; code: string }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-[var(--code-bg)]">
+    <div className="overflow-hidden rounded-lg border border-border bg-(--code-bg)">
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <span className="font-mono text-[12px] text-text-subtle">{title}</span>
         <span className="caption text-text-subtle">{lang}</span>

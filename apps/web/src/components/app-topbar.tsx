@@ -29,7 +29,7 @@ export function AppTopbar() {
   const title = titleFromPath(pathname);
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-center border-b border-border bg-bg/90 px-4 backdrop-blur supports-[backdrop-filter]:bg-bg/70">
+    <header className="sticky top-0 z-20 flex h-14 items-center justify-center border-b border-border bg-bg/90 px-4 backdrop-blur-sm supports-backdrop-filter:bg-bg/70">
       <div className="font-display text-[14px] font-medium tracking-tight text-text">
         {title}
       </div>

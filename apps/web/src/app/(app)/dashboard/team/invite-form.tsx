@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { inviteMember } from './actions';
 
 const inputClass =
-  'h-9 rounded-md border border-border bg-transparent px-3 text-[13px] outline-none placeholder:text-text-subtle focus:border-transparent focus:outline focus:outline-2 focus:outline-accent disabled:opacity-50';
+  'h-9 rounded-md border border-border bg-transparent px-3 text-[13px] outline-hidden placeholder:text-text-subtle focus:border-transparent focus:outline-solid focus:outline-2 focus:outline-accent disabled:opacity-50';
 
 interface State {
   ok: boolean;

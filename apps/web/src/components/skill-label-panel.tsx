@@ -64,7 +64,7 @@ export function SkillLabelPanel() {
   }
 
   const inputCls =
-    'w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950 focus:outline-none focus:ring-1 focus:ring-[#3F47FF]';
+    'w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950 focus:outline-hidden focus:ring-1 focus:ring-[#3F47FF]';
   const btnCls =
     'rounded-md bg-[#3F47FF] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#3038e0] disabled:opacity-50 transition-colors whitespace-nowrap';
 
