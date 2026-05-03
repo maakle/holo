@@ -6,7 +6,7 @@ import { createDb, schema } from '@holo/db';
 import { HoloError } from '@holo/errors';
 import { getSubjectsForUser } from '@holo/user-subjects';
 import { createSessionMiddleware } from './middleware/session.js';
-import { mountMcp } from './jsonrpc.js';
+import { mountMcp } from './mcp/transport.js';
 import { apiReference } from '@scalar/hono-api-reference';
 import { createRestRouter, openApiConfig } from './rest/router.js';
 

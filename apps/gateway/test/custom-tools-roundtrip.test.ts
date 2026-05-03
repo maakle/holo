@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import postgres from 'postgres';
 import { createDb } from '@holo/db';
 import { createCustomTool, deleteCustomToolByName } from '@holo/custom-tools';
-import { mountMcp } from '../src/jsonrpc.js';
+import { mountMcp } from '../src/mcp/transport.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ECHO = resolve(here, '../../../packages/custom-tools/test/fixtures/echo-tool.sh');
@@ -20,7 +20,6 @@ let userId: string;
 beforeAll(async () => {
   sql = postgres(url, { max: 1 });
   db = createDb(url);
-  // Reuse the first org/user in the DB; tests assume seeded data exists.
   const orgRow = await sql<{ id: string }[]>`SELECT id FROM organization LIMIT 1`;
   const userRow = await sql<{ id: string }[]>`SELECT id FROM "user" LIMIT 1`;
   orgId = orgRow[0]!.id;
@@ -46,15 +45,60 @@ afterAll(async () => {
   await sql.end();
 });
 
-async function jsonRpc(method: string, params: unknown): Promise<unknown> {
-  const res = await app.fetch(
+/** Initialize a session against a Hono app and return its session id. */
+async function init(targetApp: Hono): Promise<string> {
+  const res = await targetApp.fetch(
     new Request('http://test/mcp', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 0,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: {},
+          clientInfo: { name: 't', version: '0' },
+        },
+      }),
+    }),
+  );
+  const sid = res.headers.get('mcp-session-id');
+  if (!sid) throw new Error(`init failed: ${res.status} ${await res.text()}`);
+  return sid;
+}
+
+async function parseSseJson(res: Response): Promise<unknown> {
+  const text = await res.text();
+  for (const line of text.split('\n')) {
+    if (line.startsWith('data: ')) return JSON.parse(line.slice('data: '.length));
+  }
+  return JSON.parse(text);
+}
+
+async function call(
+  targetApp: Hono,
+  sessionId: string,
+  method: string,
+  params: unknown,
+): Promise<{ status: number; body: unknown }> {
+  const res = await targetApp.fetch(
+    new Request('http://test/mcp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        'mcp-session-id': sessionId,
+        'mcp-protocol-version': '2025-06-18',
+      },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
     }),
   );
-  return res.json();
+  if (res.status !== 200) return { status: res.status, body: await res.text().catch(() => null) };
+  return { status: res.status, body: await parseSseJson(res) };
 }
 
 describe('custom tool roundtrip', () => {
@@ -79,7 +123,8 @@ describe('custom tool roundtrip', () => {
       maxOutputBytes: 8192,
     });
 
-    const listed = (await jsonRpc('tools/list', {})) as {
+    const sid = await init(app);
+    const listed = (await call(app, sid, 'tools/list', {})).body as {
       result: { tools: Array<{ name: string; description: string }> };
     };
     const echo = listed.result.tools.find((t) => t.name === 'echo_argv');
@@ -88,10 +133,10 @@ describe('custom tool roundtrip', () => {
     expect(echo!.description).toContain('read-only');
     expect(echo!.description).toContain('scope: test');
 
-    const called = (await jsonRpc('tools/call', {
+    const called = (await call(app, sid, 'tools/call', {
       name: 'echo_argv',
       arguments: { phrase: 'hello-world' },
-    })) as { result: { content: Array<{ text: string }> } };
+    })).body as { result: { content: Array<{ text: string }> } };
     const payload = JSON.parse(called.result.content[0]!.text) as {
       stdout: string;
       exit_code: number;
@@ -99,7 +144,6 @@ describe('custom tool roundtrip', () => {
     expect(payload.exit_code).toBe(0);
     expect(payload.stdout).toContain('hello-world');
 
-    // Audit row written (emit is fire-and-forget; poll up to ~1s)
     let audit: { event_type: string }[] = [];
     for (let i = 0; i < 20; i++) {
       audit = await sql<{ event_type: string }[]>`
@@ -129,19 +173,17 @@ describe('custom tool roundtrip', () => {
         };
       },
     });
-    const res = await isolatedApp.fetch(
-      new Request('http://test/mcp', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'tools/call',
-          params: { name: 'echo_argv', arguments: { phrase: 'x' } },
-        }),
-      }),
-    );
-    expect(res.status).toBe(403);
+    const sid = await init(isolatedApp);
+    const { body } = await call(isolatedApp, sid, 'tools/call', {
+      name: 'echo_argv',
+      arguments: { phrase: 'x' },
+    });
+    // SDK reports tool errors via JSON-RPC error or isError content; either way it MUST NOT succeed.
+    const env = body as
+      | { error?: { message?: string }; result?: { isError?: boolean; content?: Array<{ text?: string }> } };
+    const errMsg = env.error?.message ?? env.result?.content?.[0]?.text ?? '';
+    expect(env.error || env.result?.isError).toBeTruthy();
+    expect(String(errMsg)).toMatch(/allowlist|not (in|allowed)/i);
   });
 
   it('writes audit row for non-zero exit', async () => {
@@ -180,23 +222,15 @@ describe('custom tool roundtrip', () => {
       },
     });
 
-    const res = await failApp.fetch(
-      new Request('http://test/mcp', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'tools/call',
-          params: { name: failName, arguments: {} },
-        }),
-      }),
-    );
-    const body = (await res.json()) as { result: { content: Array<{ text: string }> } };
-    const payload = JSON.parse(body.result.content[0]!.text) as { exit_code: number };
+    const sid = await init(failApp);
+    const { body } = await call(failApp, sid, 'tools/call', {
+      name: failName,
+      arguments: {},
+    });
+    const env = body as { result: { content: Array<{ text: string }> } };
+    const payload = JSON.parse(env.result.content[0]!.text) as { exit_code: number };
     expect(payload.exit_code).toBe(7);
 
-    // Poll up to 1s for the audit row, mirroring the success-case poll.
     let auditRow: { meta: Record<string, unknown> } | undefined;
     for (let i = 0; i < 20 && !auditRow; i++) {
       const rows = await sql<{ meta: Record<string, unknown> }[]>`

@@ -10,7 +10,7 @@ import {
   revokeAccessToken,
   computeS256Challenge,
 } from '@holo/oauth-provider';
-import { mountMcp } from '../src/jsonrpc.js';
+import { mountMcp } from '../src/mcp/transport.js';
 import { createSessionMiddleware } from '../src/middleware/session.js';
 import type { ToolContext } from '../src/tools/index.js';
 
@@ -119,36 +119,87 @@ async function fullFlow(): Promise<string> {
   return accessToken;
 }
 
-async function jsonRpc(token: string | null, method: string, params: unknown): Promise<Response> {
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
+/** Initialize an MCP session over the new Streamable HTTP transport. */
+async function initSession(token: string | null): Promise<{ status: number; sessionId: string | null }> {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    accept: 'application/json, text/event-stream',
+  };
   if (token) headers.authorization = `Bearer ${token}`;
-  return app.fetch(
+  const res = await app.fetch(
+    new Request('http://test/mcp', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 0,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: {},
+          clientInfo: { name: 't', version: '0' },
+        },
+      }),
+    }),
+  );
+  return { status: res.status, sessionId: res.headers.get('mcp-session-id') };
+}
+
+/** Parse an SSE stream body and pull out the first JSON-RPC message. */
+async function parseSseJson(res: Response): Promise<unknown> {
+  const text = await res.text();
+  for (const line of text.split('\n')) {
+    if (line.startsWith('data: ')) return JSON.parse(line.slice('data: '.length));
+  }
+  return JSON.parse(text);
+}
+
+async function callMethod(
+  token: string | null,
+  sessionId: string,
+  method: string,
+  params: unknown,
+): Promise<{ status: number; body: unknown }> {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    accept: 'application/json, text/event-stream',
+    'mcp-session-id': sessionId,
+    'mcp-protocol-version': '2025-06-18',
+  };
+  if (token) headers.authorization = `Bearer ${token}`;
+  const res = await app.fetch(
     new Request('http://test/mcp', {
       method: 'POST',
       headers,
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
     }),
   );
+  if (res.status !== 200) return { status: res.status, body: null };
+  return { status: res.status, body: await parseSseJson(res) };
 }
 
 describe('oauth roundtrip', () => {
   it('full flow: code → token → MCP tools/list returns built-ins', async () => {
     const token = await fullFlow();
-    const res = await jsonRpc(token, 'tools/list', {});
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { result: { tools: Array<{ name: string }> } };
-    const names = body.result.tools.map((t) => t.name);
+    const { sessionId } = await initSession(token);
+    expect(sessionId).toBeTruthy();
+    const { status, body } = await callMethod(token, sessionId!, 'tools/list', {});
+    expect(status).toBe(200);
+    const result = (body as { result: { tools: Array<{ name: string }> } }).result;
+    const names = result.tools.map((t) => t.name);
     expect(names).toContain('search');
     expect(names.length).toBeGreaterThanOrEqual(6);
   });
 
   it('token validates against MCP — search tool is listed', async () => {
     const token = await fullFlow();
-    const res = await jsonRpc(token, 'tools/list', {});
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { result: { tools: Array<{ name: string }> } };
-    expect(body.result.tools.length).toBeGreaterThan(0);
-    expect(body.result.tools.map((t) => t.name)).toContain('search');
+    const { sessionId } = await initSession(token);
+    expect(sessionId).toBeTruthy();
+    const { status, body } = await callMethod(token, sessionId!, 'tools/list', {});
+    expect(status).toBe(200);
+    const result = (body as { result: { tools: Array<{ name: string }> } }).result;
+    expect(result.tools.length).toBeGreaterThan(0);
+    expect(result.tools.map((t) => t.name)).toContain('search');
   });
 
   it('reused code is rejected', async () => {
@@ -177,16 +228,16 @@ describe('oauth roundtrip', () => {
     ).rejects.toThrow();
   });
 
-  it('unknown bearer token is rejected by MCP (not 200)', async () => {
-    const res = await jsonRpc('totally-not-a-real-token', 'tools/list', {});
-    expect(res.status).not.toBe(200);
+  it('unknown bearer token is rejected by MCP (initialize fails)', async () => {
+    const { status } = await initSession('totally-not-a-real-token');
+    expect(status).not.toBe(200);
   });
 
-  it('revoked bearer token is rejected by MCP (not 200)', async () => {
+  it('revoked bearer token is rejected by MCP (initialize fails)', async () => {
     const token = await fullFlow();
     const ok = await revokeAccessToken(db, token);
     expect(ok).toBe(true);
-    const res = await jsonRpc(token, 'tools/list', {});
-    expect(res.status).not.toBe(200);
+    const { status } = await initSession(token);
+    expect(status).not.toBe(200);
   });
 });
