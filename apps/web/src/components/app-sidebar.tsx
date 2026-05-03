@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { OrgSwitcher } from '@/components/org-switcher';
+import { OrgSwitcher, type OrgSummary } from '@/components/org-switcher';
 import { UserMenu } from '@/components/user-menu';
 
 type NavItem = {
@@ -56,9 +56,13 @@ const sections: NavSection[] = [
 export function AppSidebar({
   userEmail,
   userName,
+  orgs,
+  activeOrgId,
 }: {
   userEmail?: string | null;
   userName?: string | null;
+  orgs: OrgSummary[];
+  activeOrgId: string;
 }) {
   const pathname = usePathname();
 
@@ -69,7 +73,7 @@ export function AppSidebar({
     >
       {/* Org switcher */}
       <div className="px-2 pt-3 pb-2">
-        <OrgSwitcher name="holo" />
+        <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
       </div>
 
       {/* Nav */}
