@@ -58,7 +58,7 @@ describe('MCP streamable HTTP transport', () => {
   });
 
   it('does not respond to JSON-RPC notifications (no id)', async () => {
-    const init = await app.request('/mcp', {
+    const initRes = await app.request('/mcp', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -75,7 +75,7 @@ describe('MCP streamable HTTP transport', () => {
         },
       }),
     });
-    const sid = init.headers.get('mcp-session-id')!;
+    const sid = initRes.headers.get('mcp-session-id')!;
 
     const res = await app.request('/mcp', {
       method: 'POST',

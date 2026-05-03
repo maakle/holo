@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { mountMcp } from '../src/mcp/transport.js';
 import { HoloError } from '@holo/errors';
