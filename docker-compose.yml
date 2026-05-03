@@ -32,23 +32,23 @@ services:
   migrate:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: apps/worker/Dockerfile
     command: ["pnpm", "-F", "@holo/db", "migrate"]
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-holo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-holo}
     depends_on:
       postgres: { condition: service_healthy }
 
-  api:
+  worker:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: apps/worker/Dockerfile
     environment: &app_env
       DATABASE_URL: postgresql://${POSTGRES_USER:-holo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-holo}
       REDIS_URL: redis://redis:6379
       HOLO_TOKEN_ENCRYPTION_KEY: ${HOLO_TOKEN_ENCRYPTION_KEY}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3030}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       GITHUB_LOGIN_CLIENT_ID: ${GITHUB_LOGIN_CLIENT_ID}
       GITHUB_LOGIN_CLIENT_SECRET: ${GITHUB_LOGIN_CLIENT_SECRET}
       GITHUB_CONNECTOR_CLIENT_ID: ${GITHUB_CONNECTOR_CLIENT_ID}
@@ -56,27 +56,17 @@ services:
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       NODE_ENV: production
-    ports:
-      - "4000:4000"
-    depends_on:
-      migrate: { condition: service_completed_successfully }
-
-  worker:
-    build:
-      context: .
-      dockerfile: apps/worker/Dockerfile
-    environment: *app_env
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
 
-  mcp:
+  gateway:
     build:
       context: .
-      dockerfile: apps/mcp/Dockerfile
+      dockerfile: apps/gateway/Dockerfile
     environment: *app_env
     ports:
-      - "8091:8091"
+      - "8080:8080"
     depends_on:
       migrate: { condition: service_completed_successfully }
 
@@ -86,7 +76,7 @@ services:
       dockerfile: apps/web/Dockerfile
     environment: *app_env
     ports:
-      - "3030:3030"
+      - "3000:3000"
     depends_on:
       migrate: { condition: service_completed_successfully }
 

@@ -51,23 +51,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Extract metadata (MCP)
-        id: meta-mcp
+      - name: Extract metadata (gateway)
+        id: meta-gateway
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_PREFIX }}-mcp
+          images: ${{ env.IMAGE_PREFIX }}-gateway
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
-      - name: Build and push holo-mcp
+      - name: Build and push holo-gateway
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./apps/mcp/Dockerfile
+          file: ./apps/gateway/Dockerfile
           push: true
-          tags: ${{ steps.meta-mcp.outputs.tags }}
-          labels: ${{ steps.meta-mcp.outputs.labels }}
+          tags: ${{ steps.meta-gateway.outputs.tags }}
+          labels: ${{ steps.meta-gateway.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

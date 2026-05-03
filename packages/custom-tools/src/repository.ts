@@ -4,7 +4,7 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
 import type { CustomToolRow } from './types.js';
 
-// keep in sync with apps/mcp/src/tools/index.ts
+// keep in sync with apps/gateway/src/tools/index.ts
 const BUILTIN_TOOL_NAMES = new Set([
   'search',
   'get_pr',

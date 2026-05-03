@@ -9,17 +9,17 @@ healthcheckPath = "/api/health"
 startCommand = "node apps/web/server.js"
 
 [services.variables]
-PORT = "3030"
+PORT = "3000"
 NODE_ENV = "production"
 
 [[services]]
-name = "holo-mcp"
-source = "apps/mcp/Dockerfile"
+name = "holo-gateway"
+source = "apps/gateway/Dockerfile"
 healthcheckPath = "/health"
-startCommand = "node apps/mcp/dist/main.js"
+startCommand = "node apps/gateway/dist/main.js"
 
 [services.variables]
-MCP_PORT = "8091"
+MCP_PORT = "8080"
 NODE_ENV = "production"
 
 [[services]]

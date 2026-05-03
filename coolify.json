@@ -7,15 +7,15 @@
       "name": "holo-web",
       "type": "dockerfile",
       "dockerfilePath": "apps/web/Dockerfile",
-      "port": 3030,
+      "port": 3000,
       "healthcheck": "/api/health",
       "env": ["DATABASE_URL", "REDIS_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "ANTHROPIC_API_KEY", "GITHUB_LOGIN_CLIENT_ID", "GITHUB_LOGIN_CLIENT_SECRET", "HOLO_TOKEN_ENCRYPTION_KEY"]
     },
     {
-      "name": "holo-mcp",
+      "name": "holo-gateway",
       "type": "dockerfile",
-      "dockerfilePath": "apps/mcp/Dockerfile",
-      "port": 8091,
+      "dockerfilePath": "apps/gateway/Dockerfile",
+      "port": 8080,
       "healthcheck": "/health",
       "env": ["DATABASE_URL", "MCP_PUBLIC_URL", "WEB_PUBLIC_URL"]
     }

@@ -16,10 +16,10 @@ RUN pnpm -F @holo/web build
 FROM node:20-alpine AS runtime
 WORKDIR /repo
 ENV NODE_ENV=production
-ENV PORT=3030
+ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 COPY --from=build /repo/apps/web/.next/standalone /repo
 COPY --from=build /repo/apps/web/.next/static /repo/apps/web/.next/static
 COPY --from=build /repo/apps/web/public /repo/apps/web/public 2>/dev/null || true
-EXPOSE 3030
+EXPOSE 3000
 CMD ["node", "/repo/apps/web/server.js"]
