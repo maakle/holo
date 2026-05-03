@@ -1,8 +1,16 @@
 import { test, expect } from '@playwright/test';
 
-test('unauthenticated home page redirects to /sign-in', async ({ page }) => {
+test('home page renders the public marketing landing', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveURL(/\/sign-in$/);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(
+    page.getByRole('heading', { name: /Shared context for the agents/i }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: /Get started/i }).first()).toBeVisible();
+});
+
+test('sign-in page exposes the GitHub option', async ({ page }) => {
+  await page.goto('/sign-in');
   await expect(page.getByRole('heading', { name: /Sign in to holo/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /Continue with GitHub/i })).toBeVisible();
 });
