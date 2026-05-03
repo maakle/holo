@@ -4,22 +4,20 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { holoError, ErrorCode } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
-
-const ROLES = ['owner', 'admin', 'member'] as const;
-type Role = (typeof ROLES)[number];
+import { inviteMemberSchema, cancelInvitationSchema } from './schemas';
 
 export async function inviteMember(formData: FormData): Promise<{
   ok: boolean;
   error?: string;
 }> {
-  const email = String(formData.get('email') ?? '').trim().toLowerCase();
-  const role = String(formData.get('role') ?? 'member') as Role;
-  if (!email || !email.includes('@')) {
-    return { ok: false, error: 'Enter a valid email address.' };
+  const parsed = inviteMemberSchema.safeParse({
+    email: formData.get('email'),
+    role: formData.get('role') ?? 'member',
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid input.' };
   }
-  if (!ROLES.includes(role)) {
-    return { ok: false, error: 'Invalid role.' };
-  }
+  const { email, role } = parsed.data;
 
   const { auth } = await getServerContext();
   const reqHeaders = await headers();
@@ -52,15 +50,17 @@ export async function inviteMember(formData: FormData): Promise<{
 }
 
 export async function cancelInvitation(formData: FormData): Promise<void> {
-  const invitationId = String(formData.get('invitationId') ?? '');
-  if (!invitationId) return;
+  const parsed = cancelInvitationSchema.safeParse({
+    invitationId: formData.get('invitationId'),
+  });
+  if (!parsed.success) return;
 
   const { auth } = await getServerContext();
   const reqHeaders = await headers();
 
   try {
     await auth.api.cancelInvitation({
-      body: { invitationId },
+      body: { invitationId: parsed.data.invitationId },
       headers: reqHeaders,
     });
   } catch {
