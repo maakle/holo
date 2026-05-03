@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { emailOTP } from 'better-auth/plugins';
+import { emailOTP, organization } from 'better-auth/plugins';
+import { eq } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import type { Env } from '@holo/env';
@@ -63,6 +64,9 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
         session: schema.session,
         account: schema.account,
         verification: schema.verification,
+        organization: schema.organization,
+        member: schema.member,
+        invitation: schema.invitation,
       },
     }),
     secret: env.BETTER_AUTH_SECRET,
@@ -81,11 +85,60 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
         scope: ['read:user', 'user:email'],
       },
     },
+    databaseHooks: {
+      // Auto-enroll new users in their home org. The `user.organizationId`
+      // additionalField defaults the home org at insert; here we mirror that
+      // into the `member` table so the org plugin sees them as a member.
+      user: {
+        create: {
+          after: async (createdUser) => {
+            const orgId =
+              (createdUser as unknown as { organizationId?: string }).organizationId ??
+              defaultOrganizationId;
+            const existing = await db
+              .select({ id: schema.member.id })
+              .from(schema.member)
+              .where(eq(schema.member.userId, createdUser.id))
+              .limit(1);
+            if (existing[0]) return;
+            await db.insert(schema.member).values({
+              organizationId: orgId,
+              userId: createdUser.id,
+              role: 'owner',
+            });
+          },
+        },
+      },
+      // When a session is created, default `activeOrganizationId` to the
+      // user's home org if not already set. Better Auth's
+      // `organizationCreation` flow may override this later.
+      session: {
+        create: {
+          before: async (newSession) => {
+            const s = newSession as { userId: string; activeOrganizationId?: string | null };
+            if (s.activeOrganizationId) return;
+            const rows = await db
+              .select({ organizationId: schema.user.organizationId })
+              .from(schema.user)
+              .where(eq(schema.user.id, s.userId))
+              .limit(1);
+            const homeOrg = rows[0]?.organizationId;
+            if (!homeOrg) return;
+            return { data: { ...newSession, activeOrganizationId: homeOrg } };
+          },
+        },
+      },
+    },
     plugins: [
       emailOTP({
         async sendVerificationOTP({ email, otp, type }) {
           await sendOtpEmail(env, email, otp, type);
         },
+      }),
+      organization({
+        // A user can belong to many orgs but defaults to a single home org
+        // until they create or are invited to additional ones.
+        allowUserToCreateOrganization: true,
       }),
     ],
     user: {

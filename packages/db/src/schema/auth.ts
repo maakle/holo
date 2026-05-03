@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, jsonb, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, jsonb, uuid, uniqueIndex, index } from 'drizzle-orm/pg-core';
 import { encryptedText } from './encrypted-text';
 
 // organization MUST be defined first because user.organization_id references it.
@@ -17,6 +17,9 @@ export const user = pgTable('user', {
   emailVerified: boolean('email_verified').notNull().default(false),
   name: text('name'),
   image: text('image'),
+  // The user's "home" / default organization. Each user is auto-enrolled
+  // here at signup. Multi-tenancy: a user can belong to additional orgs via
+  // the `member` table; the active org is tracked on `session`.
   organizationId: uuid('organization_id')
     .notNull()
     .references(() => organization.id),
@@ -33,6 +36,12 @@ export const session = pgTable('session', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
+  // Set by Better Auth's organization plugin when the user switches orgs.
+  // Null means "use the user's home org (user.organization_id)."
+  activeOrganizationId: uuid('active_organization_id').references(
+    () => organization.id,
+    { onDelete: 'set null' },
+  ),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -62,3 +71,48 @@ export const verification = pgTable('verification', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Better Auth `organization` plugin: a user can be a member of N orgs.
+// `role` is plugin-defined (default values: owner / admin / member).
+export const member = pgTable(
+  'member',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().default('member'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgUserUniq: uniqueIndex('member_org_user_uniq').on(t.organizationId, t.userId),
+    userIdx: index('member_user_idx').on(t.userId),
+  }),
+);
+
+// Better Auth `organization` plugin: pending email invitations to join an org.
+export const invitation = pgTable(
+  'invitation',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    role: text('role').notNull().default('member'),
+    status: text('status', { enum: ['pending', 'accepted', 'rejected', 'canceled'] })
+      .notNull()
+      .default('pending'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    inviterId: uuid('inviter_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+  },
+  (t) => ({
+    orgEmailIdx: index('invitation_org_email_idx').on(t.organizationId, t.email),
+    statusIdx: index('invitation_status_idx').on(t.status, t.expiresAt),
+  }),
+);

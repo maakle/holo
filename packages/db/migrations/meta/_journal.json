@@ -134,6 +134,13 @@
       "when": 1777682362224,
       "tag": "0018_per_user_oauth",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1777800000000,
+      "tag": "0019_organizations_multi_tenancy",
+      "breakpoints": true
     }
   ]
 }
