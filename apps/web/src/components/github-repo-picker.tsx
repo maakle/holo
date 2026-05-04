@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { notifySyncTriggered } from '@/lib/sync-events';
 
@@ -22,6 +23,7 @@ export function GithubRepoPicker() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,7 +102,26 @@ export function GithubRepoPicker() {
 
   return (
     <div className="mt-3 rounded-md border border-border bg-bg">
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-2/40"
+      >
+        {expanded ? (
+          <ChevronDown className="h-4 w-4 text-text-muted" aria-hidden />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-text-muted" aria-hidden />
+        )}
+        <span className="flex-1 text-[13px] font-medium text-text">
+          {expanded ? 'Hide repository list' : 'Show repository list'}
+        </span>
+        <span className="text-[12px] text-text-muted">
+          {selected.size} / {repos.length} selected
+        </span>
+      </button>
+      {!expanded ? null : (
+      <>
+      <div className="flex items-center gap-2 border-y border-border px-3 py-2">
         <input
           type="text"
           value={filter}
@@ -108,9 +129,6 @@ export function GithubRepoPicker() {
           placeholder="Filter repos…"
           className="flex-1 rounded-md border border-border bg-bg px-2 py-1 text-[12px] text-text placeholder:text-text-subtle focus:outline-hidden focus:focus-ring"
         />
-        <span className="text-[12px] text-text-muted">
-          {selected.size} / {repos.length} selected
-        </span>
       </div>
       <div className="max-h-72 overflow-y-auto">
         {filtered.length === 0 ? (
@@ -160,6 +178,8 @@ export function GithubRepoPicker() {
           {saving ? 'Saving…' : 'Save selection'}
         </Button>
       </div>
+      </>
+      )}
     </div>
   );
 }
