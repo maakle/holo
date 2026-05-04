@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
@@ -92,7 +92,40 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({ running, lastSyncedAt, lastStatus });
+    // Embed queue depth scoped to this org's sources for this provider.
+    let embedQueued = 0;
+    if (sourceIds.size > 0) {
+      const embed = getQueueByName('embed');
+      const jobs = await embed.getJobs(['waiting', 'active', 'delayed']);
+      for (const j of jobs) {
+        const payload = j.data as { organizationId?: string } | undefined;
+        if (payload?.organizationId === orgId) embedQueued += 1;
+      }
+    }
+
+    // Number of chunks already indexed for this provider's sources in this org.
+    let chunksIndexed = 0;
+    if (sourceIds.size > 0) {
+      const rows = await db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(schema.chunks)
+        .where(
+          and(
+            eq(schema.chunks.organizationId, orgId),
+            eq(schema.chunks.provider, provider),
+            inArray(schema.chunks.sourceId, [...sourceIds]),
+          ),
+        );
+      chunksIndexed = rows[0]?.c ?? 0;
+    }
+
+    return NextResponse.json({
+      running,
+      lastSyncedAt,
+      lastStatus,
+      embedQueued,
+      chunksIndexed,
+    });
   } catch (e) {
     if (e instanceof HoloError) {
       return NextResponse.json({ problem: e.problem, fix: e.fix }, { status: 400 });

@@ -11,7 +11,13 @@ interface Props {
   initialLastSyncedAt: string | null;
 }
 
-type Status = { running: boolean; lastSyncedAt: string | null; lastStatus: string | null };
+type Status = {
+  running: boolean;
+  lastSyncedAt: string | null;
+  lastStatus: string | null;
+  embedQueued: number;
+  chunksIndexed: number;
+};
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -21,6 +27,8 @@ export function SyncStatusBadge({ provider, initialLastSyncedAt }: Props) {
     running: false,
     lastSyncedAt: initialLastSyncedAt,
     lastStatus: null,
+    embedQueued: 0,
+    chunksIndexed: 0,
   });
   const cancelledRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,10 +92,15 @@ export function SyncStatusBadge({ provider, initialLastSyncedAt }: Props) {
 
   if (!status.running) return null;
 
+  const counter =
+    status.embedQueued > 0
+      ? `${status.chunksIndexed.toLocaleString()} indexed · ${status.embedQueued.toLocaleString()} queued`
+      : `${status.chunksIndexed.toLocaleString()} indexed`;
+
   return (
     <Badge variant="neutral" className="gap-1.5">
       <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-      Syncing…
+      Syncing… <span className="text-text-muted/80">{counter}</span>
     </Badge>
   );
 }
