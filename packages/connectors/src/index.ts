@@ -64,3 +64,9 @@ export {
   __clearGithubAppTokenCacheForTests,
 } from './github/auth';
 export type { GithubAppConfig } from './github/auth';
+export {
+  verifyGithubWebhookSignature,
+  isHandledEvent,
+  GITHUB_WEBHOOK_EVENTS,
+} from './github/webhook';
+export type { GithubWebhookEvent, VerifyResult } from './github/webhook';
