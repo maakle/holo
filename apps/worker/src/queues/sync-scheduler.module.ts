@@ -5,6 +5,7 @@ import { SlackSyncModule } from './slack';
 import { NotionSyncModule } from './notion';
 import { GrainSyncModule } from './grain';
 import { PylonSyncModule } from './pylon';
+import { HubspotSyncModule } from './hubspot';
 import { SyncSchedulerService } from './sync-scheduler.service';
 
 @Module({
@@ -15,6 +16,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
     NotionSyncModule,
     GrainSyncModule,
     PylonSyncModule,
+    HubspotSyncModule,
   ],
   providers: [SyncSchedulerService],
 })

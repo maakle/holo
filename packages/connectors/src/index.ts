@@ -18,6 +18,23 @@ export { createPylonConnector } from './pylon/index';
 export type { PylonConnectorOptions } from './pylon/index';
 export { createHubspotConnector } from './hubspot/index';
 export type { HubspotConnectorOptions } from './hubspot/index';
+export { runHubspotSync } from './hubspot/sync';
+export type {
+  RunHubspotSyncInput,
+  RunHubspotSyncOutput,
+  HubspotChunkPayload,
+  HubspotChunkKind,
+  HubspotEmbedEnqueueFn,
+  HubspotCursor,
+} from './hubspot/sync';
+export { createHubspotApiClient } from './hubspot/api-client';
+export type {
+  HubspotApiClient,
+  HubspotRecord,
+  HubspotEngagement,
+  HubspotObjectType,
+  HubspotListPage,
+} from './hubspot/api-client';
 
 // Underlying sync engines + API clients (used by the worker to bypass the
 // connector facade for github, where prose and code dispatch on different queues).

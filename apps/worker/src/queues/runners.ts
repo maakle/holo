@@ -21,11 +21,13 @@ import {
   createGithubApiClient,
   createGrainConnector,
   createPylonConnector,
+  createHubspotConnector,
   resolveAllowlist,
   runGithubProseSync,
   runGithubCodeSync,
   type GithubProseEmbedEnqueueFn,
   type GithubCodeEmbedEnqueueFn,
+  type HubspotEmbedEnqueueFn,
 } from '@holo/connectors';
 import type { SyncRunner, SyncResult } from './sync-dispatch';
 import type { SyncJobPayload, SyncCursor } from './types';
@@ -41,7 +43,7 @@ export type RunnerDeps = {
 async function loadConnectorToken(
   db: DB,
   organizationId: string,
-  provider: 'github' | 'slack' | 'notion' | 'grain' | 'pylon',
+  provider: 'github' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot',
 ): Promise<string> {
   const rows = await db
     .select({ accessToken: schema.connectorCredentials.accessToken })
@@ -304,6 +306,39 @@ export function createPylonRunner(deps: RunnerDeps): SyncRunner {
       const connector = createPylonConnector({ apiKey, db: deps.db, enqueueEmbed });
       const result = await connector.incrementalSync(
         { accessToken: apiKey },
+        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
+      );
+      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
+    },
+  };
+}
+
+// ── HubSpot ──────────────────────────────────────────────────────────────────
+export function createHubspotRunner(deps: RunnerDeps): SyncRunner {
+  const enqueueEmbed: HubspotEmbedEnqueueFn = makeEnqueueEmbed(deps.embedQueue);
+  const buildConnector = (): ReturnType<typeof createHubspotConnector> =>
+    createHubspotConnector({
+      // OAuth client credentials are only needed for buildAuthorizeUrl/exchange/refresh,
+      // which the worker never invokes. Worker-side we only need db + enqueueEmbed.
+      clientId: process.env.HUBSPOT_CONNECTOR_CLIENT_ID ?? '',
+      clientSecret: process.env.HUBSPOT_CONNECTOR_CLIENT_SECRET ?? '',
+      db: deps.db,
+      enqueueEmbed,
+    });
+
+  return {
+    async full(payload: SyncJobPayload): Promise<SyncResult> {
+      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'hubspot');
+      const result = await buildConnector().fullSync(
+        { accessToken },
+        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
+      );
+      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
+    },
+    async incremental(payload: SyncJobPayload): Promise<SyncResult> {
+      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'hubspot');
+      const result = await buildConnector().incrementalSync(
+        { accessToken },
         { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
       );
       return { artifactCount: result.artifactCount, newCursor: result.newCursor };

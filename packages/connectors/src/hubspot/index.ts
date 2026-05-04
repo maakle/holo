@@ -1,4 +1,11 @@
 import { holoError, ErrorCode } from '@holo/errors';
+import type { DB } from '@holo/db';
+import { createHubspotApiClient } from './api-client';
+import {
+  runHubspotSync,
+  type HubspotCursor,
+  type HubspotEmbedEnqueueFn,
+} from './sync';
 import type {
   Connector,
   ConnectorTokens,
@@ -13,15 +20,16 @@ import type {
 } from '../contract';
 
 /**
- * HubSpot OAuth scopes for v0.0 — read-only across the three CRM objects we
- * care about. Tighten or broaden via env in a follow-up if a customer needs
- * line items, tickets, etc.
+ * HubSpot OAuth scopes — read-only across the three CRM objects plus the
+ * engagement timelines (notes/calls/emails/meetings/tasks) we ingest as
+ * separate chunks per record.
  */
 const HUBSPOT_SCOPES = [
   'oauth',
   'crm.objects.contacts.read',
   'crm.objects.deals.read',
   'crm.objects.companies.read',
+  'sales-email-read',
 ];
 
 const AUTHORIZE_URL = 'https://app.hubspot.com/oauth/authorize';
@@ -34,6 +42,9 @@ export interface HubspotConnectorOptions {
   fetchImpl?: typeof fetch;
   /** Override scopes if a downstream install needs additional surface area. */
   scopes?: string[];
+  /** Required when the worker invokes fullSync/incrementalSync. */
+  db?: DB;
+  enqueueEmbed?: HubspotEmbedEnqueueFn;
 }
 
 interface HubspotTokenResponse {
@@ -162,25 +173,47 @@ export function createHubspotConnector(opts: HubspotConnectorOptions): Connector
       };
     },
 
-    // Sync engine lands in a follow-up. The worker queue (`apps/worker/src/queues/hubspot.ts`)
-    // will call into a `runHubspotSync` similar to Pylon's pattern (paginated REST over
-    // contacts / deals / companies, content-hash dedup, embed enqueue). For v0.0 we ship
-    // OAuth round-trip + token storage only — `/connections` flips to "Connected ✓" but
-    // search returns nothing from HubSpot until ingestion lands.
-    async fullSync(_tokens, _ctx: SyncContext): Promise<SyncResult> {
-      throw holoError({
-        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
-        problem: 'HubSpot fullSync is not yet implemented',
-        fix: 'OAuth round-trip works in v0.0; ingestion lands in a follow-up PR.',
+    async fullSync(tokens: ConnectorTokens, ctx: SyncContext): Promise<SyncResult> {
+      if (!opts.db || !opts.enqueueEmbed) {
+        throw holoError({
+          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+          problem: 'HubSpot fullSync requires db and enqueueEmbed',
+          fix: 'Pass db and enqueueEmbed when calling createHubspotConnector().',
+        });
+      }
+      const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
+      const result = await runHubspotSync({
+        client: createHubspotApiClient(tokens.accessToken, fetchImpl),
+        cursor: {},
+        organizationId: ctx.organizationId,
+        sourceId: ctx.sourceId,
+        existingHashes,
+        enqueueEmbed: opts.enqueueEmbed,
       });
+      await persistHubspotCursor(opts.db, ctx.organizationId, ctx.sourceId, result.newCursor);
+      return { artifactCount: result.artifactCount, newCursor: new Date() };
     },
 
-    async incrementalSync(_tokens, _ctx: SyncContext): Promise<SyncResult> {
-      throw holoError({
-        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
-        problem: 'HubSpot incrementalSync is not yet implemented',
-        fix: 'OAuth round-trip works in v0.0; ingestion lands in a follow-up PR.',
+    async incrementalSync(tokens: ConnectorTokens, ctx: SyncContext): Promise<SyncResult> {
+      if (!opts.db || !opts.enqueueEmbed) {
+        throw holoError({
+          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+          problem: 'HubSpot incrementalSync requires db and enqueueEmbed',
+          fix: 'Pass db and enqueueEmbed when calling createHubspotConnector().',
+        });
+      }
+      const cursor = await loadHubspotCursor(opts.db, ctx.sourceId);
+      const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
+      const result = await runHubspotSync({
+        client: createHubspotApiClient(tokens.accessToken, fetchImpl),
+        cursor,
+        organizationId: ctx.organizationId,
+        sourceId: ctx.sourceId,
+        existingHashes,
+        enqueueEmbed: opts.enqueueEmbed,
       });
+      await persistHubspotCursor(opts.db, ctx.organizationId, ctx.sourceId, result.newCursor);
+      return { artifactCount: result.artifactCount, newCursor: new Date() };
     },
 
     verifyWebhook(_env: WebhookEnvelope, _secret: string): boolean {
@@ -199,4 +232,47 @@ export function createHubspotConnector(opts: HubspotConnectorOptions): Connector
       });
     },
   };
+}
+
+async function loadHubspotCursor(db: DB, sourceId: string): Promise<HubspotCursor> {
+  const { schema } = await import('@holo/db');
+  const { eq, and } = await import('drizzle-orm');
+  const rows = await db
+    .select({ metadata: schema.connectorCursors.metadata })
+    .from(schema.connectorCursors)
+    .where(and(eq(schema.connectorCursors.sourceId, sourceId), eq(schema.connectorCursors.scope, 'sync')))
+    .limit(1);
+  const meta = (rows[0]?.metadata ?? {}) as Record<string, unknown>;
+  const out: HubspotCursor = {};
+  if (typeof meta['contacts'] === 'string') out.contacts = meta['contacts'] as string;
+  if (typeof meta['deals'] === 'string') out.deals = meta['deals'] as string;
+  if (typeof meta['companies'] === 'string') out.companies = meta['companies'] as string;
+  return out;
+}
+
+async function persistHubspotCursor(
+  db: DB,
+  organizationId: string,
+  sourceId: string,
+  cursor: HubspotCursor,
+): Promise<void> {
+  const { sql } = await import('drizzle-orm');
+  await db.execute(sql`
+    INSERT INTO connector_cursors (organization_id, source_id, scope, metadata, last_run_at, last_status)
+    VALUES (${organizationId}, ${sourceId}, 'sync', ${JSON.stringify(cursor)}::jsonb, now(), 'ok')
+    ON CONFLICT (source_id, scope) DO UPDATE SET
+      metadata = EXCLUDED.metadata,
+      last_run_at = now(),
+      last_status = 'ok'
+  `);
+}
+
+async function loadExistingHashes(db: DB, organizationId: string): Promise<Set<string>> {
+  const { schema } = await import('@holo/db');
+  const { eq } = await import('drizzle-orm');
+  const rows = await db
+    .select({ contentHash: schema.chunks.contentHash })
+    .from(schema.chunks)
+    .where(eq(schema.chunks.organizationId, organizationId));
+  return new Set(rows.map((r) => r.contentHash));
 }
