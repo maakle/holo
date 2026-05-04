@@ -9,7 +9,8 @@
  * The worker calls `loadGithubInstallationToken` on every sync. The actual
  * key parsing and HTTP call happen once per cache window.
  */
-import { SignJWT, importPKCS8 } from 'jose';
+import { SignJWT } from 'jose';
+import { createPrivateKey, type KeyObject } from 'node:crypto';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
@@ -41,8 +42,28 @@ export function __clearGithubAppTokenCacheForTests(): void {
   tokenCache.clear();
 }
 
+function loadPrivateKey(pem: string): KeyObject {
+  // GitHub-issued App private keys are PKCS#1 PEM
+  // (`-----BEGIN RSA PRIVATE KEY-----`). jose's importPKCS8 only accepts
+  // PKCS#8 (`-----BEGIN PRIVATE KEY-----`). Node's createPrivateKey detects
+  // both formats and returns a KeyObject — jose's SignJWT.sign accepts that
+  // KeyObject directly, so we don't need to detect or convert ourselves.
+  try {
+    return createPrivateKey({ key: pem, format: 'pem' });
+  } catch (cause) {
+    throw holoError({
+      code: ErrorCode.HOLO_ENV_INVALID,
+      problem: 'GITHUB_APP_PRIVATE_KEY_B64 does not decode to a valid RSA private key',
+      cause: String(cause),
+      fix:
+        'Re-download the .pem from your GitHub App settings, base64 it with ' +
+        '`base64 -i key.pem | tr -d \'\\n\'`, and replace GITHUB_APP_PRIVATE_KEY_B64.',
+    });
+  }
+}
+
 async function signAppJwt(config: GithubAppConfig): Promise<string> {
-  const key = await importPKCS8(config.privateKeyPem, 'RS256');
+  const key = loadPrivateKey(config.privateKeyPem);
   const now = Math.floor(Date.now() / 1000);
   return new SignJWT({})
     .setProtectedHeader({ alg: 'RS256' })
