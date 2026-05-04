@@ -73,6 +73,8 @@ export function SyncHistoryPanel({ provider }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
     async function run(): Promise<void> {
       try {
         const res = await fetch(`/api/connectors/${provider}/runs`, { cache: 'no-store' });
@@ -86,18 +88,30 @@ export function SyncHistoryPanel({ provider }: Props) {
           setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
           return;
         }
-        setRuns(body.runs ?? []);
+        const list = body.runs ?? [];
+        setRuns(list);
         setError(null);
+        // Keep polling while anything is in flight so worker-side completions
+        // surface without the user clicking Refresh. Stop once everything
+        // settles to avoid background traffic.
+        const inFlight = list.some((r) => r.state === 'active' || r.state === 'waiting');
+        if (inFlight && !cancelled) {
+          timeout = setTimeout(() => {
+            if (!cancelled) void run();
+          }, 4000);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
+
     void run();
     const off = onSyncTriggered(provider, () => {
       void run();
     });
     return () => {
       cancelled = true;
+      if (timeout) clearTimeout(timeout);
       off();
     };
   }, [provider]);
