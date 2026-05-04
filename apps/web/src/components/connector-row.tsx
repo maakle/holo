@@ -1,7 +1,5 @@
 'use client';
 import { useState } from 'react';
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { MoreHorizontal } from 'lucide-react';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,17 +9,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { GithubRepoPicker } from '@/components/github-repo-picker';
 import { SyncStatusBadge } from '@/components/sync-status-badge';
-import { SyncHistoryPanel } from '@/components/sync-history-panel';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import { notifySyncTriggered } from '@/lib/sync-events';
+import { ConnectorManageSheet } from '@/components/connector-manage-sheet';
 
 interface AllowlistEntry {
   pattern: string;
@@ -68,11 +57,11 @@ export function ConnectorRow({
 }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [showApiKeyForm, setShowApiKeyForm] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
-  const [showRepos, setShowRepos] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [showManage, setShowManage] = useState(false);
+
+  const isApiKey = meta.flowType === 'apikey';
+  const showApiKeyForm = isApiKey && status === 'disconnected';
 
   async function connect() {
     setBusy(true);
@@ -121,58 +110,6 @@ export function ConnectorRow({
       setBusy(false);
     }
   }
-
-  async function syncNow() {
-    setBusy(true);
-    setError(null);
-    setSyncMessage(null);
-    try {
-      const res = await fetch(`/api/connectors/${meta.id}/resync`, { method: 'POST' });
-      const body = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        queues?: string[];
-        fix?: string;
-        problem?: string;
-      };
-      if (!res.ok) {
-        setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
-        return;
-      }
-      setSyncMessage(`Sync enqueued (${(body.queues ?? []).join(', ') || 'no queues'}).`);
-      notifySyncTriggered(meta.id);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function disconnect() {
-    const ok = window.confirm(
-      `Disconnect ${meta.displayName}? This revokes your access token. ` +
-        `If no other users have it connected, indexed data and the repo allowlist will also be removed.`,
-    );
-    if (!ok) return;
-    setBusy(true);
-    setError(null);
-    setSyncMessage(null);
-    try {
-      const res = await fetch(`/api/connectors/${meta.id}/connection`, { method: 'DELETE' });
-      const body = (await res.json().catch(() => ({}))) as {
-        fix?: string;
-        problem?: string;
-      };
-      if (!res.ok) {
-        setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
-        return;
-      }
-      window.location.reload();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const isApiKey = meta.flowType === 'apikey';
-  const showForm = isApiKey && (status === 'disconnected' || showApiKeyForm);
-  const isGithub = meta.id === 'github';
 
   return (
     <div className="flex flex-col gap-3 px-5 py-4 transition-colors duration-micro hover:bg-surface-2/40">
@@ -226,10 +163,7 @@ export function ConnectorRow({
             </TooltipProvider>
           ) : null}
           {error ? <p className="mt-2 text-[12px] text-error">{error}</p> : null}
-          {syncMessage ? (
-            <p className="mt-2 text-[12px] text-text-muted">{syncMessage}</p>
-          ) : null}
-          {showForm ? (
+          {showApiKeyForm ? (
             <form onSubmit={saveApiKey} className="mt-3 flex items-center gap-2">
               <input
                 type="password"
@@ -243,110 +177,36 @@ export function ConnectorRow({
               <Button type="submit" variant="secondary" size="sm" disabled={busy || !tokenInput.trim()}>
                 Save
               </Button>
-              {status === 'connected' ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowApiKeyForm(false);
-                    setError(null);
-                    setTokenInput('');
-                  }}
-                >
-                  Cancel
-                </Button>
-              ) : null}
             </form>
           ) : null}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 pt-0.5">
-          {status === 'connected' && isGithub ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowRepos((v) => !v)}
-              disabled={busy}
-            >
-              {showRepos ? 'Hide repos' : 'Manage repos'}
-            </Button>
-          ) : null}
+        <div className="flex shrink-0 items-center justify-end gap-2 pt-0.5">
           {status === 'disconnected' && !isApiKey ? (
             <Button variant="primary" size="sm" onClick={connect} disabled={busy}>
               Connect
             </Button>
           ) : null}
           {status === 'connected' ? (
-            <DropdownMenu.Root>
-              <DropdownMenu.Trigger asChild>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  aria-label={`${meta.displayName} actions`}
-                  disabled={busy}
-                >
-                  <MoreHorizontal aria-hidden className="h-4 w-4" />
-                </Button>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Portal>
-                <DropdownMenu.Content
-                  align="end"
-                  sideOffset={4}
-                  className="z-50 min-w-[160px] overflow-hidden rounded-md border border-border bg-surface p-1 text-[13px] shadow-md"
-                >
-                  <DropdownMenu.Item
-                    onSelect={() => void syncNow()}
-                    className="cursor-pointer rounded-sm px-2 py-1.5 text-text outline-none hover:bg-surface-2 focus:bg-surface-2"
-                  >
-                    Sync now
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item
-                    onSelect={() => setShowHistory(true)}
-                    className="cursor-pointer rounded-sm px-2 py-1.5 text-text outline-none hover:bg-surface-2 focus:bg-surface-2"
-                  >
-                    Sync history
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item
-                    onSelect={() => {
-                      if (isApiKey) {
-                        setShowApiKeyForm(true);
-                        setError(null);
-                      } else {
-                        void connect();
-                      }
-                    }}
-                    className="cursor-pointer rounded-sm px-2 py-1.5 text-text outline-none hover:bg-surface-2 focus:bg-surface-2"
-                  >
-                    Reconnect
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Separator className="my-1 h-px bg-border" />
-                  <DropdownMenu.Item
-                    onSelect={() => void disconnect()}
-                    className="cursor-pointer rounded-sm px-2 py-1.5 text-error outline-none hover:bg-surface-2 focus:bg-surface-2"
-                  >
-                    Disconnect
-                  </DropdownMenu.Item>
-                </DropdownMenu.Content>
-              </DropdownMenu.Portal>
-            </DropdownMenu.Root>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowManage(true)}
+              disabled={busy}
+            >
+              Manage
+            </Button>
           ) : null}
         </div>
       </div>
-      {isGithub && status === 'connected' && showRepos ? <GithubRepoPicker /> : null}
       {status === 'connected' ? (
-        <Sheet open={showHistory} onOpenChange={setShowHistory}>
-          <SheetContent side="right" className="w-full sm:max-w-xl">
-            <SheetHeader>
-              <SheetTitle>{meta.displayName} · Sync history</SheetTitle>
-              <SheetDescription>
-                Recent sync runs from BullMQ, scoped to your organization.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="overflow-y-auto px-5 py-4">
-              {showHistory ? <SyncHistoryPanel provider={meta.id} /> : null}
-            </div>
-          </SheetContent>
-        </Sheet>
+        <ConnectorManageSheet
+          meta={meta}
+          open={showManage}
+          onOpenChange={setShowManage}
+          connectedAs={connectedAs}
+          lastSyncedAt={lastSyncedAt ?? null}
+          lastSyncStatus={lastSyncStatus ?? null}
+        />
       ) : null}
     </div>
   );
