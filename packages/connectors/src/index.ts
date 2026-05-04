@@ -55,3 +55,11 @@ export type {
 } from './github/sync-code';
 export { createGithubApiClient } from './github/api-client';
 export type { GithubApiClient } from './github/api-client';
+export {
+  loadGithubInstallationToken,
+  mintInstallationToken,
+  mintAppJwt,
+  githubAppConfigFromEnv,
+  __clearGithubAppTokenCacheForTests,
+} from './github/auth';
+export type { GithubAppConfig } from './github/auth';

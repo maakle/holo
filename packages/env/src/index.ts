@@ -11,6 +11,12 @@ const EnvSchema = z.object({
   GITHUB_LOGIN_CLIENT_SECRET: z.string().min(1),
   GITHUB_CONNECTOR_CLIENT_ID: z.string().min(1),
   GITHUB_CONNECTOR_CLIENT_SECRET: z.string().min(1),
+  // GitHub App credentials replace the OAuth-app connector flow. Required
+  // only after the app is registered; optional during the migration window.
+  GITHUB_APP_ID: z.string().min(1).optional(),
+  GITHUB_APP_SLUG: z.string().min(1).optional(),
+  GITHUB_APP_PRIVATE_KEY_B64: z.string().min(40).optional(),
+  GITHUB_APP_WEBHOOK_SECRET: z.string().min(16).optional(),
   SLACK_CONNECTOR_CLIENT_ID: z.string().optional(),
   SLACK_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   GRAIN_CONNECTOR_CLIENT_ID: z.string().optional(),
