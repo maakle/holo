@@ -43,14 +43,17 @@ function redactSecrets(s: string): string {
     .replace(/xox[abpsr]-[A-Za-z0-9-]{10,}/g, '<redacted-token>');
 }
 
-function extractFix(reason: string | undefined): { problem: string | null; fix: string | null } {
+function extractFailureParts(reason: string | undefined): {
+  problem: string | null;
+  fix: string | null;
+} {
   if (!reason) return { problem: null, fix: null };
   const safe = redactSecrets(reason);
-  // HoloError serializes as `${code}: ${problem} (fix: ${fix})` from holoError()
-  const fixMatch = safe.match(/\(fix:\s*([^)]+)\)\s*$/);
-  const fix = fixMatch?.[1]?.trim() ?? null;
-  const problem = fix ? safe.replace(/\s*\(fix:[^)]+\)\s*$/, '').trim() : safe;
-  return { problem, fix };
+  // HoloError shape: `${code}: ${problem}`. The fix and cause fields aren't
+  // serialized into the message — operators get those via the worker's
+  // failure logger, which prints the full HoloError block to the terminal.
+  // The dashboard intentionally shows only the user-actionable problem line.
+  return { problem: safe, fix: null };
 }
 
 export async function GET(
@@ -99,7 +102,7 @@ export async function GET(
         const enqueuedAt = maybeNumber(j.timestamp);
         const returnVal = (j.returnvalue ?? null) as { artifactCount?: number } | null;
         const reason = (j.failedReason ?? undefined) as string | undefined;
-        const { problem, fix } = extractFix(reason);
+        const { problem, fix } = extractFailureParts(reason);
 
         let state: RunRow['state'];
         if (finishedOn && !reason) state = 'completed';

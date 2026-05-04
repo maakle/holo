@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import postgres, { type Sql } from 'postgres';
-import { holoError, ErrorCode } from '@holo/errors';
+import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { runSyncJob, type SyncResult } from './sync-dispatch';
 import { getSyncRunner } from './sync-runner-registry';
 import {
@@ -54,17 +54,32 @@ export abstract class SyncProcessorBase extends WorkerHost {
   protected abstract readonly queueName: QueueName;
 
   async process(job: Job<SyncJobPayload>): Promise<SyncResult> {
-    const result = await runSyncJob({
-      queue: this.queueName,
-      jobId: job.id ?? `unidentified-${Date.now()}`,
-      payload: job.data,
-      runner: getSyncRunner(this.queueName),
-      cursorStore: getCursorStore(),
-      checkpointStore: getCheckpointStore(),
-    });
-    this.logger.log(
-      `synced sourceId=${job.data.sourceId} queue=${this.queueName} artifacts=${result.artifactCount}`,
-    );
-    return result;
+    const jobId = job.id ?? `unidentified-${Date.now()}`;
+    const ctx = `sourceId=${job.data.sourceId} queue=${this.queueName} jobId=${jobId}`;
+    try {
+      const result = await runSyncJob({
+        queue: this.queueName,
+        jobId,
+        payload: job.data,
+        runner: getSyncRunner(this.queueName),
+        cursorStore: getCursorStore(),
+        checkpointStore: getCheckpointStore(),
+      });
+      this.logger.log(`synced ${ctx} artifacts=${result.artifactCount}`);
+      return result;
+    } catch (err) {
+      // Surface failures in the worker terminal with full HoloError context
+      // (code + problem + cause + fix). Without this, BullMQ would swallow the
+      // detail and the only place to see anything was the sync-history UI,
+      // which previously also stripped the cause.
+      if (err instanceof HoloError) {
+        this.logger.error(
+          `failed ${ctx} code=${err.code}\n  problem: ${err.problem}\n  cause:   ${err.cause ?? '<none>'}\n  fix:     ${err.fix}`,
+        );
+      } else {
+        this.logger.error(`failed ${ctx} ${(err as Error).stack ?? String(err)}`);
+      }
+      throw err;
+    }
   }
 }
