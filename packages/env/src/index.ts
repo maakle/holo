@@ -7,6 +7,7 @@ const EnvSchema = z.object({
   HOLO_TOKEN_ENCRYPTION_KEY: z.string().min(40),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
+  AUTH_TRUSTED_ORIGINS: z.string().optional(),
   GITHUB_LOGIN_CLIENT_ID: z.string().min(1),
   GITHUB_LOGIN_CLIENT_SECRET: z.string().min(1),
   // GitHub App credentials replace the OAuth-app connector flow.

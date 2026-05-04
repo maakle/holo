@@ -13,6 +13,7 @@ export interface CreateAuthOpts {
     Env,
     | 'BETTER_AUTH_SECRET'
     | 'BETTER_AUTH_URL'
+    | 'AUTH_TRUSTED_ORIGINS'
     | 'GITHUB_LOGIN_CLIENT_ID'
     | 'GITHUB_LOGIN_CLIENT_SECRET'
     | 'EMAIL_PROVIDER'
@@ -111,6 +112,7 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
     }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
+    trustedOrigins: parseTrustedOrigins(env.BETTER_AUTH_URL, env.AUTH_TRUSTED_ORIGINS),
     logger: { level: 'debug' },
     advanced: {
       database: {
@@ -203,3 +205,14 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
 }
 
 export type Auth = ReturnType<typeof createAuth>;
+
+function parseTrustedOrigins(baseUrl: string, extra: string | undefined): string[] {
+  const origins = new Set<string>([baseUrl]);
+  if (extra) {
+    for (const raw of extra.split(',')) {
+      const o = raw.trim();
+      if (o) origins.add(o);
+    }
+  }
+  return [...origins];
+}
