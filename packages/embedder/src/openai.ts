@@ -9,6 +9,18 @@ export interface CreateOpenAiEmbedderOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
+// text-embedding-3-large accepts up to 8192 tokens per input.
+// Tokens are roughly 1 per 4 chars for English; we use a conservative 3 to
+// stay under the limit even for code-heavy content where tokens are denser.
+// 8192 * 3 ≈ 24576 chars. We pick 24000 to leave a small safety buffer.
+const OPENAI_EMBED_MAX_CHARS = 24000;
+
+function truncateForOpenAi(text: string): string {
+  return text.length > OPENAI_EMBED_MAX_CHARS
+    ? text.slice(0, OPENAI_EMBED_MAX_CHARS)
+    : text;
+}
+
 export function createOpenAiEmbedder(opts: CreateOpenAiEmbedderOptions): Embedder {
   // maxRetries: 0 disables the SDK's built-in retry; withBackoff handles our own.
   const client = new OpenAI({ apiKey: opts.apiKey, maxRetries: 0 });
@@ -17,8 +29,15 @@ export function createOpenAiEmbedder(opts: CreateOpenAiEmbedderOptions): Embedde
     dimensions: 1024,
     async embed(texts: string[]): Promise<number[][]> {
       if (texts.length === 0) return [];
+      // Truncate any input that would exceed the 8192-token limit. Without
+      // this a single oversized PR/issue body kills the whole batch with a
+      // 400 from OpenAI ("maximum input length is 8192 tokens"), and BullMQ
+      // retries the same batch indefinitely. Truncating produces a slightly
+      // less accurate embedding for the long ones, but that's strictly
+      // better than no embedding at all.
+      const truncated = texts.map(truncateForOpenAi);
       const out: number[][] = [];
-      for (const batch of chunkArray(texts, 100)) {
+      for (const batch of chunkArray(truncated, 100)) {
         const res = await withBackoff(
           () =>
             client.embeddings.create({
