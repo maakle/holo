@@ -48,11 +48,12 @@ export async function GET(
 
     let running = false;
     if (sourceIds.size > 0) {
-      // Check across all queues this provider feeds. Only count jobs whose
-      // payload.sourceId belongs to this org.
+      // Only count jobs that are actively executing or queued for immediate
+      // pickup. `delayed` jobs are scheduled for the future (e.g. the next 6h
+      // recurring tick) and shouldn't trigger the "Syncing…" indicator.
       for (const name of activeQueueNames(provider)) {
         const queue = getQueueByName(name);
-        const jobs = await queue.getJobs(['active', 'waiting', 'delayed']);
+        const jobs = await queue.getJobs(['active', 'waiting']);
         for (const j of jobs) {
           const payload = j.data as { sourceId?: string; organizationId?: string } | undefined;
           if (
@@ -92,11 +93,12 @@ export async function GET(
       }
     }
 
-    // Embed queue depth scoped to this org's sources for this provider.
+    // Embed queue depth scoped to this org. Only counts work waiting or in
+    // flight — not delayed retries.
     let embedQueued = 0;
     if (sourceIds.size > 0) {
       const embed = getQueueByName('embed');
-      const jobs = await embed.getJobs(['waiting', 'active', 'delayed']);
+      const jobs = await embed.getJobs(['waiting', 'active']);
       for (const j of jobs) {
         const payload = j.data as { organizationId?: string } | undefined;
         if (payload?.organizationId === orgId) embedQueued += 1;
