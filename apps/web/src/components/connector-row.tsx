@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/tooltip';
 import { GithubRepoPicker } from '@/components/github-repo-picker';
 import { SyncStatusBadge } from '@/components/sync-status-badge';
+import { SyncHistoryPanel } from '@/components/sync-history-panel';
 import { notifySyncTriggered } from '@/lib/sync-events';
 
 interface AllowlistEntry {
@@ -63,6 +64,7 @@ export function ConnectorRow({
   const [showApiKeyForm, setShowApiKeyForm] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [showRepos, setShowRepos] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   async function connect() {
@@ -292,6 +294,12 @@ export function ConnectorRow({
                     Sync now
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
+                    onSelect={() => setShowHistory((v) => !v)}
+                    className="cursor-pointer rounded-sm px-2 py-1.5 text-text outline-none hover:bg-surface-2 focus:bg-surface-2"
+                  >
+                    {showHistory ? 'Hide sync history' : 'Sync history'}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
                     onSelect={() => {
                       if (isApiKey) {
                         setShowApiKeyForm(true);
@@ -318,6 +326,7 @@ export function ConnectorRow({
         </div>
       </div>
       {isGithub && status === 'connected' && showRepos ? <GithubRepoPicker /> : null}
+      {status === 'connected' && showHistory ? <SyncHistoryPanel provider={meta.id} /> : null}
     </div>
   );
 }
