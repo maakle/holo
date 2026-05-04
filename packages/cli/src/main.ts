@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { registerAllowlistCommand } from './commands/allowlist.js';
+import { registerConnectCommand } from './commands/connect.js';
 import { registerSyncCommand } from './commands/sync.js';
 import { registerToolCommand } from './commands/tool.js';
 
@@ -14,6 +15,7 @@ export function buildProgram(): Command {
     .exitOverride();
 
   registerAllowlistCommand(program);
+  registerConnectCommand(program);
   registerSyncCommand(program);
   registerToolCommand(program);
 
