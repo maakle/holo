@@ -78,7 +78,7 @@ export function ConnectorRow({
         return;
       }
       if (body.authorizeUrl) {
-        window.location.href = body.authorizeUrl;
+        window.open(body.authorizeUrl, '_blank', 'noopener,noreferrer');
         return;
       }
       setError('unexpected response from initiate');
