@@ -9,7 +9,7 @@ Decision rationale: [0005-github-app-over-oauth.md](../decisions/0005-github-app
 
 ## Goal
 
-Replace the GitHub OAuth-App auth model with a GitHub-App + installation-tokens model, for durability, rate-limit headroom, and webhooks. Ship as a parallel flow first — both auth modes coexist — then deprecate OAuth.
+Replace the GitHub OAuth-App auth model with a GitHub App + installation-tokens model, for durability, rate-limit headroom, and webhooks. **Hard cutover** — no parallel flow, no feature flag. We don't have customer connections to migrate; existing dev OAuth installs are wiped clean.
 
 ## Non-goals
 
@@ -17,28 +17,26 @@ Replace the GitHub OAuth-App auth model with a GitHub-App + installation-tokens 
 - Replacing the connector port interface; we still satisfy `Connector<TConfig, TResource>`.
 - Building a marketplace listing for the App. We register a private GitHub App in our org; customers install via a direct URL.
 
+## Decisions locked in this iteration
+
+- **Webhook endpoint lives in `apps/web`**, not `apps/gateway`. Gateway is the MCP-first agent-facing surface ([ARCHITECTURE.md](../ARCHITECTURE.md)); inbound third-party HTTP (OAuth callbacks, webhooks) belongs alongside Next.js's other public routes.
+- **Hard delete OAuth.** No deprecation phase. Wipe existing OAuth credentials + sources for GitHub, drop the OAuth-flow code, ship the App flow as the only path.
+- **Permissions:** `Contents: Read`, `Issues: Read`, `Pull requests: Read`, `Metadata: Read`, `Members: Read`. Locked at App registration; adding any later requires every installation to re-authorize.
+
 ## Architecture changes
 
-### Auth flow
+### Auth flow (target)
 
-**OAuth (today):**
 ```
-user → /api/connectors/github/initiate
-     → github.com/login/oauth/authorize
-     → /api/connectors/github/callback (code → user-to-server token)
-     → connector_credentials.access_token (encrypted, long-lived)
-```
-
-**App (target):**
-```
-admin → /api/connectors/github/initiate?mode=app
-      → github.com/apps/holo/installations/new
+admin → /api/connectors/github/initiate
+      → github.com/apps/holo/installations/new?state=<jwt>
       → /api/connectors/github/install-callback (installation_id, setup_action=install|update)
       → github_installations.installation_id (no token stored)
 
 worker, on demand:
   installation_id + private_key → JWT → POST /app/installations/{id}/access_tokens
                                       → 1-hour token used for that single sync
+                                      → cached in-process for ~50 min
 ```
 
 The worker mints tokens just-in-time. We never persist them.
@@ -63,105 +61,114 @@ create table github_installations (
 );
 ```
 
-`sources` rows for App-installed connectors set `metadata.auth_mode = 'app'` and `metadata.installation_id = N`. OAuth-connected sources keep `metadata.auth_mode = 'oauth'` (or the field is absent — treat absence as oauth).
+`sources` rows for GitHub will carry `metadata.installation_id = N`. The `connector_credentials` table no longer holds GitHub rows after cutover.
 
 ### Token loading
 
 `packages/connectors/src/github/auth.ts` (new):
 
 ```ts
-export async function loadGithubToken(args: {
-  db: DB;
+export async function loadGithubInstallationToken(args: {
   organizationId: string;
-}): Promise<{ token: string; mode: 'oauth' | 'app' }>;
+  db: DB;
+}): Promise<string>;
 ```
 
-- App path: read installation row, mint a JWT with the App private key (`GITHUB_APP_PRIVATE_KEY`, RS256 signed), POST it to `/app/installations/{id}/access_tokens`, return the resulting `token`. Cache for ~50 min in-process.
-- OAuth path: existing `connectorCredentials.accessToken` decrypt.
-- The runners stop calling `loadConnectorToken` directly — they call `loadGithubToken` instead.
+- Look up `github_installations` row for the org.
+- Mint a JWT signed with `GITHUB_APP_PRIVATE_KEY` (RS256, ≤10 min expiry per GitHub spec).
+- POST it to `/app/installations/{id}/access_tokens`.
+- Cache result in-process keyed by `installation_id` with a 50-min TTL.
+- Throw a `HOLO_GITHUB_INSTALLATION_SUSPENDED` if the row's `suspended_at IS NOT NULL`.
+
+The worker's `loadConnectorToken(... 'github')` is replaced by this call.
 
 ### Webhook intake
 
-New endpoint: `POST /api/webhooks/github` in `apps/web` (or move to `apps/gateway` if we want to decouple webhook traffic from user-facing routes — TBD).
+New endpoint: `POST /api/webhooks/github` in `apps/web`.
 
-Verifies the `X-Hub-Signature-256` HMAC against `GITHUB_APP_WEBHOOK_SECRET`, dispatches by `X-GitHub-Event`:
+Verifies the `X-Hub-Signature-256` HMAC against `GITHUB_APP_WEBHOOK_SECRET` (read raw body before JSON parsing), dispatches by `X-GitHub-Event`:
 
 | Event | Action |
 |---|---|
 | `installation` (`created` / `deleted` / `suspend` / `unsuspend`) | Upsert / mark `suspended_at` on `github_installations` |
-| `installation_repositories` | Re-sync the repo allowlist for that installation |
-| `pull_request`, `pull_request_review`, `pull_request_review_comment` | Enqueue a partial prose-sync for that one PR |
-| `issues`, `issue_comment` | Enqueue a partial prose-sync for that one issue |
-| `push` to default branch | Enqueue a code-sync diff from the cursor SHA |
+| `installation_repositories` (`added` / `removed`) | Re-sync the repo allowlist for that installation |
+| `pull_request`, `pull_request_review`, `pull_request_review_comment` | v1: enqueue a generic incremental prose-sync. v2: fast-path single-PR re-index. |
+| `issues`, `issue_comment` | v1: enqueue a generic incremental prose-sync. v2: fast-path single-issue. |
+| `push` (default branch only) | Enqueue an incremental code-sync diff from the cursor SHA |
 
-Initial implementation can swallow the partial-sync ones and just bump a "last webhook seen" cursor — full event-driven sync is a v2 of this. The point of v1 is making the install/uninstall lifecycle work.
+v1 of this migration just makes the install/uninstall lifecycle work end-to-end. The per-resource fast paths are deferred — we keep the existing 6h scheduler so even if webhooks lag, nothing falls through.
 
-## Implementation steps
+## Implementation phases
 
-Each step is independently mergeable behind a feature flag (`HOLO_GITHUB_APP_ENABLED`) so OAuth keeps working throughout.
+Five phases. Each is independently mergeable.
 
-### Phase 1 — App registration + auth (no UI yet)
+### Phase 1 — App registration + auth helper + schema
 
-1. Register the GitHub App in the holo dev account. Permissions: `Contents: Read`, `Issues: Read`, `Pull requests: Read`, `Metadata: Read`, `Members: Read`. Webhook URL: `https://<our-host>/api/webhooks/github`. Subscribe to: `installation`, `installation_repositories`, `pull_request`, `issues`, `issue_comment`, `pull_request_review`, `push`.
-2. Save private key + webhook secret as deploy secrets (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_WEBHOOK_SECRET`). Add to `.env.example`.
-3. Create `packages/connectors/src/github/auth.ts` with `mintInstallationToken(installationId)`. Use `jsonwebtoken` for the JWT and our existing `fetch` wrapper for the POST. Cache tokens in-memory keyed by `installationId` with a 50-minute TTL.
-4. Migration: `0027_github_installations.sql` adding the table above.
-5. Unit tests for JWT minting, token-cache TTL, error handling on suspended installations.
+1. Register the GitHub App in the holo dev account. Set permissions, webhook URL `https://<dev-host>/api/webhooks/github`, subscribe to events listed above.
+2. Save `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_WEBHOOK_SECRET`, `GITHUB_APP_SLUG` as env vars. Update `packages/env/src/index.ts` and `.env.example`.
+3. Migration `0027_github_installations.sql` adding the table.
+4. `packages/connectors/src/github/auth.ts` with `loadGithubInstallationToken`. JWT via `jsonwebtoken`. Token cache in-memory, keyed on installation_id. Test seam for the cache.
+5. Unit tests: JWT signature shape, installation lookup, suspended-installation error, cache TTL behavior.
 
-### Phase 2 — Install flow
+### Phase 2 — Install flow + UI
 
-1. Update `/api/connectors/github/initiate` to accept `?mode=app` and return `authorizeUrl: 'https://github.com/apps/<slug>/installations/new?state=<jwt>'`. Existing `mode=oauth` (default) unchanged.
-2. New route: `/api/connectors/github/install-callback`. GitHub redirects here with `installation_id`, `setup_action`, and our `state`. Verify state, fetch installation metadata via `GET /app/installations/{id}`, upsert `github_installations`, upsert `sources` row with `metadata.auth_mode='app'`. Trigger initial sync.
-3. UI: in `connector-row.tsx`, when GitHub is unconnected and `HOLO_GITHUB_APP_ENABLED`, render two buttons — `Install GitHub App` (primary) and `Connect via OAuth` (secondary, will be removed later). Default the App path.
-4. Manage sheet: detect `auth_mode` from `sources.metadata`. App-mode rows show "Manage installation" linking to `https://github.com/installations/<id>` instead of "Reconnect".
+1. Update `/api/connectors/github/initiate`: return `authorizeUrl: 'https://github.com/apps/<slug>/installations/new?state=<jwt>'`. State JWT carries `user_id`, `organization_id`, `csrf_nonce` (same shape as today's OAuth state).
+2. New route `/api/connectors/github/install-callback`. Verify state, fetch installation metadata via `GET /app/installations/{id}` (using a JWT from our private key, since we don't have an installation token yet for that install), upsert `github_installations`, upsert `sources` row with `metadata.installation_id`, redirect to `/connections`.
+3. Delete the old `/api/connectors/github/callback`, `/api/connectors/github/repos` route's auth-via-`connector_credentials` (replace with installation-token auth), and the GitHub-specific OAuth code in `packages/connectors/src/github/index.ts` (`buildAuthorizeUrl` / `exchangeCode` / `refresh`).
+4. UI: `connector-row.tsx` GitHub button labels stay "Connect" / "Manage" but the underlying flow is App. Manage sheet's "Reconnect" becomes "Manage installation" linking to `https://github.com/installations/<id>`.
 
 ### Phase 3 — Worker uses installation tokens
 
-1. Update `apps/worker/src/queues/runners.ts`: `loadConnectorToken(... 'github')` becomes `loadGithubToken({db, organizationId})`. Worker doesn't need to know which mode — the helper picks based on the source's metadata.
-2. Update the clone URL builder to use `https://x-access-token:${token}@github.com/...` regardless of mode (the username is informational; it works for both OAuth and App tokens).
-3. End-to-end test: create a test installation against a fixture org, run a sync, verify chunks land. Tear down installation in test cleanup.
+1. `apps/worker/src/queues/runners.ts`: `loadConnectorToken(... 'github')` is replaced by a call to `loadGithubInstallationToken` (which reads `sources.metadata.installation_id`, looks up the row, mints the token).
+2. Clone URL: `https://x-access-token:${token}@github.com/...` works unchanged — the username is informational, GitHub accepts any username with a valid installation token.
+3. Update `packages/connectors/src/github/api-client.ts` to retry once on 401 by minting a fresh token (handles the rare race where the cached 50-min token expires mid-call). Today's 401 throws unconditionally.
+4. End-to-end test against a fixture installation.
 
 ### Phase 4 — Webhook intake
 
-1. New route in `apps/web/src/app/api/webhooks/github/route.ts`. Raw-body HMAC verification (use `req.text()` not `req.json()`).
-2. Handle `installation.created` / `installation.deleted` / `installation.suspend` / `installation.unsuspend` — upsert / soft-delete.
-3. Handle `installation_repositories.added` / `removed` — update allowlist for that installation.
-4. Stub PR/issue/push handlers — log and enqueue a generic incremental sync for now. Per-resource fast-path is v2.
+1. `apps/web/src/app/api/webhooks/github/route.ts`. Read raw body, HMAC-SHA256 verify, parse JSON.
+2. Handle `installation.*` and `installation_repositories.*` lifecycle events — upsert / soft-delete `github_installations` rows, update sources / allowlist.
+3. Stub PR/issue/push handlers — log + enqueue a generic incremental sync. Fast-path is v2.
+4. Tests: HMAC tampering, suspended installation, install/uninstall round-trip.
 
 ### Phase 5 — Disconnect path
 
-1. New `DELETE /api/connectors/github/connection?mode=app` calls `DELETE /app/installations/{id}` via the App JWT, then deletes the `github_installations` row and `sources` (with cascade to chunks). Existing OAuth-mode disconnect unchanged.
-2. Confirmation dialog mentions "this will uninstall the holo App from <org>" so the admin understands the effect on GitHub's side.
+1. `DELETE /api/connectors/github/connection`: mint App JWT, call `DELETE /app/installations/{id}` to uninstall on GitHub's side, then delete the `github_installations` row, `sources` row (cascade clears artifacts → chunks), and `connector_allowlists` rows for github.
+2. Confirmation dialog in the manage sheet says "uninstalls the holo App from <org>" so the admin understands GitHub-side effect.
 
-### Phase 6 — Deprecation
+## Pre-flight cleanup (before Phase 1 lands in dev)
 
-Conditional on Phase 1–5 being stable in production for ≥1 week of real-customer traffic.
+Run-once SQL on dev DB to wipe existing OAuth GitHub state cleanly:
 
-1. Default new connections to App-only. OAuth button moves behind a "legacy" disclosure.
-2. Notify existing OAuth-connected orgs in-product: "Re-install via GitHub App for better reliability."
-3. Drop OAuth flow, callbacks, and the now-unused user-to-server token paths in `connector_credentials`. Delete the `gho_*`-token regex from redactors (no longer needed).
+```sql
+delete from connector_credentials where provider = 'github';
+delete from connector_allowlists where provider = 'github';
+delete from sources where provider = 'github';
+-- chunks + artifacts cascade via FK
+```
 
-## Open questions
+Plus `redis-cli del bull:github-code-sync:* bull:github-prose-sync:*` to drop any in-flight jobs.
 
-1. **Where does the webhook endpoint live?** `apps/web` is simplest (Next.js route handler) but couples webhook traffic to the user-facing dyno. `apps/gateway` is purpose-built for inbound. **Lean: gateway**, decided in Phase 4.
-2. **Self-host docs.** The single biggest doc rewrite — every self-hoster registers their own App. Need a `docs/connectors/github-app-setup.md` with a manifest JSON and step-by-step. Out of scope for the code refactor; track separately.
-3. **Migration UX for existing OAuth connections.** Quietly "they'll see a banner" vs. forcing a re-install. **Lean: banner + soft re-prompt** for one cycle, then forced.
-4. **Permission bump strategy.** Adding a new permission to the App later requires every installation to re-authorize. Decide the *full* permissions list now and don't change it for the next year unless absolutely required.
+## Open questions (still)
+
+- **Installation JWT signing library.** `jsonwebtoken` is the obvious pick (already in the ecosystem), but `@octokit/auth-app` does the whole flow (JWT + installation token exchange + caching) for us. Net 50 LOC vs. ~150 LOC. **Lean: use `@octokit/auth-app`.** Decide in Phase 1.
+- **Self-host docs.** Every self-hoster registers their own App. Need a `docs/connectors/github-app-setup.md` with a manifest JSON for one-click registration. Track separately, not blocking the code refactor.
 
 ## Effort estimate
 
-| Phase | Effort | Notes |
-|---|---|---|
-| 1 — Auth helper + schema | 1.5 days | JWT signing, token caching, migration, tests |
-| 2 — Install flow | 1 day | Two new routes, UI branch |
-| 3 — Worker token integration | 0.5 day | Mostly a refactor of existing token loader |
-| 4 — Webhook intake | 1.5 days | HMAC verify, dispatch, lifecycle events. Per-PR fast path deferred. |
-| 5 — Disconnect | 0.5 day | New endpoint, confirm dialog text |
-| 6 — Deprecation | 0.5 day | Mostly UI/copy + cleanup |
-| **Total** | **~5.5 days** | One engineer, focused. |
+| Phase | Effort |
+|---|---|
+| 1 — App reg + auth helper + schema | 1.5 days |
+| 2 — Install flow + UI cleanup | 1 day |
+| 3 — Worker token integration | 0.5 day |
+| 4 — Webhook intake (lifecycle only) | 1 day |
+| 5 — Disconnect | 0.5 day |
+| **Total** | **~4.5 days** |
+
+Down from 5.5 because no deprecation phase.
 
 ## Test plan
 
-- Unit: token minting (JWT signature shape, expiry handling), token cache TTL, HMAC verification (correct + tampered + wrong-secret cases).
-- Integration: full install → sync → uninstall cycle against a sacrificial test org, asserting (a) chunks landed, (b) installation row written, (c) cleanup deletes everything.
+- Unit: token minting (signature, expiry), token cache TTL, HMAC verification (correct + tampered + wrong-secret), suspended-installation error path.
+- Integration: install on a sacrificial org → sync → uninstall, asserting (a) chunks landed, (b) installation row written, (c) cleanup deletes everything.
 - Manual: smoke test on a real account, verify the install UI on GitHub's side, verify the audit log shows "holo App" not a person.
