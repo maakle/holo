@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile as fsReadFile } from 'node:fs/promises';
+import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { githubCodeChunker } from '@holo/chunker';
 import type { TreeSitterRegistry } from '@holo/chunker';
@@ -79,6 +80,13 @@ function isolatedGitEnv(): NodeJS.ProcessEnv {
 
 export const realGitShell: GitShell = {
   async clone(repoUrl, dir) {
+    // Clear the workDir if a previous attempt left content behind.
+    // `git clone` refuses to clone into a non-empty directory, so a single
+    // failed sync would otherwise wedge every subsequent sync until someone
+    // SSH'd into the worker and rm'd by hand. The workDir lives under
+    // os.tmpdir()/holo-clones/<sha-of-repo-name>, which we own end-to-end.
+    rmSync(dir, { recursive: true, force: true });
+
     try {
       await execFileAsync(
         'git',
@@ -89,7 +97,7 @@ export const realGitShell: GitShell = {
       throw holoError({
         code: ErrorCode.HOLO_CLONE_FAILED,
         problem: `git clone failed for ${redactUrl(repoUrl)}`,
-        fix: 'Verify the access token has repo scope, the OAuth app is approved for the repo owner (SSO), and the repo exists.',
+        fix: 'Verify the App installation has access to the repo and that the access token has Contents: Read.',
         cause: redactSecrets(String(cause)),
       });
     }
