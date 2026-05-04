@@ -33,6 +33,8 @@ export default async function SlackPersonalConnectPage({
       <div>
         <a
           href="/api/connect/slack-personal/start"
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center rounded-md bg-(--accent,#3F47FF) px-4 py-2 text-sm font-medium text-white hover:opacity-90"
         >
           Connect Slack

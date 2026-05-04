@@ -11,11 +11,18 @@ import {
 } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 
-export async function POST(_req: Request, { params }: { params: Promise<{ provider: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ provider: string }> }) {
   try {
     const { provider } = await params;
     const { auth, env, defaultOrgId } = await getServerContext();
-    const session = await auth.api.getSession({ headers: await headers() });
+    const hdrs = await headers();
+    const forwardedProto = hdrs.get('x-forwarded-proto');
+    const forwardedHost = hdrs.get('x-forwarded-host') ?? hdrs.get('host');
+    const origin =
+      forwardedHost && forwardedProto
+        ? `${forwardedProto}://${forwardedHost}`
+        : new URL(req.url).origin;
+    const session = await auth.api.getSession({ headers: hdrs });
     if (!session) {
       throw holoError({
         code: ErrorCode.HOLO_AUTH_NO_SESSION,
@@ -28,7 +35,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ provid
     let redirectUri: string;
 
     if (provider === 'github') {
-      redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/github/callback`;
+      redirectUri = `${origin}/api/connectors/github/callback`;
       conn = createGithubConnector({
         clientId: env.GITHUB_CONNECTOR_CLIENT_ID,
         clientSecret: env.GITHUB_CONNECTOR_CLIENT_SECRET,
@@ -41,7 +48,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ provid
           fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET in the environment.',
         });
       }
-      redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/slack/callback`;
+      redirectUri = `${origin}/api/connectors/slack/callback`;
       conn = createSlackConnector({
         clientId: env.SLACK_CONNECTOR_CLIENT_ID,
         clientSecret: env.SLACK_CONNECTOR_CLIENT_SECRET,
@@ -54,7 +61,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ provid
           fix: 'Set GRAIN_CONNECTOR_CLIENT_ID and GRAIN_CONNECTOR_CLIENT_SECRET in the environment.',
         });
       }
-      redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/grain/callback`;
+      redirectUri = `${origin}/api/connectors/grain/callback`;
       conn = createGrainConnector({
         clientId: env.GRAIN_CONNECTOR_CLIENT_ID,
         clientSecret: env.GRAIN_CONNECTOR_CLIENT_SECRET,
@@ -67,7 +74,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ provid
           fix: 'Set HUBSPOT_CONNECTOR_CLIENT_ID and HUBSPOT_CONNECTOR_CLIENT_SECRET in the environment.',
         });
       }
-      redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/hubspot/callback`;
+      redirectUri = `${origin}/api/connectors/hubspot/callback`;
       conn = createHubspotConnector({
         clientId: env.HUBSPOT_CONNECTOR_CLIENT_ID,
         clientSecret: env.HUBSPOT_CONNECTOR_CLIENT_SECRET,
