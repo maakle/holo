@@ -222,6 +222,7 @@ export function ConnectorRow({
           lastSyncedAt={lastSyncedAt ?? null}
           lastSyncStatus={lastSyncStatus ?? null}
           allowlistCount={allowlist.length}
+          githubDefaultAll={meta.id === 'github' && allowlist.length === 0}
         />
       ) : null}
       {showSlackDevHint ? (

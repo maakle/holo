@@ -18,9 +18,16 @@ interface Props {
   /** Number of allowlist entries already saved on the server, for the
    * collapsed-state count. */
   initialSelectedCount?: number;
+  /** True when the allowlist is empty for github (= default-all mode).
+   * Lets the collapsed state render "All repos" without having to hit
+   * GitHub for the actual repo count. */
+  initialDefaultAll?: boolean;
 }
 
-export function GithubRepoPicker({ initialSelectedCount }: Props = {}) {
+export function GithubRepoPicker({
+  initialSelectedCount,
+  initialDefaultAll,
+}: Props = {}) {
   const router = useRouter();
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -125,13 +132,18 @@ export function GithubRepoPicker({ initialSelectedCount }: Props = {}) {
   // understands every repo — including future ones — is being synced.
   const allChecked =
     repos !== null && repos.length > 0 && repos.every((r) => selected.has(r.fullName));
+  // When collapsed (repos not yet fetched), prefer the server-side
+  // defaultAll signal over a stale 0-count derived from an empty allowlist.
+  // Once expanded and the live list arrives, the fetched-data branch wins.
   const summaryCount = repos
     ? allChecked
       ? `All · ${repos.length} repos`
       : `${selected.size} / ${repos.length} selected`
-    : initialSelectedCount !== undefined
-      ? `${initialSelectedCount} selected`
-      : '';
+    : initialDefaultAll
+      ? 'All repos'
+      : initialSelectedCount !== undefined
+        ? `${initialSelectedCount} selected`
+        : '';
 
   return (
     <div className="mt-3 rounded-md border border-border bg-bg">
