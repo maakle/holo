@@ -32,14 +32,23 @@ export function SignInForm() {
     }
   }
 
-  async function handleSendOtp(ev: FormEvent) {
+  async function handleSendOtp(ev: FormEvent<HTMLFormElement>) {
     ev.preventDefault();
+    // Read from FormData so we still get the value when a password manager
+    // autofills the input without firing React's onChange (1Password etc.).
+    const formData = new FormData(ev.currentTarget);
+    const submittedEmail = String(formData.get('email') ?? '').trim();
+    if (!submittedEmail) {
+      setError('Please enter an email.');
+      return;
+    }
+    if (submittedEmail !== email) setEmail(submittedEmail);
     setBusy(true);
     setError(null);
     setInfo(null);
     try {
       const res = await authClient.emailOtp.sendVerificationOtp({
-        email,
+        email: submittedEmail,
         type: 'sign-in',
       });
       if ('error' in res && res.error) {
@@ -47,7 +56,7 @@ export function SignInForm() {
         return;
       }
       setStep('otp');
-      setInfo(`We sent a 6-digit code to ${email}. It expires in 5 minutes.`);
+      setInfo(`We sent a 6-digit code to ${submittedEmail}. It expires in 5 minutes.`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -116,7 +125,7 @@ export function SignInForm() {
           />
           <Button
             type="submit"
-            disabled={busy || !email}
+            disabled={busy}
             size="lg"
             variant="outline"
             className="w-full"
