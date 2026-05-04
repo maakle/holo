@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { onSyncTriggered } from '@/lib/sync-events';
 
 interface Props {
   provider: string;
@@ -12,6 +13,8 @@ interface Props {
 
 type Status = { running: boolean; lastSyncedAt: string | null; lastStatus: string | null };
 
+const POLL_INTERVAL_MS = 3000;
+
 export function SyncStatusBadge({ provider, initialLastSyncedAt }: Props) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>({
@@ -19,40 +22,63 @@ export function SyncStatusBadge({ provider, initialLastSyncedAt }: Props) {
     lastSyncedAt: initialLastSyncedAt,
     lastStatus: null,
   });
-  const wasRunning = useRef(false);
+  const cancelledRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollingRef = useRef(false);
+  const wasRunningRef = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
+    cancelledRef.current = false;
 
-    async function poll() {
+    async function tick(): Promise<void> {
       try {
         const res = await fetch(`/api/connectors/${provider}/sync-status`, {
           cache: 'no-store',
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          // Stop on error rather than spinning indefinitely; user action will restart.
+          pollingRef.current = false;
+          return;
+        }
         const body = (await res.json()) as Status;
-        if (cancelled) return;
+        if (cancelledRef.current) return;
         setStatus(body);
-        // When a sync transitions running → not running, refresh the page so
-        // the server-rendered "last synced" tooltip text updates.
-        if (wasRunning.current && !body.running) {
+        // running → idle: refresh server-rendered tooltip data, then stop.
+        if (wasRunningRef.current && !body.running) {
           router.refresh();
         }
-        wasRunning.current = body.running;
-      } finally {
-        if (!cancelled) {
-          // Poll faster when something is actively running.
-          const next = wasRunning.current ? 3000 : 15000;
-          timeout = setTimeout(poll, next);
+        wasRunningRef.current = body.running;
+        if (!body.running) {
+          pollingRef.current = false;
+          return;
         }
+      } catch {
+        pollingRef.current = false;
+        return;
       }
+      timeoutRef.current = setTimeout(() => {
+        if (!cancelledRef.current) void tick();
+      }, POLL_INTERVAL_MS);
     }
 
-    void poll();
+    function startPolling(): void {
+      if (pollingRef.current) return;
+      pollingRef.current = true;
+      void tick();
+    }
+
+    // First load: one fetch. If running, keep polling until it transitions to idle.
+    startPolling();
+
+    // Resume polling whenever the user kicks off a sync from elsewhere on the page
+    // (Sync now button, Save selection in the repo picker, etc).
+    const off = onSyncTriggered(provider, startPolling);
+
     return () => {
-      cancelled = true;
-      if (timeout) clearTimeout(timeout);
+      cancelledRef.current = true;
+      off();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      pollingRef.current = false;
     };
   }, [provider, router]);
 

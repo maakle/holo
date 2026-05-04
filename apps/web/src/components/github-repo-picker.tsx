@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { notifySyncTriggered } from '@/lib/sync-events';
 
 type Repo = {
   fullName: string;
@@ -62,12 +63,14 @@ export function GithubRepoPicker() {
       const body = (await res.json().catch(() => ({}))) as {
         fix?: string;
         problem?: string;
+        triggeredSync?: boolean;
       };
       if (!res.ok) {
         setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
         return;
       }
       setSavedAt(Date.now());
+      if (body.triggeredSync) notifySyncTriggered('github');
       router.refresh();
     } finally {
       setSaving(false);

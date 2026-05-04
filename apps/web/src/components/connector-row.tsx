@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/tooltip';
 import { GithubRepoPicker } from '@/components/github-repo-picker';
 import { SyncStatusBadge } from '@/components/sync-status-badge';
+import { notifySyncTriggered } from '@/lib/sync-events';
 
 interface AllowlistEntry {
   pattern: string;
@@ -129,6 +130,7 @@ export function ConnectorRow({
         return;
       }
       setSyncMessage(`Sync enqueued (${(body.queues ?? []).join(', ') || 'no queues'}).`);
+      notifySyncTriggered(meta.id);
     } finally {
       setBusy(false);
     }
