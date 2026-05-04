@@ -12,6 +12,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { GithubRepoPicker } from '@/components/github-repo-picker';
+import { SlackChannelPicker } from '@/components/slack-channel-picker';
 import { SyncHistoryPanel } from '@/components/sync-history-panel';
 import { notifySyncTriggered } from '@/lib/sync-events';
 
@@ -59,6 +60,7 @@ export function ConnectorManageSheet({
 
   const isApiKey = meta.flowType === 'apikey';
   const isGithub = meta.id === 'github';
+  const isSlack = meta.id === 'slack';
 
   // Poll the sync-status endpoint while the sheet is open so the Stop button
   // appears as soon as a job is in flight and disappears when the queue
@@ -273,6 +275,22 @@ export function ConnectorManageSheet({
                   Pick which repositories to ingest. Saving triggers an immediate sync.
                 </p>
                 <GithubRepoPicker initialSelectedCount={allowlistCount} />
+              </section>
+            ) : null}
+
+            {/* Channels (Slack only) */}
+            {isSlack ? (
+              <section className="flex flex-col gap-2">
+                <div className="flex items-baseline justify-between">
+                  <h3 className="text-[13px] font-medium text-text">Channels</h3>
+                  <Badge variant="neutral">slack</Badge>
+                </div>
+                <p className="text-[12px] text-text-muted">
+                  Pick which channels to ingest. The holo bot must be invited to private channels
+                  (run <code className="rounded bg-surface-2 px-1">/invite @holo</code> in Slack).
+                  Saving triggers an immediate sync.
+                </p>
+                <SlackChannelPicker initialSelectedCount={allowlistCount} />
               </section>
             ) : null}
 
