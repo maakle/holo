@@ -131,12 +131,46 @@ async function handleInstallation(
   const inst = payload.installation;
 
   if (payload.action === 'deleted') {
-    // Admin uninstalled on GitHub's side — clear our local state. We don't
-    // know which org installed it without the existing row, so look up
-    // by installation_id.
+    // Admin uninstalled directly on GitHub (bypassing our Disconnect
+    // button). Mirror the Disconnect endpoint: nuke the installation row,
+    // sources (cascades to artifacts and chunks via FK), and allowlist.
+    //
+    // The intent matches our explicit Disconnect path: "uninstalling the
+    // holo App means the data is gone." Symmetric mental model, no
+    // orphan rows to GC, GDPR-friendly default. A re-install will start
+    // fresh — re-indexing is slow but rarely the user's surprise.
+    //
+    // We need the org_id to clean up sources / allowlist; look it up via
+    // installation_id since the webhook only carries that.
+    const existing = await db
+      .select({ organizationId: schema.githubInstallations.organizationId })
+      .from(schema.githubInstallations)
+      .where(eq(schema.githubInstallations.installationId, inst.id))
+      .limit(1);
+    const orgId = existing[0]?.organizationId;
+
     await db
       .delete(schema.githubInstallations)
       .where(eq(schema.githubInstallations.installationId, inst.id));
+
+    if (orgId) {
+      await db
+        .delete(schema.sources)
+        .where(
+          and(
+            eq(schema.sources.organizationId, orgId),
+            eq(schema.sources.provider, 'github'),
+          ),
+        );
+      await db
+        .delete(schema.connectorAllowlists)
+        .where(
+          and(
+            eq(schema.connectorAllowlists.organizationId, orgId),
+            eq(schema.connectorAllowlists.provider, 'github'),
+          ),
+        );
+    }
     return;
   }
 
