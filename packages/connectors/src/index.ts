@@ -57,6 +57,7 @@ export { createGithubApiClient } from './github/api-client';
 export type { GithubApiClient } from './github/api-client';
 export {
   loadGithubInstallationToken,
+  listInstallationRepos,
   mintInstallationToken,
   mintAppJwt,
   githubAppConfigFromEnv,

@@ -119,10 +119,10 @@ Five phases. Each is independently mergeable.
 
 ### Phase 3 — Worker uses installation tokens
 
-1. `apps/worker/src/queues/runners.ts`: `loadConnectorToken(... 'github')` is replaced by a call to `loadGithubInstallationToken` (which reads `sources.metadata.installation_id`, looks up the row, mints the token).
+1. `apps/worker/src/queues/runners.ts`: `loadConnectorToken(... 'github')` is replaced by a call to `loadGithubInstallationToken` (which reads `github_installations`, mints/caches the token via the App private key).
 2. Clone URL: `https://x-access-token:${token}@github.com/...` works unchanged — the username is informational, GitHub accepts any username with a valid installation token.
-3. Update `packages/connectors/src/github/api-client.ts` to retry once on 401 by minting a fresh token (handles the rare race where the cached 50-min token expires mid-call). Today's 401 throws unconditionally.
-4. End-to-end test against a fixture installation.
+3. **Deferred:** `packages/connectors/src/github/api-client.ts` retry-on-401 by minting a fresh token. The 50-min cache means the token is fresh enough for typical sync durations; a sync that exceeds the cache window will fail once with a 401 and BullMQ will retry the whole job, which mints a fresh token. Acceptable for now; revisit if we see real-world 401-mid-sync flapping.
+4. **Done in this phase:** repo-source fallback. With App auth the admin already curates repos at install time on GitHub's side, so requiring a separate `connector_allowlists` entry creates redundant friction. The runner now defaults to "everything the installation can see" when the allowlist is empty for github; the picker stays a true subset filter for explicit narrowing.
 
 ### Phase 4 — Webhook intake
 
