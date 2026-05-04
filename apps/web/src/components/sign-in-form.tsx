@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { authClient, signIn } from '@holo/auth/client';
 import { Button } from '@/components/ui/button';
 
@@ -16,6 +16,23 @@ export function SignInForm() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [hasEmail, setHasEmail] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+
+  // Sync `hasEmail` from the actual DOM value on focus/input/blur. This lets
+  // password-manager autofill (which sometimes assigns the value without
+  // dispatching a React-observable change event) still enable the button.
+  function syncHasEmail() {
+    setHasEmail(!!emailRef.current?.value.trim());
+  }
+
+  // After mount, double-check the field — autofill can land before our
+  // listeners attach.
+  useEffect(() => {
+    if (step !== 'email') return;
+    const id = window.setTimeout(syncHasEmail, 200);
+    return () => window.clearTimeout(id);
+  }, [step]);
 
   async function handleGithub() {
     setBusy(true);
@@ -112,12 +129,19 @@ export function SignInForm() {
       {step === 'email' ? (
         <form onSubmit={handleSendOtp} className="space-y-3">
           <input
+            ref={emailRef}
             name="email"
             type="email"
             required
             placeholder="you@company.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            defaultValue={email}
+            onInput={syncHasEmail}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              syncHasEmail();
+            }}
+            onFocus={syncHasEmail}
+            onBlur={syncHasEmail}
             disabled={busy}
             autoComplete="email"
             autoFocus
@@ -125,7 +149,7 @@ export function SignInForm() {
           />
           <Button
             type="submit"
-            disabled={busy}
+            disabled={busy || !hasEmail}
             size="lg"
             variant="outline"
             className="w-full"
