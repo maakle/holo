@@ -5,6 +5,7 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { createNotionConnector } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
+import { enqueueInitialSync } from '@/lib/sync-queue';
 
 export async function POST(req: Request) {
   try {
@@ -75,6 +76,8 @@ export async function POST(req: Request) {
         target: [schema.sources.organizationId, schema.sources.provider, schema.sources.externalId],
         set: { name: ident.name, updatedAt: new Date() },
       });
+
+    await enqueueInitialSync(db, orgId, 'notion').catch(() => {});
 
     return NextResponse.json({ ok: true });
   } catch (e) {

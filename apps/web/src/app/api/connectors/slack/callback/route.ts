@@ -5,6 +5,7 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { shared, createSlackConnector } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
+import { enqueueInitialSync } from '@/lib/sync-queue';
 
 export async function GET(req: Request) {
   try {
@@ -112,6 +113,11 @@ export async function GET(req: Request) {
         ],
         set: { name: ident.name, updatedAt: new Date() },
       });
+
+    await enqueueInitialSync(db, orgId, 'slack').catch(() => {
+      // Initial sync is best-effort; if Redis is down or the queue rejects,
+      // the recurring scheduler will pick it up at the next tick.
+    });
 
     return NextResponse.redirect(new URL('/connections', req.url));
   } catch (e) {

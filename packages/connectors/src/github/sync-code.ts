@@ -43,16 +43,54 @@ export interface GitShell {
   diffNameStatus(dir: string, fromSha: string, toSha: string): Promise<DiffEntry[]>;
 }
 
+function redactUrl(url: string): string {
+  // Strip basic-auth / token from URLs so we don't leak access tokens into
+  // logs, error messages, or the sync-history UI. Matches `https://<user>:<pw>@host…`
+  // and `https://<token>@host…`.
+  return url.replace(/(https?:\/\/)([^@/]+)@/, '$1<redacted>@');
+}
+
+function redactSecrets(s: string): string {
+  // GitHub user-to-server tokens (gho_), app tokens (ghs_), refresh tokens
+  // (ghr_), personal access tokens (ghp_), server tokens (ghu_). Strip them
+  // wherever they appear so stack traces / git stderr can't leak credentials.
+  return redactUrl(s).replace(/gh[opusr]_[A-Za-z0-9]{20,}/g, '<redacted-token>');
+}
+
+// Disable any local-machine git config that could intercept the URL-embedded
+// token: credential helpers (osxkeychain), [url] insteadOf rewrites that
+// switch to SSH, askpass prompts. Run with no system config and an empty
+// HOME so a developer's ~/.gitconfig can't poison the worker.
+const ISOLATED_GIT_CONFIG = [
+  '-c', 'credential.helper=',
+  '-c', 'core.askpass=',
+  '-c', 'core.sshCommand=true',
+  '-c', 'http.followRedirects=true',
+];
+function isolatedGitEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: '0',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_ASKPASS: '/bin/true',
+    HOME: '/dev/null',
+  };
+}
+
 export const realGitShell: GitShell = {
   async clone(repoUrl, dir) {
     try {
-      await execFileAsync('git', ['clone', '--depth=1', repoUrl, dir]);
+      await execFileAsync(
+        'git',
+        [...ISOLATED_GIT_CONFIG, 'clone', '--depth=1', repoUrl, dir],
+        { env: isolatedGitEnv() },
+      );
     } catch (cause) {
       throw holoError({
         code: ErrorCode.HOLO_CLONE_FAILED,
-        problem: `git clone failed for ${repoUrl}`,
-        fix: 'Verify the clone URL and access token.',
-        cause: String(cause),
+        problem: `git clone failed for ${redactUrl(repoUrl)}`,
+        fix: 'Verify the access token has repo scope, the OAuth app is approved for the repo owner (SSO), and the repo exists.',
+        cause: redactSecrets(String(cause)),
       });
     }
   },
@@ -79,7 +117,7 @@ export const realGitShell: GitShell = {
         code: ErrorCode.HOLO_FETCH_FAILED,
         problem: `git fetch failed in ${dir}`,
         fix: 'Check network connectivity and access token.',
-        cause: String(cause),
+        cause: redactSecrets(String(cause)),
       });
     }
   },

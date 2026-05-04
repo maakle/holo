@@ -145,6 +145,20 @@ export async function runGithubProseSync(
       logger.warn({ code: 'HOLO_GITHUB_REPO_NOT_FOUND', repoFullName });
       continue;
     }
+    // GitHub returns 404 (which the api-client maps to null) for repos the
+    // token can't see — including private repos in orgs whose SAML SSO the
+    // OAuth app hasn't been authorized for. Without this guard the runner
+    // walks an "empty" repo and reports `0 artifacts · ok`, hiding the real
+    // permissions problem.
+    if (!repo) {
+      throw holoError({
+        code: ErrorCode.HOLO_GITHUB_REPO_NOT_FOUND,
+        problem: `GitHub returned 404 for ${repoFullName} — repo is not visible to this token`,
+        fix:
+          'Verify the repo exists and the OAuth token has access. For private repos in an org with SAML SSO, ' +
+          'authorize the holo OAuth app for that org under Settings → Applications → the holo entry → Configure SSO.',
+      });
+    }
 
     // ── PRs ──────────────────────────────────────────────────────────────────
     const cursorTs = prUpdatedSince[repoFullName];
@@ -215,6 +229,9 @@ export async function runGithubProseSync(
         }
       }
 
+      // Flush after every page so progress is observable in the embed queue
+      // and a mid-walk failure preserves the work done so far.
+      await flushBatch();
       if (!hasMore) break;
       page++;
     }
@@ -267,6 +284,7 @@ export async function runGithubProseSync(
         }
       }
 
+      await flushBatch();
       if (!hasMore) break;
       page++;
     }
