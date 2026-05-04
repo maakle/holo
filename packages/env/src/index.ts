@@ -7,6 +7,15 @@ const EnvSchema = z.object({
   HOLO_TOKEN_ENCRYPTION_KEY: z.string().min(40),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
+  /**
+   * Comma-separated list of additional origins Better Auth should trust for
+   * sign-in cookies and CSRF — beyond `BETTER_AUTH_URL` which is always
+   * trusted. Use this in dev when you access the app over both
+   * `http://localhost:3000` and an ngrok / preview tunnel URL.
+   *
+   * Example: `AUTH_TRUSTED_ORIGINS=http://localhost:3000,https://abc.ngrok.dev`
+   */
+  AUTH_TRUSTED_ORIGINS: z.string().optional(),
   GITHUB_LOGIN_CLIENT_ID: z.string().min(1),
   GITHUB_LOGIN_CLIENT_SECRET: z.string().min(1),
   // GitHub App credentials replace the OAuth-app connector flow.

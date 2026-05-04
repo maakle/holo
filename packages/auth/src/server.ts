@@ -13,12 +13,28 @@ export interface CreateAuthOpts {
     Env,
     | 'BETTER_AUTH_SECRET'
     | 'BETTER_AUTH_URL'
+    | 'AUTH_TRUSTED_ORIGINS'
     | 'GITHUB_LOGIN_CLIENT_ID'
     | 'GITHUB_LOGIN_CLIENT_SECRET'
     | 'EMAIL_PROVIDER'
     | 'RESEND_API_KEY'
   >;
   defaultOrganizationId: string;
+}
+
+/**
+ * Parse the comma-separated AUTH_TRUSTED_ORIGINS env var. Empty / missing
+ * returns []. Whitespace and trailing slashes are normalized so duplicates
+ * with cosmetic differences are deduped.
+ */
+export function parseTrustedOrigins(raw: string | undefined): string[] {
+  if (!raw) return [];
+  const set = new Set<string>();
+  for (const part of raw.split(',')) {
+    const trimmed = part.trim().replace(/\/+$/, '');
+    if (trimmed) set.add(trimmed);
+  }
+  return [...set];
 }
 
 interface ResendEmail {
@@ -111,6 +127,15 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
     }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
+    // Allow sign-in / CSRF cookies on additional origins — typically used
+    // in dev when accessing the app over both localhost and an ngrok tunnel.
+    // BETTER_AUTH_URL is implicitly trusted; we de-dupe defensively.
+    trustedOrigins: [
+      ...new Set([
+        env.BETTER_AUTH_URL.replace(/\/+$/, ''),
+        ...parseTrustedOrigins(env.AUTH_TRUSTED_ORIGINS),
+      ]),
+    ],
     logger: { level: 'debug' },
     advanced: {
       database: {
