@@ -206,6 +206,7 @@ export function ConnectorRow({
           connectedAs={connectedAs}
           lastSyncedAt={lastSyncedAt ?? null}
           lastSyncStatus={lastSyncStatus ?? null}
+          allowlistCount={allowlist.length}
         />
       ) : null}
     </div>

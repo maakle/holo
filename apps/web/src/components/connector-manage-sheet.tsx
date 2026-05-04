@@ -22,6 +22,8 @@ interface Props {
   connectedAs?: string;
   lastSyncedAt: string | null;
   lastSyncStatus: string | null;
+  /** Number of allowlist entries already saved on the server (GitHub). */
+  allowlistCount?: number;
 }
 
 function formatRelative(iso: string): string {
@@ -46,6 +48,7 @@ export function ConnectorManageSheet({
   connectedAs,
   lastSyncedAt,
   lastSyncStatus,
+  allowlistCount,
 }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -199,7 +202,7 @@ export function ConnectorManageSheet({
                 <p className="text-[12px] text-text-muted">
                   Pick which repositories to ingest. Saving triggers an immediate sync.
                 </p>
-                <GithubRepoPicker />
+                <GithubRepoPicker initialSelectedCount={allowlistCount} />
               </section>
             ) : null}
 

@@ -14,19 +14,28 @@ type Repo = {
   selected: boolean;
 };
 
-export function GithubRepoPicker() {
+interface Props {
+  /** Number of allowlist entries already saved on the server, for the
+   * collapsed-state count. */
+  initialSelectedCount?: number;
+}
+
+export function GithubRepoPicker({ initialSelectedCount }: Props = {}) {
   const router = useRouter();
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
 
+  // Lazy fetch — only hit GitHub when the user actually opens the list.
   useEffect(() => {
+    if (!expanded || repos !== null) return;
     let cancelled = false;
+    setLoading(true);
     void (async () => {
       try {
         const res = await fetch('/api/connectors/github/repos');
@@ -51,7 +60,7 @@ export function GithubRepoPicker() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [expanded, repos]);
 
   async function save() {
     setSaving(true);
@@ -88,17 +97,20 @@ export function GithubRepoPicker() {
     });
   }
 
-  if (loading) {
-    return <div className="mt-3 text-[12px] text-text-muted">Loading repos…</div>;
-  }
-  if (error && !repos) {
-    return <div className="mt-3 text-[12px] text-error">{error}</div>;
-  }
-  if (!repos) return null;
+  const filtered = repos
+    ? filter.trim()
+      ? repos.filter((r) => r.fullName.toLowerCase().includes(filter.trim().toLowerCase()))
+      : repos
+    : [];
 
-  const filtered = filter.trim()
-    ? repos.filter((r) => r.fullName.toLowerCase().includes(filter.trim().toLowerCase()))
-    : repos;
+  // Collapsed count: prefer the live fetched count once we have it; otherwise
+  // fall back to the server-rendered allowlist size so we don't have to hit
+  // GitHub just to populate a number.
+  const summaryCount = repos
+    ? `${selected.size} / ${repos.length} selected`
+    : initialSelectedCount !== undefined
+      ? `${initialSelectedCount} selected`
+      : '';
 
   return (
     <div className="mt-3 rounded-md border border-border bg-bg">
@@ -115,11 +127,17 @@ export function GithubRepoPicker() {
         <span className="flex-1 text-[13px] font-medium text-text">
           {expanded ? 'Hide repository list' : 'Show repository list'}
         </span>
-        <span className="text-[12px] text-text-muted">
-          {selected.size} / {repos.length} selected
-        </span>
+        {summaryCount ? (
+          <span className="text-[12px] text-text-muted">{summaryCount}</span>
+        ) : null}
       </button>
-      {!expanded ? null : (
+      {!expanded ? null : loading && !repos ? (
+        <div className="border-t border-border px-3 py-4 text-[12px] text-text-muted">
+          Loading repos…
+        </div>
+      ) : error && !repos ? (
+        <div className="border-t border-border px-3 py-4 text-[12px] text-error">{error}</div>
+      ) : !repos ? null : (
       <>
       <div className="flex items-center gap-2 border-y border-border px-3 py-2">
         <input
