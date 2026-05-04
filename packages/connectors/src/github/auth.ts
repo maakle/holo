@@ -162,6 +162,59 @@ export async function loadGithubInstallationToken(args: {
 }
 
 /**
+ * Uninstalls the App from a GitHub account. Called when the user clicks
+ * Disconnect in our UI — without this, the holo App stays installed on
+ * GitHub even after we've forgotten about it locally, which leaves the
+ * admin to clean up manually at github.com/settings/installations.
+ *
+ * Uses an App-level JWT (the App can manage its own installations); no
+ * installation token needed.
+ *
+ * Returns whether the uninstall actually happened. We treat 404 as a
+ * successful no-op — if GitHub already has no record of the installation,
+ * we've reached the desired state regardless. Other failures throw.
+ */
+export async function uninstallApp(args: {
+  config: GithubAppConfig;
+  installationId: number;
+  fetchImpl?: typeof fetch;
+}): Promise<{ uninstalled: boolean }> {
+  const fetchImpl = args.fetchImpl ?? fetch;
+  const jwt = await signAppJwt(args.config);
+  const res = await fetchImpl(
+    `https://api.github.com/app/installations/${args.installationId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    },
+  );
+  // GitHub returns 204 on a successful uninstall.
+  if (res.status === 204) {
+    tokenCache.delete(args.installationId);
+    return { uninstalled: true };
+  }
+  if (res.status === 404) {
+    // Already gone on GitHub's side. Drop any cached token and report no-op.
+    tokenCache.delete(args.installationId);
+    return { uninstalled: false };
+  }
+  const body = await res.text().catch(() => '');
+  throw holoError({
+    code: ErrorCode.HOLO_FETCH_FAILED,
+    problem: `GitHub DELETE /app/installations/${args.installationId} returned ${res.status}`,
+    cause: body.slice(0, 500),
+    fix:
+      res.status === 401
+        ? 'The App private key does not match GITHUB_APP_ID. Verify both env vars.'
+        : 'Retry the disconnect; if it persists, check GitHub status.',
+  });
+}
+
+/**
  * Lists every repo the org's installation has access to. Pages through GitHub's
  * `/installation/repositories` endpoint using the installation token. Used by
  * the worker as a fallback when the user hasn't narrowed the allowlist via

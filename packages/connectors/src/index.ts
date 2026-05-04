@@ -60,6 +60,7 @@ export {
   listInstallationRepos,
   mintInstallationToken,
   mintAppJwt,
+  uninstallApp,
   githubAppConfigFromEnv,
   __clearGithubAppTokenCacheForTests,
 } from './github/auth';
