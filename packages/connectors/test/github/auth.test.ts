@@ -9,11 +9,13 @@ import {
   uninstallApp,
 } from '../../src/github/auth';
 
-function generateTestKeyPair(): { privateKeyPem: string; publicKeyPem: string } {
+function generateTestKeyPair(
+  privateKeyType: 'pkcs1' | 'pkcs8' = 'pkcs8',
+): { privateKeyPem: string; publicKeyPem: string } {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', {
     modulusLength: 2048,
     publicKeyEncoding: { type: 'spki', format: 'pem' },
-    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    privateKeyEncoding: { type: privateKeyType, format: 'pem' },
   });
   return { privateKeyPem: privateKey, publicKeyPem: publicKey };
 }
@@ -49,6 +51,17 @@ describe('github app auth', () => {
       await expect(
         mintAppJwt({ appId: '1', privateKeyPem: 'not a pem' }),
       ).rejects.toThrow();
+    });
+
+    it('accepts PKCS#1 private keys (the format GitHub generates)', async () => {
+      const { privateKeyPem, publicKeyPem } = generateTestKeyPair('pkcs1');
+      // Sanity check: confirm the test fixture is actually PKCS#1.
+      expect(privateKeyPem).toContain('-----BEGIN RSA PRIVATE KEY-----');
+
+      const token = await mintAppJwt({ appId: '777', privateKeyPem });
+      const publicKey = await importSPKI(publicKeyPem, 'RS256');
+      const { payload } = await jwtVerify(token, publicKey);
+      expect(payload.iss).toBe('777');
     });
   });
 
