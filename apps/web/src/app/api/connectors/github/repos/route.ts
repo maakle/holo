@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
+import {
+  githubAppConfigFromEnv,
+  loadGithubInstallationToken,
+} from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 import { enqueueResync } from '@/lib/sync-queue';
 
@@ -16,45 +20,23 @@ type GithubRepo = {
   pushed_at: string | null;
 };
 
-async function loadAccessToken(
-  db: Awaited<ReturnType<typeof getServerContext>>['db'],
-  organizationId: string,
-  userId: string,
-): Promise<string> {
-  const rows = await db
-    .select({ accessToken: schema.connectorCredentials.accessToken })
-    .from(schema.connectorCredentials)
-    .where(
-      and(
-        eq(schema.connectorCredentials.organizationId, organizationId),
-        eq(schema.connectorCredentials.userId, userId),
-        eq(schema.connectorCredentials.provider, 'github'),
-        eq(schema.connectorCredentials.status, 'active'),
-      ),
-    )
-    .orderBy(desc(schema.connectorCredentials.connectedAt))
-    .limit(1);
-  const token = rows[0]?.accessToken;
-  if (!token) {
-    throw holoError({
-      code: ErrorCode.HOLO_AUTH_NO_SESSION,
-      problem: 'GitHub is not connected for this user',
-      fix: 'Click Connect on the GitHub row before picking repos.',
-    });
-  }
-  return token;
+interface InstallationRepositoriesResponse {
+  total_count: number;
+  repositories: GithubRepo[];
 }
 
-async function listAllRepos(token: string): Promise<GithubRepo[]> {
+/**
+ * Lists every repo the App's installation in this org has access to. Different
+ * from the OAuth-era /user/repos call: this only returns repos the admin
+ * actually selected at install time (or all repos if they chose "all").
+ */
+async function listInstallationRepos(token: string): Promise<GithubRepo[]> {
   const out: GithubRepo[] = [];
   let page = 1;
-  // Cap pagination so a user with many orgs can't make the page hang.
-  while (page <= 5) {
-    const url = new URL('https://api.github.com/user/repos');
+  while (page <= 10) {
+    const url = new URL('https://api.github.com/installation/repositories');
     url.searchParams.set('per_page', '100');
     url.searchParams.set('page', String(page));
-    url.searchParams.set('sort', 'pushed');
-    url.searchParams.set('affiliation', 'owner,collaborator,organization_member');
     const res = await fetch(url.toString(), {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -65,13 +47,13 @@ async function listAllRepos(token: string): Promise<GithubRepo[]> {
     if (!res.ok) {
       throw holoError({
         code: ErrorCode.HOLO_FETCH_FAILED,
-        problem: `GitHub /user/repos returned ${res.status}`,
-        fix: 'Reconnect GitHub or verify the OAuth scope includes `repo read:org`.',
+        problem: `GitHub /installation/repositories returned ${res.status}`,
+        fix: 'Re-install the holo GitHub App and verify the admin granted access to repos.',
       });
     }
-    const items = (await res.json()) as GithubRepo[];
-    out.push(...items);
-    if (items.length < 100) break;
+    const body = (await res.json()) as InstallationRepositoriesResponse;
+    out.push(...body.repositories);
+    if (body.repositories.length < 100) break;
     page += 1;
   }
   return out;
@@ -79,7 +61,7 @@ async function listAllRepos(token: string): Promise<GithubRepo[]> {
 
 export async function GET() {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db, env, defaultOrgId } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -90,10 +72,14 @@ export async function GET() {
     }
     const orgId =
       (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
-    const userId = session.user.id;
 
-    const token = await loadAccessToken(db, orgId, userId);
-    const repos = await listAllRepos(token);
+    const config = githubAppConfigFromEnv(env);
+    const { token } = await loadGithubInstallationToken({
+      db,
+      organizationId: orgId,
+      config,
+    });
+    const repos = await listInstallationRepos(token);
 
     const allowlist = await db
       .select({

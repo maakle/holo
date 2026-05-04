@@ -26,8 +26,6 @@ export default defineConfig({
       BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
       GITHUB_LOGIN_CLIENT_ID: 'test-login-cid',
       GITHUB_LOGIN_CLIENT_SECRET: 'test-login-csec',
-      GITHUB_CONNECTOR_CLIENT_ID: 'test-conn-cid',
-      GITHUB_CONNECTOR_CLIENT_SECRET: 'test-conn-csec',
       EMAIL_PROVIDER: 'console',
       NODE_ENV: 'test',
     },

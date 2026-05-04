@@ -155,8 +155,8 @@ export function createNotionRunner(deps: RunnerDeps): SyncRunner {
 }
 
 // ── GitHub prose ─────────────────────────────────────────────────────────────
-// Bypasses createGithubConnector.fullSync because that calls both prose AND
-// code in one shot, which doesn't match the worker's split-queue topology.
+// Calls runGithubProseSync directly. The split between prose and code matches
+// the two BullMQ queues (different concurrency, different cost profiles).
 export function createGithubProseRunner(deps: RunnerDeps): SyncRunner {
   const enqueueEmbed: GithubProseEmbedEnqueueFn = makeEnqueueEmbed(deps.embedQueue);
 

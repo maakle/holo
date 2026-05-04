@@ -141,6 +141,13 @@
       "when": 1777800000000,
       "tag": "0019_organizations_multi_tenancy",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1777900000000,
+      "tag": "0020_github_installations",
+      "breakpoints": true
     }
   ]
 }

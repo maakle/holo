@@ -3,7 +3,6 @@ import { headers, cookies } from 'next/headers';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import {
   shared,
-  createGithubConnector,
   createSlackConnector,
   createGrainConnector,
   createHubspotConnector,
@@ -31,16 +30,45 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
       });
     }
 
+    // GitHub uses a GitHub App install flow rather than OAuth — the redirect
+    // target is github.com/apps/<slug>/installations/new and the state cookie
+    // is verified by the install-callback route. No client_id/secret needed.
+    if (provider === 'github') {
+      if (!env.GITHUB_APP_SLUG) {
+        throw holoError({
+          code: ErrorCode.HOLO_ENV_INVALID,
+          problem: 'GITHUB_APP_SLUG is not set',
+          fix: 'Register a GitHub App and set GITHUB_APP_ID, GITHUB_APP_SLUG, and GITHUB_APP_PRIVATE_KEY_B64. See docs/connectors/github-app.md.',
+        });
+      }
+      const csrfNonce = shared.generateCsrfNonce();
+      const state = await shared.signState(
+        {
+          user_id: session.user.id,
+          organization_id: defaultOrgId,
+          csrf_nonce: csrfNonce,
+          provider: 'github',
+        },
+        env.BETTER_AUTH_SECRET,
+      );
+      const authorizeUrl = `https://github.com/apps/${env.GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`;
+
+      const cookieStore = await cookies();
+      cookieStore.set(shared.CSRF_COOKIE_NAME, csrfNonce, {
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: 600,
+        secure: env.NODE_ENV === 'production',
+      });
+
+      return NextResponse.json({ authorizeUrl });
+    }
+
     let conn: Connector;
     let redirectUri: string;
 
-    if (provider === 'github') {
-      redirectUri = `${origin}/api/connectors/github/callback`;
-      conn = createGithubConnector({
-        clientId: env.GITHUB_CONNECTOR_CLIENT_ID,
-        clientSecret: env.GITHUB_CONNECTOR_CLIENT_SECRET,
-      });
-    } else if (provider === 'slack') {
+    if (provider === 'slack') {
       if (!env.SLACK_CONNECTOR_CLIENT_ID || !env.SLACK_CONNECTOR_CLIENT_SECRET) {
         throw holoError({
           code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,

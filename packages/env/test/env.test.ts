@@ -10,8 +10,6 @@ const COMPLETE_ENV = {
   BETTER_AUTH_URL: 'http://localhost:3000',
   GITHUB_LOGIN_CLIENT_ID: 'lid',
   GITHUB_LOGIN_CLIENT_SECRET: 'lsec',
-  GITHUB_CONNECTOR_CLIENT_ID: 'cid',
-  GITHUB_CONNECTOR_CLIENT_SECRET: 'csec',
   EMAIL_PROVIDER: 'console',
   NODE_ENV: 'development',
 };
