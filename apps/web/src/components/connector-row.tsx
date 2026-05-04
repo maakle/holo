@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/tooltip';
 import { SyncStatusBadge } from '@/components/sync-status-badge';
 import { ConnectorManageSheet } from '@/components/connector-manage-sheet';
+import { SlackDevConnectDialog } from '@/components/slack-dev-connect-dialog';
 
 interface AllowlistEntry {
   pattern: string;
@@ -59,8 +60,12 @@ export function ConnectorRow({
   const [busy, setBusy] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [showManage, setShowManage] = useState(false);
+  const [showDevHint, setShowDevHint] = useState(false);
 
   const isApiKey = meta.flowType === 'apikey';
+  const isDev = process.env.NODE_ENV === 'development';
+  const showSlackDevHint =
+    isDev && meta.id === 'slack' && status === 'disconnected';
   const showApiKeyForm = isApiKey && status === 'disconnected';
 
   async function connect() {
@@ -181,6 +186,16 @@ export function ConnectorRow({
           ) : null}
         </div>
         <div className="flex shrink-0 items-center justify-end gap-2 pt-0.5">
+          {showSlackDevHint ? (
+            <button
+              type="button"
+              onClick={() => setShowDevHint(true)}
+              className="text-[12px] text-text-muted underline-offset-2 hover:text-text hover:underline"
+              title="Local-dev shortcut: paste a token via CLI instead of OAuth"
+            >
+              Dev shortcut
+            </button>
+          ) : null}
           {status === 'disconnected' && !isApiKey ? (
             <Button variant="primary" size="sm" onClick={connect} disabled={busy}>
               Connect
@@ -208,6 +223,9 @@ export function ConnectorRow({
           lastSyncStatus={lastSyncStatus ?? null}
           allowlistCount={allowlist.length}
         />
+      ) : null}
+      {showSlackDevHint ? (
+        <SlackDevConnectDialog open={showDevHint} onOpenChange={setShowDevHint} />
       ) : null}
     </div>
   );

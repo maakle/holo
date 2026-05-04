@@ -125,7 +125,7 @@ export function SignInForm() {
           />
           <Button
             type="submit"
-            disabled={busy}
+            disabled={busy || !email.trim()}
             size="lg"
             variant="outline"
             className="w-full"
