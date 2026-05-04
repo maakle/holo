@@ -25,9 +25,13 @@ import {
   resolveAllowlist,
   runGithubProseSync,
   runGithubCodeSync,
+  loadGithubInstallationToken,
+  listInstallationRepos,
+  githubAppConfigFromEnv,
   type GithubProseEmbedEnqueueFn,
   type GithubCodeEmbedEnqueueFn,
   type HubspotEmbedEnqueueFn,
+  type GithubAppConfig,
 } from '@holo/connectors';
 import type { SyncRunner, SyncResult } from './sync-dispatch';
 import type { SyncJobPayload, SyncCursor } from './types';
@@ -40,10 +44,55 @@ export type RunnerDeps = {
   workDirRoot?: string;
 };
 
+/**
+ * Lazy-loads the GitHub App config from env on first use. Throws a clear
+ * error if env is missing — better than failing per-job.
+ */
+let cachedGithubAppConfig: GithubAppConfig | null = null;
+function getGithubAppConfig(): GithubAppConfig {
+  if (cachedGithubAppConfig) return cachedGithubAppConfig;
+  cachedGithubAppConfig = githubAppConfigFromEnv({
+    GITHUB_APP_ID: process.env.GITHUB_APP_ID,
+    GITHUB_APP_PRIVATE_KEY_B64: process.env.GITHUB_APP_PRIVATE_KEY_B64,
+  });
+  return cachedGithubAppConfig;
+}
+
+/**
+ * Resolves which github repos this org's installation should sync. Prefers
+ * the explicit allowlist (the picker) when set; falls back to "everything
+ * the installation can access" when the allowlist is empty. The fallback
+ * matters because admins already curate repos on GitHub's install page —
+ * forcing a separate allowlist after install would be redundant friction.
+ */
+async function resolveGithubRepos(args: {
+  db: DB;
+  organizationId: string;
+  installationToken: string;
+}): Promise<string[]> {
+  try {
+    const allowlist = await resolveAllowlist({
+      db: args.db,
+      organizationId: args.organizationId,
+      provider: 'github',
+    });
+    return allowlist.resolved;
+  } catch (err) {
+    if (
+      err instanceof Object &&
+      'code' in err &&
+      (err as { code?: string }).code === ErrorCode.HOLO_ALLOWLIST_EMPTY
+    ) {
+      return listInstallationRepos({ token: args.installationToken });
+    }
+    throw err;
+  }
+}
+
 async function loadConnectorToken(
   db: DB,
   organizationId: string,
-  provider: 'github' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot',
+  provider: 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot',
 ): Promise<string> {
   const rows = await db
     .select({ accessToken: schema.connectorCredentials.accessToken })
@@ -164,16 +213,20 @@ export function createGithubProseRunner(deps: RunnerDeps): SyncRunner {
     payload: SyncJobPayload,
     cursor: SyncCursor | null,
   ): Promise<SyncResult> => {
-    const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'github');
-    const allowlist = await resolveAllowlist({
+    const { token } = await loadGithubInstallationToken({
       db: deps.db,
       organizationId: payload.organizationId,
-      provider: 'github',
+      config: getGithubAppConfig(),
+    });
+    const allowedRepos = await resolveGithubRepos({
+      db: deps.db,
+      organizationId: payload.organizationId,
+      installationToken: token,
     });
     const existingHashes = await loadExistingHashes(deps.db, payload.organizationId);
     const result = await runGithubProseSync({
-      client: createGithubApiClient(accessToken),
-      allowedRepos: allowlist.resolved,
+      client: createGithubApiClient(token),
+      allowedRepos,
       cursorMetadata: cursor?.metadata ?? {},
       organizationId: payload.organizationId,
       sourceId: payload.sourceId,
@@ -202,11 +255,15 @@ export function createGithubCodeRunner(deps: RunnerDeps): SyncRunner {
     payload: SyncJobPayload,
     fromSha: string | undefined,
   ): Promise<SyncResult> => {
-    const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'github');
-    const allowlist = await resolveAllowlist({
+    const { token } = await loadGithubInstallationToken({
       db: deps.db,
       organizationId: payload.organizationId,
-      provider: 'github',
+      config: getGithubAppConfig(),
+    });
+    const allowedRepos = await resolveGithubRepos({
+      db: deps.db,
+      organizationId: payload.organizationId,
+      installationToken: token,
     });
     const existingHashes = await loadExistingHashes(deps.db, payload.organizationId);
 
@@ -215,9 +272,11 @@ export function createGithubCodeRunner(deps: RunnerDeps): SyncRunner {
     let totalArtifacts = 0;
     const lastShas: Record<string, string> = {};
 
-    for (const repoFullName of allowlist.resolved) {
+    for (const repoFullName of allowedRepos) {
       const workDir = workDirFor(workDirRoot, repoFullName);
-      const cloneUrl = `https://x-access-token:${accessToken}@github.com/${repoFullName}.git`;
+      // x-access-token is the documented username for both OAuth and App
+      // installation tokens; GitHub treats the username as informational.
+      const cloneUrl = `https://x-access-token:${token}@github.com/${repoFullName}.git`;
       const result = await runGithubCodeSync({
         repoFullName,
         cloneUrl,

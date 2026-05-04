@@ -162,6 +162,46 @@ export async function loadGithubInstallationToken(args: {
 }
 
 /**
+ * Lists every repo the org's installation has access to. Pages through GitHub's
+ * `/installation/repositories` endpoint using the installation token. Used by
+ * the worker as a fallback when the user hasn't narrowed the allowlist via
+ * the picker — installations already have admin-curated repo selection on
+ * GitHub's side.
+ */
+export async function listInstallationRepos(args: {
+  token: string;
+  fetchImpl?: typeof fetch;
+}): Promise<string[]> {
+  const fetchImpl = args.fetchImpl ?? fetch;
+  const out: string[] = [];
+  let page = 1;
+  while (page <= 10) {
+    const url = new URL('https://api.github.com/installation/repositories');
+    url.searchParams.set('per_page', '100');
+    url.searchParams.set('page', String(page));
+    const res = await fetchImpl(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${args.token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+    if (!res.ok) {
+      throw holoError({
+        code: ErrorCode.HOLO_FETCH_FAILED,
+        problem: `GitHub /installation/repositories returned ${res.status}`,
+        fix: 'Ensure the holo App is installed and has access to at least one repo.',
+      });
+    }
+    const body = (await res.json()) as { repositories: Array<{ full_name: string }> };
+    out.push(...body.repositories.map((r) => r.full_name));
+    if (body.repositories.length < 100) break;
+    page += 1;
+  }
+  return out;
+}
+
+/**
  * Build a `GithubAppConfig` from environment variables. Throws if any of the
  * required env vars are missing — the caller (worker bootstrap, web route)
  * should surface that as a setup error rather than a runtime sync failure.
