@@ -215,6 +215,9 @@ export async function runGithubProseSync(
         }
       }
 
+      // Flush after every page so progress is observable in the embed queue
+      // and a mid-walk failure preserves the work done so far.
+      await flushBatch();
       if (!hasMore) break;
       page++;
     }
@@ -267,6 +270,7 @@ export async function runGithubProseSync(
         }
       }
 
+      await flushBatch();
       if (!hasMore) break;
       page++;
     }

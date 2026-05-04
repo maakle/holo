@@ -81,6 +81,9 @@ import { holoError, ErrorCode } from '@holo/errors';
 const GH_API = 'https://api.github.com';
 const PER_PAGE = 100;
 
+const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
+const MAX_RETRIES = 3;
+
 async function ghFetch(
   token: string,
   path: string,
@@ -91,30 +94,66 @@ async function ghFetch(
   if (params) {
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   }
-  const res = await fetchImpl(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
+
+  let lastStatus = 0;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    let res: Response;
+    try {
+      res = await fetchImpl(url.toString(), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      });
+    } catch (err) {
+      // Network-level failure (DNS, connection reset). Treat as transient.
+      if (attempt === MAX_RETRIES) throw err;
+      await sleep(backoffMs(attempt));
+      continue;
+    }
+    lastStatus = res.status;
+
+    if (res.status === 401) {
+      throw Object.assign(new Error('GitHub 401'), { status: 401 });
+    }
+    if (res.status === 404) return null;
+    if (res.status === 403) {
+      const retryAfter = res.headers.get('X-RateLimit-Reset');
+      throw Object.assign(new Error('GitHub 403 rate limit'), {
+        status: 403,
+        retryAfter: retryAfter ? parseInt(retryAfter, 10) : undefined,
+      });
+    }
+    if (TRANSIENT_STATUSES.has(res.status) && attempt < MAX_RETRIES) {
+      await sleep(backoffMs(attempt));
+      continue;
+    }
+    if (!res.ok) {
+      throw holoError({
+        code: ErrorCode.HOLO_FETCH_FAILED,
+        problem: `GitHub API ${res.status} ${path}`,
+        fix: 'Check the request parameters and token permissions.',
+      });
+    }
+    return res.json();
+  }
+  // Exhausted retries on transient status.
+  throw holoError({
+    code: ErrorCode.HOLO_FETCH_FAILED,
+    problem: `GitHub API ${lastStatus} ${path} after ${MAX_RETRIES + 1} attempts`,
+    fix: 'GitHub returned a transient error repeatedly. Retry the sync later.',
   });
-  if (res.status === 401) {
-    const err = Object.assign(new Error('GitHub 401'), { status: 401 });
-    throw err;
-  }
-  if (res.status === 404) {
-    return null;
-  }
-  if (res.status === 403) {
-    const retryAfter = res.headers.get('X-RateLimit-Reset');
-    const err = Object.assign(new Error('GitHub 403 rate limit'), {
-      status: 403,
-      retryAfter: retryAfter ? parseInt(retryAfter, 10) : undefined,
-    });
-    throw err;
-  }
-  if (!res.ok) throw holoError({ code: ErrorCode.HOLO_FETCH_FAILED, problem: `GitHub API ${res.status} ${path}`, fix: 'Check the request parameters and token permissions.' });
-  return res.json();
+}
+
+function backoffMs(attempt: number): number {
+  // 500ms, 1s, 2s with full jitter
+  const base = 500 * 2 ** attempt;
+  return Math.floor(base * (0.5 + Math.random() * 0.5));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function createGithubApiClient(
