@@ -26,7 +26,7 @@ function getSql(): Sql {
       fix: 'Export DATABASE_URL before starting the worker process.',
     });
   }
-  cachedSql = postgres(url, { max: 4 });
+  cachedSql = postgres(url, { max: 4, onnotice: () => {} });
   return cachedSql;
 }
 
@@ -77,7 +77,14 @@ export abstract class SyncProcessorBase extends WorkerHost {
           `failed ${ctx} code=${err.code}\n  problem: ${err.problem}\n  cause:   ${err.cause ?? '<none>'}\n  fix:     ${err.fix}`,
         );
       } else {
-        this.logger.error(`failed ${ctx} ${(err as Error).stack ?? String(err)}`);
+        // Unwrap undici-style errors that hide the real cause behind a generic
+        // "TypeError: fetch failed" message. The interesting bit is on .cause.
+        const e = err as Error & { cause?: unknown; code?: string };
+        const cause = e.cause
+          ? `\n  cause:   ${(e.cause as Error)?.stack ?? String(e.cause)}`
+          : '';
+        const code = e.code ? ` errno=${e.code}` : '';
+        this.logger.error(`failed ${ctx}${code} ${e.stack ?? String(e)}${cause}`);
       }
       throw err;
     }

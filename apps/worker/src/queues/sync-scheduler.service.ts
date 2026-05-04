@@ -23,7 +23,7 @@ function getSql(): Sql {
       fix: 'Export DATABASE_URL before starting the worker process.',
     });
   }
-  cachedSql = postgres(url, { max: 2 });
+  cachedSql = postgres(url, { max: 2, onnotice: () => {} });
   return cachedSql;
 }
 

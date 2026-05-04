@@ -11,6 +11,7 @@ import { mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { Logger } from '@nestjs/common';
 import { eq, and, desc } from 'drizzle-orm';
 import type { Queue } from 'bullmq';
 import { schema, type DB } from '@holo/db';
@@ -42,6 +43,18 @@ export type RunnerDeps = {
   embedQueue: Queue<EmbedJobPayload>;
   /** Root directory for github clones; defaults to os.tmpdir()/holo-clones. */
   workDirRoot?: string;
+};
+
+const githubProseLogger = new Logger('GithubProseSync');
+const githubCodeLogger = new Logger('GithubCodeSync');
+
+const proseSyncLogger = {
+  info: (obj: unknown) => githubProseLogger.log(JSON.stringify(obj)),
+  warn: (obj: unknown) => githubProseLogger.warn(JSON.stringify(obj)),
+};
+const codeSyncLogger = {
+  info: (obj: unknown) => githubCodeLogger.log(JSON.stringify(obj)),
+  warn: (obj: unknown) => githubCodeLogger.warn(JSON.stringify(obj)),
 };
 
 /**
@@ -232,6 +245,7 @@ export function createGithubProseRunner(deps: RunnerDeps): SyncRunner {
       sourceId: payload.sourceId,
       existingHashes,
       enqueueEmbed,
+      logger: proseSyncLogger,
     });
     return {
       artifactCount: result.artifactCount,
@@ -286,6 +300,7 @@ export function createGithubCodeRunner(deps: RunnerDeps): SyncRunner {
         sourceId: payload.sourceId,
         existingHashes,
         enqueueEmbed,
+        logger: codeSyncLogger,
         // treeSitter is omitted here — when null, githubCodeChunker falls back to
         // recursiveSplit. A real TreeSitterRegistry can be injected later via
         // RunnerDeps if AST chunking is desired in production.

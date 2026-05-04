@@ -62,6 +62,9 @@ export function GithubRepoPicker({
           setRepos(list);
           setSelected(new Set(list.filter((r) => r.selected).map((r) => r.fullName)));
           setDefaultAll(Boolean(body.defaultAll));
+          // Clear any stale error from a prior failed save — the fact that we
+          // just fetched the live repo list proves auth/network are healthy.
+          setError(null);
         }
       } finally {
         if (!cancelled) setLoading(false);

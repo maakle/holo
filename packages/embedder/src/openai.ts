@@ -9,11 +9,12 @@ export interface CreateOpenAiEmbedderOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
-// text-embedding-3-large accepts up to 8192 tokens per input.
-// Tokens are roughly 1 per 4 chars for English; we use a conservative 3 to
-// stay under the limit even for code-heavy content where tokens are denser.
-// 8192 * 3 ≈ 24576 chars. We pick 24000 to leave a small safety buffer.
-const OPENAI_EMBED_MAX_CHARS = 24000;
+// text-embedding-3-large accepts up to 8192 tokens per input. Token density
+// varies wildly: prose is ~4 chars/token, but code with single-char tokens
+// (braces, operators, identifiers) can hit ~1.5 chars/token. We pick 12000
+// (≈ 1.5 chars/token × 8192 tokens) to stay safe for the densest code.
+// Slightly less accurate embeddings on long files beat batch-killing 400s.
+const OPENAI_EMBED_MAX_CHARS = 12000;
 
 function truncateForOpenAi(text: string): string {
   return text.length > OPENAI_EMBED_MAX_CHARS

@@ -24,7 +24,11 @@ function getSql(): Sql {
       fix: 'Export DATABASE_URL before starting the worker process.',
     });
   }
-  cachedSql = postgres(url, { max: 4 });
+  // onnotice: drop server NOTICEs (e.g. "word is too long to be indexed" from
+  // chunks_content_tsv_trigger when a code chunk contains a >2047-char token —
+  // FTS skips that token, the row still inserts). Without this they flood the
+  // worker terminal during code sync.
+  cachedSql = postgres(url, { max: 4, onnotice: () => {} });
   return cachedSql;
 }
 

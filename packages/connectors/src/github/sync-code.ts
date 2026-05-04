@@ -158,7 +158,12 @@ export interface RunGithubCodeSyncInput {
   enqueueEmbed: GithubCodeEmbedEnqueueFn;
   gitShell?: GitShell;
   treeSitter?: TreeSitterRegistry;
-  logger?: { warn(obj: unknown): void };
+  logger?: SyncLogger;
+}
+
+export interface SyncLogger {
+  info(obj: unknown): void;
+  warn(obj: unknown): void;
 }
 
 export interface RunGithubCodeSyncOutput {
@@ -170,7 +175,7 @@ export async function runGithubCodeSync(
   input: RunGithubCodeSyncInput,
 ): Promise<RunGithubCodeSyncOutput> {
   const shell = input.gitShell ?? realGitShell;
-  const logger = input.logger ?? { warn: () => {} };
+  const logger: SyncLogger = input.logger ?? { info: () => {}, warn: () => {} };
   const ctx = {
     organizationId: input.organizationId,
     sourceId: input.sourceId,
@@ -200,8 +205,20 @@ export async function runGithubCodeSync(
     filePaths = await shell.lsFiles(input.workDir);
   }
 
+  logger.info({
+    event: 'github_code_walk_start',
+    repo: input.repoFullName,
+    fromSha: input.fromSha ?? null,
+    headSha,
+    fileCount: filePaths.length,
+  });
+
   const pending: GithubCodeChunkPayload[] = [];
   let totalArtifacts = 0;
+  let indexed = 0;
+  let skipped = 0;
+  let chunkFailed = 0;
+  let dedupedHashes = 0;
 
   const flushBatch = async () => {
     if (pending.length === 0) return;
@@ -225,7 +242,11 @@ export async function runGithubCodeSync(
       continue;
     }
 
-    if (!shouldIndex(filePath, buf.length, buf)) continue;
+    if (!shouldIndex(filePath, buf.length, buf)) {
+      skipped += 1;
+      continue;
+    }
+    indexed += 1;
 
     const language = extToLanguage(filePath);
     const content = buf.toString('utf8');
@@ -238,13 +259,17 @@ export async function runGithubCodeSync(
         { sourceArtifactId, ...ctx },
       );
     } catch (err) {
+      chunkFailed += 1;
       logger.warn({ code: 'HOLO_CHUNK_FAILED', filePath, error: String(err) });
       continue;
     }
 
     for (const c of chunks) {
       const hash = chunkHash('github-code', c.content);
-      if (input.existingHashes.has(hash)) continue;
+      if (input.existingHashes.has(hash)) {
+        dedupedHashes += 1;
+        continue;
+      }
       pending.push({
         kind: 'github-code',
         content: c.content,
@@ -262,5 +287,15 @@ export async function runGithubCodeSync(
   }
 
   await flushBatch();
+  logger.info({
+    event: 'github_code_walk_done',
+    repo: input.repoFullName,
+    fileCount: filePaths.length,
+    indexed,
+    skipped,
+    chunkFailed,
+    dedupedHashes,
+    artifactCount: totalArtifacts,
+  });
   return { artifactCount: totalArtifacts, headSha };
 }

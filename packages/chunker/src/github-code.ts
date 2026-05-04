@@ -1,7 +1,6 @@
 import type { Chunker, Chunk, ChunkContext } from './contract.js';
 import { recursiveSplit } from './recursive-split.js';
 import { astChunk } from './tree-sitter/index.js';
-import { holoError, ErrorCode } from '@holo/errors';
 
 export interface GithubCodeInput {
   repoFullName: string;
@@ -32,14 +31,6 @@ export const githubCodeChunker: Chunker<GithubCodeInput> = {
   kind: 'github-code',
   embeddingModel: 'voyage-code-3',
   async chunk(input: GithubCodeInput, ctx: ChunkContext): Promise<Chunk[]> {
-    if (!ctx.treeSitter) {
-      throw holoError({
-        code: ErrorCode.HOLO_INVALID_INPUT,
-        problem: 'github-code chunker requires ctx.treeSitter to be provided',
-        fix: 'Pass a TreeSitterRegistry instance in the chunk context.',
-      });
-    }
-
     const parentExternalId = `code:${input.repoFullName}:${input.commitSha}:${input.filePath}`;
     const aclSubjects = [`org:${ctx.organizationId}`];
     const baseMeta = {
@@ -49,7 +40,12 @@ export const githubCodeChunker: Chunker<GithubCodeInput> = {
       language: input.language,
     };
 
-    const node = await ctx.treeSitter.parse(input.language, input.content);
+    // Tree-sitter is optional. The worker doesn't ship a registry, so prod
+    // currently runs the recursive-split fallback. Tests can inject a
+    // TreeSitterRegistry to exercise the AST path.
+    const node = ctx.treeSitter
+      ? await ctx.treeSitter.parse(input.language, input.content)
+      : null;
 
     if (node) {
       const ast = astChunk(node, { maxTokens: 1200, overlap: 150 });
@@ -67,16 +63,8 @@ export const githubCodeChunker: Chunker<GithubCodeInput> = {
     }
 
     // Fallback: recursive split, then compute line ranges by counting newlines.
-    console.warn(
-      JSON.stringify({
-        event: 'HOLO_CHUNKER_FALLBACK',
-        language: input.language,
-        filePath: input.filePath,
-        repoFullName: input.repoFullName,
-        commitSha: input.commitSha,
-      }),
-    );
-
+    // The worker doesn't ship a TreeSitterRegistry, so this is the steady-state
+    // path in production — no per-file warning.
     const pieces = recursiveSplit(input.content, { chunkSize: 4800, overlap: 600 });
     const chunks: Chunk[] = [];
     let cursor = 0;

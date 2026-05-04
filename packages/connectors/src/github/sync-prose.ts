@@ -10,6 +10,7 @@ import type {
   GithubPrReview,
   GithubPrReviewComment,
 } from './api-client';
+import type { SyncLogger } from './sync-code';
 
 const BATCH_SIZE = 50;
 const MAX_PAGES = 20; // 20 × 100 = 2000 items per type per repo per run
@@ -40,7 +41,7 @@ export interface RunGithubProseSyncInput {
   sourceId: string;
   existingHashes: Set<string>;
   enqueueEmbed: GithubProseEmbedEnqueueFn;
-  logger?: { warn(obj: unknown): void };
+  logger?: SyncLogger;
 }
 
 export interface RunGithubProseSyncOutput {
@@ -91,7 +92,8 @@ export async function runGithubProseSync(
     });
   }
 
-  const logger = input.logger ?? { warn: () => {} };
+  const logger: SyncLogger = input.logger ?? { info: () => {}, warn: () => {} };
+  logger.info({ event: 'github_prose_start', repos: input.allowedRepos });
   const prUpdatedSince = {
     ...((input.cursorMetadata['pr_updated_since'] as Record<string, string>) ?? {}),
   };
@@ -130,6 +132,7 @@ export async function runGithubProseSync(
   };
 
   for (const repoFullName of input.allowedRepos) {
+    logger.info({ event: 'github_prose_repo_start', repo: repoFullName });
     let repo;
     try {
       repo = await input.client.getRepo(repoFullName);
@@ -340,8 +343,14 @@ export async function runGithubProseSync(
     }
 
     await flushBatch();
+    logger.info({
+      event: 'github_prose_repo_done',
+      repo: repoFullName,
+      runningArtifactCount: totalArtifacts,
+    });
   }
 
+  logger.info({ event: 'github_prose_done', artifactCount: totalArtifacts });
   return {
     artifactCount: totalArtifacts,
     updatedMetadata: {

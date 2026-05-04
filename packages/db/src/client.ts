@@ -11,7 +11,7 @@ const pools = (globalForDb.__holoPgPools ??= new Map());
 export function createDb(databaseUrl: string) {
   let pg = pools.get(databaseUrl);
   if (!pg) {
-    pg = postgres(databaseUrl, { max: 10 });
+    pg = postgres(databaseUrl, { max: 10, onnotice: () => {} });
     pools.set(databaseUrl, pg);
   }
   return drizzle(pg, { schema });
