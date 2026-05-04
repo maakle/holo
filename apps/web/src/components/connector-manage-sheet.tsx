@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
@@ -54,9 +54,73 @@ export function ConnectorManageSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const wasOpenRef = useRef(false);
 
   const isApiKey = meta.flowType === 'apikey';
   const isGithub = meta.id === 'github';
+
+  // Poll the sync-status endpoint while the sheet is open so the Stop button
+  // appears as soon as a job is in flight and disappears when the queue
+  // settles. Reuses the same status endpoint the row badge already uses.
+  useEffect(() => {
+    if (!open) {
+      wasOpenRef.current = false;
+      return;
+    }
+    wasOpenRef.current = true;
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    async function tick(): Promise<void> {
+      try {
+        const res = await fetch(`/api/connectors/${meta.id}/sync-status`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const body = (await res.json()) as { running?: boolean };
+        if (cancelled) return;
+        setRunning(Boolean(body.running));
+      } finally {
+        if (!cancelled) timeout = setTimeout(tick, 4000);
+      }
+    }
+    void tick();
+    return () => {
+      cancelled = true;
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [open, meta.id]);
+
+  async function stopSync() {
+    setBusy(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const res = await fetch(`/api/connectors/${meta.id}/stop`, { method: 'POST' });
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        removed?: number;
+        activeRunning?: number;
+        fix?: string;
+        problem?: string;
+      };
+      if (!res.ok) {
+        setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
+        return;
+      }
+      const removed = body.removed ?? 0;
+      const active = body.activeRunning ?? 0;
+      setInfo(
+        removed === 0
+          ? 'Nothing was running.'
+          : `Stopped ${removed} job(s)${active ? ` (${active} were mid-run; the worker will exit shortly)` : ''}.`,
+      );
+      setRunning(false);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function syncNow() {
     setBusy(true);
@@ -162,9 +226,15 @@ export function ConnectorManageSheet({
           <div className="flex flex-col gap-6">
             {/* Action bar */}
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="primary" size="sm" onClick={syncNow} disabled={busy}>
-                Sync now
-              </Button>
+              {running ? (
+                <Button variant="primary" size="sm" onClick={stopSync} disabled={busy}>
+                  Stop sync
+                </Button>
+              ) : (
+                <Button variant="primary" size="sm" onClick={syncNow} disabled={busy}>
+                  Sync now
+                </Button>
+              )}
               <Button variant="secondary" size="sm" onClick={reconnect} disabled={busy}>
                 Reconnect
               </Button>

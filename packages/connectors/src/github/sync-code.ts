@@ -57,10 +57,34 @@ function redactSecrets(s: string): string {
   return redactUrl(s).replace(/gh[opusr]_[A-Za-z0-9]{20,}/g, '<redacted-token>');
 }
 
+// Disable any local-machine git config that could intercept the URL-embedded
+// token: credential helpers (osxkeychain), [url] insteadOf rewrites that
+// switch to SSH, askpass prompts. Run with no system config and an empty
+// HOME so a developer's ~/.gitconfig can't poison the worker.
+const ISOLATED_GIT_CONFIG = [
+  '-c', 'credential.helper=',
+  '-c', 'core.askpass=',
+  '-c', 'core.sshCommand=true',
+  '-c', 'http.followRedirects=true',
+];
+function isolatedGitEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: '0',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_ASKPASS: '/bin/true',
+    HOME: '/dev/null',
+  };
+}
+
 export const realGitShell: GitShell = {
   async clone(repoUrl, dir) {
     try {
-      await execFileAsync('git', ['clone', '--depth=1', repoUrl, dir]);
+      await execFileAsync(
+        'git',
+        [...ISOLATED_GIT_CONFIG, 'clone', '--depth=1', repoUrl, dir],
+        { env: isolatedGitEnv() },
+      );
     } catch (cause) {
       throw holoError({
         code: ErrorCode.HOLO_CLONE_FAILED,
