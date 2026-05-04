@@ -95,13 +95,19 @@ export async function GET() {
         ),
       );
 
-    const includedExact = new Set(
-      allowlist
-        .filter((r) => r.decision === 'include' && r.patternKind === 'exact_id')
-        .map((r) => r.pattern),
+    const includes = allowlist.filter(
+      (r) => r.decision === 'include' && r.patternKind === 'exact_id',
     );
+    const includedExact = new Set(includes.map((r) => r.pattern));
+
+    // Default-all mode: when no allowlist rows exist, the runner falls back
+    // to "everything the installation can see" (Phase 3 / runners.ts). The
+    // picker should reflect that — show every repo as selected, with a flag
+    // the UI uses to render an "All repos · default" hint.
+    const defaultAll = includes.length === 0;
 
     return NextResponse.json({
+      defaultAll,
       repos: repos
         .filter((r) => !r.archived)
         .map((r) => ({
@@ -110,7 +116,7 @@ export async function GET() {
           description: r.description,
           fork: r.fork,
           pushedAt: r.pushed_at,
-          selected: includedExact.has(r.full_name),
+          selected: defaultAll ? true : includedExact.has(r.full_name),
         })),
       allowlist: allowlist.map((r) => ({
         pattern: r.pattern,
@@ -142,22 +148,33 @@ export async function PUT(req: Request) {
       (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
     const userId = session.user.id;
 
-    const body = (await req.json().catch(() => ({}))) as { repos?: string[] };
+    const body = (await req.json().catch(() => ({}))) as {
+      repos?: string[];
+      defaultAll?: boolean;
+    };
+
+    // Two intent modes:
+    //  - `defaultAll: true`   → clear the allowlist; runner falls back to
+    //                            "all installation repos" via Phase 3 fallback.
+    //  - `repos: [...]`       → narrow to exactly those repos; runner uses them.
+    const defaultAll = body.defaultAll === true;
     const desired = Array.isArray(body.repos) ? Array.from(new Set(body.repos)) : [];
-    if (desired.length > 50) {
+    if (!defaultAll && desired.length > 50) {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
         problem: `Cannot allowlist ${desired.length} repos (max 50)`,
-        fix: 'Select 50 or fewer repos.',
+        fix: 'Select 50 or fewer repos, or use the default-all mode.',
       });
     }
-    for (const r of desired) {
-      if (typeof r !== 'string' || !/^[^/\s]+\/[^/\s]+$/.test(r)) {
-        throw holoError({
-          code: ErrorCode.HOLO_INVALID_INPUT,
-          problem: `Invalid repo identifier '${r}'`,
-          fix: 'Repos must be in `owner/name` form.',
-        });
+    if (!defaultAll) {
+      for (const r of desired) {
+        if (typeof r !== 'string' || !/^[^/\s]+\/[^/\s]+$/.test(r)) {
+          throw holoError({
+            code: ErrorCode.HOLO_INVALID_INPUT,
+            problem: `Invalid repo identifier '${r}'`,
+            fix: 'Repos must be in `owner/name` form.',
+          });
+        }
       }
     }
 
@@ -182,12 +199,21 @@ export async function PUT(req: Request) {
         .map((r) => [r.pattern, r.id]),
     );
 
-    const desiredSet = new Set(desired);
+    let toInsert: string[];
+    let toDelete: string[];
 
-    const toInsert = desired.filter((p) => !existingExact.has(p));
-    const toDelete = [...existingExact.entries()]
-      .filter(([pattern]) => !desiredSet.has(pattern))
-      .map(([, id]) => id);
+    if (defaultAll) {
+      // Clear every existing include row. The runner's Phase 3 fallback
+      // takes over once the table is empty for this provider.
+      toInsert = [];
+      toDelete = [...existingExact.values()];
+    } else {
+      const desiredSet = new Set(desired);
+      toInsert = desired.filter((p) => !existingExact.has(p));
+      toDelete = [...existingExact.entries()]
+        .filter(([pattern]) => !desiredSet.has(pattern))
+        .map(([, id]) => id);
+    }
 
     for (const id of toDelete) {
       await db
@@ -212,10 +238,13 @@ export async function PUT(req: Request) {
       );
     }
 
-    // If anything actually changed and the user has at least one selected repo,
-    // kick off a one-shot sync so they don't have to wait for the next 6h tick.
+    // Kick off a one-shot sync if anything actually changed. In default-all
+    // mode this fires whenever we cleared rows (intent: refresh) or always
+    // on first save (intent: ingest the freshly installed repos).
     let triggeredSync = false;
-    if ((toInsert.length > 0 || toDelete.length > 0) && desired.length > 0) {
+    const changed = toInsert.length > 0 || toDelete.length > 0;
+    const hasReposToSync = defaultAll || desired.length > 0;
+    if (changed && hasReposToSync) {
       const sourceRows = await db
         .select({ id: schema.sources.id })
         .from(schema.sources)

@@ -24,6 +24,7 @@ export function GithubRepoPicker({ initialSelectedCount }: Props = {}) {
   const router = useRouter();
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [defaultAll, setDefaultAll] = useState(false);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -41,6 +42,7 @@ export function GithubRepoPicker({ initialSelectedCount }: Props = {}) {
         const res = await fetch('/api/connectors/github/repos');
         const body = (await res.json().catch(() => ({}))) as {
           repos?: Repo[];
+          defaultAll?: boolean;
           fix?: string;
           problem?: string;
         };
@@ -52,6 +54,7 @@ export function GithubRepoPicker({ initialSelectedCount }: Props = {}) {
           const list = body.repos ?? [];
           setRepos(list);
           setSelected(new Set(list.filter((r) => r.selected).map((r) => r.fullName)));
+          setDefaultAll(Boolean(body.defaultAll));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -66,10 +69,21 @@ export function GithubRepoPicker({ initialSelectedCount }: Props = {}) {
     setSaving(true);
     setError(null);
     try {
+      // If every visible repo is checked, send `defaultAll: true` so the
+      // server clears the allowlist and the runner falls back to "all
+      // installation repos" — meaning newly-installed repos auto-include
+      // without re-saving.
+      const allChecked =
+        repos !== null &&
+        repos.length > 0 &&
+        repos.every((r) => selected.has(r.fullName));
+      const payload = allChecked
+        ? { defaultAll: true }
+        : { repos: [...selected] };
       const res = await fetch('/api/connectors/github/repos', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repos: [...selected] }),
+        body: JSON.stringify(payload),
       });
       const body = (await res.json().catch(() => ({}))) as {
         fix?: string;
@@ -81,6 +95,7 @@ export function GithubRepoPicker({ initialSelectedCount }: Props = {}) {
         return;
       }
       setSavedAt(Date.now());
+      setDefaultAll(allChecked);
       if (body.triggeredSync) notifySyncTriggered('github');
       router.refresh();
     } finally {
@@ -106,8 +121,14 @@ export function GithubRepoPicker({ initialSelectedCount }: Props = {}) {
   // Collapsed count: prefer the live fetched count once we have it; otherwise
   // fall back to the server-rendered allowlist size so we don't have to hit
   // GitHub just to populate a number.
+  // In default-all mode (no allowlist rows), show "All · N" so the user
+  // understands every repo — including future ones — is being synced.
+  const allChecked =
+    repos !== null && repos.length > 0 && repos.every((r) => selected.has(r.fullName));
   const summaryCount = repos
-    ? `${selected.size} / ${repos.length} selected`
+    ? allChecked
+      ? `All · ${repos.length} repos`
+      : `${selected.size} / ${repos.length} selected`
     : initialSelectedCount !== undefined
       ? `${initialSelectedCount} selected`
       : '';
@@ -139,6 +160,12 @@ export function GithubRepoPicker({ initialSelectedCount }: Props = {}) {
         <div className="border-t border-border px-3 py-4 text-[12px] text-error">{error}</div>
       ) : !repos ? null : (
       <>
+      {defaultAll && allChecked ? (
+        <div className="border-t border-border bg-surface-2/40 px-3 py-2 text-[12px] text-text-muted">
+          <strong className="font-medium text-text">All repos</strong> · default. Newly-installed
+          repos will sync automatically. Uncheck any to narrow the selection.
+        </div>
+      ) : null}
       <div className="flex items-center gap-2 border-y border-border px-3 py-2">
         <input
           type="text"
