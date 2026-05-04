@@ -30,14 +30,16 @@ function getSql(): Sql {
 
 function getEmbedder(): EmbedderClient {
   if (cachedEmbedder) return cachedEmbedder;
-  // Until the @holo/embedder package is wired in (currently unbuildable from
-  // the worker), this throws on use. Tests inject an embedder via
-  // __setEmbedderForTests().
   throw holoError({
     code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
     problem: 'Embedder client not bound in the worker',
-    fix: 'Provide an EmbedderClient via __setEmbedderForTests() during bootstrap.',
+    fix: 'Call setEmbedderClient(...) during worker bootstrap before any embed jobs run.',
   });
+}
+
+/** Bind the embedder used by the EmbedProcessor. Called from worker bootstrap. */
+export function setEmbedderClient(embedder: EmbedderClient): void {
+  cachedEmbedder = embedder;
 }
 
 // Test seams.

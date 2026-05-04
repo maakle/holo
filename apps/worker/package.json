@@ -14,6 +14,7 @@
     "@holo/connectors": "workspace:*",
     "@holo/crypto": "workspace:*",
     "@holo/db": "workspace:*",
+    "@holo/embedder": "workspace:*",
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",
     "@holo/user-subjects": "workspace:*",

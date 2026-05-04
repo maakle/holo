@@ -3,11 +3,49 @@ import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 import { parseEnv } from '@holo/env';
 import { initCrypto } from '@holo/crypto';
+import { createOpenAiEmbedder, createVoyageEmbedder } from '@holo/embedder';
+import { holoError, ErrorCode } from '@holo/errors';
 import { AppModule } from './app.module';
+import { setEmbedderClient } from './queues/embed';
+import type { EmbedderClient } from './queues/embed-runner';
+import type { EmbeddingModel } from './queues/embed-insert';
+
+/**
+ * Build the EmbedderClient adapter the worker expects. We need a single
+ * object that dispatches `embedBatch(model, texts)` to the right vendor
+ * SDK — github-code chunks go to Voyage, everything else to OpenAI.
+ *
+ * Voyage is optional: if VOYAGE_API_KEY is unset, we fall back to OpenAI
+ * for github-code too. That keeps the bootstrap green for solo developers
+ * who haven't signed up for Voyage.
+ */
+function buildEmbedderClient(): EmbedderClient {
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) {
+    throw holoError({
+      code: ErrorCode.HOLO_ENV_INVALID,
+      problem: 'OPENAI_API_KEY is required for the embed worker',
+      fix: 'Set OPENAI_API_KEY in your .env. Embeddings cannot run without it.',
+    });
+  }
+  const openai = createOpenAiEmbedder({ apiKey: openaiKey });
+  const voyageKey = process.env.VOYAGE_API_KEY;
+  const voyage = voyageKey ? createVoyageEmbedder({ apiKey: voyageKey }) : null;
+
+  return {
+    async embedBatch(model: EmbeddingModel, texts: string[]): Promise<number[][]> {
+      if (model === 'voyage-code-3') {
+        return voyage ? voyage.embed(texts) : openai.embed(texts);
+      }
+      return openai.embed(texts);
+    },
+  };
+}
 
 async function bootstrap() {
   parseEnv(process.env);
   await initCrypto();
+  setEmbedderClient(buildEmbedderClient());
   const app = await NestFactory.createApplicationContext(AppModule, {
     bufferLogs: true,
     logger: ['error', 'warn'],
