@@ -5,7 +5,7 @@ Per-connector setup guides for developers running Holo locally or configuring a 
 | Connector | Auth | Guide |
 |---|---|---|
 | Slack | OAuth (bot + user) | [slack.md](./slack.md) |
-| GitHub | OAuth (login + connector — two apps) | _todo_ |
+| GitHub | GitHub App (one App per Holo deployment) | [github-app.md](./github-app.md) |
 | Notion | API key | _todo_ |
 | Grain | OAuth | _todo_ |
 | Pylon | API key | _todo_ |
