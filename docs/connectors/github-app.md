@@ -28,15 +28,17 @@ Go to <https://github.com/settings/apps/new> (or your org's apps page if you wan
 | **GitHub App name** | `holo-dev-<your-handle>` (must be globally unique across GitHub) |
 | **Description** | "Local development install of Holo's GitHub connector." |
 | **Homepage URL** | `http://localhost:3000` |
-| **Callback URL** | `http://localhost:3000/api/connectors/github/install-callback` |
+| **Callback URL** | leave blank |
 | **Expire user authorization tokens** | OFF |
 | **Request user authorization (OAuth) during installation** | OFF |
 | **Enable Device Flow** | OFF |
-| **Setup URL** | leave blank |
+| **Setup URL** | `http://localhost:3000/api/connectors/github/install-callback` |
 | **Redirect on update** | ON |
-| **Webhook → Active** | OFF for now (turn on once Phase 4 ships and you have a tunnel — see below) |
-| **Webhook URL** | (only if Active is ON) your smee.io URL — see below |
+| **Webhook → Active** | OFF for now (turn on once you have a tunnel — see below) |
+| **Webhook URL** | (only if Active is ON) your smee.io / ngrok URL — see below |
 | **Webhook secret** | generate with `openssl rand -hex 32`. Save this; you'll add it to `.env`. |
+
+> **Why Setup URL, not Callback URL.** GitHub Apps use *Callback URL* only when you also enable "Request user authorization (OAuth) during installation" — i.e., the user authorizes the App as themselves on top of the install. We don't do that; we want a pure App installation. The post-install redirect for App installations goes to *Setup URL*. If you put our `install-callback` route in the Callback URL field, GitHub will install the App fine but never redirect back to us, so Holo never learns the install happened.
 
 ### Permissions
 
