@@ -111,7 +111,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-Two GitHub OAuth apps are required (login + connector); see [decision 0001](./docs/decisions/0001-connector-port-interface.md) for why the split is intentional. Full setup notes in [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+Two GitHub OAuth apps are required (login + connector); see [decision 0001](./docs/decisions/0001-connector-port-interface.md) for why the split is intentional. Full setup notes in [`CONTRIBUTING.md`](./CONTRIBUTING.md). Per-connector OAuth setup (Slack, GitHub, etc.) lives in [`docs/connectors/`](./docs/connectors/).
 
 ---
 

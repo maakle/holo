@@ -56,7 +56,7 @@ The most common contribution path. Shape:
 6. **ACL extraction** (most important — see below)
 7. Per-source chunker if needed
 8. Integration tests against fixtures
-9. Documentation
+9. Documentation — add a setup guide under [`docs/connectors/`](./docs/connectors/) (see [`slack.md`](./docs/connectors/slack.md) for the template)
 
 **ACL extraction is non-negotiable.** Every connector must populate `acl_subjects text[]` on each document with the source's native permissions. If you can't figure out a source's permission model, ask in the issue before starting.
 
