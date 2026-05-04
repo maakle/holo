@@ -132,12 +132,13 @@ export function GithubRepoPicker({
   // understands every repo — including future ones — is being synced.
   const allChecked =
     repos !== null && repos.length > 0 && repos.every((r) => selected.has(r.fullName));
-  // When collapsed (repos not yet fetched), prefer the server-side
-  // defaultAll signal over a stale 0-count derived from an empty allowlist.
-  // Once expanded and the live list arrives, the fetched-data branch wins.
+  // Default-all mode shows "All repos" identically whether collapsed or
+  // expanded — the count is misleading since new repos auto-include
+  // and the expanded list visually shows what's there. The X / N format
+  // only kicks in when the user has narrowed the selection.
   const summaryCount = repos
     ? allChecked
-      ? `All · ${repos.length} repos`
+      ? 'All repos'
       : `${selected.size} / ${repos.length} selected`
     : initialDefaultAll
       ? 'All repos'
