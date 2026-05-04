@@ -2,10 +2,12 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 import { parseEnv } from '@holo/env';
+import { initCrypto } from '@holo/crypto';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   parseEnv(process.env);
+  await initCrypto();
   const app = await NestFactory.createApplicationContext(AppModule, {
     bufferLogs: true,
     logger: ['error', 'warn'],

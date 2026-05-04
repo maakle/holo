@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@holo/connectors": "workspace:*",
+    "@holo/crypto": "workspace:*",
     "@holo/db": "workspace:*",
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",
