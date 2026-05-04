@@ -5,6 +5,7 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { shared, createGrainConnector } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
+import { enqueueInitialSync } from '@/lib/sync-queue';
 
 export async function GET(req: Request) {
   try {
@@ -113,6 +114,8 @@ export async function GET(req: Request) {
         ],
         set: { name: ident.name, metadata: { grain_singleton: true }, updatedAt: new Date() },
       });
+
+    await enqueueInitialSync(db, orgId, 'grain').catch(() => {});
 
     return NextResponse.redirect(new URL('/connections', req.url));
   } catch (e) {

@@ -32,14 +32,58 @@ export default async function ConnectionsPage({
       ),
     );
   const sourceRows = await db
-    .select({ provider: schema.sources.provider, name: schema.sources.name })
+    .select({
+      id: schema.sources.id,
+      provider: schema.sources.provider,
+      name: schema.sources.name,
+    })
     .from(schema.sources)
     .where(eq(schema.sources.organizationId, orgId));
+
+  const sourceIds = sourceRows.map((s) => s.id);
+  const cursorRows = sourceIds.length
+    ? await db
+        .select({
+          sourceId: schema.connectorCursors.sourceId,
+          lastRunAt: schema.connectorCursors.lastRunAt,
+          lastStatus: schema.connectorCursors.lastStatus,
+        })
+        .from(schema.connectorCursors)
+        .where(eq(schema.connectorCursors.organizationId, orgId))
+    : [];
+  const lastSyncByProvider = new Map<string, { at: Date; status: string | null }>();
+  const sourceProviderById = new Map(sourceRows.map((s) => [s.id, s.provider]));
+  for (const c of cursorRows) {
+    if (!c.lastRunAt) continue;
+    const provider = sourceProviderById.get(c.sourceId);
+    if (!provider) continue;
+    const cur = lastSyncByProvider.get(provider);
+    if (!cur || c.lastRunAt > cur.at) {
+      lastSyncByProvider.set(provider, { at: c.lastRunAt, status: c.lastStatus });
+    }
+  }
+
+  const allowlistRows = await db
+    .select({
+      provider: schema.connectorAllowlists.provider,
+      pattern: schema.connectorAllowlists.pattern,
+      patternKind: schema.connectorAllowlists.patternKind,
+      decision: schema.connectorAllowlists.decision,
+    })
+    .from(schema.connectorAllowlists)
+    .where(eq(schema.connectorAllowlists.organizationId, orgId));
 
   const connected = new Map(
     credRows.filter((r) => r.status === 'active').map((r) => [r.provider, true]),
   );
   const sourceName = new Map(sourceRows.map((r) => [r.provider, r.name]));
+  const allowlistByProvider = new Map<string, { pattern: string; isGlob: boolean }[]>();
+  for (const r of allowlistRows) {
+    if (r.decision !== 'include') continue;
+    const arr = allowlistByProvider.get(r.provider) ?? [];
+    arr.push({ pattern: r.pattern, isGlob: r.patternKind === 'glob' });
+    allowlistByProvider.set(r.provider, arr);
+  }
 
   return (
     <div className="space-y-8">
@@ -66,6 +110,9 @@ export default async function ConnectionsPage({
               meta={meta}
               status={connected.get(meta.id) ? 'connected' : 'disconnected'}
               connectedAs={sourceName.get(meta.id)}
+              allowlist={allowlistByProvider.get(meta.id) ?? []}
+              lastSyncedAt={lastSyncByProvider.get(meta.id)?.at.toISOString() ?? null}
+              lastSyncStatus={lastSyncByProvider.get(meta.id)?.status ?? null}
             />
           </div>
         ))}
