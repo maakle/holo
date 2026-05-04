@@ -103,33 +103,30 @@ export function SyncHistoryPanel({ provider }: Props) {
   }, [provider]);
 
   if (loading && !runs) {
-    return <div className="mt-3 text-[12px] text-text-muted">Loading history…</div>;
+    return <div className="text-[12px] text-text-muted">Loading history…</div>;
   }
   if (error && !runs) {
-    return <div className="mt-3 text-[12px] text-error">{error}</div>;
+    return <div className="text-[12px] text-error">{error}</div>;
   }
   if (!runs) return null;
 
   return (
-    <div className="mt-3 rounded-md border border-border bg-bg">
+    <div className="rounded-md border border-border bg-bg">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <div className="text-[12px] font-medium text-text">Sync history</div>
-        <div className="flex items-center gap-2 text-[11px] text-text-muted">
-          <span>{runs.length} runs</span>
-          <button
-            type="button"
-            onClick={async () => {
-              setLoading(true);
-              const res = await fetch(`/api/connectors/${provider}/runs`, { cache: 'no-store' });
-              const body = (await res.json().catch(() => ({}))) as { runs?: Run[] };
-              setRuns(body.runs ?? []);
-              setLoading(false);
-            }}
-            className="rounded-sm border border-border px-1.5 py-0.5 hover:bg-surface-2"
-          >
-            Refresh
-          </button>
-        </div>
+        <div className="text-[12px] text-text-muted">{runs.length} runs</div>
+        <button
+          type="button"
+          onClick={async () => {
+            setLoading(true);
+            const res = await fetch(`/api/connectors/${provider}/runs`, { cache: 'no-store' });
+            const body = (await res.json().catch(() => ({}))) as { runs?: Run[] };
+            setRuns(body.runs ?? []);
+            setLoading(false);
+          }}
+          className="rounded-sm border border-border px-1.5 py-0.5 text-[11px] text-text-muted hover:bg-surface-2"
+        >
+          Refresh
+        </button>
       </div>
       {runs.length === 0 ? (
         <div className="px-3 py-4 text-[12px] text-text-muted">

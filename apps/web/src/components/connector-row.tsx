@@ -14,6 +14,13 @@ import {
 import { GithubRepoPicker } from '@/components/github-repo-picker';
 import { SyncStatusBadge } from '@/components/sync-status-badge';
 import { SyncHistoryPanel } from '@/components/sync-history-panel';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { notifySyncTriggered } from '@/lib/sync-events';
 
 interface AllowlistEntry {
@@ -294,10 +301,10 @@ export function ConnectorRow({
                     Sync now
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
-                    onSelect={() => setShowHistory((v) => !v)}
+                    onSelect={() => setShowHistory(true)}
                     className="cursor-pointer rounded-sm px-2 py-1.5 text-text outline-none hover:bg-surface-2 focus:bg-surface-2"
                   >
-                    {showHistory ? 'Hide sync history' : 'Sync history'}
+                    Sync history
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     onSelect={() => {
@@ -326,7 +333,21 @@ export function ConnectorRow({
         </div>
       </div>
       {isGithub && status === 'connected' && showRepos ? <GithubRepoPicker /> : null}
-      {status === 'connected' && showHistory ? <SyncHistoryPanel provider={meta.id} /> : null}
+      {status === 'connected' ? (
+        <Sheet open={showHistory} onOpenChange={setShowHistory}>
+          <SheetContent side="right" className="w-full sm:max-w-xl">
+            <SheetHeader>
+              <SheetTitle>{meta.displayName} · Sync history</SheetTitle>
+              <SheetDescription>
+                Recent sync runs from BullMQ, scoped to your organization.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="overflow-y-auto px-5 py-4">
+              {showHistory ? <SyncHistoryPanel provider={meta.id} /> : null}
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : null}
     </div>
   );
 }
