@@ -28,12 +28,28 @@ function maybeNumber(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
+/**
+ * Defensive secret scrub at the API boundary. Any path that leaks a token into
+ * a job's failedReason — including jobs queued before the worker-side redaction
+ * fix shipped — gets cleaned here before it reaches the browser.
+ */
+function redactSecrets(s: string): string {
+  return s
+    // Basic-auth in URLs: https://user:pw@host or https://token@host
+    .replace(/(https?:\/\/)([^@/\s]+)@/g, '$1<redacted>@')
+    // GitHub tokens: gho_/ghs_/ghp_/ghr_/ghu_
+    .replace(/gh[opusr]_[A-Za-z0-9]{20,}/g, '<redacted-token>')
+    // Slack-style xoxb / xoxp / xoxa / xoxs
+    .replace(/xox[abpsr]-[A-Za-z0-9-]{10,}/g, '<redacted-token>');
+}
+
 function extractFix(reason: string | undefined): { problem: string | null; fix: string | null } {
   if (!reason) return { problem: null, fix: null };
+  const safe = redactSecrets(reason);
   // HoloError serializes as `${code}: ${problem} (fix: ${fix})` from holoError()
-  const fixMatch = reason.match(/\(fix:\s*([^)]+)\)\s*$/);
+  const fixMatch = safe.match(/\(fix:\s*([^)]+)\)\s*$/);
   const fix = fixMatch?.[1]?.trim() ?? null;
-  const problem = fix ? reason.replace(/\s*\(fix:[^)]+\)\s*$/, '').trim() : reason;
+  const problem = fix ? safe.replace(/\s*\(fix:[^)]+\)\s*$/, '').trim() : safe;
   return { problem, fix };
 }
 
