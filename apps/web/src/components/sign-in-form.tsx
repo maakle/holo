@@ -21,9 +21,13 @@ export function SignInForm() {
     setBusy(true);
     setError(null);
     try {
-      await signIn.social({ provider: 'github', callbackURL: '/dashboard' });
+      const res = await signIn.social({ provider: 'github', callbackURL: '/dashboard' });
+      if (res && 'error' in res && res.error) {
+        setError(res.error.message ?? 'Sign-in failed.');
+      }
     } catch (e) {
       setError((e as Error).message);
+    } finally {
       setBusy(false);
     }
   }
