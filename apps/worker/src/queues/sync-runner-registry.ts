@@ -27,6 +27,7 @@ const registry: Record<string, SyncRunner> = {
   'notion-sync': stubRunner('notion'),
   'grain-sync': stubRunner('grain'),
   'pylon-sync': stubRunner('pylon'),
+  'hubspot-sync': stubRunner('hubspot'),
 };
 
 export function getSyncRunner(queue: string): SyncRunner {

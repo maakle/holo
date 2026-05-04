@@ -5,6 +5,7 @@ export const QUEUE_NAMES = {
   NOTION_SYNC: 'notion-sync',
   GRAIN_SYNC: 'grain-sync',
   PYLON_SYNC: 'pylon-sync',
+  HUBSPOT_SYNC: 'hubspot-sync',
   EMBED: 'embed',
 } as const;
 
@@ -17,6 +18,7 @@ export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   'notion-sync': 2,
   'grain-sync': 2,
   'pylon-sync': 2,
+  'hubspot-sync': 2,
   embed: 5,
 };
 

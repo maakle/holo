@@ -11,6 +11,7 @@ import {
   createGithubCodeRunner,
   createGrainRunner,
   createPylonRunner,
+  createHubspotRunner,
 } from './runners';
 import { setSyncRunner } from './sync-runner-registry';
 import type { EmbedJobPayload } from './embed-insert';
@@ -52,7 +53,10 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     setSyncRunner(QUEUE_NAMES.GITHUB_CODE_SYNC, createGithubCodeRunner(deps));
     setSyncRunner(QUEUE_NAMES.GRAIN_SYNC, createGrainRunner(deps));
     setSyncRunner(QUEUE_NAMES.PYLON_SYNC, createPylonRunner(deps));
-    this.logger.log('Registered real SyncRunners for slack, notion, github-prose, github-code, grain, pylon');
+    setSyncRunner(QUEUE_NAMES.HUBSPOT_SYNC, createHubspotRunner(deps));
+    this.logger.log(
+      'Registered real SyncRunners for slack, notion, github-prose, github-code, grain, pylon, hubspot',
+    );
   }
 }
 

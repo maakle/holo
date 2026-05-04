@@ -10,3 +10,10 @@ export { slackThreadChunker, type SlackThreadInput } from './slack-thread.js';
 export { notionPageChunker, type NotionPageInput } from './notion-page.js';
 export { grainCallChunker, type GrainCallInput, type GrainSpeakerTurn } from './grain-call.js';
 export { pylonTicketChunker, type PylonTicketInput, type PylonMessage } from './pylon-ticket.js';
+export {
+  hubspotRecordChunker,
+  type HubspotRecordInput,
+  type HubspotEngagement,
+  type HubspotEngagementType,
+  type HubspotRecordType,
+} from './hubspot-record.js';

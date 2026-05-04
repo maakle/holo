@@ -10,7 +10,7 @@ export const CONNECTORS: ConnectorMeta[] = [
   {
     id: 'github',
     displayName: 'GitHub',
-    description: 'Pull requests, issues, repo metadata.',
+    description: 'Code, pull requests, issues, and markdown docs.',
     implemented: true,
     flowType: 'oauth',
   },
@@ -24,7 +24,7 @@ export const CONNECTORS: ConnectorMeta[] = [
   {
     id: 'notion',
     displayName: 'Notion',
-    description: 'Pages, databases, comments.',
+    description: 'Pages and databases.',
     implemented: true,
     flowType: 'apikey',
   },
@@ -45,7 +45,7 @@ export const CONNECTORS: ConnectorMeta[] = [
   {
     id: 'hubspot',
     displayName: 'HubSpot',
-    description: 'CRM contacts, deals, companies.',
+    description: 'CRM contacts, deals, companies, and engagement timelines.',
     implemented: true,
     flowType: 'oauth',
   },
