@@ -4,8 +4,8 @@ export { resolveAllowlist } from './shared/allowlist';
 export type { ResolveAllowlistInput, AllowlistResult, AllowlistRow } from './shared/allowlist';
 export { chunkHash, dedupeAgainstDb } from './shared/content-hash';
 export type { DedupeAgainstDbInput } from './shared/content-hash';
-export { createGithubConnector } from './github/index';
-export type { GithubConnectorOptions } from './github/index';
+// GitHub uses GitHub App auth, not OAuth — there is no Connector facade.
+// Worker dispatches directly to runGithubProseSync / runGithubCodeSync below.
 export { createSlackConnector } from './slack/index';
 export type { SlackConnectorOptions } from './slack/index';
 export { createSlackUserApiClient } from './slack/user-client';

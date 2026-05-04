@@ -181,8 +181,10 @@ export function ConnectorManageSheet({
 
   async function disconnect() {
     const ok = window.confirm(
-      `Disconnect ${meta.displayName}? This revokes your access token. ` +
-        `If no other users have it connected, indexed data and the repo allowlist will also be removed.`,
+      isGithub
+        ? `Disconnect GitHub? Holo's record of your installation, repo allowlist, and indexed chunks will be removed locally. The holo App will remain installed on GitHub — to also uninstall it there, visit https://github.com/settings/installations after this completes.`
+        : `Disconnect ${meta.displayName}? This revokes your access token. ` +
+          `If no other users have it connected, indexed data and the repo allowlist will also be removed.`,
     );
     if (!ok) return;
     setBusy(true);
@@ -238,7 +240,7 @@ export function ConnectorManageSheet({
                 </Button>
               )}
               <Button variant="secondary" size="sm" onClick={reconnect} disabled={busy}>
-                Reconnect
+                {isGithub ? 'Manage installation' : 'Reconnect'}
               </Button>
               <div className="ml-auto">
                 <Button

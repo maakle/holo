@@ -36,6 +36,40 @@ export async function DELETE(
       (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
     const userId = session.user.id;
 
+    // GitHub uses an org-level App installation, not per-user credentials.
+    // Local cleanup only — Phase 5 will add the call to GitHub's
+    // DELETE /app/installations/{id} endpoint to uninstall remotely.
+    if (provider === 'github') {
+      const deletedInstalls = await db
+        .delete(schema.githubInstallations)
+        .where(eq(schema.githubInstallations.organizationId, orgId))
+        .returning({ id: schema.githubInstallations.id });
+      const deletedSources = await db
+        .delete(schema.sources)
+        .where(
+          and(
+            eq(schema.sources.organizationId, orgId),
+            eq(schema.sources.provider, 'github'),
+          ),
+        )
+        .returning({ id: schema.sources.id });
+      const deletedAllow = await db
+        .delete(schema.connectorAllowlists)
+        .where(
+          and(
+            eq(schema.connectorAllowlists.organizationId, orgId),
+            eq(schema.connectorAllowlists.provider, 'github'),
+          ),
+        )
+        .returning({ id: schema.connectorAllowlists.id });
+      return NextResponse.json({
+        ok: true,
+        removedInstallations: deletedInstalls.length,
+        removedSources: deletedSources.length,
+        removedAllowlistRows: deletedAllow.length,
+      });
+    }
+
     // Mark this user's credential revoked. Other users in the same org keep theirs.
     await db
       .update(schema.connectorCredentials)
