@@ -266,7 +266,7 @@ export function ConnectorManageSheet({
                   <AlertDialogTitle>Disconnect {meta.displayName}?</AlertDialogTitle>
                   <AlertDialogDescription>
                     {isGithub
-                      ? "Holo's record of your installation, repo allowlist, and indexed chunks will be removed locally. The holo App will remain installed on GitHub — visit github.com/settings/installations after this completes to also uninstall it there."
+                      ? "The holo App will be uninstalled from GitHub on your behalf, and Holo's local record (installation, repo allowlist, indexed chunks) will be removed. You can re-install anytime from the connections page."
                       : `This revokes your access token. If no other users have it connected, indexed data and the repo allowlist will also be removed.`}
                   </AlertDialogDescription>
                 </AlertDialogHeader>

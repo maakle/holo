@@ -6,6 +6,7 @@ import {
   githubAppConfigFromEnv,
   mintAppJwt,
   mintInstallationToken,
+  uninstallApp,
 } from '../../src/github/auth';
 
 function generateTestKeyPair(): { privateKeyPem: string; publicKeyPem: string } {
@@ -116,6 +117,71 @@ describe('github app auth', () => {
       ).rejects.toMatchObject({
         code: 'HOLO_FETCH_FAILED',
         fix: expect.stringContaining('GITHUB_APP_PRIVATE_KEY'),
+      });
+    });
+  });
+
+  describe('uninstallApp', () => {
+    it('reports uninstalled=true on a 204 response', async () => {
+      const { privateKeyPem } = generateTestKeyPair();
+      let capturedMethod = '';
+      let capturedUrl = '';
+      const fetchImpl: typeof fetch = async (input, init) => {
+        capturedMethod = String(init?.method ?? 'GET');
+        capturedUrl = String(input);
+        return new Response(null, { status: 204 });
+      };
+      const result = await uninstallApp({
+        config: { appId: '1', privateKeyPem },
+        installationId: 42,
+        fetchImpl,
+      });
+      expect(result.uninstalled).toBe(true);
+      expect(capturedMethod).toBe('DELETE');
+      expect(capturedUrl).toBe('https://api.github.com/app/installations/42');
+    });
+
+    it('treats 404 as a successful no-op (already gone)', async () => {
+      const { privateKeyPem } = generateTestKeyPair();
+      const fetchImpl: typeof fetch = async () =>
+        new Response('{"message":"not found"}', { status: 404 });
+      const result = await uninstallApp({
+        config: { appId: '1', privateKeyPem },
+        installationId: 99,
+        fetchImpl,
+      });
+      expect(result.uninstalled).toBe(false);
+    });
+
+    it('throws on 401 with a clear key/app id mismatch fix', async () => {
+      const { privateKeyPem } = generateTestKeyPair();
+      const fetchImpl: typeof fetch = async () =>
+        new Response('{"message":"jwt invalid"}', { status: 401 });
+      await expect(
+        uninstallApp({
+          config: { appId: '1', privateKeyPem },
+          installationId: 99,
+          fetchImpl,
+        }),
+      ).rejects.toMatchObject({
+        code: 'HOLO_FETCH_FAILED',
+        fix: expect.stringContaining('private key'),
+      });
+    });
+
+    it('throws on other non-2xx responses', async () => {
+      const { privateKeyPem } = generateTestKeyPair();
+      const fetchImpl: typeof fetch = async () =>
+        new Response('{"message":"server error"}', { status: 500 });
+      await expect(
+        uninstallApp({
+          config: { appId: '1', privateKeyPem },
+          installationId: 99,
+          fetchImpl,
+        }),
+      ).rejects.toMatchObject({
+        code: 'HOLO_FETCH_FAILED',
+        problem: expect.stringContaining('500'),
       });
     });
   });

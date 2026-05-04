@@ -131,10 +131,11 @@ Five phases. Each is independently mergeable.
 3. Stub PR/issue/push handlers — log + enqueue a generic incremental sync. Fast-path is v2.
 4. Tests: HMAC tampering, suspended installation, install/uninstall round-trip.
 
-### Phase 5 — Disconnect path
+### Phase 5 — Disconnect path ✅
 
-1. `DELETE /api/connectors/github/connection`: mint App JWT, call `DELETE /app/installations/{id}` to uninstall on GitHub's side, then delete the `github_installations` row, `sources` row (cascade clears artifacts → chunks), and `connector_allowlists` rows for github.
-2. Confirmation dialog in the manage sheet says "uninstalls the holo App from <org>" so the admin understands GitHub-side effect.
+1. ✅ `DELETE /api/connectors/github/connection`: mint App JWT, call `DELETE /app/installations/{id}` to uninstall on GitHub's side, then delete the `github_installations` row, `sources` row (cascade clears artifacts → chunks), and `connector_allowlists` rows for github. Remote uninstall failures are logged but don't block local cleanup — leaving stale local state is worse than leaving the App installed on GitHub.
+2. ✅ Confirmation dialog updated: "The holo App will be uninstalled from GitHub on your behalf, and Holo's local record will be removed."
+3. ✅ Remote 404 is treated as a successful no-op so re-installing-then-disconnecting on a fresh installation_id doesn't fail.
 
 ## Pre-flight cleanup (before Phase 1 lands in dev)
 

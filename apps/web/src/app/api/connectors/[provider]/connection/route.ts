@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { and, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
+import { githubAppConfigFromEnv, uninstallApp } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 
 const PROVIDERS = new Set(['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot'] as const);
@@ -23,7 +24,7 @@ export async function DELETE(
     }
     const provider = rawProvider as Provider;
 
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db, env, defaultOrgId } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -36,10 +37,41 @@ export async function DELETE(
       (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
     const userId = session.user.id;
 
-    // GitHub uses an org-level App installation, not per-user credentials.
-    // Local cleanup only — Phase 5 will add the call to GitHub's
-    // DELETE /app/installations/{id} endpoint to uninstall remotely.
+    // GitHub uses an org-level App installation. Disconnect order matters:
+    //   1. Read installation_id locally (we lose it once we delete the row).
+    //   2. Tell GitHub to uninstall the App so it disappears from the
+    //      admin's github.com/settings/installations page.
+    //   3. Delete local rows (installation, sources, allowlist) regardless
+    //      of whether the GitHub-side uninstall actually changed anything —
+    //      a 404 from GitHub is treated as success (already gone).
     if (provider === 'github') {
+      const installRows = await db
+        .select({ installationId: schema.githubInstallations.installationId })
+        .from(schema.githubInstallations)
+        .where(eq(schema.githubInstallations.organizationId, orgId));
+
+      let remoteUninstalled = 0;
+      let remoteAlreadyGone = 0;
+      for (const row of installRows) {
+        try {
+          const config = githubAppConfigFromEnv(env);
+          const result = await uninstallApp({
+            config,
+            installationId: row.installationId,
+          });
+          if (result.uninstalled) remoteUninstalled += 1;
+          else remoteAlreadyGone += 1;
+        } catch (err) {
+          // Don't let a remote failure block local cleanup — leaving stale
+          // local state is worse than leaving the App installed on GitHub.
+          // The admin can always uninstall from github.com/settings/installations.
+          console.error(
+            `[disconnect/github] uninstall ${row.installationId} failed:`,
+            err,
+          );
+        }
+      }
+
       const deletedInstalls = await db
         .delete(schema.githubInstallations)
         .where(eq(schema.githubInstallations.organizationId, orgId))
@@ -64,6 +96,8 @@ export async function DELETE(
         .returning({ id: schema.connectorAllowlists.id });
       return NextResponse.json({
         ok: true,
+        remoteUninstalled,
+        remoteAlreadyGone,
         removedInstallations: deletedInstalls.length,
         removedSources: deletedSources.length,
         removedAllowlistRows: deletedAllow.length,
