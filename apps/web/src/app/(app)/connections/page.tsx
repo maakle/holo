@@ -31,6 +31,20 @@ export default async function ConnectionsPage({
         eq(schema.connectorCredentials.userId, userId),
       ),
     );
+
+  // GitHub uses GitHub App installations, not connector_credentials. The
+  // installation is org-scoped (not per-user) — any installation row for the
+  // org means GitHub is connected for everyone in that org.
+  const githubInstallRows = await db
+    .select({
+      id: schema.githubInstallations.id,
+      accountLogin: schema.githubInstallations.accountLogin,
+    })
+    .from(schema.githubInstallations)
+    .where(eq(schema.githubInstallations.organizationId, orgId))
+    .limit(1);
+  const githubConnected = githubInstallRows.length > 0;
+  const githubAccountLogin = githubInstallRows[0]?.accountLogin ?? null;
   const sourceRows = await db
     .select({
       id: schema.sources.id,
@@ -74,9 +88,17 @@ export default async function ConnectionsPage({
     .where(eq(schema.connectorAllowlists.organizationId, orgId));
 
   const connected = new Map(
-    credRows.filter((r) => r.status === 'active').map((r) => [r.provider, true]),
+    credRows
+      .filter((r) => r.status === 'active' && r.provider !== 'github')
+      .map((r) => [r.provider, true]),
   );
+  if (githubConnected) connected.set('github', true);
   const sourceName = new Map(sourceRows.map((r) => [r.provider, r.name]));
+  // For GitHub, fall back to the installation's account_login when no
+  // source row exists yet (very brief window between install and first sync).
+  if (!sourceName.has('github') && githubAccountLogin) {
+    sourceName.set('github', githubAccountLogin);
+  }
   const allowlistByProvider = new Map<string, { pattern: string; isGlob: boolean }[]>();
   for (const r of allowlistRows) {
     if (r.decision !== 'include') continue;
