@@ -84,9 +84,12 @@ const PER_PAGE = 100;
 const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
 const MAX_RETRIES = 3;
 // Cap rate-limit waits so a misconfigured reset header can't pin a job for
-// hours. If GitHub says we have to wait longer than this, surface to BullMQ
-// so the job can retry from scratch later.
-const MAX_RATE_LIMIT_WAIT_MS = 15 * 60 * 1000;
+// hours. GitHub's primary rate limits reset on a rolling 1-hour window, so
+// at any moment the reset can be up to 60 min away. We allow a small buffer
+// past that to absorb clock skew between us and GitHub. BullMQ auto-renews
+// the worker's job lock during sleep, so a long wait doesn't risk a stalled
+// pickup — better than giving up and re-running the whole walk later.
+const MAX_RATE_LIMIT_WAIT_MS = 65 * 60 * 1000;
 
 async function ghFetch(
   token: string,
@@ -135,12 +138,13 @@ async function ghFetch(
         code: ErrorCode.HOLO_FETCH_FAILED,
         problem:
           waitMs !== null
-            ? `GitHub rate limited; reset in ~${Math.ceil(waitMs / 60000)}m`
+            ? `GitHub rate-limited this installation; reset in ~${Math.ceil(waitMs / 60000)}m. ` +
+              `This is GitHub throttling our App, not a code error.`
             : 'GitHub returned 403 (rate limit or forbidden)',
         fix:
           waitMs !== null
-            ? 'The sync will retry on the next scheduler tick. Re-run later or wait for the rate limit window to reset.'
-            : 'Verify the OAuth scope includes repo read:org and that the token is still valid.',
+            ? 'The 6h scheduler will retry automatically when the window resets. No action needed.'
+            : 'Verify the App installation has access and the installation token has the expected permissions.',
       });
     }
     if (TRANSIENT_STATUSES.has(res.status) && attempt < MAX_RETRIES) {
