@@ -196,6 +196,9 @@ export function SyncHistoryPanel({ provider }: Props) {
                             {r.failedFix ? (
                               <div className="mt-1 text-error/80">Fix: {r.failedFix}</div>
                             ) : null}
+                            <div className="mt-2 text-[10px] text-error/70">
+                              Full stack trace and underlying cause are in the worker logs.
+                            </div>
                           </div>
                         ) : null}
                       </div>
