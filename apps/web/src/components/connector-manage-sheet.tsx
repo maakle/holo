@@ -14,6 +14,16 @@ import {
 import { GithubRepoPicker } from '@/components/github-repo-picker';
 import { SlackChannelPicker } from '@/components/slack-channel-picker';
 import { SyncHistoryPanel } from '@/components/sync-history-panel';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { notifySyncTriggered } from '@/lib/sync-events';
 
 interface Props {
@@ -56,6 +66,7 @@ export function ConnectorManageSheet({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const wasOpenRef = useRef(false);
 
   const isApiKey = meta.flowType === 'apikey';
@@ -180,13 +191,6 @@ export function ConnectorManageSheet({
   }
 
   async function disconnect() {
-    const ok = window.confirm(
-      isGithub
-        ? `Disconnect GitHub? Holo's record of your installation, repo allowlist, and indexed chunks will be removed locally. The holo App will remain installed on GitHub — to also uninstall it there, visit https://github.com/settings/installations after this completes.`
-        : `Disconnect ${meta.displayName}? This revokes your access token. ` +
-          `If no other users have it connected, indexed data and the repo allowlist will also be removed.`,
-    );
-    if (!ok) return;
     setBusy(true);
     setError(null);
     setInfo(null);
@@ -200,6 +204,7 @@ export function ConnectorManageSheet({
         setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
         return;
       }
+      setConfirmingDisconnect(false);
       onOpenChange(false);
       router.refresh();
     } finally {
@@ -246,7 +251,7 @@ export function ConnectorManageSheet({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={disconnect}
+                  onClick={() => setConfirmingDisconnect(true)}
                   disabled={busy}
                   className="text-error hover:bg-[color-mix(in_srgb,var(--error)_8%,transparent)]"
                 >
@@ -254,6 +259,34 @@ export function ConnectorManageSheet({
                 </Button>
               </div>
             </div>
+
+            <AlertDialog open={confirmingDisconnect} onOpenChange={setConfirmingDisconnect}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Disconnect {meta.displayName}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {isGithub
+                      ? "Holo's record of your installation, repo allowlist, and indexed chunks will be removed locally. The holo App will remain installed on GitHub — visit github.com/settings/installations after this completes to also uninstall it there."
+                      : `This revokes your access token. If no other users have it connected, indexed data and the repo allowlist will also be removed.`}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    destructive
+                    disabled={busy}
+                    onClick={(e) => {
+                      // Prevent Radix's auto-close so the action stays open
+                      // until the request completes; we close manually on success.
+                      e.preventDefault();
+                      void disconnect();
+                    }}
+                  >
+                    {busy ? 'Disconnecting…' : 'Disconnect'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {error ? (
               <div className="rounded-md border border-error/30 bg-[color-mix(in_srgb,var(--error)_8%,transparent)] px-3 py-2 text-[12px] text-error">
