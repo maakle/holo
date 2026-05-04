@@ -10,6 +10,7 @@ import {
   customType,
   integer,
   boolean,
+  bigint,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { encryptedText } from './encrypted-text';
@@ -196,6 +197,33 @@ export const connectorAllowlists = pgTable(
       t.organizationId,
       t.provider,
     ),
+  }),
+);
+
+export const githubInstallations = pgTable(
+  'github_installations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    installationId: bigint('installation_id', { mode: 'number' }).notNull(),
+    accountLogin: text('account_login').notNull(),
+    accountType: text('account_type').notNull(),
+    accountId: bigint('account_id', { mode: 'number' }).notNull(),
+    repositorySelection: text('repository_selection').notNull(),
+    installedByUserId: uuid('installed_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    installedAt: timestamp('installed_at', { withTimezone: true }).notNull().defaultNow(),
+    suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+  },
+  (t) => ({
+    orgInstallUniq: uniqueIndex('github_installations_org_install_uniq').on(
+      t.organizationId,
+      t.installationId,
+    ),
+    installIdx: index('github_installations_install_idx').on(t.installationId),
   }),
 );
 
