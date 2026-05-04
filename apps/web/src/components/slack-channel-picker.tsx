@@ -22,12 +22,15 @@ interface Props {
 export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
   const router = useRouter();
   const [channels, setChannels] = useState<Channel[] | null>(null);
+  const [teamId, setTeamId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [needsInvite, setNeedsInvite] = useState<{ id: string; name: string }[]>([]);
+  const [joinedCount, setJoinedCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -39,6 +42,7 @@ export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
         const res = await fetch('/api/connectors/slack/channels');
         const body = (await res.json().catch(() => ({}))) as {
           channels?: Channel[];
+          teamId?: string | null;
           fix?: string;
           problem?: string;
         };
@@ -49,6 +53,7 @@ export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
         if (!cancelled) {
           const list = body.channels ?? [];
           setChannels(list);
+          setTeamId(body.teamId ?? null);
           setSelected(new Set(list.filter((c) => c.selected).map((c) => c.id)));
         }
       } finally {
@@ -73,12 +78,23 @@ export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
         fix?: string;
         problem?: string;
         triggeredSync?: boolean;
+        joined?: string[];
+        needsInvite?: { id: string; name: string }[];
+        joinErrors?: { id: string; error: string }[];
       };
       if (!res.ok) {
         setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
         return;
       }
       setSavedAt(Date.now());
+      setJoinedCount(body.joined?.length ?? 0);
+      setNeedsInvite(body.needsInvite ?? []);
+      const missingScope = body.joinErrors?.some((e) => e.error === 'missing_scope');
+      if (missingScope) {
+        setError(
+          'Selection saved, but the bot lacks the channels:join scope to auto-join public channels. Click Reconnect to re-authorize.',
+        );
+      }
       if (body.triggeredSync) notifySyncTriggered('slack');
       router.refresh();
     } finally {
@@ -202,10 +218,54 @@ export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
               ))
             )}
           </div>
+          {savedAt && needsInvite.length > 0 ? (
+            <div className="border-t border-border bg-[color-mix(in_srgb,var(--warning,#b45309)_8%,transparent)] px-3 py-2 text-[12px] text-text">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                <div className="flex-1">
+                  <div className="font-medium">
+                    {needsInvite.length} private channel
+                    {needsInvite.length === 1 ? '' : 's'} need the holo bot invited
+                  </div>
+                  <div className="text-text-muted">
+                    Run <code className="rounded bg-surface-2 px-1">/invite @holo</code> in each.
+                    Public channels were joined automatically.
+                  </div>
+                  <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                    {needsInvite.map((c) => {
+                      const href = teamId
+                        ? `slack://channel?team=${teamId}&id=${c.id}`
+                        : `https://slack.com/app_redirect?channel=${c.id}`;
+                      return (
+                        <li key={c.id}>
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center rounded border border-border bg-surface px-1.5 py-0.5 text-[11px] hover:bg-surface-2"
+                          >
+                            #{c.name}
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2">
             <div className="text-[12px] text-text-muted">
               {error ? <span className="text-error">{error}</span> : null}
-              {!error && savedAt ? <span>Saved · sync was kicked off.</span> : null}
+              {!error && savedAt ? (
+                <span>
+                  Saved · sync kicked off
+                  {joinedCount > 0
+                    ? ` · auto-joined ${joinedCount} public channel${joinedCount === 1 ? '' : 's'}`
+                    : ''}
+                  .
+                </span>
+              ) : null}
             </div>
             <Button variant="primary" size="sm" onClick={save} disabled={saving}>
               {saving ? 'Saving…' : 'Save selection'}

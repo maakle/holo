@@ -19,6 +19,7 @@ import type { DB } from '@holo/db';
 const SCOPES = [
   'channels:history',
   'channels:read',
+  'channels:join',
   'groups:history',
   'groups:read',
   'users:read',

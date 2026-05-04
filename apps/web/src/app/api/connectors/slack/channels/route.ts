@@ -46,6 +46,22 @@ async function loadAccessToken(
   return token;
 }
 
+async function joinPublicChannel(
+  token: string,
+  channelId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch('https://slack.com/api/conversations.join', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({ channel: channelId }).toString(),
+  });
+  const json = (await res.json()) as { ok: boolean; error?: string };
+  return { ok: json.ok, error: json.error };
+}
+
 async function listAllChannels(token: string): Promise<SlackChannel[]> {
   const out: SlackChannel[] = [];
   let cursor: string | undefined;
@@ -122,10 +138,11 @@ export async function GET() {
     // Pull bot_not_in_channel warnings from cursor metadata across all Slack
     // sources for this org.
     const slackSources = await db
-      .select({ id: schema.sources.id })
+      .select({ id: schema.sources.id, externalId: schema.sources.externalId })
       .from(schema.sources)
       .where(and(eq(schema.sources.organizationId, orgId), eq(schema.sources.provider, 'slack')));
     const sourceIds = slackSources.map((s) => s.id);
+    const teamId = slackSources[0]?.externalId ?? null;
     const botNotInChannel = new Set<string>();
     if (sourceIds.length > 0) {
       const cursors = await db
@@ -145,6 +162,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
+      teamId,
       channels: channels.map((c) => ({
         id: c.id,
         name: c.name,
@@ -248,6 +266,32 @@ export async function PUT(req: Request) {
       );
     }
 
+    // Auto-join public channels we just added. Private channels can't be
+    // joined by the bot — flag them so the UI can prompt for /invite @holo.
+    const joined: string[] = [];
+    const needsInvite: { id: string; name: string }[] = [];
+    const joinErrors: { id: string; error: string }[] = [];
+    if (toInsert.length > 0) {
+      const token = await loadAccessToken(db, orgId, userId);
+      const all = await listAllChannels(token);
+      const byId = new Map(all.map((c) => [c.id, c]));
+      for (const id of toInsert) {
+        const c = byId.get(id);
+        if (!c) continue;
+        if (c.is_private) {
+          if (!c.is_member) needsInvite.push({ id: c.id, name: c.name });
+          continue;
+        }
+        if (c.is_member) {
+          joined.push(id);
+          continue;
+        }
+        const result = await joinPublicChannel(token, id);
+        if (result.ok) joined.push(id);
+        else joinErrors.push({ id, error: result.error ?? 'unknown' });
+      }
+    }
+
     let triggeredSync = false;
     if ((toInsert.length > 0 || toDelete.length > 0) && desired.length > 0) {
       const sourceRows = await db
@@ -267,6 +311,9 @@ export async function PUT(req: Request) {
       removed: toDelete.length,
       total: desired.length,
       triggeredSync,
+      joined,
+      needsInvite,
+      joinErrors,
     });
   } catch (e) {
     if (e instanceof HoloError) {
