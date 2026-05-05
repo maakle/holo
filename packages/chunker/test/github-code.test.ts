@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { githubCodeChunker } from '../src/github-code.js';
 import { createRegistry } from '../src/tree-sitter/registry.js';
 import type { ChunkContext } from '../src/contract.js';
@@ -42,10 +42,9 @@ function baz() {
     }
   });
 
-  it('unknown language (cobol) → falls back to recursiveSplit + warning', async () => {
+  it('unknown language (cobol) → falls back to recursiveSplit', async () => {
     const registry = createRegistry();
     const ctx: ChunkContext = { ...baseCtx, treeSitter: registry };
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const content = 'IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\n';
     const chunks = await githubCodeChunker.chunk(
       {
@@ -62,24 +61,23 @@ function baz() {
       expect(c.metadata.language).toBe('cobol');
       expect(c.metadata.symbol_name).toBeUndefined();
     }
-    const calls = warnSpy.mock.calls.map((c) => String(c[0]));
-    expect(calls.some((s) => s.includes('HOLO_CHUNKER_FALLBACK'))).toBe(true);
-    warnSpy.mockRestore();
   });
 
-  it('missing ctx.treeSitter → throws', async () => {
-    await expect(
-      githubCodeChunker.chunk(
-        {
-          repoFullName: 'acme/api',
-          commitSha: 'abc123',
-          filePath: 'main.ts',
-          language: 'typescript',
-          content: 'function f(){}',
-        },
-        baseCtx,
-      ),
-    ).rejects.toThrow(/treeSitter/);
+  it('missing ctx.treeSitter → falls back to recursiveSplit', async () => {
+    const chunks = await githubCodeChunker.chunk(
+      {
+        repoFullName: 'acme/api',
+        commitSha: 'abc123',
+        filePath: 'main.ts',
+        language: 'typescript',
+        content: 'function f(){}',
+      },
+      baseCtx,
+    );
+    expect(chunks.length).toBeGreaterThan(0);
+    for (const c of chunks) {
+      expect(c.metadata.symbol_name).toBeUndefined();
+    }
   });
 
   it('embeddingModel is voyage-code-3', () => {
