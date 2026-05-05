@@ -5,13 +5,10 @@ import { usePathname } from 'next/navigation';
 const TITLES: Record<string, string> = {
   '/dashboard': 'Overview',
   '/connections': 'Connections',
-  '/skills': 'Skills',
-  '/skills/runs': 'Skill runs',
   '/observability': 'Observability',
   '/connect-agent': 'Connect agent',
   '/dashboard/team': 'Team',
   '/audit': 'Audit log',
-  '/marketplace': 'Marketplace',
   '/profile': 'Profile',
 };
 

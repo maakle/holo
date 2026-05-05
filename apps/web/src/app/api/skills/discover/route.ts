@@ -1,22 +1,5 @@
-import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
-import { runDiscovery } from '@holo/discovery';
-import { getServerContext } from '@/lib/server-context';
-import { buildDiscoveryDb } from '@/lib/discovery-db';
+// Procedure auto-discovery deferred from the MVP. See README roadmap.
+// Original implementation in git history; supporting logic in @holo/discovery.
+import { deferred } from '@/lib/feature-deferred';
 
-export async function POST() {
-  const { auth, db, defaultOrgId } = await getServerContext();
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  const orgId = defaultOrgId;
-
-  const apiKey = process.env['ANTHROPIC_API_KEY'];
-  if (!apiKey) return NextResponse.json({ error: 'missing_api_key' }, { status: 500 });
-
-  const result = await runDiscovery({
-    orgId,
-    apiKey,
-    db: buildDiscoveryDb(db),
-  });
-  return NextResponse.json(result);
-}
+export const POST = () => deferred('procedure auto-discovery');
