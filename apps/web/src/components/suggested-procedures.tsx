@@ -102,7 +102,7 @@ function ProposalCard({
     <div className="rounded-md border border-border bg-surface px-5 py-4 space-y-3">
       {/* Heading */}
       <div className="space-y-1">
-        <h3 className="font-display text-[18px] leading-7 font-semibold text-text tracking-[-0.01em]">
+        <h3 className="font-sans text-[18px] leading-7 font-semibold text-text tracking-[-0.01em]">
           {proposal.proposedName}
         </h3>
         <p className="text-[13px] leading-5 text-text-muted">{proposal.summary}</p>
@@ -246,14 +246,15 @@ export function SuggestedProcedures() {
           </p>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="sm"
             onClick={discover}
             disabled={discovering}
-            className="rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-fg hover:bg-accent/90 active:bg-accent/85 disabled:opacity-50 transition-colors duration-micro whitespace-nowrap"
+            className="whitespace-nowrap"
           >
             {discovering ? 'Scanning artifacts…' : 'Discover now'}
-          </button>
+          </Button>
           {discoverError && (
             <p className="text-[12px] text-error text-right max-w-48">{discoverError}</p>
           )}
