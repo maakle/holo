@@ -29,11 +29,32 @@ export type SyncResult = {
   skipReason?: string;
 };
 
+// Heartbeat callback. The processor wires this to a debounced DB write so
+// connectors can call it freely; runners that don't pass it through degrade
+// to "no live progress" without breaking.
+export type ReportProgressFn = (input: {
+  current: number;
+  total?: number | null;
+  message?: string;
+}) => void;
+
+export type SyncRunnerOpts = {
+  reportProgress?: ReportProgressFn;
+};
+
 export type SyncRunner = {
-  full?(payload: SyncJobPayload): Promise<SyncResult>;
-  incremental?(payload: SyncJobPayload, cursor: SyncCursor): Promise<SyncResult>;
-  codeInitial?(payload: SyncJobPayload): Promise<SyncResult>;
-  codeIncremental?(payload: SyncJobPayload, cursor: SyncCursor): Promise<SyncResult>;
+  full?(payload: SyncJobPayload, opts?: SyncRunnerOpts): Promise<SyncResult>;
+  incremental?(
+    payload: SyncJobPayload,
+    cursor: SyncCursor,
+    opts?: SyncRunnerOpts,
+  ): Promise<SyncResult>;
+  codeInitial?(payload: SyncJobPayload, opts?: SyncRunnerOpts): Promise<SyncResult>;
+  codeIncremental?(
+    payload: SyncJobPayload,
+    cursor: SyncCursor,
+    opts?: SyncRunnerOpts,
+  ): Promise<SyncResult>;
 };
 
 export type RunSyncJobArgs = {
@@ -43,6 +64,7 @@ export type RunSyncJobArgs = {
   runner: SyncRunner;
   cursorStore: SyncCursorStore;
   checkpointStore: CheckpointStore;
+  reportProgress?: ReportProgressFn;
 };
 
 // Executes one sync job: read cursor → decide mode → invoke runner wrapped in
@@ -56,7 +78,10 @@ export async function runSyncJob(args: RunSyncJobArgs): Promise<SyncResult> {
     sourceId: args.payload.sourceId,
     jobId: args.jobId,
     name: 'connector-sync',
-    run: () => invokeRunner(mode, args.runner, args.payload, cursor),
+    run: () =>
+      invokeRunner(mode, args.runner, args.payload, cursor, {
+        reportProgress: args.reportProgress,
+      }),
   });
 
   await args.cursorStore.upsertAfterSync(args.payload.sourceId, {
@@ -73,19 +98,20 @@ async function invokeRunner(
   runner: SyncRunner,
   payload: SyncJobPayload,
   cursor: SyncCursor,
+  opts: SyncRunnerOpts,
 ): Promise<SyncResult> {
   switch (mode) {
     case 'full':
       if (!runner.full) notImplemented('full');
-      return runner.full(payload);
+      return runner.full(payload, opts);
     case 'incremental':
       if (!runner.incremental) notImplemented('incremental');
-      return runner.incremental(payload, cursor);
+      return runner.incremental(payload, cursor, opts);
     case 'code-initial':
       if (!runner.codeInitial) notImplemented('codeInitial');
-      return runner.codeInitial(payload);
+      return runner.codeInitial(payload, opts);
     case 'code-incremental':
       if (!runner.codeIncremental) notImplemented('codeIncremental');
-      return runner.codeIncremental(payload, cursor);
+      return runner.codeIncremental(payload, cursor, opts);
   }
 }

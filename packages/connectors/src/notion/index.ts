@@ -1,7 +1,28 @@
 import { holoError, ErrorCode } from '@holo/errors';
 import { resolveAllowlist } from '../shared/allowlist';
-import { createNotionApiClient } from './api-client';
+import { createNotionApiClient, type NotionApiClient } from './api-client';
 import { runNotionSync, type NotionEmbedEnqueueFn } from './sync';
+
+// Notion's integration token already scopes access to pages explicitly shared
+// with the integration — duplicating that as a per-ID allowlist on our side
+// is friction. A wildcard glob means "trust the Notion-side share boundary";
+// we resolve it at sync time by enumerating every page the token can see.
+async function expandWildcardToAccessiblePageIds(
+  client: NotionApiClient,
+): Promise<string[]> {
+  const ids = new Set<string>();
+  let cursor: string | undefined;
+  // Cap at 10 pages of 100 results to avoid runaway enumeration on huge
+  // workspaces. Users with >1000 accessible pages should narrow via
+  // `holo allowlist add notion <pattern>`.
+  for (let page = 0; page < 10; page++) {
+    const res = await client.search('', cursor);
+    for (const p of res.results) ids.add(p.id);
+    if (!res.nextCursor) break;
+    cursor = res.nextCursor;
+  }
+  return [...ids];
+}
 import type {
   Connector,
   ConnectorTokens,
@@ -89,15 +110,21 @@ export function createNotionConnector(opts: NotionConnectorOptions = {}): Connec
         organizationId: ctx.organizationId,
         provider: 'notion',
       });
+      const client = createNotionApiClient(tokens.accessToken, fetchImpl);
+      ctx.reportProgress?.({ current: 0, total: null, message: 'Discovering pages…' });
+      const allowedPageIds = allowlist.resolved.includes('*')
+        ? await expandWildcardToAccessiblePageIds(client)
+        : allowlist.resolved;
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
       const result = await runNotionSync({
-        client: createNotionApiClient(tokens.accessToken, fetchImpl),
-        allowedPageIds: allowlist.resolved,
+        client,
+        allowedPageIds,
         cursorMetadata: {},
         organizationId: ctx.organizationId,
         sourceId: ctx.sourceId,
         existingHashes,
         enqueueEmbed: opts.enqueueEmbed,
+        reportProgress: ctx.reportProgress,
       });
       return { artifactCount: result.artifactCount, newCursor: new Date() };
     },
@@ -115,16 +142,22 @@ export function createNotionConnector(opts: NotionConnectorOptions = {}): Connec
         organizationId: ctx.organizationId,
         provider: 'notion',
       });
+      const client = createNotionApiClient(tokens.accessToken, fetchImpl);
+      ctx.reportProgress?.({ current: 0, total: null, message: 'Discovering pages…' });
+      const allowedPageIds = allowlist.resolved.includes('*')
+        ? await expandWildcardToAccessiblePageIds(client)
+        : allowlist.resolved;
       const cursor = await loadCursorMetadata(opts.db, ctx.sourceId);
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
       const result = await runNotionSync({
-        client: createNotionApiClient(tokens.accessToken, fetchImpl),
-        allowedPageIds: allowlist.resolved,
+        client,
+        allowedPageIds,
         cursorMetadata: cursor,
         organizationId: ctx.organizationId,
         sourceId: ctx.sourceId,
         existingHashes,
         enqueueEmbed: opts.enqueueEmbed,
+        reportProgress: ctx.reportProgress,
       });
       return { artifactCount: result.artifactCount, newCursor: new Date() };
     },

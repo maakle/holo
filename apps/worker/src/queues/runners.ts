@@ -207,19 +207,29 @@ export function createNotionRunner(deps: RunnerDeps): SyncRunner {
     createNotionConnector({ db: deps.db, enqueueEmbed });
 
   return {
-    async full(payload: SyncJobPayload): Promise<SyncResult> {
+    async full(payload: SyncJobPayload, opts): Promise<SyncResult> {
       const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'notion');
       const result = await buildConnector().fullSync(
         { accessToken },
-        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
+        {
+          sourceId: payload.sourceId,
+          organizationId: payload.organizationId,
+          cursorScope: 'sync',
+          reportProgress: opts?.reportProgress,
+        },
       );
       return { artifactCount: result.artifactCount, newCursor: result.newCursor };
     },
-    async incremental(payload: SyncJobPayload): Promise<SyncResult> {
+    async incremental(payload: SyncJobPayload, _cursor, opts): Promise<SyncResult> {
       const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'notion');
       const result = await buildConnector().incrementalSync(
         { accessToken },
-        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
+        {
+          sourceId: payload.sourceId,
+          organizationId: payload.organizationId,
+          cursorScope: 'sync',
+          reportProgress: opts?.reportProgress,
+        },
       );
       return { artifactCount: result.artifactCount, newCursor: result.newCursor };
     },

@@ -99,6 +99,20 @@ function ApiKeyStep<TState>({
               ) : null}
             </p>
           ) : null}
+          {args.instructions && args.instructions.length > 0 ? (
+            <ol className="flex flex-col gap-1 text-[12px] text-text-muted list-decimal pl-4">
+              {args.instructions.map((s) => (
+                <li key={s}>{s}</li>
+              ))}
+            </ol>
+          ) : null}
+          {args.permissions && args.permissions.length > 0 ? (
+            <ul className="flex flex-col gap-1 text-[12px] text-text-muted">
+              {args.permissions.map((p) => (
+                <li key={p}>· {p}</li>
+              ))}
+            </ul>
+          ) : null}
           <input
             type="password"
             value={token}

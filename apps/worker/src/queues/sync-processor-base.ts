@@ -14,6 +14,7 @@ import {
   startSyncRun,
   finishSyncRunOk,
   finishSyncRunFailed,
+  updateSyncRunProgress,
 } from './sync-runs-store';
 import type { QueueName, SyncJobPayload } from './types';
 
@@ -74,6 +75,36 @@ export abstract class SyncProcessorBase extends WorkerHost {
     } catch (err) {
       this.logger.warn(`sync_runs start insert failed ${ctx}: ${(err as Error).message}`);
     }
+    // Debounced heartbeat: connectors call reportProgress freely (once per
+    // page / repo / channel), but we coalesce to one DB write every ~1s and
+    // skip writes when nothing changed since the last one. Final state on
+    // ok/failed comes from finishSyncRun*, not from this path.
+    let lastProgressWriteAt = 0;
+    let lastProgressKey = '';
+    const reportProgress = (input: {
+      current: number;
+      total?: number | null;
+      message?: string;
+    }): void => {
+      const now = Date.now();
+      const key = `${input.current}/${input.total ?? ''}/${input.message ?? ''}`;
+      if (key === lastProgressKey) return;
+      if (now - lastProgressWriteAt < 1000) return;
+      lastProgressKey = key;
+      lastProgressWriteAt = now;
+      updateSyncRunProgress(sql, {
+        queueName: this.queueName,
+        jobId,
+        current: input.current,
+        total: input.total ?? null,
+        message: input.message ?? null,
+      }).catch((err) => {
+        this.logger.warn(
+          `sync_runs progress update failed ${ctx}: ${(err as Error).message}`,
+        );
+      });
+    };
+
     try {
       const result = await runSyncJob({
         queue: this.queueName,
@@ -82,6 +113,7 @@ export abstract class SyncProcessorBase extends WorkerHost {
         runner: getSyncRunner(this.queueName),
         cursorStore: getCursorStore(),
         checkpointStore: getCheckpointStore(),
+        reportProgress,
       });
       try {
         await finishSyncRunOk(sql, {

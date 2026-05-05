@@ -44,7 +44,36 @@ export async function startSyncRun(sql: Sql, args: StartRunArgs): Promise<void> 
       artifact_count = NULL,
       error_code = NULL,
       error_problem = NULL,
-      error_cause = NULL
+      error_cause = NULL,
+      progress_current = NULL,
+      progress_total = NULL,
+      progress_message = NULL
+  `;
+}
+
+export interface UpdateProgressArgs {
+  queueName: QueueName;
+  jobId: string;
+  current: number;
+  total?: number | null;
+  message?: string | null;
+}
+
+// Heartbeat update — only writes when the row is still 'running' so a late
+// heartbeat from a worker whose job got cancelled mid-flight can't resurrect
+// the progress fields after FinishFail / FinishOk wrote final state.
+export async function updateSyncRunProgress(
+  sql: Sql,
+  args: UpdateProgressArgs,
+): Promise<void> {
+  await sql`
+    UPDATE sync_runs
+       SET progress_current = ${args.current},
+           progress_total = ${args.total ?? null},
+           progress_message = ${args.message ?? null}
+     WHERE queue_name = ${args.queueName}
+       AND job_id = ${args.jobId}
+       AND status = 'running'
   `;
 }
 

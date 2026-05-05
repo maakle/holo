@@ -77,6 +77,34 @@ export async function POST(req: Request) {
         set: { name: ident.name, updatedAt: new Date() },
       });
 
+    // Notion's own "Access to content" UI is the access boundary — the
+    // integration token can only see pages the user explicitly shared with
+    // it. Mirror that on our side with a wildcard allowlist on first connect
+    // so users don't have to reselect pages here. Operators can still narrow
+    // later via `holo allowlist add notion <pattern>`.
+    const existingAllow = await db
+      .select({ id: schema.connectorAllowlists.id })
+      .from(schema.connectorAllowlists)
+      .where(
+        and(
+          eq(schema.connectorAllowlists.organizationId, orgId),
+          eq(schema.connectorAllowlists.provider, 'notion'),
+          eq(schema.connectorAllowlists.decision, 'include'),
+        ),
+      )
+      .limit(1);
+    if (!existingAllow[0]) {
+      await db.insert(schema.connectorAllowlists).values({
+        organizationId: orgId,
+        provider: 'notion',
+        pattern: '*',
+        patternKind: 'glob',
+        decision: 'include',
+        createdBy: userId,
+        notes: 'Access is managed inside Notion via page sharing.',
+      });
+    }
+
     await enqueueInitialSync(db, orgId, 'notion').catch(() => {});
 
     return NextResponse.json({ ok: true });

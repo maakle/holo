@@ -17,6 +17,10 @@ type Run = {
   failedReason: string | null;
   failedFix: string | null;
   skipReason: string | null;
+  liveArtifactCount: number | null;
+  progressCurrent: number | null;
+  progressTotal: number | null;
+  progressMessage: string | null;
 };
 
 function describeSkipReason(reason: string): string {
@@ -178,6 +182,18 @@ export function SyncHistoryPanel({ provider }: Props) {
             const rowKey = `${r.queue}:${r.id}`;
             const expanded = openRowId === rowKey;
             const artifactsLabel = formatArtifacts(r.state, r.artifactCount, r.skipReason);
+            // While running, surface the heartbeat in the collapsed header so
+            // users see motion without expanding. Falls back to live chunk
+            // counter when the connector hasn't reported a message yet.
+            const liveLabel =
+              r.state === 'active'
+                ? r.progressMessage ??
+                  (r.progressCurrent !== null && r.progressTotal !== null
+                    ? `${r.progressCurrent} / ${r.progressTotal}`
+                    : r.liveArtifactCount && r.liveArtifactCount > 0
+                      ? `+${r.liveArtifactCount.toLocaleString()} chunks so far`
+                      : null)
+                : null;
             return (
               <li
                 key={rowKey}
@@ -208,6 +224,9 @@ export function SyncHistoryPanel({ provider }: Props) {
                       {artifactsLabel ? (
                         <span className="text-text-muted">· {artifactsLabel}</span>
                       ) : null}
+                      {liveLabel ? (
+                        <span className="text-accent">· {liveLabel}</span>
+                      ) : null}
                       {r.attempts > 1 ? (
                         <span className="text-warning">
                           · {r.attempts} attempts
@@ -237,12 +256,32 @@ export function SyncHistoryPanel({ provider }: Props) {
                       <dd className="text-text">
                         {r.skipReason
                           ? `0 (${describeSkipReason(r.skipReason)} — sync skipped)`
-                          : r.artifactCount === null
-                            ? '—'
-                            : r.artifactCount === 0
+                          : r.artifactCount !== null
+                            ? r.artifactCount === 0
                               ? '0 (content already indexed — nothing new to embed)'
-                              : r.artifactCount.toLocaleString()}
+                              : r.artifactCount.toLocaleString()
+                            : r.state === 'active' && r.liveArtifactCount !== null
+                              ? `${r.liveArtifactCount.toLocaleString()} so far (live)`
+                              : '—'}
                       </dd>
+                      {r.state === 'active' &&
+                      (r.progressMessage || r.progressCurrent !== null) ? (
+                        <>
+                          <dt className="text-text-muted">Progress</dt>
+                          <dd className="text-text">
+                            {r.progressCurrent !== null && r.progressTotal !== null
+                              ? `${r.progressCurrent} / ${r.progressTotal}`
+                              : r.progressCurrent !== null
+                                ? `${r.progressCurrent}`
+                                : null}
+                            {r.progressMessage ? (
+                              <span className="block text-text-muted">
+                                {r.progressMessage}
+                              </span>
+                            ) : null}
+                          </dd>
+                        </>
+                      ) : null}
                       {r.attempts > 0 ? (
                         <>
                           <dt className="text-text-muted">Attempts</dt>

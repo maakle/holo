@@ -34,6 +34,16 @@ export interface RunNotionSyncInput {
   existingHashes: Set<string>;
   enqueueEmbed: NotionEmbedEnqueueFn;
   logger?: { warn(obj: unknown): void };
+  /**
+   * Heartbeat hook. Called once before each top-level page traversal and once
+   * after the last flush so the dashboard sees a denominator and a moving
+   * numerator. Safe to omit; runs that don't pass it through still work.
+   */
+  reportProgress?: (input: {
+    current: number;
+    total?: number | null;
+    message?: string;
+  }) => void;
 }
 
 export interface RunNotionSyncOutput {
@@ -71,10 +81,22 @@ export async function runNotionSync(input: RunNotionSyncInput): Promise<RunNotio
     pending.length = 0;
   };
 
-  for (const rootId of input.allowedPageIds) {
+  const total = input.allowedPageIds.length;
+  for (let i = 0; i < input.allowedPageIds.length; i++) {
+    const rootId = input.allowedPageIds[i]!;
+    input.reportProgress?.({
+      current: i,
+      total,
+      message: `Indexing page ${i + 1} of ${total}`,
+    });
     await processPageTree(rootId, rootId, null, 0);
   }
   await flushBatch();
+  input.reportProgress?.({
+    current: total,
+    total,
+    message: `Queued ${totalArtifacts} chunk${totalArtifacts === 1 ? '' : 's'} for embedding`,
+  });
 
   return {
     artifactCount: totalArtifacts,

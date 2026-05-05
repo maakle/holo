@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gt, sql } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
@@ -22,6 +22,14 @@ type RunRow = {
   failedReason: string | null;
   failedFix: string | null;
   skipReason: string | null;
+  /** Live count of chunks committed since the run started — only populated
+   * for in-flight runs. Lets the UI show progress without waiting for the
+   * worker's final artifact_count write. */
+  liveArtifactCount: number | null;
+  /** Connector heartbeat — set while running, cleared on each fresh start. */
+  progressCurrent: number | null;
+  progressTotal: number | null;
+  progressMessage: string | null;
 };
 
 const RESPONSE_LIMIT = 20;
@@ -81,6 +89,7 @@ export async function GET(
     const historicRows = await db
       .select({
         id: schema.syncRuns.id,
+        sourceId: schema.syncRuns.sourceId,
         queueName: schema.syncRuns.queueName,
         jobId: schema.syncRuns.jobId,
         status: schema.syncRuns.status,
@@ -91,6 +100,9 @@ export async function GET(
         errorCode: schema.syncRuns.errorCode,
         errorProblem: schema.syncRuns.errorProblem,
         skipReason: schema.syncRuns.skipReason,
+        progressCurrent: schema.syncRuns.progressCurrent,
+        progressTotal: schema.syncRuns.progressTotal,
+        progressMessage: schema.syncRuns.progressMessage,
       })
       .from(schema.syncRuns)
       .where(
@@ -102,41 +114,73 @@ export async function GET(
       .orderBy(desc(schema.syncRuns.startedAt))
       .limit(HISTORIC_FETCH_LIMIT);
 
+    // Live counts for active runs: how many chunks have been committed since
+    // the run started? One small query per active row keeps things simple —
+    // the index on chunks(organization_id, source_id) makes each cheap.
+    async function liveCountFor(
+      sourceId: string,
+      since: Date,
+    ): Promise<number> {
+      const rows = await db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(schema.chunks)
+        .where(
+          and(
+            eq(schema.chunks.organizationId, orgId),
+            eq(schema.chunks.sourceId, sourceId),
+            gt(schema.chunks.createdAt, since),
+          ),
+        );
+      return rows[0]?.c ?? 0;
+    }
+
     // Track each row's BullMQ jobId alongside the row so we can dedupe
     // historic 'running' entries against the same job's live BullMQ state.
     // The row's public `id` stays the postgres UUID for stable React keys.
     const rowJobIds = new Map<RunRow, string | null>();
-    const rows: RunRow[] = historicRows.map((r) => {
-      const startedMs = r.startedAt ? r.startedAt.getTime() : null;
-      const finishedMs = r.finishedAt ? r.finishedAt.getTime() : null;
-      const state: RunRow['state'] =
-        r.status === 'ok'
-          ? 'completed'
-          : r.status === 'failed'
-            ? 'failed'
-            : r.status === 'stalled'
-              ? 'stalled'
-              : r.status === 'cancelled'
-                ? 'cancelled'
-                : 'active';
-      const problem = r.errorProblem ? redactSecrets(r.errorProblem) : null;
-      const row: RunRow = {
-        id: r.id,
-        queue: r.queueName,
-        state,
-        enqueuedAt: startedMs,
-        processedOn: startedMs,
-        finishedOn: finishedMs,
-        durationMs: r.durationMs,
-        attempts: 0,
-        artifactCount: r.artifactCount,
-        failedReason: problem,
-        failedFix: null,
-        skipReason: r.skipReason ?? null,
-      };
-      rowJobIds.set(row, r.jobId);
-      return row;
-    });
+    const rows: RunRow[] = await Promise.all(
+      historicRows.map(async (r) => {
+        const startedMs = r.startedAt ? r.startedAt.getTime() : null;
+        const finishedMs = r.finishedAt ? r.finishedAt.getTime() : null;
+        const state: RunRow['state'] =
+          r.status === 'ok'
+            ? 'completed'
+            : r.status === 'failed'
+              ? 'failed'
+              : r.status === 'stalled'
+                ? 'stalled'
+                : r.status === 'cancelled'
+                  ? 'cancelled'
+                  : 'active';
+        const problem = r.errorProblem ? redactSecrets(r.errorProblem) : null;
+        // Only spend a query on rows that are still in flight — once a run
+        // finishes, artifactCount is authoritative.
+        const liveArtifactCount =
+          state === 'active' && r.startedAt
+            ? await liveCountFor(r.sourceId, r.startedAt)
+            : null;
+        const row: RunRow = {
+          id: r.id,
+          queue: r.queueName,
+          state,
+          enqueuedAt: startedMs,
+          processedOn: startedMs,
+          finishedOn: finishedMs,
+          durationMs: r.durationMs,
+          attempts: 0,
+          artifactCount: r.artifactCount,
+          failedReason: problem,
+          failedFix: null,
+          skipReason: r.skipReason ?? null,
+          liveArtifactCount,
+          progressCurrent: r.progressCurrent ?? null,
+          progressTotal: r.progressTotal ?? null,
+          progressMessage: r.progressMessage ?? null,
+        };
+        rowJobIds.set(row, r.jobId);
+        return row;
+      }),
+    );
 
     // Live BullMQ state — only what's running NOW or queued for immediate
     // pickup. We deliberately skip `delayed` because those are scheduled
@@ -182,8 +226,20 @@ export async function GET(
           failedReason: null,
           failedFix: null,
           skipReason: null,
+          liveArtifactCount: null,
+          progressCurrent: null,
+          progressTotal: null,
+          progressMessage: null,
         };
         if (existingIdx >= 0) {
+          // Carry forward the live/progress fields that come from postgres —
+          // BullMQ doesn't know about them, so a naive replace would drop
+          // the heartbeat the user is reading right now.
+          const prior = rows[existingIdx]!;
+          live.liveArtifactCount = prior.liveArtifactCount;
+          live.progressCurrent = prior.progressCurrent;
+          live.progressTotal = prior.progressTotal;
+          live.progressMessage = prior.progressMessage;
           rows[existingIdx] = live;
         } else if (!seenJobKeys.has(liveKey)) {
           rows.push(live);

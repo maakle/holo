@@ -118,8 +118,18 @@ const notionConfig: ConnectorWizardConfig = {
         apiKeyStep(ctx, {
           placeholder: 'Notion integration token (secret_…)',
           helpText:
-            'Create an internal integration in Notion, share the pages you want indexed with it, then paste the token here.',
+            'Notion integrations are read-only and only see pages you explicitly share with them — Holo cannot read your full workspace.',
           helpUrl: 'https://www.notion.so/profile/integrations',
+          instructions: [
+            'Open notion.so/profile/integrations and click "New integration". Name it "Holo". Under Connection capabilities, enable only "Read content" — uncheck "Insert content" and "Update content".',
+            'Copy the Internal Integration Token (starts with secret_ or ntn_) and paste it below.',
+            'Open the integration → "Access to content" tab → "Edit access" → tick the top-level pages you want indexed (use "Select all" under Shared / Private to grant everything at once). Sub-pages are included automatically.',
+          ],
+          permissions: [
+            'Read pages and databases you share with the integration',
+            'No write, comment, or user-management access',
+            'Disconnect any time from this page',
+          ],
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },

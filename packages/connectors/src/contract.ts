@@ -31,6 +31,18 @@ export interface SyncContext {
   organizationId: string;
   cursorScope: string;
   latestSeenTs?: Date;
+  /**
+   * Optional heartbeat callback. Connectors call this periodically (e.g. once
+   * per top-level page or repo) so the dashboard can show "12 / 47 pages —
+   * Indexing Engineering Wiki" instead of an opaque spinner. Pass `total: null`
+   * when the denominator is unknown. The worker debounces internally; calling
+   * on every iteration is safe.
+   */
+  reportProgress?: (input: {
+    current: number;
+    total?: number | null;
+    message?: string;
+  }) => void;
 }
 
 export interface SyncResult {
