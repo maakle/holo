@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@holo/audit": "workspace:*",
+    "@holo/discovery": "workspace:*",
     "@holo/auth": "workspace:*",
     "@holo/connectors": "workspace:*",
     "@holo/crypto": "workspace:*",
