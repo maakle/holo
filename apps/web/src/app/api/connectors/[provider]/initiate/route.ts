@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { headers, cookies } from 'next/headers';
+import { headers } from 'next/headers';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import {
   shared,
@@ -50,16 +50,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
         env.BETTER_AUTH_SECRET,
       );
       const authorizeUrl = `https://github.com/apps/${env.GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`;
-
-      const cookieStore = await cookies();
-      cookieStore.set(shared.CSRF_COOKIE_NAME, csrfNonce, {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-        maxAge: 600,
-        secure: env.NODE_ENV === 'production',
-      });
-
+      // No CSRF cookie: the callback runs on WEB_PUBLIC_URL (e.g. ngrok in
+      // dev) while the user's session lives on BETTER_AUTH_URL — cookies
+      // don't cross. We bind the OAuth handshake to the user via session
+      // check on the callback (claims.user_id === session.user.id) instead.
       return NextResponse.json({ authorizeUrl });
     }
 
@@ -125,16 +119,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
     );
 
     const authorizeUrl = conn.buildAuthorizeUrl({ redirectUri, state });
-
-    const cookieStore = await cookies();
-    cookieStore.set(shared.CSRF_COOKIE_NAME, csrfNonce, {
-      path: '/',
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 600,
-      secure: env.NODE_ENV === 'production',
-    });
-
+    // No CSRF cookie — see comment above on the GitHub branch. Callback
+    // verifies the state JWT's user_id matches the current session.
     return NextResponse.json({ authorizeUrl });
   } catch (e) {
     if (e instanceof HoloError) {

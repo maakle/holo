@@ -10,6 +10,11 @@ import {
   type SyncCursorStore,
 } from './sync-cursor-store';
 import { createPostgresCheckpointStore, type CheckpointStore } from '../step';
+import {
+  startSyncRun,
+  finishSyncRunOk,
+  finishSyncRunFailed,
+} from './sync-runs-store';
 import type { QueueName, SyncJobPayload } from './types';
 
 let cachedSql: Sql | null = null;
@@ -56,6 +61,19 @@ export abstract class SyncProcessorBase extends WorkerHost {
   async process(job: Job<SyncJobPayload>): Promise<SyncResult> {
     const jobId = job.id ?? `unidentified-${Date.now()}`;
     const ctx = `sourceId=${job.data.sourceId} queue=${this.queueName} jobId=${jobId}`;
+    const sql = getSql();
+    // Best-effort run-history write. If the insert itself blows up (DB down,
+    // FK violation against a deleted source), we'd rather still attempt the
+    // sync than refuse to start — the BullMQ history is the fallback.
+    try {
+      await startSyncRun(sql, {
+        queueName: this.queueName,
+        jobId,
+        payload: job.data,
+      });
+    } catch (err) {
+      this.logger.warn(`sync_runs start insert failed ${ctx}: ${(err as Error).message}`);
+    }
     try {
       const result = await runSyncJob({
         queue: this.queueName,
@@ -65,9 +83,27 @@ export abstract class SyncProcessorBase extends WorkerHost {
         cursorStore: getCursorStore(),
         checkpointStore: getCheckpointStore(),
       });
+      try {
+        await finishSyncRunOk(sql, {
+          queueName: this.queueName,
+          jobId,
+          artifactCount: result.artifactCount,
+        });
+      } catch (err) {
+        this.logger.warn(`sync_runs ok update failed ${ctx}: ${(err as Error).message}`);
+      }
       this.logger.log(`synced ${ctx} artifacts=${result.artifactCount}`);
       return result;
     } catch (err) {
+      try {
+        await finishSyncRunFailed(sql, {
+          queueName: this.queueName,
+          jobId,
+          error: err,
+        });
+      } catch (e) {
+        this.logger.warn(`sync_runs fail update failed ${ctx}: ${(e as Error).message}`);
+      }
       // Surface failures in the worker terminal with full HoloError context
       // (code + problem + cause + fix). Without this, BullMQ would swallow the
       // detail and the only place to see anything was the sync-history UI,

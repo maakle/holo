@@ -36,6 +36,10 @@ export interface SyncContext {
 export interface SyncResult {
   artifactCount: number;
   newCursor: Date | null;
+  /** Connector-specific metadata to merge into the cursor record. Used by
+   * Slack to persist `oldest_per_channel` / `bot_not_in_channel`, by GitHub
+   * prose to persist per-repo cursors, etc. */
+  metadataPatch?: Record<string, unknown>;
 }
 
 export interface WebhookEnvelope {

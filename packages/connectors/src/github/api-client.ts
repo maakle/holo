@@ -83,13 +83,13 @@ const PER_PAGE = 100;
 
 const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
 const MAX_RETRIES = 3;
-// Cap rate-limit waits so a misconfigured reset header can't pin a job for
-// hours. GitHub's primary rate limits reset on a rolling 1-hour window, so
-// at any moment the reset can be up to 60 min away. We allow a small buffer
-// past that to absorb clock skew between us and GitHub. BullMQ auto-renews
-// the worker's job lock during sleep, so a long wait doesn't risk a stalled
-// pickup — better than giving up and re-running the whole walk later.
-const MAX_RATE_LIMIT_WAIT_MS = 65 * 60 * 1000;
+// Cap rate-limit waits to 5 minutes. Earlier we waited up to 65 min so a
+// rate-limited job could still finish, but in practice that pinned BullMQ
+// jobs past their stall-detection window — laptop sleeps and Redis blips
+// during a long sleep would mark the job stalled and it'd fail with
+// "job stalled more than allowable limit". Failing fast and letting the
+// 6-hour scheduler retry is healthier; the cursor means no work is lost.
+const MAX_RATE_LIMIT_WAIT_MS = 5 * 60 * 1000;
 
 async function ghFetch(
   token: string,

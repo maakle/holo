@@ -13,7 +13,12 @@ import type {
 import type { SyncLogger } from './sync-code';
 
 const BATCH_SIZE = 50;
-const MAX_PAGES = 20; // 20 × 100 = 2000 items per type per repo per run
+// 5 pages × 100 items = 500 PRs/issues max per type per run. The cursor
+// (`pr_updated_since`, `issue_updated_since`) means subsequent runs only
+// walk fresh items, so the cap only matters on the initial backfill — and
+// even then a busy repo finishes in 4-5 scheduler ticks rather than one
+// 2-hour job that gets killed by BullMQ's stall detection.
+const MAX_PAGES = 5;
 
 export type GithubProseChunkPayload = {
   kind: 'github-pr' | 'github-issue' | 'github-doc';
@@ -170,10 +175,18 @@ export async function runGithubProseSync(
     let stop = false;
 
     while (!stop && page <= MAX_PAGES) {
+      const pageStart = Date.now();
       const { items, hasMore } = await input.client.listPullRequests(repoFullName, {
         state: 'all',
         page,
         perPage: 100,
+      });
+      logger.info({
+        event: 'github_prose_pr_page',
+        repo: repoFullName,
+        page,
+        count: items.length,
+        runningArtifactCount: totalArtifacts,
       });
 
       for (const pr of items) {
@@ -235,6 +248,13 @@ export async function runGithubProseSync(
       // Flush after every page so progress is observable in the embed queue
       // and a mid-walk failure preserves the work done so far.
       await flushBatch();
+      logger.info({
+        event: 'github_prose_pr_page_done',
+        repo: repoFullName,
+        page,
+        elapsedMs: Date.now() - pageStart,
+        runningArtifactCount: totalArtifacts,
+      });
       if (!hasMore) break;
       page++;
     }

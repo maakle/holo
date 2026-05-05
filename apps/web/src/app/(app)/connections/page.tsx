@@ -5,6 +5,8 @@ import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { CONNECTORS } from '@/lib/connector-registry';
 import { ConnectorRow } from '@/components/connector-row';
+import { SlackOnboardingTrigger } from '@/components/slack-onboarding-trigger';
+import { ConnectErrorBanner } from '@/components/connect-error-banner';
 
 export default async function ConnectionsPage({
   searchParams,
@@ -118,13 +120,13 @@ export default async function ConnectionsPage({
         </p>
       </header>
       {sp.connect_error ? (
-        <div className="rounded-md border border-error/30 bg-[color-mix(in_srgb,var(--error)_10%,transparent)] p-4 text-[13px]">
-          <div className="font-medium text-error">{sp.connect_error}</div>
-          {sp.connect_fix ? (
-            <div className="mt-1 text-error/80">{sp.connect_fix}</div>
-          ) : null}
-        </div>
+        <ConnectErrorBanner code={sp.connect_error} fix={sp.connect_fix} />
       ) : null}
+      <SlackOnboardingTrigger
+        slackConnected={Boolean(connected.get('slack'))}
+        slackAllowlistEmpty={(allowlistByProvider.get('slack') ?? []).length === 0}
+        connectedAs={sourceName.get('slack')}
+      />
       <div className="overflow-hidden rounded-md border border-border bg-surface">
         {CONNECTORS.map((meta, idx) => (
           <div key={meta.id} className={idx > 0 ? 'border-t border-border' : undefined}>

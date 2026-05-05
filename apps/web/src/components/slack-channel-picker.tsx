@@ -17,13 +17,17 @@ type Channel = {
 
 interface Props {
   initialSelectedCount?: number;
+  /** True when no allowlist rows exist for slack — default-all mode.
+   * Lets the collapsed state render "All channels" without fetching live data. */
+  initialDefaultAll?: boolean;
 }
 
-export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
+export function SlackChannelPicker({ initialSelectedCount, initialDefaultAll }: Props = {}) {
   const router = useRouter();
   const [channels, setChannels] = useState<Channel[] | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [defaultAll, setDefaultAll] = useState(false);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -43,6 +47,7 @@ export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
         const body = (await res.json().catch(() => ({}))) as {
           channels?: Channel[];
           teamId?: string | null;
+          defaultAll?: boolean;
           fix?: string;
           problem?: string;
         };
@@ -54,7 +59,16 @@ export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
           const list = body.channels ?? [];
           setChannels(list);
           setTeamId(body.teamId ?? null);
-          setSelected(new Set(list.filter((c) => c.selected).map((c) => c.id)));
+          setDefaultAll(Boolean(body.defaultAll));
+          // In default-all mode the server returns selected=false on every row
+          // (no allowlist rows). Pre-check everything in the UI so the user
+          // sees "everything is on" and can uncheck to narrow.
+          if (body.defaultAll) {
+            setSelected(new Set(list.map((c) => c.id)));
+          } else {
+            setSelected(new Set(list.filter((c) => c.selected).map((c) => c.id)));
+          }
+          setError(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -69,10 +83,20 @@ export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
     setSaving(true);
     setError(null);
     try {
+      // If every visible channel is checked, send `defaultAll: true` so the
+      // server clears the allowlist and the runner falls back to "all
+      // bot-member channels" — newly-joined channels then auto-include.
+      const allChecked =
+        channels !== null &&
+        channels.length > 0 &&
+        channels.every((c) => selected.has(c.id));
+      const payload = allChecked
+        ? { defaultAll: true }
+        : { channels: [...selected] };
       const res = await fetch('/api/connectors/slack/channels', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channels: [...selected] }),
+        body: JSON.stringify(payload),
       });
       const body = (await res.json().catch(() => ({}))) as {
         fix?: string;
@@ -87,6 +111,7 @@ export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
         return;
       }
       setSavedAt(Date.now());
+      setDefaultAll(allChecked);
       setJoinedCount(body.joined?.length ?? 0);
       setNeedsInvite(body.needsInvite ?? []);
       const missingScope = body.joinErrors?.some((e) => e.error === 'missing_scope');
@@ -111,17 +136,36 @@ export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
     });
   }
 
+  function toggleAll() {
+    if (!channels) return;
+    setSelected((prev) => {
+      const allChecked = channels.every((c) => prev.has(c.id));
+      if (allChecked) return new Set();
+      return new Set(channels.map((c) => c.id));
+    });
+  }
+
   const filtered = channels
     ? filter.trim()
       ? channels.filter((c) => c.name.toLowerCase().includes(filter.trim().toLowerCase()))
       : channels
     : [];
 
+  const allChecked =
+    channels !== null && channels.length > 0 && channels.every((c) => selected.has(c.id));
+
+  // Default-all mode shows "All channels" in collapsed and expanded states —
+  // matches GitHub's pattern (count is misleading because new channels
+  // auto-include).
   const summaryCount = channels
-    ? `${selected.size} / ${channels.length} selected`
-    : initialSelectedCount !== undefined
-      ? `${initialSelectedCount} selected`
-      : '';
+    ? allChecked
+      ? 'All channels'
+      : `${selected.size} / ${channels.length} selected`
+    : initialDefaultAll
+      ? 'All channels'
+      : initialSelectedCount !== undefined
+        ? `${initialSelectedCount} selected`
+        : '';
 
   const warningCount = channels?.filter((c) => c.botNotInChannel && selected.has(c.id)).length ?? 0;
 
@@ -152,6 +196,13 @@ export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
         <div className="border-t border-border px-3 py-4 text-[12px] text-error">{error}</div>
       ) : !channels ? null : (
         <>
+          {defaultAll && allChecked ? (
+            <div className="border-t border-border bg-surface-2/40 px-3 py-2 text-[12px] text-text-muted">
+              <strong className="font-medium text-text">All channels</strong> · default. Channels
+              you invite the bot to (or that are public and joined) will sync automatically.
+              Uncheck any to narrow the selection.
+            </div>
+          ) : null}
           {warningCount > 0 ? (
             <div className="flex items-start gap-2 border-t border-border bg-[color-mix(in_srgb,var(--warning,#b45309)_8%,transparent)] px-3 py-2 text-[12px] text-text">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -163,6 +214,15 @@ export function SlackChannelPicker({ initialSelectedCount }: Props = {}) {
             </div>
           ) : null}
           <div className="flex items-center gap-2 border-y border-border px-3 py-2">
+            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-text-muted">
+              <input
+                type="checkbox"
+                checked={allChecked}
+                onChange={toggleAll}
+                aria-label="Select all channels"
+              />
+              <span>Select all</span>
+            </label>
             <input
               type="text"
               value={filter}

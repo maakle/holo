@@ -208,6 +208,7 @@ export function ConnectorRow({
           lastSyncStatus={lastSyncStatus ?? null}
           allowlistCount={allowlist.length}
           githubDefaultAll={meta.id === 'github' && allowlist.length === 0}
+          slackDefaultAll={meta.id === 'slack' && allowlist.length === 0}
         />
       ) : null}
     </div>

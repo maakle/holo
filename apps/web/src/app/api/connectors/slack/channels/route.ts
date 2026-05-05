@@ -161,8 +161,11 @@ export async function GET() {
       }
     }
 
+    const defaultAll = includedExact.size === 0;
+
     return NextResponse.json({
       teamId,
+      defaultAll,
       channels: channels.map((c) => ({
         id: c.id,
         name: c.name,
@@ -197,22 +200,30 @@ export async function PUT(req: Request) {
       (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
     const userId = session.user.id;
 
-    const body = (await req.json().catch(() => ({}))) as { channels?: string[] };
-    const desired = Array.isArray(body.channels) ? Array.from(new Set(body.channels)) : [];
-    if (desired.length > 50) {
+    const body = (await req.json().catch(() => ({}))) as {
+      channels?: string[];
+      defaultAll?: boolean;
+    };
+    const defaultAll = body.defaultAll === true;
+    const desired = !defaultAll && Array.isArray(body.channels)
+      ? Array.from(new Set(body.channels))
+      : [];
+    if (!defaultAll && desired.length > 50) {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
         problem: `Cannot allowlist ${desired.length} channels (max 50)`,
-        fix: 'Select 50 or fewer channels.',
+        fix: 'Select 50 or fewer channels, or use the default-all mode.',
       });
     }
-    for (const id of desired) {
-      if (typeof id !== 'string' || !CHANNEL_ID_RE.test(id)) {
-        throw holoError({
-          code: ErrorCode.HOLO_INVALID_INPUT,
-          problem: `Invalid Slack channel ID '${id}'`,
-          fix: 'Channel IDs must look like C012345 or G012345.',
-        });
+    if (!defaultAll) {
+      for (const id of desired) {
+        if (typeof id !== 'string' || !CHANNEL_ID_RE.test(id)) {
+          throw holoError({
+            code: ErrorCode.HOLO_INVALID_INPUT,
+            problem: `Invalid Slack channel ID '${id}'`,
+            fix: 'Channel IDs must look like C012345 or G012345.',
+          });
+        }
       }
     }
 
@@ -238,10 +249,12 @@ export async function PUT(req: Request) {
     );
 
     const desiredSet = new Set(desired);
-    const toInsert = desired.filter((p) => !existingExact.has(p));
-    const toDelete = [...existingExact.entries()]
-      .filter(([pattern]) => !desiredSet.has(pattern))
-      .map(([, id]) => id);
+    const toInsert = defaultAll ? [] : desired.filter((p) => !existingExact.has(p));
+    const toDelete = defaultAll
+      ? [...existingExact.values()]
+      : [...existingExact.entries()]
+          .filter(([pattern]) => !desiredSet.has(pattern))
+          .map(([, id]) => id);
 
     for (const id of toDelete) {
       await db
@@ -266,16 +279,24 @@ export async function PUT(req: Request) {
       );
     }
 
-    // Auto-join public channels we just added. Private channels can't be
-    // joined by the bot — flag them so the UI can prompt for /invite @holo.
+    // Auto-join public channels. For explicit picks: only the newly-added
+    // IDs. For default-all: every public channel in the workspace, since the
+    // user's intent is "sync everything." Private channels can't be joined
+    // by the bot — flag them so the UI can prompt for /invite @holo.
     const joined: string[] = [];
     const needsInvite: { id: string; name: string }[] = [];
     const joinErrors: { id: string; error: string }[] = [];
-    if (toInsert.length > 0) {
+    const targets: string[] = defaultAll
+      ? [] // populated below from the live channel list
+      : toInsert;
+    if (defaultAll || toInsert.length > 0) {
       const token = await loadAccessToken(db, orgId, userId);
       const all = await listAllChannels(token);
       const byId = new Map(all.map((c) => [c.id, c]));
-      for (const id of toInsert) {
+      if (defaultAll) {
+        for (const c of all) targets.push(c.id);
+      }
+      for (const id of targets) {
         const c = byId.get(id);
         if (!c) continue;
         if (c.is_private) {
@@ -293,7 +314,15 @@ export async function PUT(req: Request) {
     }
 
     let triggeredSync = false;
-    if ((toInsert.length > 0 || toDelete.length > 0) && desired.length > 0) {
+    const hasChannelsToSync = defaultAll || desired.length > 0;
+    // In default-all mode, trigger sync whenever we joined or surfaced any
+    // channels — the allowlist rows don't change but membership does, which
+    // is what the worker actually reads.
+    const defaultAllChanged = defaultAll && (joined.length > 0 || needsInvite.length > 0);
+    if (
+      (toInsert.length > 0 || toDelete.length > 0 || defaultAllChanged) &&
+      hasChannelsToSync
+    ) {
       const sourceRows = await db
         .select({ id: schema.sources.id })
         .from(schema.sources)
@@ -309,7 +338,8 @@ export async function PUT(req: Request) {
     return NextResponse.json({
       added: toInsert,
       removed: toDelete.length,
-      total: desired.length,
+      total: defaultAll ? null : desired.length,
+      defaultAll,
       triggeredSync,
       joined,
       needsInvite,

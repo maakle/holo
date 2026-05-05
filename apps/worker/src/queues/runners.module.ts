@@ -1,6 +1,7 @@
 import { Module, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
+import postgres from 'postgres';
 import { createDb, type DB } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
 import { QUEUE_NAMES } from './types';
@@ -14,6 +15,7 @@ import {
   createHubspotRunner,
 } from './runners';
 import { setSyncRunner } from './sync-runner-registry';
+import { reconcileOrphanedRuns } from './sync-runs-store';
 import type { EmbedJobPayload } from './embed-insert';
 
 let cachedDb: DB | null = null;
@@ -45,7 +47,7 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     @InjectQueue(QUEUE_NAMES.EMBED) private readonly embedQueue: Queue<EmbedJobPayload>,
   ) {}
 
-  onApplicationBootstrap(): void {
+  async onApplicationBootstrap(): Promise<void> {
     const deps = { db: getDb(), embedQueue: this.embedQueue };
     setSyncRunner(QUEUE_NAMES.SLACK_SYNC, createSlackRunner(deps));
     setSyncRunner(QUEUE_NAMES.NOTION_SYNC, createNotionRunner(deps));
@@ -57,6 +59,24 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     this.logger.log(
       'Registered real SyncRunners for slack, notion, github-prose, github-code, grain, pylon, hubspot',
     );
+
+    // Reap any 'running' rows the previous worker incarnation left behind
+    // (crash, OOM, BullMQ stall). Without this, a dead worker's rows stay
+    // 'running' forever and pollute the dashboard. 30-min floor inside
+    // reconcileOrphanedRuns prevents reaping legitimately long syncs.
+    try {
+      const url = process.env.DATABASE_URL;
+      if (url) {
+        const sql = postgres(url, { max: 1, onnotice: () => {} });
+        const swept = await reconcileOrphanedRuns(sql);
+        await sql.end({ timeout: 5 });
+        if (swept > 0) {
+          this.logger.log(`reconciled ${swept} orphaned sync_runs row(s) → stalled`);
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`sync_runs reconciliation failed: ${(err as Error).message}`);
+    }
   }
 }
 

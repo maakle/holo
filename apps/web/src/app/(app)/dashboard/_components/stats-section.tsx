@@ -6,11 +6,15 @@ import { getServerContext } from '@/lib/server-context';
 
 export async function StatsSection({ orgId }: { orgId: string }) {
   const { db } = await getServerContext();
-  const [connectedRows, skillRows, invocationRows] = await Promise.all([
+  const [credRows, githubRows, skillRows, invocationRows] = await Promise.all([
     db
       .select({ value: count() })
       .from(schema.connectorCredentials)
       .where(eq(schema.connectorCredentials.organizationId, orgId)),
+    db
+      .select({ value: count() })
+      .from(schema.githubInstallations)
+      .where(eq(schema.githubInstallations.organizationId, orgId)),
     db.select({ value: count() }).from(schema.skills).where(eq(schema.skills.organizationId, orgId)),
     db
       .select({ value: count() })
@@ -18,8 +22,10 @@ export async function StatsSection({ orgId }: { orgId: string }) {
       .where(eq(schema.mcpInvocations.organizationId, orgId)),
   ]);
 
+  const connectionCount = (credRows[0]?.value ?? 0) + (githubRows[0]?.value ?? 0);
+
   const stats = [
-    { label: 'Connections', value: connectedRows[0]?.value ?? 0, icon: Plug, href: '/connections' },
+    { label: 'Connections', value: connectionCount, icon: Plug, href: '/connections' },
     { label: 'Skills', value: skillRows[0]?.value ?? 0, icon: Sparkles, href: '/skills' },
     { label: 'Invocations · 7d', value: invocationRows[0]?.value ?? 0, icon: Activity, href: '/observability' },
   ] as const;

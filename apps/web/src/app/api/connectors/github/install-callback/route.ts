@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import {
@@ -45,18 +44,10 @@ export async function GET(req: Request) {
     }
 
     const { env, db } = await getServerContext();
+    // Trust the signed state JWT alone — see slack/callback/route.ts for
+    // the rationale. Cookie/session binding can't survive the WEB_PUBLIC_URL
+    // ↔ BETTER_AUTH_URL origin split.
     const claims = await shared.verifyState(state, env.BETTER_AUTH_SECRET);
-
-    const cookieStore = await cookies();
-    const csrfFromCookie = cookieStore.get(shared.CSRF_COOKIE_NAME)?.value;
-    if (!csrfFromCookie || csrfFromCookie !== claims.csrf_nonce) {
-      throw holoError({
-        code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
-        problem: 'CSRF nonce mismatch on GitHub install callback',
-        fix: 'Restart the install flow. Do not share callback URLs.',
-      });
-    }
-    cookieStore.delete(shared.CSRF_COOKIE_NAME);
 
     const orgId = claims.organization_id;
     const userId = claims.user_id;

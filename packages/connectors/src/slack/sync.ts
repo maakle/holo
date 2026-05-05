@@ -33,6 +33,13 @@ export interface RunSlackSyncInput {
   sourceId: string;
   existingHashes: Set<string>;
   enqueueEmbed: EmbedEnqueueFn;
+  /**
+   * Persist partial cursor metadata after each channel completes. Lets a
+   * mid-sync failure (rate limit exhaustion, network blip) resume from the
+   * last fully-synced channel instead of starting over. Optional — when
+   * absent, runSlackSync returns metadata only at the end (legacy behavior).
+   */
+  flushCursor?: (metadata: Record<string, unknown>) => Promise<void>;
   logger?: { warn(obj: unknown): void };
 }
 
@@ -171,6 +178,25 @@ export async function runSlackSync(input: RunSlackSyncInput): Promise<RunSlackSy
     if (!bailed && maxTsSeen !== oldest) {
       // Advance cursor by 1µs so the next incremental excludes this timestamp
       oldestPerChannel[channelId] = (parseFloat(maxTsSeen) + 0.000001).toFixed(6);
+    }
+
+    // Flush partial progress after each channel so a later failure doesn't
+    // discard everything. Best-effort — a flush failure shouldn't abort the
+    // sync (we'll persist again on the next channel or at the end).
+    if (input.flushCursor) {
+      try {
+        await input.flushCursor({
+          ...input.cursorMetadata,
+          oldest_per_channel: oldestPerChannel,
+          bot_not_in_channel: botNotInChannel,
+        });
+      } catch (err) {
+        logger.warn({
+          code: 'HOLO_SLACK_CURSOR_FLUSH_FAILED',
+          channelId,
+          error: (err as Error).message,
+        });
+      }
     }
   }
 

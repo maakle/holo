@@ -37,6 +37,8 @@ interface Props {
   allowlistCount?: number;
   /** True when the GitHub allowlist is empty — default-all mode. */
   githubDefaultAll?: boolean;
+  /** True when the Slack allowlist is empty — default-all mode. */
+  slackDefaultAll?: boolean;
 }
 
 function formatRelative(iso: string): string {
@@ -63,6 +65,7 @@ export function ConnectorManageSheet({
   lastSyncStatus,
   allowlistCount,
   githubDefaultAll,
+  slackDefaultAll,
 }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -270,7 +273,9 @@ export function ConnectorManageSheet({
                   <AlertDialogDescription>
                     {isGithub
                       ? "The holo App will be uninstalled from GitHub on your behalf, and Holo's local record (installation, repo allowlist, indexed chunks) will be removed. You can re-install anytime from the connections page."
-                      : `This revokes your access token. If no other users have it connected, indexed data and the repo allowlist will also be removed.`}
+                      : isSlack
+                        ? `This revokes your access token. If no other users have Slack connected, the holo app will be fully uninstalled from your workspace — the bot is removed from every channel it joined, and indexed data + the channel allowlist are deleted. You can reconnect anytime.`
+                        : `This revokes your access token. If no other users have it connected, indexed data and the allowlist will also be removed.`}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -331,7 +336,10 @@ export function ConnectorManageSheet({
                   (run <code className="rounded bg-surface-2 px-1">/invite @holo</code> in Slack).
                   Saving triggers an immediate sync.
                 </p>
-                <SlackChannelPicker initialSelectedCount={allowlistCount} />
+                <SlackChannelPicker
+                  initialSelectedCount={allowlistCount}
+                  initialDefaultAll={slackDefaultAll}
+                />
               </section>
             ) : null}
 

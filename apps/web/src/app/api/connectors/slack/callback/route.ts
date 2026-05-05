@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { eq, and } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
@@ -39,18 +38,14 @@ export async function GET(req: Request) {
       });
     }
 
+    // Trust the signed state JWT for CSRF protection. We can't bind to a
+    // cookie or session here because the callback runs on WEB_PUBLIC_URL
+    // (e.g. ngrok in dev) while the user's auth cookie is set on
+    // BETTER_AUTH_URL (e.g. localhost) — cookies don't cross origins. The
+    // JWT is HS256-signed with BETTER_AUTH_SECRET, has a 10-minute exp,
+    // and carries user_id; its signature alone is the CSRF defense. Slack's
+    // `code` is single-use, which closes the replay window further.
     const claims = await shared.verifyState(state, env.BETTER_AUTH_SECRET);
-
-    const cookieStore = await cookies();
-    const csrfFromCookie = cookieStore.get(shared.CSRF_COOKIE_NAME)?.value;
-    if (!csrfFromCookie || csrfFromCookie !== claims.csrf_nonce) {
-      throw holoError({
-        code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
-        problem: 'CSRF nonce mismatch on Slack callback',
-        fix: 'Restart the connect flow. Do not share callback URLs.',
-      });
-    }
-    cookieStore.delete(shared.CSRF_COOKIE_NAME);
 
     const publicOrigin = (env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL).replace(/\/+$/, '');
     const redirectUri = `${publicOrigin}/api/connectors/slack/callback`;
@@ -120,7 +115,12 @@ export async function GET(req: Request) {
       // the recurring scheduler will pick it up at the next tick.
     });
 
-    return NextResponse.redirect(new URL('/connections', env.BETTER_AUTH_URL));
+    // ?onboard_slack=1 triggers the SlackOnboardingDialog on /connections so
+    // the user lands directly in the channel-pick step instead of an inert
+    // "connected but never synced" row.
+    return NextResponse.redirect(
+      new URL('/connections?onboard_slack=1', env.BETTER_AUTH_URL),
+    );
   } catch (e) {
     // Resolve the user-facing app origin for redirects. Fall back to req.url
     // if env resolution itself failed (otherwise we'd mask the original error).

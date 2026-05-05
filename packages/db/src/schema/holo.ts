@@ -200,6 +200,45 @@ export const connectorAllowlists = pgTable(
   }),
 );
 
+// Durable history of every connector sync attempt. The worker writes a row
+// in `running` state when a job starts and updates it to `ok` / `failed` on
+// finish. Orphaned `running` rows (worker crash, BullMQ stall) are swept to
+// `stalled` on worker boot. Source-of-truth for the connections page run
+// list — outlives Redis flushes.
+export const syncRuns = pgTable(
+  'sync_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    sourceId: uuid('source_id')
+      .notNull()
+      .references(() => sources.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    queueName: text('queue_name').notNull(),
+    jobId: text('job_id').notNull(),
+    status: text('status', { enum: ['running', 'ok', 'failed', 'stalled'] }).notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    durationMs: integer('duration_ms'),
+    artifactCount: integer('artifact_count'),
+    errorCode: text('error_code'),
+    errorProblem: text('error_problem'),
+    errorCause: text('error_cause'),
+  },
+  (t) => ({
+    queueJobUniq: uniqueIndex('sync_runs_queue_job_uniq').on(t.queueName, t.jobId),
+    orgProviderStartedIdx: index('sync_runs_org_provider_started_idx').on(
+      t.organizationId,
+      t.provider,
+      t.startedAt,
+    ),
+    sourceStartedIdx: index('sync_runs_source_started_idx').on(t.sourceId, t.startedAt),
+    statusStartedIdx: index('sync_runs_status_started_idx').on(t.status, t.startedAt),
+  }),
+);
+
 export const githubInstallations = pgTable(
   'github_installations',
   {

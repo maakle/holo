@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { and, desc, eq } from 'drizzle-orm';
+import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
 import { activeQueueNames, getQueueByName } from '@/lib/sync-queue';
@@ -10,7 +12,7 @@ type Provider = typeof PROVIDERS extends Set<infer T> ? T : never;
 type RunRow = {
   id: string;
   queue: string;
-  state: 'completed' | 'failed' | 'active' | 'waiting' | 'delayed';
+  state: 'completed' | 'failed' | 'stalled' | 'active' | 'waiting' | 'delayed';
   enqueuedAt: number | null;
   processedOn: number | null;
   finishedOn: number | null;
@@ -21,8 +23,12 @@ type RunRow = {
   failedFix: string | null;
 };
 
-const PER_QUEUE_LIMIT = 25;
 const RESPONSE_LIMIT = 20;
+// Pull a bit more than we'll return so the merge of historic + live state has
+// headroom — a job that's `active` in BullMQ is also a `running` row in
+// sync_runs, and we want to dedupe by (queue, jobId) without truncating live
+// state out of the result.
+const HISTORIC_FETCH_LIMIT = RESPONSE_LIMIT * 2;
 
 function maybeNumber(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
@@ -30,30 +36,14 @@ function maybeNumber(v: unknown): number | null {
 
 /**
  * Defensive secret scrub at the API boundary. Any path that leaks a token into
- * a job's failedReason — including jobs queued before the worker-side redaction
- * fix shipped — gets cleaned here before it reaches the browser.
+ * an error string — including rows written before worker-side redaction
+ * fixes shipped — gets cleaned here before it reaches the browser.
  */
 function redactSecrets(s: string): string {
   return s
-    // Basic-auth in URLs: https://user:pw@host or https://token@host
     .replace(/(https?:\/\/)([^@/\s]+)@/g, '$1<redacted>@')
-    // GitHub tokens: gho_/ghs_/ghp_/ghr_/ghu_
     .replace(/gh[opusr]_[A-Za-z0-9]{20,}/g, '<redacted-token>')
-    // Slack-style xoxb / xoxp / xoxa / xoxs
     .replace(/xox[abpsr]-[A-Za-z0-9-]{10,}/g, '<redacted-token>');
-}
-
-function extractFailureParts(reason: string | undefined): {
-  problem: string | null;
-  fix: string | null;
-} {
-  if (!reason) return { problem: null, fix: null };
-  const safe = redactSecrets(reason);
-  // HoloError shape: `${code}: ${problem}`. The fix and cause fields aren't
-  // serialized into the message — operators get those via the worker's
-  // failure logger, which prints the full HoloError block to the terminal.
-  // The dashboard intentionally shows only the user-actionable problem line.
-  return { problem: safe, fix: null };
 }
 
 export async function GET(
@@ -70,7 +60,7 @@ export async function GET(
       });
     }
     const provider = rawProvider as Provider;
-    const { auth, defaultOrgId } = await getServerContext();
+    const { auth, db, defaultOrgId } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -82,49 +72,105 @@ export async function GET(
     const orgId =
       (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
 
-    const rows: RunRow[] = [];
+    // Historic rows (completed / failed / stalled / running) come from
+    // Postgres, which survives Redis flushes. Live state (active / waiting /
+    // delayed) still comes from BullMQ since that's where the queue actually
+    // lives. The two get merged below; a live job will shadow its 'running'
+    // history row by (queue, jobId).
+    const historicRows = await db
+      .select({
+        id: schema.syncRuns.id,
+        queueName: schema.syncRuns.queueName,
+        jobId: schema.syncRuns.jobId,
+        status: schema.syncRuns.status,
+        startedAt: schema.syncRuns.startedAt,
+        finishedAt: schema.syncRuns.finishedAt,
+        durationMs: schema.syncRuns.durationMs,
+        artifactCount: schema.syncRuns.artifactCount,
+        errorCode: schema.syncRuns.errorCode,
+        errorProblem: schema.syncRuns.errorProblem,
+      })
+      .from(schema.syncRuns)
+      .where(
+        and(
+          eq(schema.syncRuns.organizationId, orgId),
+          eq(schema.syncRuns.provider, provider),
+        ),
+      )
+      .orderBy(desc(schema.syncRuns.startedAt))
+      .limit(HISTORIC_FETCH_LIMIT);
+
+    const rows: RunRow[] = historicRows.map((r) => {
+      const startedMs = r.startedAt ? r.startedAt.getTime() : null;
+      const finishedMs = r.finishedAt ? r.finishedAt.getTime() : null;
+      const state: RunRow['state'] =
+        r.status === 'ok'
+          ? 'completed'
+          : r.status === 'failed'
+            ? 'failed'
+            : r.status === 'stalled'
+              ? 'stalled'
+              : 'active';
+      const problem = r.errorProblem ? redactSecrets(r.errorProblem) : null;
+      return {
+        id: r.id,
+        queue: r.queueName,
+        state,
+        enqueuedAt: startedMs,
+        processedOn: startedMs,
+        finishedOn: finishedMs,
+        durationMs: r.durationMs,
+        attempts: 0,
+        artifactCount: r.artifactCount,
+        failedReason: problem,
+        failedFix: null,
+      };
+    });
+
+    // Live BullMQ state — only what's running NOW or queued for immediate
+    // pickup. We deliberately skip `delayed` because those are scheduled
+    // future ticks (the 6h scheduler), not runs — surfacing them as
+    // "waiting" in the history panel was misleading.
+    const seenJobKeys = new Set(rows.map((r) => `${r.queue}:${r.id}`));
     for (const name of activeQueueNames(provider)) {
       const queue = getQueueByName(name);
-      // Pull completed and failed in parallel; cap per-queue to keep it fast.
-      const [completed, failed, active, waiting] = await Promise.all([
-        queue.getJobs(['completed'], 0, PER_QUEUE_LIMIT - 1, false),
-        queue.getJobs(['failed'], 0, PER_QUEUE_LIMIT - 1, false),
+      const [active, waiting] = await Promise.all([
         queue.getJobs(['active']),
         queue.getJobs(['waiting']),
       ]);
-
-      for (const j of [...completed, ...failed, ...active, ...waiting]) {
+      for (const j of [...active, ...waiting]) {
         const payload = j.data as { organizationId?: string } | undefined;
         if (payload?.organizationId !== orgId) continue;
-
+        const jobId = String(j.id ?? '');
+        const liveKey = `${name}:${jobId}`;
+        // Replace the historic 'running' row with the live job's metadata —
+        // the BullMQ row has accurate processedOn / waiting status that the
+        // 'running' insert can't predict.
+        const existingIdx = rows.findIndex(
+          (r) => r.queue === name && r.id === jobId && r.state === 'active',
+        );
         const finishedOn = maybeNumber(j.finishedOn);
         const processedOn = maybeNumber(j.processedOn);
         const enqueuedAt = maybeNumber(j.timestamp);
-        const returnVal = (j.returnvalue ?? null) as { artifactCount?: number } | null;
-        const reason = (j.failedReason ?? undefined) as string | undefined;
-        const { problem, fix } = extractFailureParts(reason);
-
-        let state: RunRow['state'];
-        if (finishedOn && !reason) state = 'completed';
-        else if (reason) state = 'failed';
-        else if (processedOn && !finishedOn) state = 'active';
-        else state = 'waiting';
-
-        rows.push({
-          id: String(j.id ?? ''),
+        const live: RunRow = {
+          id: jobId,
           queue: name,
-          state,
+          state: processedOn && !finishedOn ? 'active' : 'waiting',
           enqueuedAt,
           processedOn,
           finishedOn,
           durationMs:
             finishedOn && processedOn ? Math.max(0, finishedOn - processedOn) : null,
           attempts: j.attemptsMade ?? 0,
-          artifactCount:
-            typeof returnVal?.artifactCount === 'number' ? returnVal.artifactCount : null,
-          failedReason: problem,
-          failedFix: fix,
-        });
+          artifactCount: null,
+          failedReason: null,
+          failedFix: null,
+        };
+        if (existingIdx >= 0) {
+          rows[existingIdx] = live;
+        } else if (!seenJobKeys.has(liveKey)) {
+          rows.push(live);
+        }
       }
     }
 

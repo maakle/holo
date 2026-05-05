@@ -1,6 +1,6 @@
 import { holoError, ErrorCode } from '@holo/errors';
 import { resolveAllowlist } from '../shared/allowlist';
-import { createSlackApiClient } from './api-client';
+import { createSlackApiClient, type SlackApiClient } from './api-client';
 import { runSlackSync, type EmbedEnqueueFn } from './sync';
 import type {
   Connector,
@@ -114,22 +114,32 @@ export function createSlackConnector(opts: SlackConnectorOptions): Connector {
           fix: 'Pass db and enqueueEmbed options when calling createSlackConnector().',
         });
       }
-      const allowlist = await resolveAllowlist({
+      const client = createSlackApiClient(tokens.accessToken, fetchImpl);
+      const allowedChannelIds = await resolveSlackChannelIds({
         db: opts.db,
         organizationId: ctx.organizationId,
-        provider: 'slack',
+        client,
       });
+      if (allowedChannelIds.length === 0) {
+        return { artifactCount: 0, newCursor: new Date() };
+      }
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
+      const db = opts.db;
       const result = await runSlackSync({
-        client: createSlackApiClient(tokens.accessToken, fetchImpl),
-        allowedChannelIds: allowlist.resolved,
+        client,
+        allowedChannelIds,
         cursorMetadata: {},
         organizationId: ctx.organizationId,
         sourceId: ctx.sourceId,
         existingHashes,
         enqueueEmbed: opts.enqueueEmbed,
+        flushCursor: (metadata) => upsertCursorMetadata(db, ctx.sourceId, ctx.organizationId, metadata),
       });
-      return { artifactCount: result.artifactCount, newCursor: new Date() };
+      return {
+        artifactCount: result.artifactCount,
+        newCursor: new Date(),
+        metadataPatch: result.updatedMetadata,
+      };
     },
 
     async incrementalSync(tokens: ConnectorTokens, ctx: SyncContext): Promise<SyncResult> {
@@ -140,23 +150,33 @@ export function createSlackConnector(opts: SlackConnectorOptions): Connector {
           fix: 'Pass db and enqueueEmbed options when calling createSlackConnector().',
         });
       }
-      const allowlist = await resolveAllowlist({
+      const client = createSlackApiClient(tokens.accessToken, fetchImpl);
+      const allowedChannelIds = await resolveSlackChannelIds({
         db: opts.db,
         organizationId: ctx.organizationId,
-        provider: 'slack',
+        client,
       });
+      if (allowedChannelIds.length === 0) {
+        return { artifactCount: 0, newCursor: new Date() };
+      }
       const cursor = await loadCursorMetadata(opts.db, ctx.sourceId);
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
+      const db = opts.db;
       const result = await runSlackSync({
-        client: createSlackApiClient(tokens.accessToken, fetchImpl),
-        allowedChannelIds: allowlist.resolved,
+        client,
+        allowedChannelIds,
         cursorMetadata: cursor,
         organizationId: ctx.organizationId,
         sourceId: ctx.sourceId,
         existingHashes,
         enqueueEmbed: opts.enqueueEmbed,
+        flushCursor: (metadata) => upsertCursorMetadata(db, ctx.sourceId, ctx.organizationId, metadata),
       });
-      return { artifactCount: result.artifactCount, newCursor: new Date() };
+      return {
+        artifactCount: result.artifactCount,
+        newCursor: new Date(),
+        metadataPatch: result.updatedMetadata,
+      };
     },
 
     verifyWebhook(_env: WebhookEnvelope, _secret: string): boolean {
@@ -171,6 +191,71 @@ export function createSlackConnector(opts: SlackConnectorOptions): Connector {
       });
     },
   };
+}
+
+/**
+ * Resolve which channels to sync. Prefers an explicit allowlist; falls back
+ * to "all channels the bot is a member of" when no allowlist is set. The
+ * fallback matches GitHub's default-all pattern — it would be redundant
+ * friction to require admins to re-pick channels in our UI when they've
+ * already curated channel membership in Slack itself (private channels need
+ * /invite, public channels are explicitly joined).
+ */
+async function resolveSlackChannelIds(args: {
+  db: DB;
+  organizationId: string;
+  client: SlackApiClient;
+}): Promise<string[]> {
+  try {
+    const allowlist = await resolveAllowlist({
+      db: args.db,
+      organizationId: args.organizationId,
+      provider: 'slack',
+    });
+    return allowlist.resolved;
+  } catch (err) {
+    if ((err as { code?: string }).code !== ErrorCode.HOLO_ALLOWLIST_EMPTY) throw err;
+    const channels = await args.client.listMemberChannels();
+    return channels.map((c) => c.id);
+  }
+}
+
+/**
+ * Persist partial cursor metadata mid-sync. Called after each channel
+ * completes so an interrupted sync can resume at the channel boundary
+ * instead of restarting from oldest=0.
+ */
+async function upsertCursorMetadata(
+  db: DB,
+  sourceId: string,
+  organizationId: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  const { schema } = await import('@holo/db');
+  const { eq, and } = await import('drizzle-orm');
+  const existing = await db
+    .select({ id: schema.connectorCursors.id })
+    .from(schema.connectorCursors)
+    .where(
+      and(
+        eq(schema.connectorCursors.sourceId, sourceId),
+        eq(schema.connectorCursors.scope, 'sync'),
+      ),
+    )
+    .limit(1);
+  if (existing[0]) {
+    await db
+      .update(schema.connectorCursors)
+      .set({ metadata })
+      .where(eq(schema.connectorCursors.id, existing[0].id));
+  } else {
+    await db.insert(schema.connectorCursors).values({
+      organizationId,
+      sourceId,
+      scope: 'sync',
+      metadata,
+    });
+  }
 }
 
 async function loadCursorMetadata(db: DB, sourceId: string): Promise<Record<string, unknown>> {

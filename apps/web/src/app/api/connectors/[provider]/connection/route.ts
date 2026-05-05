@@ -104,6 +104,28 @@ export async function DELETE(
       });
     }
 
+    // Capture this user's still-valid token BEFORE we mark it revoked — we
+    // may need it below to call Slack's apps.uninstall when this is the last
+    // credential for the org. (Slack's revoke/uninstall calls require an
+    // active bot token.)
+    const tokenToUninstall =
+      provider === 'slack'
+        ? (
+            await db
+              .select({ accessToken: schema.connectorCredentials.accessToken })
+              .from(schema.connectorCredentials)
+              .where(
+                and(
+                  eq(schema.connectorCredentials.organizationId, orgId),
+                  eq(schema.connectorCredentials.userId, userId),
+                  eq(schema.connectorCredentials.provider, 'slack'),
+                  eq(schema.connectorCredentials.status, 'active'),
+                ),
+              )
+              .limit(1)
+          )[0]?.accessToken ?? null
+        : null;
+
     // Mark this user's credential revoked. Other users in the same org keep theirs.
     await db
       .update(schema.connectorCredentials)
@@ -129,6 +151,45 @@ export async function DELETE(
           eq(schema.connectorCredentials.status, 'active'),
         ),
       );
+
+    // For Slack, when the last user disconnects we also fully uninstall the
+    // app from the workspace via apps.uninstall — that revokes the token,
+    // removes the holo bot from every channel it joined, and removes the
+    // app from the workspace's installed-apps list. Best-effort: a failure
+    // here doesn't block local cleanup (matches the GitHub disconnect
+    // policy at line ~64 above).
+    let slackRemoteUninstalled: boolean | null = null;
+    if (
+      provider === 'slack' &&
+      remaining.length === 0 &&
+      tokenToUninstall &&
+      env.SLACK_CONNECTOR_CLIENT_ID &&
+      env.SLACK_CONNECTOR_CLIENT_SECRET
+    ) {
+      try {
+        const params = new URLSearchParams({
+          client_id: env.SLACK_CONNECTOR_CLIENT_ID,
+          client_secret: env.SLACK_CONNECTOR_CLIENT_SECRET,
+        });
+        const res = await fetch(
+          `https://slack.com/api/apps.uninstall?${params.toString()}`,
+          {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${tokenToUninstall}` },
+          },
+        );
+        const json = (await res.json()) as { ok: boolean; error?: string };
+        slackRemoteUninstalled = json.ok;
+        if (!json.ok) {
+          console.error(
+            `[disconnect/slack] apps.uninstall returned not-ok: ${json.error}`,
+          );
+        }
+      } catch (err) {
+        console.error('[disconnect/slack] apps.uninstall failed:', err);
+        slackRemoteUninstalled = false;
+      }
+    }
 
     let removedSources = 0;
     let removedAllowlistRows = 0;
@@ -161,6 +222,7 @@ export async function DELETE(
       removedSources,
       removedAllowlistRows,
       remainingCredentials: remaining.length,
+      slackRemoteUninstalled,
     });
   } catch (e) {
     if (e instanceof HoloError) {

@@ -177,7 +177,11 @@ export function createSlackRunner(deps: RunnerDeps): SyncRunner {
         { accessToken },
         { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
       );
-      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
+      return {
+        artifactCount: result.artifactCount,
+        newCursor: result.newCursor,
+        metadataPatch: result.metadataPatch,
+      };
     },
     async incremental(payload: SyncJobPayload): Promise<SyncResult> {
       const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'slack');
@@ -185,7 +189,11 @@ export function createSlackRunner(deps: RunnerDeps): SyncRunner {
         { accessToken },
         { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
       );
-      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
+      return {
+        artifactCount: result.artifactCount,
+        newCursor: result.newCursor,
+        metadataPatch: result.metadataPatch,
+      };
     },
   };
 }
