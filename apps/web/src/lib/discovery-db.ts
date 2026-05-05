@@ -4,14 +4,20 @@ import type { DiscoveryDb } from '@holo/discovery';
 
 const ID_HINT_REGEX = /\b([a-z]{3,12}[-_:]?[a-zA-Z0-9]{6,40})\b/g;
 
-function extractHints(payload: Record<string, unknown>): string[] {
+function extractHints(payload: Record<string, unknown>, chunkContent: string | null): string[] {
   const hints = new Set<string>();
   for (const [k, v] of Object.entries(payload)) {
     if (typeof v !== 'string') continue;
     const matches = v.match(ID_HINT_REGEX);
     if (matches) for (const m of matches) hints.add(`${k}:${m}`);
   }
-  return Array.from(hints).slice(0, 8);
+  // Connectors today often store empty payloads; the real text lives in chunks.content.
+  // Mine the chunk text as a fallback so cross-connector ID references still cluster.
+  if (chunkContent) {
+    const matches = chunkContent.match(ID_HINT_REGEX);
+    if (matches) for (const m of matches) hints.add(`chunk:${m}`);
+  }
+  return Array.from(hints).slice(0, 16);
 }
 
 export function buildDiscoveryDb(db: DB): DiscoveryDb {
@@ -49,16 +55,27 @@ export function buildDiscoveryDb(db: DB): DiscoveryDb {
         }
       }
 
-      return Array.from(byId.values()).map((r) => ({
-        id: r.id,
-        sourceId: r.sourceId,
-        externalId: r.externalId,
-        kind: r.kind,
-        payload: r.payload as Record<string, unknown>,
-        fetchedAt: r.fetchedAt,
-        embedding: (r.embedding as number[] | null) ?? null,
-        entityHints: extractHints(r.payload as Record<string, unknown>),
-      }));
+      return Array.from(byId.values()).map((r) => {
+        const payload = (typeof r.payload === 'object' && r.payload !== null
+          ? (r.payload as Record<string, unknown>)
+          : {}) as Record<string, unknown>;
+        // If the connector left payload empty, surface chunk content under a synthetic
+        // key so downstream code (LLM proposal naming) sees real text.
+        const enrichedPayload =
+          Object.keys(payload).length === 0 && r.chunkContent
+            ? { content: r.chunkContent.slice(0, 4000) }
+            : payload;
+        return {
+          id: r.id,
+          sourceId: r.sourceId,
+          externalId: r.externalId,
+          kind: r.kind,
+          payload: enrichedPayload,
+          fetchedAt: r.fetchedAt,
+          embedding: (r.embedding as number[] | null) ?? null,
+          entityHints: extractHints(payload, r.chunkContent),
+        };
+      });
     },
 
     async recentRejectedCentroidsForOrg(orgId, lookbackMs) {
