@@ -11,11 +11,11 @@ import Link from 'next/link';
 import { Store } from 'lucide-react';
 
 export default async function SkillsPage() {
-  const { auth, db } = await getServerContext();
+  const { auth, db, defaultOrgId } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
-  const orgId = (session.user as unknown as { organizationId: string }).organizationId;
+  const orgId = defaultOrgId;
 
   const skills = await db
     .select({
