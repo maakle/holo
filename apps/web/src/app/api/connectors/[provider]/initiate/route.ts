@@ -15,12 +15,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
     const { provider } = await params;
     const { auth, env, defaultOrgId } = await getServerContext();
     const hdrs = await headers();
-    const forwardedProto = hdrs.get('x-forwarded-proto');
-    const forwardedHost = hdrs.get('x-forwarded-host') ?? hdrs.get('host');
-    const origin =
-      forwardedHost && forwardedProto
-        ? `${forwardedProto}://${forwardedHost}`
-        : new URL(req.url).origin;
+    // OAuth redirect_uri must be a publicly reachable URL the IdP can hit.
+    // In dev with a tunnel, set WEB_PUBLIC_URL to the tunnel; BETTER_AUTH_URL
+    // can stay localhost for browser-side auth/cookies.
+    const publicOrigin = (env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL).replace(/\/+$/, '');
     const session = await auth.api.getSession({ headers: hdrs });
     if (!session) {
       throw holoError({
@@ -76,7 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
           fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET in the environment.',
         });
       }
-      redirectUri = `${origin}/api/connectors/slack/callback`;
+      redirectUri = `${publicOrigin}/api/connectors/slack/callback`;
       conn = createSlackConnector({
         clientId: env.SLACK_CONNECTOR_CLIENT_ID,
         clientSecret: env.SLACK_CONNECTOR_CLIENT_SECRET,
@@ -89,7 +87,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
           fix: 'Set GRAIN_CONNECTOR_CLIENT_ID and GRAIN_CONNECTOR_CLIENT_SECRET in the environment.',
         });
       }
-      redirectUri = `${origin}/api/connectors/grain/callback`;
+      redirectUri = `${publicOrigin}/api/connectors/grain/callback`;
       conn = createGrainConnector({
         clientId: env.GRAIN_CONNECTOR_CLIENT_ID,
         clientSecret: env.GRAIN_CONNECTOR_CLIENT_SECRET,
@@ -102,7 +100,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
           fix: 'Set HUBSPOT_CONNECTOR_CLIENT_ID and HUBSPOT_CONNECTOR_CLIENT_SECRET in the environment.',
         });
       }
-      redirectUri = `${origin}/api/connectors/hubspot/callback`;
+      redirectUri = `${publicOrigin}/api/connectors/hubspot/callback`;
       conn = createHubspotConnector({
         clientId: env.HUBSPOT_CONNECTOR_CLIENT_ID,
         clientSecret: env.HUBSPOT_CONNECTOR_CLIENT_SECRET,

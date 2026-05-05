@@ -52,10 +52,8 @@ export async function GET(req: Request): Promise<Response> {
       });
     }
 
-    const redirectUri = new URL(
-      '/api/connect/slack-personal/callback',
-      req.url,
-    ).toString();
+    const publicOrigin = (env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL).replace(/\/+$/, '');
+    const redirectUri = `${publicOrigin}/api/connect/slack-personal/callback`;
     const tokenRes = await fetch('https://slack.com/api/oauth.v2.access', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

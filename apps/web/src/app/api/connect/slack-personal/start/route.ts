@@ -29,10 +29,8 @@ export async function GET(req: Request): Promise<Response> {
     path: '/',
   });
 
-  const redirectUri = new URL(
-    '/api/connect/slack-personal/callback',
-    req.url,
-  ).toString();
+  const publicOrigin = (env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL).replace(/\/+$/, '');
+  const redirectUri = `${publicOrigin}/api/connect/slack-personal/callback`;
   const params = new URLSearchParams({
     client_id: env.SLACK_CONNECTOR_CLIENT_ID,
     user_scope: 'channels:read,groups:read,im:read,mpim:read',

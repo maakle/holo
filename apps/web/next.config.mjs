@@ -2,6 +2,7 @@
 const nextConfig = {
   output: 'standalone',
   typedRoutes: false,
+  allowedDevOrigins: ['omnidirectional-corrinne-nonheroically.ngrok-free.dev'],
   // Native modules (use node-gyp-build / prebuilds) — must NOT be bundled by
   // webpack; load from node_modules at runtime instead.
   serverExternalPackages: [

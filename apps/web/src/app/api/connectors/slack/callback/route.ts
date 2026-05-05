@@ -52,7 +52,8 @@ export async function GET(req: Request) {
     }
     cookieStore.delete(shared.CSRF_COOKIE_NAME);
 
-    const redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/slack/callback`;
+    const publicOrigin = (env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL).replace(/\/+$/, '');
+    const redirectUri = `${publicOrigin}/api/connectors/slack/callback`;
     const conn = createSlackConnector({
       clientId: env.SLACK_CONNECTOR_CLIENT_ID,
       clientSecret: env.SLACK_CONNECTOR_CLIENT_SECRET,
@@ -119,15 +120,26 @@ export async function GET(req: Request) {
       // the recurring scheduler will pick it up at the next tick.
     });
 
-    return NextResponse.redirect(new URL('/connections', req.url));
+    return NextResponse.redirect(new URL('/connections', env.BETTER_AUTH_URL));
   } catch (e) {
+    // Resolve the user-facing app origin for redirects. Fall back to req.url
+    // if env resolution itself failed (otherwise we'd mask the original error).
+    let appOrigin: string;
+    try {
+      const { env: errEnv } = await getServerContext();
+      appOrigin = errEnv.BETTER_AUTH_URL;
+    } catch {
+      appOrigin = new URL(req.url).origin;
+    }
     if (e instanceof HoloError) {
-      const u = new URL('/connections', req.url);
+      const u = new URL('/connections', appOrigin);
       u.searchParams.set('connect_error', e.code);
       u.searchParams.set('connect_fix', e.fix);
       return NextResponse.redirect(u);
     }
     console.error(e);
-    return NextResponse.redirect(new URL('/connections?connect_error=HOLO_INTERNAL', req.url));
+    return NextResponse.redirect(
+      new URL('/connections?connect_error=HOLO_INTERNAL', appOrigin),
+    );
   }
 }

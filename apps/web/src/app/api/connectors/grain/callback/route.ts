@@ -53,7 +53,8 @@ export async function GET(req: Request) {
     }
     cookieStore.delete(shared.CSRF_COOKIE_NAME);
 
-    const redirectUri = `${env.BETTER_AUTH_URL}/api/connectors/grain/callback`;
+    const publicOrigin = (env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL).replace(/\/+$/, '');
+    const redirectUri = `${publicOrigin}/api/connectors/grain/callback`;
     const conn = createGrainConnector({
       clientId: env.GRAIN_CONNECTOR_CLIENT_ID,
       clientSecret: env.GRAIN_CONNECTOR_CLIENT_SECRET,
@@ -117,15 +118,24 @@ export async function GET(req: Request) {
 
     await enqueueInitialSync(db, orgId, 'grain').catch(() => {});
 
-    return NextResponse.redirect(new URL('/connections', req.url));
+    return NextResponse.redirect(new URL('/connections', env.BETTER_AUTH_URL));
   } catch (e) {
+    let appOrigin: string;
+    try {
+      const { env: errEnv } = await getServerContext();
+      appOrigin = errEnv.BETTER_AUTH_URL;
+    } catch {
+      appOrigin = new URL(req.url).origin;
+    }
     if (e instanceof HoloError) {
-      const u = new URL('/connections', req.url);
+      const u = new URL('/connections', appOrigin);
       u.searchParams.set('connect_error', e.code);
       u.searchParams.set('connect_fix', e.fix);
       return NextResponse.redirect(u);
     }
     console.error(e);
-    return NextResponse.redirect(new URL('/connections?connect_error=HOLO_INTERNAL', req.url));
+    return NextResponse.redirect(
+      new URL('/connections?connect_error=HOLO_INTERNAL', appOrigin),
+    );
   }
 }
