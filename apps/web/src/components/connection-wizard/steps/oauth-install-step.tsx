@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Check } from 'lucide-react';
+import { toast } from 'sonner';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { openOAuthPopup } from '@/lib/oauth-popup';
@@ -59,6 +60,7 @@ function OAuthInstallStep<TState>({
         // User dismissed without completing OAuth — stay put.
         return;
       }
+      toast.success(`${meta.displayName} connected`);
       ctx.refreshServer();
       ctx.goNext();
     } finally {
