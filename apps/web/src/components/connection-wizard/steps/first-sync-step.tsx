@@ -4,6 +4,7 @@ import { AlertCircle, Check, Loader2 } from 'lucide-react';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { notifySyncTriggered } from '@/lib/sync-events';
+import { useConnectorStatus } from '@/lib/connectors-status-store';
 import type { WizardContext } from '../types';
 
 interface Args {
@@ -61,41 +62,30 @@ function FirstSyncStep<TState>({
   const { meta } = ctx;
   const startedAt =
     (ctx.state as { syncStartedAt?: number }).syncStartedAt ?? null;
-  const [running, setRunning] = useState(false);
-  const [chunksIndexed, setChunksIndexed] = useState(0);
-  const [embedQueued, setEmbedQueued] = useState(0);
+  // Status (running / chunksIndexed / embedQueued) flows from the shared
+  // bulk-status store — every connector on the page reads from one polling
+  // loop. The /runs endpoint stays per-provider since the wizard cares about
+  // individual job progress.
+  const status = useConnectorStatus(meta.id);
+  const running = status.running;
+  const chunksIndexed = status.chunksIndexed;
+  const embedQueued = status.embedQueued;
   const [latestRun, setLatestRun] = useState<RunRow | null>(null);
   const [activeRun, setActiveRun] = useState<RunRow | null>(null);
   const startedRef = useRef<number>(startedAt ?? Date.now());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Notify any sibling badges that we've kicked off a sync (in case the
-    // previous step didn't already).
     notifySyncTriggered(meta.id);
     let cancelled = false;
     async function tick() {
       try {
-        // Fan out the two reads in parallel — both hit the same DB pool and
-        // we want freshness over saving a round-trip. Failures on either side
-        // are treated as transient; we'll re-poll in 3s.
-        const [statusRes, runsRes] = await Promise.all([
-          fetch(`/api/connectors/${meta.id}/sync-status`, { cache: 'no-store' }),
-          fetch(`/api/connectors/${meta.id}/runs`, { cache: 'no-store' }),
-        ]);
+        const res = await fetch(`/api/connectors/${meta.id}/runs`, {
+          cache: 'no-store',
+        });
         if (cancelled) return;
-        if (statusRes.ok) {
-          const body = (await statusRes.json()) as {
-            running?: boolean;
-            chunksIndexed?: number;
-            embedQueued?: number;
-          };
-          setRunning(Boolean(body.running));
-          setChunksIndexed(body.chunksIndexed ?? 0);
-          setEmbedQueued(body.embedQueued ?? 0);
-        }
-        if (runsRes.ok) {
-          const body = (await runsRes.json()) as { runs?: RunRow[] };
+        if (res.ok) {
+          const body = (await res.json()) as { runs?: RunRow[] };
           const runs = body.runs ?? [];
           setLatestRun(runs[0] ?? null);
           setActiveRun(

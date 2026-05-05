@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Eye, EyeOff } from 'lucide-react';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import type { WizardContext } from '../types';
@@ -40,6 +40,7 @@ function ApiKeyStep<TState>({
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState(false);
 
   async function save() {
     setBusy(true);
@@ -113,15 +114,31 @@ function ApiKeyStep<TState>({
               ))}
             </ul>
           ) : null}
-          <input
-            type="password"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder={args.placeholder}
-            className="rounded-md border border-border bg-bg px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:outline-hidden focus:focus-ring"
-            autoComplete="off"
-            disabled={busy}
-          />
+          <div className="relative">
+            <input
+              type={revealed ? 'text' : 'password'}
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder={args.placeholder}
+              className="w-full rounded-md border border-border bg-bg py-2 pl-3 pr-9 text-[13px] text-text placeholder:text-text-subtle focus:outline-hidden focus:focus-ring"
+              autoComplete="off"
+              disabled={busy}
+            />
+            <button
+              type="button"
+              onClick={() => setRevealed((v) => !v)}
+              disabled={busy}
+              aria-label={revealed ? 'Hide token' : 'Show token'}
+              aria-pressed={revealed}
+              className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-text-subtle hover:text-text focus:outline-hidden focus:focus-ring disabled:opacity-50"
+            >
+              {revealed ? (
+                <EyeOff className="h-3.5 w-3.5" aria-hidden />
+              ) : (
+                <Eye className="h-3.5 w-3.5" aria-hidden />
+              )}
+            </button>
+          </div>
           {error ? <p className="text-[12px] text-error">{error}</p> : null}
         </div>
       )}

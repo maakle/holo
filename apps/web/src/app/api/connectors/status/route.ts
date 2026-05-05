@@ -1,0 +1,177 @@
+import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { schema } from '@holo/db';
+import { holoError, ErrorCode, HoloError } from '@holo/errors';
+import { getServerContext } from '@/lib/server-context';
+import { activeQueueNames, getQueueByName } from '@/lib/sync-queue';
+
+const PROVIDERS = ['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot'] as const;
+type Provider = (typeof PROVIDERS)[number];
+
+export type ConnectorSyncStatus = {
+  running: boolean;
+  lastSyncedAt: string | null;
+  lastStatus: string | null;
+  embedQueued: number;
+  chunksIndexed: number;
+};
+
+export type BulkStatusResponse = {
+  statuses: Record<Provider, ConnectorSyncStatus>;
+};
+
+function emptyStatus(): ConnectorSyncStatus {
+  return {
+    running: false,
+    lastSyncedAt: null,
+    lastStatus: null,
+    embedQueued: 0,
+    chunksIndexed: 0,
+  };
+}
+
+export async function GET() {
+  try {
+    const { auth, db, defaultOrgId } = await getServerContext();
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) {
+      throw holoError({
+        code: ErrorCode.HOLO_AUTH_NO_SESSION,
+        problem: 'must be signed in',
+        fix: 'Sign in first.',
+      });
+    }
+    const orgId =
+      (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
+
+    const statuses: Record<Provider, ConnectorSyncStatus> = {
+      github: emptyStatus(),
+      slack: emptyStatus(),
+      notion: emptyStatus(),
+      grain: emptyStatus(),
+      pylon: emptyStatus(),
+      hubspot: emptyStatus(),
+    };
+
+    const sourceRows = await db
+      .select({ id: schema.sources.id, provider: schema.sources.provider })
+      .from(schema.sources)
+      .where(eq(schema.sources.organizationId, orgId));
+
+    if (sourceRows.length === 0) {
+      return NextResponse.json({ statuses } satisfies BulkStatusResponse);
+    }
+
+    const sourceIdToProvider = new Map<string, Provider>();
+    const sourceIdsByProvider: Record<Provider, Set<string>> = {
+      github: new Set(),
+      slack: new Set(),
+      notion: new Set(),
+      grain: new Set(),
+      pylon: new Set(),
+      hubspot: new Set(),
+    };
+    const allSourceIds: string[] = [];
+    for (const s of sourceRows) {
+      const p = s.provider as Provider;
+      if (!(p in sourceIdsByProvider)) continue;
+      sourceIdsByProvider[p].add(s.id);
+      sourceIdToProvider.set(s.id, p);
+      allSourceIds.push(s.id);
+    }
+
+    // Walk each unique queue once; bucket active/waiting jobs into the
+    // owning provider via the source they reference. This replaces
+    // N (providers) × M (queues per provider) round trips with a single
+    // pass per distinct queue.
+    const distinctQueueNames = new Set<string>();
+    for (const p of PROVIDERS) {
+      for (const q of activeQueueNames(p)) distinctQueueNames.add(q);
+    }
+    await Promise.all(
+      [...distinctQueueNames].map(async (name) => {
+        const queue = getQueueByName(name);
+        const jobs = await queue.getJobs(['active', 'waiting']);
+        for (const j of jobs) {
+          const payload = j.data as { sourceId?: string; organizationId?: string } | undefined;
+          if (payload?.organizationId !== orgId || !payload.sourceId) continue;
+          const provider = sourceIdToProvider.get(payload.sourceId);
+          if (!provider) continue;
+          statuses[provider].running = true;
+        }
+      }),
+    );
+
+    // Last run / status — one query for all sources, then bucket.
+    const cursorRows = await db
+      .select({
+        sourceId: schema.connectorCursors.sourceId,
+        lastRunAt: schema.connectorCursors.lastRunAt,
+        lastStatus: schema.connectorCursors.lastStatus,
+      })
+      .from(schema.connectorCursors)
+      .where(
+        and(
+          eq(schema.connectorCursors.organizationId, orgId),
+          inArray(schema.connectorCursors.sourceId, allSourceIds),
+        ),
+      );
+    for (const c of cursorRows) {
+      if (!c.lastRunAt) continue;
+      const provider = sourceIdToProvider.get(c.sourceId);
+      if (!provider) continue;
+      const cur = statuses[provider];
+      const iso = c.lastRunAt.toISOString();
+      if (!cur.lastSyncedAt || new Date(iso) > new Date(cur.lastSyncedAt)) {
+        cur.lastSyncedAt = iso;
+        cur.lastStatus = c.lastStatus;
+      }
+    }
+
+    // Embed queue is shared across providers; we only know the org from the
+    // payload, not the provider. Charge embed depth equally across providers
+    // that have at least one source — the per-provider breakdown isn't
+    // semantically meaningful for embed work, and the previous endpoint
+    // double-counted by querying the same queue once per provider.
+    let embedQueuedTotal = 0;
+    {
+      const embed = getQueueByName('embed');
+      const jobs = await embed.getJobs(['waiting', 'active']);
+      for (const j of jobs) {
+        const payload = j.data as { organizationId?: string } | undefined;
+        if (payload?.organizationId === orgId) embedQueuedTotal += 1;
+      }
+    }
+    for (const p of PROVIDERS) {
+      if (sourceIdsByProvider[p].size > 0) statuses[p].embedQueued = embedQueuedTotal;
+    }
+
+    // Chunk counts grouped by provider in one round trip.
+    const chunkRows = await db
+      .select({
+        provider: schema.chunks.provider,
+        c: sql<number>`count(*)::int`,
+      })
+      .from(schema.chunks)
+      .where(
+        and(
+          eq(schema.chunks.organizationId, orgId),
+          inArray(schema.chunks.sourceId, allSourceIds),
+        ),
+      )
+      .groupBy(schema.chunks.provider);
+    for (const row of chunkRows) {
+      const p = row.provider as Provider;
+      if (p in statuses) statuses[p].chunksIndexed = row.c;
+    }
+
+    return NextResponse.json({ statuses } satisfies BulkStatusResponse);
+  } catch (e) {
+    if (e instanceof HoloError) {
+      return NextResponse.json({ problem: e.problem, fix: e.fix }, { status: 400 });
+    }
+    console.error(e);
+    return NextResponse.json({ problem: 'internal error' }, { status: 500 });
+  }
+}

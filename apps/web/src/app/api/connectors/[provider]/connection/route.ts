@@ -105,19 +105,17 @@ export async function DELETE(
       });
     }
 
-    // Drain any waiting/delayed slack-sync jobs for this org BEFORE we
-    // revoke the token — otherwise a worker could pick one up between the
-    // local revoke and apps.uninstall and run with a token that's about to
-    // become invalid (yields Slack's account_inactive error). Best-effort:
-    // a Redis blip shouldn't block the disconnect.
+    // Drain any waiting/delayed sync jobs for this org BEFORE we revoke the
+    // token / delete the source. Otherwise a worker could pick one up after
+    // the source row is gone and either run with a soon-to-be-invalid token
+    // (Slack's account_inactive) or fail the sync_runs FK insert (every
+    // other provider). Best-effort: a Redis blip shouldn't block disconnect.
     let drainedCounts: Record<string, number> | null = null;
-    if (provider === 'slack') {
-      try {
-        const { removed } = await drainJobsForOrg('slack', orgId);
-        drainedCounts = removed;
-      } catch (err) {
-        console.error('[disconnect/slack] drainJobsForOrg failed:', err);
-      }
+    try {
+      const { removed } = await drainJobsForOrg(provider, orgId);
+      drainedCounts = removed;
+    } catch (err) {
+      console.error(`[disconnect/${provider}] drainJobsForOrg failed:`, err);
     }
 
     // Capture this user's still-valid token BEFORE we mark it revoked — we

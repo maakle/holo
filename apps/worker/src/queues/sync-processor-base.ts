@@ -73,7 +73,20 @@ export abstract class SyncProcessorBase extends WorkerHost {
         payload: job.data,
       });
     } catch (err) {
-      this.logger.warn(`sync_runs start insert failed ${ctx}: ${(err as Error).message}`);
+      // FK violation on source_id means the source was deleted (user
+      // disconnected) after this job was enqueued. There's nothing to sync —
+      // bail without running the connector, otherwise we'd waste an API
+      // round-trip and produce a misleading 'failed' run row. Anything else
+      // we just warn about and try to sync anyway.
+      const msg = (err as Error).message ?? '';
+      const sourceGone = /sync_runs_source_id_fkey/.test(msg);
+      if (sourceGone) {
+        this.logger.log(
+          `skipping ${ctx}: source no longer exists (likely disconnected)`,
+        );
+        return { artifactCount: 0, newCursor: null, skipReason: 'source_deleted' };
+      }
+      this.logger.warn(`sync_runs start insert failed ${ctx}: ${msg}`);
     }
     // Debounced heartbeat: connectors call reportProgress freely (once per
     // page / repo / channel), but we coalesce to one DB write every ~1s and

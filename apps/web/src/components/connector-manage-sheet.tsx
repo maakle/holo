@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useConnectorStatus } from '@/lib/connectors-status-store';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -72,45 +73,16 @@ export function ConnectorManageSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
-  const wasOpenRef = useRef(false);
 
   const isApiKey = meta.flowType === 'apikey';
   const isGithub = meta.id === 'github';
   const isSlack = meta.id === 'slack';
 
-  // Poll the sync-status endpoint while the sheet is open so the Stop button
-  // appears as soon as a job is in flight and disappears when the queue
-  // settles. Reuses the same status endpoint the row badge already uses.
-  useEffect(() => {
-    if (!open) {
-      wasOpenRef.current = false;
-      return;
-    }
-    wasOpenRef.current = true;
-    let cancelled = false;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-
-    async function tick(): Promise<void> {
-      try {
-        const res = await fetch(`/api/connectors/${meta.id}/sync-status`, {
-          cache: 'no-store',
-        });
-        if (!res.ok) return;
-        const body = (await res.json()) as { running?: boolean };
-        if (cancelled) return;
-        setRunning(Boolean(body.running));
-      } finally {
-        if (!cancelled) timeout = setTimeout(tick, 4000);
-      }
-    }
-    void tick();
-    return () => {
-      cancelled = true;
-      if (timeout) clearTimeout(timeout);
-    };
-  }, [open, meta.id]);
+  // Live running state comes from the shared bulk-status store — every row,
+  // sheet, and badge on the page reads from the same poll loop.
+  const status = useConnectorStatus(meta.id);
+  const running = status.running;
 
   async function stopSync() {
     setBusy(true);
@@ -136,7 +108,6 @@ export function ConnectorManageSheet({
           ? 'Nothing was running.'
           : `Stopped ${removed} job(s)${active ? ` (${active} were mid-run; the worker will exit shortly)` : ''}.`,
       );
-      setRunning(false);
     } finally {
       setBusy(false);
     }

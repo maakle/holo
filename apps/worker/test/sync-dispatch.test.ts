@@ -77,7 +77,7 @@ describe('runSyncJob', () => {
     });
 
     expect(full).toHaveBeenCalledTimes(1);
-    expect(full).toHaveBeenCalledWith(payload);
+    expect(full).toHaveBeenCalledWith(payload, expect.any(Object));
     expect(result.artifactCount).toBe(5);
     const cursor = await stores.cursorStore.read('src-1');
     expect(cursor.exists).toBe(true);

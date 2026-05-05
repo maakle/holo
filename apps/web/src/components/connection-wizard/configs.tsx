@@ -125,11 +125,6 @@ const notionConfig: ConnectorWizardConfig = {
             'Copy the Internal Integration Token (starts with secret_ or ntn_) and paste it below.',
             'Open the integration → "Access to content" tab → "Edit access" → tick the top-level pages you want indexed (use "Select all" under Shared / Private to grant everything at once). Sub-pages are included automatically.',
           ],
-          permissions: [
-            'Read pages and databases you share with the integration',
-            'No write, comment, or user-management access',
-            'Disconnect any time from this page',
-          ],
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
