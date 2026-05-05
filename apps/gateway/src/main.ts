@@ -9,6 +9,8 @@ import { createSessionMiddleware, type McpSessionVars } from './middleware/sessi
 import { mountMcp } from './mcp/transport.js';
 import { apiReference } from '@scalar/hono-api-reference';
 import { createRestRouter, openApiConfig } from './rest/router.js';
+import { mountSlackEvents } from './slack/events.js';
+import { mountSlackCommands } from './slack/commands.js';
 import { logger } from './logger.js';
 
 async function main() {
@@ -83,6 +85,19 @@ async function main() {
   app.get('/docs', apiReference({ url: '/openapi.json', theme: 'default' }));
 
   app.route('/', restRouter);
+
+  // Slack bot endpoints — public (Slack signs requests; verification is in
+  // the handlers). Mounted before MCP so Slack's POSTs aren't accidentally
+  // routed through the MCP middleware stack.
+  mountSlackEvents(app, {
+    db,
+    signingSecret: env.SLACK_SIGNING_SECRET,
+    redisUrl: env.REDIS_URL,
+  });
+  mountSlackCommands(app, {
+    signingSecret: env.SLACK_SIGNING_SECRET,
+    redisUrl: env.REDIS_URL,
+  });
 
   mountMcp(app, {
     db,

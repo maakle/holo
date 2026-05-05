@@ -1,5 +1,5 @@
 'use client';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -363,7 +363,36 @@ function ChatGPTSetup({ mcpUrl, token }: { mcpUrl: string; token: string }) {
   );
 }
 
+type SlackBotStatus = 'loading' | 'not_connected' | 'ingest_only' | 'bot_enabled' | 'error';
+
+function useSlackBotStatus(): SlackBotStatus {
+  const [status, setStatus] = useState<SlackBotStatus>('loading');
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/connectors/slack/bot-status')
+      .then((res) => res.json())
+      .then((data: { status?: SlackBotStatus }) => {
+        if (cancelled) return;
+        setStatus(data.status ?? 'error');
+      })
+      .catch(() => {
+        if (!cancelled) setStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return status;
+}
+
 function SlackSetup() {
+  // The Slack bot rides on the same Slack app used for ingest. Behavior here
+  // is status-aware:
+  //  - not_connected: send the user to /connections to install Slack first
+  //  - ingest_only:   prompt re-auth so Slack adds the bot scopes
+  //  - bot_enabled:   show the success state and how to use @holo
+  const status = useSlackBotStatus();
+
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 space-y-3">
@@ -372,46 +401,113 @@ function SlackSetup() {
             Beta
           </span>
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            Private beta — request access below
+            Talk to holo from Slack
           </span>
         </div>
         <p className="text-[13px] leading-6 text-gray-700 dark:text-gray-300">
-          The holo Slack app lets your team query holo from any channel or DM. Mention{' '}
-          <InlineCode>@holo</InlineCode> to retrieve context, run a skill, or attach a run
-          summary back to the thread.
+          Mention <InlineCode>@holo</InlineCode> in any channel or DM, or run{' '}
+          <InlineCode>/holo</InlineCode>, to retrieve context from your indexed sources. The
+          bot uses the same Slack connection as your ingest sync.
         </p>
       </div>
 
-      <ol className="space-y-4 list-none">
-        <Step n={1}>
-          Click <strong>Add to Slack</strong> below. You&apos;ll be redirected to Slack to
-          install <InlineCode>@holo</InlineCode> in your workspace.
-        </Step>
-        <Step n={2}>
-          Pick the channels the bot should be able to read and post in. holo only sees
-          messages it&apos;s explicitly invited to.
-        </Step>
-        <Step n={3}>
-          Invite <InlineCode>@holo</InlineCode> into a channel and try{' '}
-          <InlineCode>@holo what do we know about X?</InlineCode>
-        </Step>
-      </ol>
+      {status === 'loading' && (
+        <p className="text-xs text-gray-400 dark:text-gray-500">Checking workspace…</p>
+      )}
 
-      <div className="flex items-center gap-3 pt-1">
-        <a
-          href="/api/connect/slack/install"
-          className="inline-flex items-center gap-2 rounded-md bg-[#4A154B] px-3 py-2 text-xs font-medium text-white hover:bg-[#611f63] transition-colors"
-        >
-          <SlackMark />
-          Add to Slack
-        </a>
-        <a
-          href="https://docs.holo.dev/connect/slack-self-hosted"
-          className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-        >
-          Self-hosting your own bot? →
-        </a>
-      </div>
+      {status === 'not_connected' && (
+        <div className="space-y-3">
+          <p className="text-[13px] leading-6 text-gray-700 dark:text-gray-300">
+            You haven&apos;t connected Slack yet. Install the holo Slack app first — the bot
+            and ingest sync share the same install.
+          </p>
+          <a
+            href="/connections"
+            className="inline-flex items-center gap-2 rounded-md bg-[#4A154B] px-3 py-2 text-xs font-medium text-white hover:bg-[#611f63] transition-colors"
+          >
+            <SlackMark />
+            Connect Slack →
+          </a>
+        </div>
+      )}
+
+      {status === 'ingest_only' && <SlackReauthCta />}
+
+      {status === 'bot_enabled' && (
+        <ol className="space-y-4 list-none">
+          <Step n={1}>
+            <span className="text-emerald-600 dark:text-emerald-400">
+              ✓ <InlineCode>@holo</InlineCode> is active in your workspace.
+            </span>
+          </Step>
+          <Step n={2}>
+            Invite the bot into any channel and ping it:{' '}
+            <InlineCode>/invite @holo</InlineCode>, then{' '}
+            <InlineCode>@holo what do we know about onboarding?</InlineCode>
+          </Step>
+          <Step n={3}>
+            Or use the slash command anywhere: <InlineCode>/holo &lt;your question&gt;</InlineCode>.
+            Add <InlineCode>--public</InlineCode> to share the answer with the channel.
+          </Step>
+          <Step n={4}>
+            DMs work too — open a DM with <InlineCode>@holo</InlineCode> and ask directly.
+          </Step>
+        </ol>
+      )}
+
+      {status === 'error' && (
+        <p className="text-xs text-red-600 dark:text-red-400">
+          Couldn&apos;t check Slack bot status. Refresh and try again.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Re-auth button: the existing /api/connectors/[provider]/initiate route
+ * accepts POST and returns { authorizeUrl } — we POST programmatically and
+ * navigate the browser there. Same pattern as the connect-wizard but inline.
+ */
+function SlackReauthCta() {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function reauth() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch('/api/connectors/slack/initiate', { method: 'POST' });
+      const data = (await res.json()) as { authorizeUrl?: string; problem?: string };
+      if (res.ok && data.authorizeUrl) {
+        window.location.href = data.authorizeUrl;
+        return;
+      }
+      setErr(data.problem ?? 'Failed to start Slack re-auth.');
+    } catch {
+      setErr('Network error.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[13px] leading-6 text-gray-700 dark:text-gray-300">
+        Your Slack workspace is connected for ingest, but the <InlineCode>@holo</InlineCode>{' '}
+        bot needs additional scopes (mentions, DMs, <InlineCode>chat:write</InlineCode>, slash
+        command). Re-authorize to enable the bot — Slack will prompt you to approve the new
+        scopes.
+      </p>
+      <button
+        onClick={reauth}
+        disabled={busy}
+        className="inline-flex items-center gap-2 rounded-md bg-[#4A154B] px-3 py-2 text-xs font-medium text-white hover:bg-[#611f63] disabled:opacity-50 transition-colors"
+      >
+        <SlackMark />
+        {busy ? 'Redirecting…' : 'Re-authorize for @holo bot'}
+      </button>
+      {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
     </div>
   );
 }

@@ -631,6 +631,26 @@ export const procedureProposals = pgTable(
   }),
 );
 
+/**
+ * Slack delivers each event with an `event_id` and retries on non-2xx or
+ * timeout. Insert into this table inside the events handler — a unique-key
+ * collision means we've already processed that event and should ack with 200
+ * without re-running the worker job. Rows TTL out via the cleanup worker
+ * (rows older than 24h can be deleted; Slack stops retrying after 1 hour).
+ */
+export const slackEventDedupe = pgTable(
+  'slack_event_dedupe',
+  {
+    teamId: text('team_id').notNull(),
+    eventId: text('event_id').notNull(),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: uniqueIndex('slack_event_dedupe_team_event_uniq').on(t.teamId, t.eventId),
+    receivedAtIdx: index('slack_event_dedupe_received_at_idx').on(t.receivedAt),
+  }),
+);
+
 export const procedureProposalDecisions = pgTable(
   'procedure_proposal_decisions',
   {

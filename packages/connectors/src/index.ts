@@ -6,10 +6,31 @@ export { chunkHash, dedupeAgainstDb } from './shared/content-hash';
 export type { DedupeAgainstDbInput } from './shared/content-hash';
 // GitHub uses GitHub App auth, not OAuth — there is no Connector facade.
 // Worker dispatches directly to runGithubProseSync / runGithubCodeSync below.
-export { createSlackConnector } from './slack/index';
+export {
+  createSlackConnector,
+  hasSlackBotScopes,
+  SLACK_INGEST_SCOPES,
+  SLACK_BOT_SCOPES,
+} from './slack/index';
 export type { SlackConnectorOptions } from './slack/index';
 export { createSlackUserApiClient } from './slack/user-client';
 export type { SlackUserApiClient } from './slack/user-client';
+export { createSlackApiClient } from './slack/api-client';
+export {
+  verifySlackSignature,
+  SLACK_REPLAY_WINDOW_SECONDS,
+} from './slack/verify-signature';
+export type {
+  VerifySlackInput,
+  VerifyResult as SlackVerifyResult,
+  SlackVerifyFailure,
+} from './slack/verify-signature';
+export type {
+  SlackApiClient,
+  SlackBlock,
+  SlackPostMessageInput,
+  SlackPostMessageResult,
+} from './slack/api-client';
 export { createNotionConnector } from './notion/index';
 export type { NotionConnectorOptions } from './notion/index';
 export { createGrainConnector } from './grain/index';
