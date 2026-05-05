@@ -52,6 +52,7 @@ export interface FinishOkArgs {
   queueName: QueueName;
   jobId: string;
   artifactCount: number;
+  skipReason?: string | null;
 }
 
 export async function finishSyncRunOk(sql: Sql, args: FinishOkArgs): Promise<void> {
@@ -60,7 +61,8 @@ export async function finishSyncRunOk(sql: Sql, args: FinishOkArgs): Promise<voi
        SET status = 'ok',
            finished_at = now(),
            duration_ms = (EXTRACT(EPOCH FROM (now() - started_at)) * 1000)::int,
-           artifact_count = ${args.artifactCount}
+           artifact_count = ${args.artifactCount},
+           skip_reason = ${args.skipReason ?? null}
      WHERE queue_name = ${args.queueName} AND job_id = ${args.jobId}
   `;
 }

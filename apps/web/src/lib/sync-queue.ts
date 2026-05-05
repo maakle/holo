@@ -80,3 +80,40 @@ export function activeQueueNames(provider: Provider): string[] {
 export function getQueueByName(name: string): Queue {
   return getQueue(name);
 }
+
+/**
+ * Drain all queued/delayed/failed jobs for a provider scoped to one org.
+ * Called from the disconnect handler so stale jobs don't fight the new
+ * install with a now-revoked token (Slack returns `account_inactive` in
+ * that race). Active jobs aren't forcibly killed — they finish on their
+ * own and may log one error; new jobs after that are gone.
+ *
+ * Returns counts per state for logging. Best-effort: a Redis hiccup
+ * shouldn't block the disconnect response.
+ */
+export async function drainJobsForOrg(
+  provider: Provider,
+  organizationId: string,
+): Promise<{ removed: Record<string, number> }> {
+  const removed: Record<string, number> = {};
+  for (const name of QUEUE_NAMES_BY_PROVIDER[provider]) {
+    const queue = getQueue(name);
+    let count = 0;
+    // 'active' jobs are mid-flight — leave them alone (forcing them off
+    // breaks the worker's connection guarantees). 'completed' is keepable
+    // history. We remove waiting / delayed / failed for this org.
+    const jobs = await queue.getJobs(['waiting', 'delayed', 'failed', 'paused']);
+    for (const j of jobs) {
+      const payload = j.data as { organizationId?: string } | undefined;
+      if (payload?.organizationId !== organizationId) continue;
+      try {
+        await j.remove();
+        count += 1;
+      } catch {
+        // Race with another worker picking the job up — ignore.
+      }
+    }
+    removed[name] = count;
+  }
+  return { removed };
+}

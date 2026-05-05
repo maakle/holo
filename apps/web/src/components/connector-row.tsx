@@ -15,6 +15,10 @@ import { ConnectorManageSheet } from '@/components/connector-manage-sheet';
 interface AllowlistEntry {
   pattern: string;
   isGlob: boolean;
+  /** Human-readable label (e.g. channel name for slack). When null we fall
+   * back to rendering the raw pattern. Older rows from before notes-on-write
+   * was added will have label === null. */
+  label: string | null;
 }
 
 interface Props {
@@ -135,30 +139,43 @@ export function ConnectorRow({
           {status === 'connected' && allowlist.length > 0 ? (
             <TooltipProvider delayDuration={150}>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {allowlist.map((a) => (
-                  <Tooltip key={a.pattern}>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex cursor-default items-center rounded-md border border-accent/30 bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] px-1.5 py-0.5 text-[11px] font-medium text-accent">
-                        {a.pattern}
-                        {a.isGlob ? <span className="ml-1 opacity-60">*</span> : null}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-medium">
-                          {a.isGlob ? `Glob: ${a.pattern}` : a.pattern}
+                {allowlist.map((a) => {
+                  const display =
+                    a.label != null
+                      ? meta.id === 'slack'
+                        ? `#${a.label}`
+                        : a.label
+                      : a.pattern;
+                  return (
+                    <Tooltip key={a.pattern}>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex cursor-default items-center rounded-md border border-accent/30 bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] px-1.5 py-0.5 text-[11px] font-medium text-accent">
+                          {display}
+                          {a.isGlob ? <span className="ml-1 opacity-60">*</span> : null}
                         </span>
-                        <span className="text-text-muted">
-                          {lastSyncedAt
-                            ? `Last synced ${formatRelative(lastSyncedAt)}${
-                                lastSyncStatus ? ` · ${lastSyncStatus}` : ''
-                              }`
-                            : 'Never synced'}
-                        </span>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-medium">
+                            {a.isGlob ? `Glob: ${a.pattern}` : display}
+                          </span>
+                          {a.label != null ? (
+                            <span className="font-mono text-[10px] text-text-muted">
+                              {a.pattern}
+                            </span>
+                          ) : null}
+                          <span className="text-text-muted">
+                            {lastSyncedAt
+                              ? `Last synced ${formatRelative(lastSyncedAt)}${
+                                  lastSyncStatus ? ` · ${lastSyncStatus}` : ''
+                                }`
+                              : 'Never synced'}
+                          </span>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
               </div>
             </TooltipProvider>
           ) : null}

@@ -181,6 +181,7 @@ export function createSlackRunner(deps: RunnerDeps): SyncRunner {
         artifactCount: result.artifactCount,
         newCursor: result.newCursor,
         metadataPatch: result.metadataPatch,
+        skipReason: result.skipReason,
       };
     },
     async incremental(payload: SyncJobPayload): Promise<SyncResult> {
@@ -193,6 +194,7 @@ export function createSlackRunner(deps: RunnerDeps): SyncRunner {
         artifactCount: result.artifactCount,
         newCursor: result.newCursor,
         metadataPatch: result.metadataPatch,
+        skipReason: result.skipReason,
       };
     },
   };

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Clock, Loader2, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { onSyncTriggered } from '@/lib/sync-events';
 
@@ -16,7 +16,13 @@ type Run = {
   artifactCount: number | null;
   failedReason: string | null;
   failedFix: string | null;
+  skipReason: string | null;
 };
+
+function describeSkipReason(reason: string): string {
+  if (reason === 'no_channels_selected') return 'no channels selected';
+  return reason;
+}
 
 interface Props {
   provider: string;
@@ -34,6 +40,19 @@ function formatDuration(ms: number | null): string {
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
   return `${m}m ${s % 60}s`;
+}
+
+function formatArtifacts(
+  state: Run['state'],
+  count: number | null,
+  skipReason: string | null,
+): string | null {
+  if (skipReason) return describeSkipReason(skipReason);
+  if (count === null) return null;
+  if (count === 0) {
+    return state === 'completed' ? 'up to date' : '0 new chunks';
+  }
+  return `+${count.toLocaleString()} new chunks`;
 }
 
 function StateBadge({ state }: { state: Run['state'] }) {
@@ -69,7 +88,7 @@ export function SyncHistoryPanel({ provider }: Props) {
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [openErrorId, setOpenErrorId] = useState<string | null>(null);
+  const [openRowId, setOpenRowId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,13 +168,24 @@ export function SyncHistoryPanel({ provider }: Props) {
       ) : (
         <ul>
           {runs.map((r) => {
-            const expanded = openErrorId === r.id + r.queue;
+            const rowKey = `${r.queue}:${r.id}`;
+            const expanded = openRowId === rowKey;
+            const artifactsLabel = formatArtifacts(r.state, r.artifactCount, r.skipReason);
             return (
               <li
-                key={`${r.queue}:${r.id}`}
+                key={rowKey}
                 className="border-b border-border last:border-b-0"
               >
-                <div className="flex items-start gap-3 px-3 py-2 text-[12px]">
+                <button
+                  type="button"
+                  onClick={() => setOpenRowId(expanded ? null : rowKey)}
+                  className="flex w-full items-start gap-3 px-3 py-2 text-left text-[12px] hover:bg-surface-2"
+                  aria-expanded={expanded}
+                >
+                  <ChevronRight
+                    className={`mt-0.5 h-3 w-3 shrink-0 text-text-muted transition-transform ${expanded ? 'rotate-90' : ''}`}
+                    aria-hidden
+                  />
                   <div className="shrink-0">
                     <StateBadge state={r.state} />
                   </div>
@@ -168,10 +198,8 @@ export function SyncHistoryPanel({ provider }: Props) {
                       <span className="text-text-muted">
                         · {formatDuration(r.durationMs)}
                       </span>
-                      {r.artifactCount !== null ? (
-                        <span className="text-text-muted">
-                          · {r.artifactCount} artifacts
-                        </span>
+                      {artifactsLabel ? (
+                        <span className="text-text-muted">· {artifactsLabel}</span>
                       ) : null}
                       {r.attempts > 1 ? (
                         <span className="text-warning">
@@ -179,32 +207,59 @@ export function SyncHistoryPanel({ provider }: Props) {
                         </span>
                       ) : null}
                     </div>
+                  </div>
+                </button>
+                {expanded ? (
+                  <div className="border-t border-border bg-surface-2 px-3 py-2.5 text-[12px]">
+                    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
+                      <dt className="text-text-muted">Queue</dt>
+                      <dd className="font-mono text-text">{r.queue}</dd>
+                      <dt className="text-text-muted">Job ID</dt>
+                      <dd className="font-mono text-text break-all">{r.id}</dd>
+                      <dt className="text-text-muted">Status</dt>
+                      <dd className="text-text">{r.state}</dd>
+                      <dt className="text-text-muted">Enqueued</dt>
+                      <dd className="text-text">{formatTime(r.enqueuedAt)}</dd>
+                      <dt className="text-text-muted">Started</dt>
+                      <dd className="text-text">{formatTime(r.processedOn)}</dd>
+                      <dt className="text-text-muted">Finished</dt>
+                      <dd className="text-text">{formatTime(r.finishedOn)}</dd>
+                      <dt className="text-text-muted">Duration</dt>
+                      <dd className="text-text">{formatDuration(r.durationMs)}</dd>
+                      <dt className="text-text-muted">New chunks</dt>
+                      <dd className="text-text">
+                        {r.skipReason
+                          ? `0 (${describeSkipReason(r.skipReason)} — sync skipped)`
+                          : r.artifactCount === null
+                            ? '—'
+                            : r.artifactCount === 0
+                              ? '0 (content already indexed — nothing new to embed)'
+                              : r.artifactCount.toLocaleString()}
+                      </dd>
+                      {r.attempts > 0 ? (
+                        <>
+                          <dt className="text-text-muted">Attempts</dt>
+                          <dd className="text-text">{r.attempts}</dd>
+                        </>
+                      ) : null}
+                    </dl>
                     {r.state === 'failed' && r.failedReason ? (
-                      <div className="mt-1">
-                        <button
-                          type="button"
-                          className="text-[11px] text-error underline-offset-2 hover:underline"
-                          onClick={() =>
-                            setOpenErrorId(expanded ? null : r.id + r.queue)
-                          }
-                        >
-                          {expanded ? 'Hide error' : 'Show error'}
-                        </button>
-                        {expanded ? (
-                          <div className="mt-1 rounded-sm border border-error/30 bg-[color-mix(in_srgb,var(--error)_8%,transparent)] p-2 font-mono text-[11px] text-error">
-                            <div>{r.failedReason}</div>
-                            {r.failedFix ? (
-                              <div className="mt-1 text-error/80">Fix: {r.failedFix}</div>
-                            ) : null}
-                            <div className="mt-2 text-[10px] text-error/70">
-                              Full stack trace and underlying cause are in the worker logs.
-                            </div>
-                          </div>
+                      <div className="mt-2.5 rounded-sm border border-error/30 bg-[color-mix(in_srgb,var(--error)_8%,transparent)] p-2 font-mono text-[11px] text-error">
+                        <div>{r.failedReason}</div>
+                        {r.failedFix ? (
+                          <div className="mt-1 text-error/80">Fix: {r.failedFix}</div>
                         ) : null}
+                        <div className="mt-2 text-[10px] text-error/70">
+                          Full stack trace and underlying cause are in the worker logs.
+                        </div>
                       </div>
                     ) : null}
+                    <div className="mt-2.5 text-[11px] text-text-muted">
+                      Per-file breakdown (indexed / skipped / deduped) currently
+                      lives only in worker logs.
+                    </div>
                   </div>
-                </div>
+                ) : null}
               </li>
             );
           })}

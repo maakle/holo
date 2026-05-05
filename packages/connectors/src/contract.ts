@@ -40,6 +40,10 @@ export interface SyncResult {
    * Slack to persist `oldest_per_channel` / `bot_not_in_channel`, by GitHub
    * prose to persist per-repo cursors, etc. */
   metadataPatch?: Record<string, unknown>;
+  /** Set when the sync intentionally did no work (e.g. no channels selected).
+   * Distinguishes "ran and found nothing new" from "didn't have anything to
+   * scan in the first place" so the UI can show a meaningful status. */
+  skipReason?: string;
 }
 
 export interface WebhookEnvelope {

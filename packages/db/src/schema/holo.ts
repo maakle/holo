@@ -226,6 +226,7 @@ export const syncRuns = pgTable(
     errorCode: text('error_code'),
     errorProblem: text('error_problem'),
     errorCause: text('error_cause'),
+    skipReason: text('skip_reason'),
   },
   (t) => ({
     queueJobUniq: uniqueIndex('sync_runs_queue_job_uniq').on(t.queueName, t.jobId),

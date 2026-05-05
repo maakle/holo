@@ -85,6 +85,7 @@ export default async function ConnectionsPage({
       pattern: schema.connectorAllowlists.pattern,
       patternKind: schema.connectorAllowlists.patternKind,
       decision: schema.connectorAllowlists.decision,
+      notes: schema.connectorAllowlists.notes,
     })
     .from(schema.connectorAllowlists)
     .where(eq(schema.connectorAllowlists.organizationId, orgId));
@@ -101,11 +102,14 @@ export default async function ConnectionsPage({
   if (!sourceName.has('github') && githubAccountLogin) {
     sourceName.set('github', githubAccountLogin);
   }
-  const allowlistByProvider = new Map<string, { pattern: string; isGlob: boolean }[]>();
+  const allowlistByProvider = new Map<
+    string,
+    { pattern: string; isGlob: boolean; label: string | null }[]
+  >();
   for (const r of allowlistRows) {
     if (r.decision !== 'include') continue;
     const arr = allowlistByProvider.get(r.provider) ?? [];
-    arr.push({ pattern: r.pattern, isGlob: r.patternKind === 'glob' });
+    arr.push({ pattern: r.pattern, isGlob: r.patternKind === 'glob', label: r.notes });
     allowlistByProvider.set(r.provider, arr);
   }
 

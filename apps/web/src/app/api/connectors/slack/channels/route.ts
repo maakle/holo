@@ -266,17 +266,29 @@ export async function PUT(req: Request) {
           ),
         );
     }
-    if (toInsert.length > 0) {
-      await db.insert(schema.connectorAllowlists).values(
-        toInsert.map((pattern) => ({
-          organizationId: orgId,
-          provider: 'slack',
-          pattern,
-          patternKind: 'exact_id' as const,
-          decision: 'include' as const,
-          createdBy: userId,
-        })),
-      );
+
+    // Load channel list once — used both for resolving names into the
+    // `notes` column (so chips show #general instead of C012ABC) and for
+    // the auto-join step below.
+    let channelsById: Map<string, SlackChannel> | null = null;
+    if (toInsert.length > 0 || defaultAll) {
+      const token = await loadAccessToken(db, orgId, userId);
+      const all = await listAllChannels(token);
+      channelsById = new Map(all.map((c) => [c.id, c]));
+
+      if (toInsert.length > 0) {
+        await db.insert(schema.connectorAllowlists).values(
+          toInsert.map((pattern) => ({
+            organizationId: orgId,
+            provider: 'slack',
+            pattern,
+            patternKind: 'exact_id' as const,
+            decision: 'include' as const,
+            createdBy: userId,
+            notes: channelsById!.get(pattern)?.name ?? null,
+          })),
+        );
+      }
     }
 
     // Auto-join public channels. For explicit picks: only the newly-added
@@ -286,18 +298,14 @@ export async function PUT(req: Request) {
     const joined: string[] = [];
     const needsInvite: { id: string; name: string }[] = [];
     const joinErrors: { id: string; error: string }[] = [];
-    const targets: string[] = defaultAll
-      ? [] // populated below from the live channel list
-      : toInsert;
-    if (defaultAll || toInsert.length > 0) {
+    const targets: string[] = defaultAll ? [] : toInsert;
+    if ((defaultAll || toInsert.length > 0) && channelsById) {
       const token = await loadAccessToken(db, orgId, userId);
-      const all = await listAllChannels(token);
-      const byId = new Map(all.map((c) => [c.id, c]));
       if (defaultAll) {
-        for (const c of all) targets.push(c.id);
+        for (const c of channelsById.values()) targets.push(c.id);
       }
       for (const id of targets) {
-        const c = byId.get(id);
+        const c = channelsById.get(id);
         if (!c) continue;
         if (c.is_private) {
           if (!c.is_member) needsInvite.push({ id: c.id, name: c.name });

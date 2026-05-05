@@ -21,6 +21,7 @@ type RunRow = {
   artifactCount: number | null;
   failedReason: string | null;
   failedFix: string | null;
+  skipReason: string | null;
 };
 
 const RESPONSE_LIMIT = 20;
@@ -89,6 +90,7 @@ export async function GET(
         artifactCount: schema.syncRuns.artifactCount,
         errorCode: schema.syncRuns.errorCode,
         errorProblem: schema.syncRuns.errorProblem,
+        skipReason: schema.syncRuns.skipReason,
       })
       .from(schema.syncRuns)
       .where(
@@ -100,6 +102,10 @@ export async function GET(
       .orderBy(desc(schema.syncRuns.startedAt))
       .limit(HISTORIC_FETCH_LIMIT);
 
+    // Track each row's BullMQ jobId alongside the row so we can dedupe
+    // historic 'running' entries against the same job's live BullMQ state.
+    // The row's public `id` stays the postgres UUID for stable React keys.
+    const rowJobIds = new Map<RunRow, string | null>();
     const rows: RunRow[] = historicRows.map((r) => {
       const startedMs = r.startedAt ? r.startedAt.getTime() : null;
       const finishedMs = r.finishedAt ? r.finishedAt.getTime() : null;
@@ -112,7 +118,7 @@ export async function GET(
               ? 'stalled'
               : 'active';
       const problem = r.errorProblem ? redactSecrets(r.errorProblem) : null;
-      return {
+      const row: RunRow = {
         id: r.id,
         queue: r.queueName,
         state,
@@ -124,14 +130,21 @@ export async function GET(
         artifactCount: r.artifactCount,
         failedReason: problem,
         failedFix: null,
+        skipReason: r.skipReason ?? null,
       };
+      rowJobIds.set(row, r.jobId);
+      return row;
     });
 
     // Live BullMQ state — only what's running NOW or queued for immediate
     // pickup. We deliberately skip `delayed` because those are scheduled
     // future ticks (the 6h scheduler), not runs — surfacing them as
     // "waiting" in the history panel was misleading.
-    const seenJobKeys = new Set(rows.map((r) => `${r.queue}:${r.id}`));
+    const seenJobKeys = new Set<string>();
+    for (const r of rows) {
+      const jid = rowJobIds.get(r);
+      if (jid) seenJobKeys.add(`${r.queue}:${jid}`);
+    }
     for (const name of activeQueueNames(provider)) {
       const queue = getQueueByName(name);
       const [active, waiting] = await Promise.all([
@@ -145,9 +158,10 @@ export async function GET(
         const liveKey = `${name}:${jobId}`;
         // Replace the historic 'running' row with the live job's metadata —
         // the BullMQ row has accurate processedOn / waiting status that the
-        // 'running' insert can't predict.
+        // 'running' insert can't predict. Match on the BullMQ jobId stored
+        // alongside the row, NOT row.id (which is the postgres UUID).
         const existingIdx = rows.findIndex(
-          (r) => r.queue === name && r.id === jobId && r.state === 'active',
+          (r) => r.queue === name && rowJobIds.get(r) === jobId && r.state === 'active',
         );
         const finishedOn = maybeNumber(j.finishedOn);
         const processedOn = maybeNumber(j.processedOn);
@@ -165,6 +179,7 @@ export async function GET(
           artifactCount: null,
           failedReason: null,
           failedFix: null,
+          skipReason: null,
         };
         if (existingIdx >= 0) {
           rows[existingIdx] = live;

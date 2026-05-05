@@ -121,7 +121,7 @@ export function createSlackConnector(opts: SlackConnectorOptions): Connector {
         client,
       });
       if (allowedChannelIds.length === 0) {
-        return { artifactCount: 0, newCursor: new Date() };
+        return { artifactCount: 0, newCursor: new Date(), skipReason: 'no_channels_selected' };
       }
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
       const db = opts.db;
@@ -157,7 +157,7 @@ export function createSlackConnector(opts: SlackConnectorOptions): Connector {
         client,
       });
       if (allowedChannelIds.length === 0) {
-        return { artifactCount: 0, newCursor: new Date() };
+        return { artifactCount: 0, newCursor: new Date(), skipReason: 'no_channels_selected' };
       }
       const cursor = await loadCursorMetadata(opts.db, ctx.sourceId);
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);

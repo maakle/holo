@@ -88,6 +88,7 @@ export abstract class SyncProcessorBase extends WorkerHost {
           queueName: this.queueName,
           jobId,
           artifactCount: result.artifactCount,
+          skipReason: result.skipReason ?? null,
         });
       } catch (err) {
         this.logger.warn(`sync_runs ok update failed ${ctx}: ${(err as Error).message}`);

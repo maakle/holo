@@ -5,6 +5,7 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { githubAppConfigFromEnv, uninstallApp } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
+import { drainJobsForOrg } from '@/lib/sync-queue';
 
 const PROVIDERS = new Set(['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot'] as const);
 type Provider = typeof PROVIDERS extends Set<infer T> ? T : never;
@@ -102,6 +103,21 @@ export async function DELETE(
         removedSources: deletedSources.length,
         removedAllowlistRows: deletedAllow.length,
       });
+    }
+
+    // Drain any waiting/delayed slack-sync jobs for this org BEFORE we
+    // revoke the token — otherwise a worker could pick one up between the
+    // local revoke and apps.uninstall and run with a token that's about to
+    // become invalid (yields Slack's account_inactive error). Best-effort:
+    // a Redis blip shouldn't block the disconnect.
+    let drainedCounts: Record<string, number> | null = null;
+    if (provider === 'slack') {
+      try {
+        const { removed } = await drainJobsForOrg('slack', orgId);
+        drainedCounts = removed;
+      } catch (err) {
+        console.error('[disconnect/slack] drainJobsForOrg failed:', err);
+      }
     }
 
     // Capture this user's still-valid token BEFORE we mark it revoked — we
@@ -223,6 +239,7 @@ export async function DELETE(
       removedAllowlistRows,
       remainingCredentials: remaining.length,
       slackRemoteUninstalled,
+      drainedJobs: drainedCounts,
     });
   } catch (e) {
     if (e instanceof HoloError) {

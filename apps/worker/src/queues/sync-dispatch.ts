@@ -26,6 +26,7 @@ export type SyncResult = {
   artifactCount: number;
   newCursor: Date | null;
   metadataPatch?: Record<string, unknown>;
+  skipReason?: string;
 };
 
 export type SyncRunner = {

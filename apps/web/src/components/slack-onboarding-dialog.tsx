@@ -54,9 +54,8 @@ export function SlackOnboardingDialog({ open, onOpenChange, connectedAs }: Props
   const [syncStartedAt, setSyncStartedAt] = useState<number | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Step 2: lazy-load channels when dialog opens. Pre-select all so the
-  // wizard's default action is "sync everything" — matches user intent
-  // when they hit Connect from a clean state.
+  // Step 2: lazy-load channels when dialog opens. Start with nothing
+  // selected — users opt in via "Select all" or per-channel checkboxes.
   useEffect(() => {
     if (!open || channels !== null) return;
     let cancelled = false;
@@ -78,7 +77,7 @@ export function SlackOnboardingDialog({ open, onOpenChange, connectedAs }: Props
           const list = body.channels ?? [];
           setChannels(list);
           setTeamId(body.teamId ?? null);
-          setSelected(new Set(list.map((c) => c.id)));
+          setSelected(new Set());
         }
       } finally {
         if (!cancelled) setBusy(false);
@@ -170,8 +169,13 @@ export function SlackOnboardingDialog({ open, onOpenChange, connectedAs }: Props
         notifySyncTriggered('slack');
         setSyncStartedAt(Date.now());
       }
-      // Skip step 3 if no private channels need invites — go straight to sync.
-      setStep((body.needsInvite?.length ?? 0) > 0 ? 3 : 4);
+      // Always advance to step 3. Even when needsInvite is empty, we show an
+      // informational message: Slack only exposes private channels the bot
+      // is already a member of, so we can't enumerate the ones that *might*
+      // want syncing. Step 3 is the moment to nudge the user to /invite the
+      // bot to any private channels they care about, while they still have
+      // Slack open.
+      setStep(3);
       router.refresh();
     } finally {
       setBusy(false);
@@ -242,8 +246,8 @@ export function SlackOnboardingDialog({ open, onOpenChange, connectedAs }: Props
         {step === 2 ? (
           <div className="flex flex-col gap-3">
             <p className="text-[13px] text-text-muted">
-              All channels are pre-selected. Public channels the bot isn&apos;t in yet will be
-              auto-joined when you save. Uncheck any to narrow the selection.
+              Pick the channels to sync, or hit &ldquo;Select all&rdquo; to grab everything. Public
+              channels the bot isn&apos;t in yet will be auto-joined when you save.
             </p>
             <div className="rounded-md border border-border bg-surface-2/40 px-3 py-2 text-[12px] text-text-muted">
               <span className="font-medium text-text">Heads up:</span> the first sync runs in the
@@ -321,42 +325,45 @@ export function SlackOnboardingDialog({ open, onOpenChange, connectedAs }: Props
 
         {step === 3 ? (
           <div className="flex flex-col gap-3">
-            <div className="rounded-md border border-warning/40 bg-[color-mix(in_srgb,var(--warning,#b45309)_8%,transparent)] px-3 py-2">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
-                <div className="text-[13px]">
-                  <div className="font-medium text-text">
-                    {needsInvite.length} private channel{needsInvite.length === 1 ? '' : 's'}{' '}
-                    need{needsInvite.length === 1 ? 's' : ''} the bot invited
-                  </div>
-                  <p className="mt-1 text-text-muted">
-                    Slack doesn&apos;t let bots auto-join private channels. Run{' '}
-                    <code className="rounded bg-surface-2 px-1">/invite @holo</code> in each, or
-                    skip and add them later.
-                  </p>
-                </div>
+            <div className="rounded-md border border-border bg-surface-2/40 px-3 py-2">
+              <div className="text-[13px]">
+                <div className="font-medium text-text">Inviting the bot to private channels</div>
+                <p className="mt-1 text-text-muted">
+                  Slack doesn&apos;t let bots discover or auto-join private channels — they only
+                  appear once you&apos;ve invited the bot. To index a private channel, run{' '}
+                  <code className="rounded bg-surface-2 px-1">/invite @holo</code> in that channel
+                  from Slack. The next sync will pick it up automatically.
+                </p>
               </div>
             </div>
-            <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-border bg-bg p-2">
-              {needsInvite.map((c) => {
-                const href = teamId
-                  ? `slack://channel?team=${teamId}&id=${c.id}`
-                  : `https://slack.com/app_redirect?channel=${c.id}`;
-                return (
-                  <li key={c.id} className="flex items-center justify-between gap-2 px-2 py-1">
-                    <span className="text-[13px] text-text">#{c.name}</span>
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[12px] text-accent underline-offset-2 hover:underline"
-                    >
-                      Open in Slack →
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
+            {needsInvite.length > 0 ? (
+              <>
+                <p className="text-[12px] text-text-muted">
+                  These private channels were already in your selection but the bot isn&apos;t a
+                  member yet:
+                </p>
+                <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-border bg-bg p-2">
+                  {needsInvite.map((c) => {
+                    const href = teamId
+                      ? `slack://channel?team=${teamId}&id=${c.id}`
+                      : `https://slack.com/app_redirect?channel=${c.id}`;
+                    return (
+                      <li key={c.id} className="flex items-center justify-between gap-2 px-2 py-1">
+                        <span className="text-[13px] text-text">#{c.name}</span>
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[12px] text-accent underline-offset-2 hover:underline"
+                        >
+                          Open in Slack →
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            ) : null}
             {joinedCount > 0 ? (
               <p className="text-[12px] text-text-muted">
                 Auto-joined {joinedCount} public channel{joinedCount === 1 ? '' : 's'}. Those will
