@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { SkillLabelPanel } from '@/components/skill-label-panel';
+import { SuggestedProcedures } from '@/components/suggested-procedures';
 import { PublishButton } from '@/components/publish-button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -114,6 +115,8 @@ export default async function SkillsPage() {
           </p>
         </div>
       )}
+
+      <SuggestedProcedures />
 
       <SkillLabelPanel />
     </div>
