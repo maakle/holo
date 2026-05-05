@@ -22,7 +22,7 @@ export async function GET() {
         summary: schema.procedureProposals.summary,
         createdAt: schema.procedureProposals.createdAt,
         episodeId: schema.procedureProposals.episodeId,
-        artifactIds: schema.procedureEpisodes.sourceArtifactIds,
+        sourceArtifactIds: schema.procedureEpisodes.sourceArtifactIds,
         entityKey: schema.procedureEpisodes.entityKey,
       })
       .from(schema.procedureProposals)
@@ -39,7 +39,12 @@ export async function GET() {
       .orderBy(desc(schema.procedureProposals.createdAt))
       .limit(20);
 
-    return NextResponse.json({ proposals: rows });
+    const proposals = rows.map(({ sourceArtifactIds, ...rest }) => ({
+      ...rest,
+      artifactCount: sourceArtifactIds?.length ?? 0,
+    }));
+
+    return NextResponse.json({ proposals });
   } catch (e) {
     if (e instanceof HoloError) {
       const status =

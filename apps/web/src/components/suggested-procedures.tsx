@@ -59,10 +59,24 @@ function ProposalCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ finalSlug: state.slug }),
       });
-      if (res.ok) {
-        setState((s) => ({ ...s, busy: false, confirmed: true }));
-        // Brief pause so user sees confirmation, then remove
-        setTimeout(() => onRemove(proposal.id), 1200);
+      if (res.ok || res.status === 207) {
+        const data = await res.json() as { skillId: string | null; slug: string; synthesisError?: string };
+        if (data.skillId) {
+          // Full success
+          setState((s) => ({ ...s, busy: false, confirmed: true }));
+          setTimeout(() => onRemove(proposal.id), 1200);
+        } else {
+          // Accepted but synthesis failed — show degraded confirmation
+          setState((s) => ({
+            ...s,
+            busy: false,
+            confirmed: true,
+            error: data.synthesisError
+              ? 'Procedure accepted. Skill synthesis failed — you can retry from the synthesize panel.'
+              : null,
+          }));
+          setTimeout(() => onRemove(proposal.id), 3000);
+        }
       } else {
         const data = await res.json() as { problem?: string };
         setState((s) => ({ ...s, busy: false, error: data.problem ?? 'Accept failed. Try again.' }));
@@ -93,7 +107,11 @@ function ProposalCard({
   if (state.confirmed) {
     return (
       <div className="rounded-md border border-border bg-surface px-5 py-4">
-        <p className="text-[13px] text-success">Skill synthesized. Reload to see it in the table.</p>
+        {state.error ? (
+          <p className="text-[13px] text-text-muted">{state.error}</p>
+        ) : (
+          <p className="text-[13px] text-success">Skill synthesized. Reload to see it in the table.</p>
+        )}
       </div>
     );
   }
@@ -191,8 +209,8 @@ export function SuggestedProcedures() {
     try {
       const res = await fetch('/api/skills/proposals');
       if (res.ok) {
-        const data = await res.json() as Proposal[];
-        setProposals(data);
+        const data = await res.json() as { proposals: Proposal[] };
+        setProposals(data.proposals);
       } else {
         setFetchError('Failed to load suggestions.');
       }
