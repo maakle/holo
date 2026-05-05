@@ -31,8 +31,8 @@ export interface ClusterOptions {
 }
 
 export const DEFAULT_CLUSTER_OPTIONS: ClusterOptions = {
-  minArtifacts: 3,
+  minArtifacts: 2,
   minDistinctSources: 2,
-  similarityThreshold: 0.78,
+  similarityThreshold: 0.7,
   timeWindowMs: 1000 * 60 * 60 * 24 * 14,
 };

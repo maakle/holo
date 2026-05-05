@@ -23,7 +23,7 @@ const artifact = (overrides: Partial<ArtifactInput>): ArtifactInput => ({
 
 describe('clusterArtifacts', () => {
   it('returns no episodes when below minArtifacts', () => {
-    const arts = [artifact({ id: 'a' }), artifact({ id: 'b' })];
+    const arts = [artifact({ id: 'a' })];
     const eps = clusterArtifacts(arts, DEFAULT_CLUSTER_OPTIONS);
     expect(eps).toEqual([]);
   });
@@ -63,16 +63,16 @@ describe('clusterArtifacts', () => {
 
   it('does not merge artifacts outside the time window', () => {
     // 'a' is far in the past; 'b' and 'c' are within window of each other.
-    // 'a' won't be merged with 'b'/'c', so b+c form a cluster of only 2 artifacts
-    // which is below minArtifacts=3 — the cluster does not survive the filter.
+    // Resulting cluster contains only b+c, never 'a'.
     const arts: ArtifactInput[] = [
       artifact({ id: 'a', sourceId: 's1', entityHints: ['deal:9'], fetchedAt: new Date('2026-01-01') }),
       artifact({ id: 'b', sourceId: 's2', entityHints: ['deal:9'], fetchedAt: new Date('2026-05-01') }),
       artifact({ id: 'c', sourceId: 's3', entityHints: ['deal:9'], fetchedAt: new Date('2026-05-02') }),
     ];
     const eps = clusterArtifacts(arts, DEFAULT_CLUSTER_OPTIONS);
-    // b+c only cluster together (2 artifacts < minArtifacts=3), so result is empty
-    expect(eps).toHaveLength(0);
+    expect(eps).toHaveLength(1);
+    expect(eps[0]!.artifactIds.sort()).toEqual(['b', 'c']);
+    expect(eps[0]!.artifactIds).not.toContain('a');
   });
 
   it('computes a centroid embedding as the element-wise mean', () => {

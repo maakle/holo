@@ -203,6 +203,7 @@ export function SuggestedProcedures() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [discovering, setDiscovering] = useState(false);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
+  const [discoverSummary, setDiscoverSummary] = useState<string | null>(null);
 
   const fetchProposals = useCallback(async () => {
     setFetchError(null);
@@ -228,12 +229,27 @@ export function SuggestedProcedures() {
   async function discover() {
     setDiscovering(true);
     setDiscoverError(null);
+    setDiscoverSummary(null);
     try {
       const res = await fetch('/api/skills/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
       if (res.ok) {
+        const result = await res.json() as {
+          episodesInserted?: number;
+          proposalsInserted?: number;
+          clustersSkipped?: number;
+        };
+        const proposalsInserted = result.proposalsInserted ?? 0;
+        const clustersSkipped = result.clustersSkipped ?? 0;
+        if (proposalsInserted > 0) {
+          setDiscoverSummary(`Found ${proposalsInserted} new procedure${proposalsInserted === 1 ? '' : 's'}.`);
+        } else if (clustersSkipped > 0) {
+          setDiscoverSummary(`Scanned recent artifacts. ${clustersSkipped} candidate${clustersSkipped === 1 ? '' : 's'} matched a previously rejected procedure.`);
+        } else {
+          setDiscoverSummary('Scanned recent artifacts. No procedures found — needs ≥2 related artifacts spanning ≥2 connectors.');
+        }
         setLoading(true);
         await fetchProposals();
       } else {
@@ -274,7 +290,10 @@ export function SuggestedProcedures() {
             {discovering ? 'Scanning artifacts…' : 'Discover now'}
           </Button>
           {discoverError && (
-            <p className="text-[12px] text-error text-right max-w-48">{discoverError}</p>
+            <p className="text-[12px] text-error text-right max-w-64">{discoverError}</p>
+          )}
+          {!discoverError && discoverSummary && (
+            <p className="text-[12px] text-text-muted text-right max-w-64">{discoverSummary}</p>
           )}
         </div>
       </div>
