@@ -1,46 +1,25 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { SlackOnboardingDialog } from '@/components/slack-onboarding-dialog';
+import { useEffect } from 'react';
 
 interface Props {
   slackConnected: boolean;
   slackAllowlistEmpty: boolean;
+  /* connectedAs reserved for future copy; not used here. */
   connectedAs?: string;
 }
 
 const DISMISS_STORAGE_KEY = 'holo:slack-onboarding-dismissed-v1';
-const START_EVENT = 'holo:slack-onboarding-start';
 
 /**
- * Auto-opens the Slack onboarding wizard. Two triggers:
+ * Soft heuristic: when Slack is connected, the allowlist is empty, and the
+ * user hasn&apos;t dismissed the wizard in this browser, probe sync-status to
+ * confirm 0 chunks indexed and dispatch a wizard-open event so the Slack
+ * row pops the wizard at the channel-pick step.
  *
- * 1) `holo:slack-onboarding-start` window event — fired by connector-row
- *    when the user clicks Connect on the Slack row. Opens the wizard at
- *    step 1 (Install), which owns the OAuth popup.
- *
- * 2) Soft heuristic on mount: Slack is already connected, allowlist is empty,
- *    and the user hasn't dismissed the wizard in this browser. Probes
- *    sync-status to confirm 0 chunks indexed before opening (no point
- *    nagging if work is already happening). Skips step 1.
- *
- * Open state is purely local — OAuth runs in a popup, so this tab never
- * navigates and nothing can perturb the wizard mid-flow.
+ * Renders nothing — pure side effect. The wizard itself lives in
+ * ConnectorRow; this component is just the auto-open nudge.
  */
-export function SlackOnboardingTrigger({
-  slackConnected,
-  slackAllowlistEmpty,
-  connectedAs,
-}: Props) {
-  const [open, setOpen] = useState(false);
-
-  // Trigger 1: user clicked Connect.
-  useEffect(() => {
-    const handler = () => setOpen(true);
-    window.addEventListener(START_EVENT, handler);
-    return () => window.removeEventListener(START_EVENT, handler);
-  }, []);
-
-  // Trigger 2: soft heuristic — already-connected user with empty allowlist.
+export function SlackOnboardingTrigger({ slackConnected, slackAllowlistEmpty }: Props) {
   useEffect(() => {
     if (!slackConnected) return;
     if (!slackAllowlistEmpty) return;
@@ -55,7 +34,13 @@ export function SlackOnboardingTrigger({
         const body = (await res.json()) as { chunksIndexed?: number; running?: boolean };
         if (cancelled) return;
         if ((body.chunksIndexed ?? 0) === 0 && !body.running) {
-          setOpen(true);
+          window.dispatchEvent(
+            new CustomEvent('holo:open-wizard:slack', {
+              detail: { initialStepId: 'channels' },
+            }),
+          );
+          // Once we've nudged, set the dismiss flag so refreshes don't loop.
+          window.localStorage.setItem(DISMISS_STORAGE_KEY, '1');
         }
       } catch {
         // best-effort
@@ -66,20 +51,5 @@ export function SlackOnboardingTrigger({
     };
   }, [slackConnected, slackAllowlistEmpty]);
 
-  function handleOpenChange(next: boolean) {
-    setOpen(next);
-    if (!next && typeof window !== 'undefined') {
-      window.localStorage.setItem(DISMISS_STORAGE_KEY, '1');
-    }
-  }
-
-  if (!open) return null;
-  return (
-    <SlackOnboardingDialog
-      open={open}
-      onOpenChange={handleOpenChange}
-      slackConnected={slackConnected}
-      connectedAs={connectedAs}
-    />
-  );
+  return null;
 }

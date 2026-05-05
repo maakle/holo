@@ -1,7 +1,5 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { openOAuthPopup } from '@/lib/oauth-popup';
+import { useEffect, useState } from 'react';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +11,8 @@ import {
 } from '@/components/ui/tooltip';
 import { SyncStatusBadge } from '@/components/sync-status-badge';
 import { ConnectorManageSheet } from '@/components/connector-manage-sheet';
+import { ConnectionWizard } from '@/components/connection-wizard/connection-wizard';
+import { getWizardConfig } from '@/components/connection-wizard/configs';
 
 interface AllowlistEntry {
   pattern: string;
@@ -47,12 +47,6 @@ function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-function placeholderForConnector(id: ConnectorMeta['id']): string {
-  if (id === 'notion') return 'Notion integration token (secret_...)';
-  if (id === 'pylon') return 'Pylon API key';
-  return 'API key or token';
-}
-
 export function ConnectorRow({
   meta,
   status,
@@ -61,76 +55,29 @@ export function ConnectorRow({
   lastSyncedAt,
   lastSyncStatus,
 }: Props) {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [tokenInput, setTokenInput] = useState('');
   const [showManage, setShowManage] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardInitialStepId, setWizardInitialStepId] = useState<string | undefined>(undefined);
+  const config = getWizardConfig(meta.id);
+  const connected = status === 'connected';
 
-  const isApiKey = meta.flowType === 'apikey';
-  const showApiKeyForm = isApiKey && status === 'disconnected';
+  // Listen for page-level requests to open this provider's wizard at a
+  // specific step (e.g. Slack's soft heuristic firing post-load when the
+  // allowlist is empty). Detail: { initialStepId?: string }.
+  useEffect(() => {
+    const eventName = `holo:open-wizard:${meta.id}`;
+    const handler = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ initialStepId?: string }>).detail;
+      setWizardInitialStepId(detail?.initialStepId);
+      setWizardOpen(true);
+    };
+    window.addEventListener(eventName, handler);
+    return () => window.removeEventListener(eventName, handler);
+  }, [meta.id]);
 
-  async function connect() {
-    // Slack has a multi-step wizard that owns the OAuth flow itself: opening
-    // the popup is step 1 inside the dialog so the user gets context before
-    // the redirect. For other providers we go straight to the popup.
-    if (meta.id === 'slack') {
-      window.dispatchEvent(new CustomEvent('holo:slack-onboarding-start'));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/connectors/${meta.id}/initiate`, { method: 'POST' });
-      const body = (await res.json().catch(() => ({}))) as {
-        authorizeUrl?: string;
-        fix?: string;
-        problem?: string;
-      };
-      if (!res.ok) {
-        setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
-        return;
-      }
-      if (!body.authorizeUrl) {
-        setError('unexpected response from initiate');
-        return;
-      }
-      const result = await openOAuthPopup(body.authorizeUrl, meta.id);
-      if (result.status === 'error') {
-        setError(result.fix ?? `Connection failed${result.code ? ` (${result.code})` : ''}`);
-        return;
-      }
-      // Refresh server data so the row flips to "connected" without a reload.
-      // Done for both 'ok' and 'closed' — user may have completed OAuth in
-      // the popup even if the postMessage was lost.
-      router.refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function saveApiKey(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/connectors/${meta.id}/connect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: tokenInput }),
-      });
-      const body = (await res.json().catch(() => ({}))) as {
-        fix?: string;
-        problem?: string;
-      };
-      if (!res.ok) {
-        setError(body.fix ?? body.problem ?? 'Connection failed');
-        return;
-      }
-      window.location.reload();
-    } finally {
-      setBusy(false);
-    }
+  function connect() {
+    setWizardInitialStepId(undefined);
+    setWizardOpen(true);
   }
 
   return (
@@ -139,14 +86,14 @@ export function ConnectorRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-[14px] font-medium text-text">{meta.displayName}</span>
-            {status === 'connected' ? (
+            {connected ? (
               <Badge variant="success">
                 Connected{connectedAs ? ` · ${connectedAs}` : ''}
               </Badge>
             ) : (
               <Badge variant="neutral">Not connected</Badge>
             )}
-            {status === 'connected' ? (
+            {connected ? (
               <SyncStatusBadge
                 provider={meta.id}
                 initialLastSyncedAt={lastSyncedAt ?? null}
@@ -154,7 +101,7 @@ export function ConnectorRow({
             ) : null}
           </div>
           <p className="mt-1 text-[13px] leading-5 text-text-muted">{meta.description}</p>
-          {status === 'connected' && allowlist.length > 0 ? (
+          {connected && allowlist.length > 0 ? (
             <TooltipProvider delayDuration={150}>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {allowlist.map((a) => {
@@ -197,43 +144,20 @@ export function ConnectorRow({
               </div>
             </TooltipProvider>
           ) : null}
-          {error ? <p className="mt-2 text-[12px] text-error">{error}</p> : null}
-          {showApiKeyForm ? (
-            <form onSubmit={saveApiKey} className="mt-3 flex items-center gap-2">
-              <input
-                type="password"
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                placeholder={placeholderForConnector(meta.id)}
-                className="flex-1 rounded-md border border-border bg-bg px-2.5 py-1.5 text-[13px] text-text placeholder:text-text-subtle focus:outline-hidden focus:focus-ring"
-                autoComplete="off"
-                disabled={busy}
-              />
-              <Button type="submit" variant="secondary" size="sm" disabled={busy || !tokenInput.trim()}>
-                Save
-              </Button>
-            </form>
-          ) : null}
         </div>
         <div className="flex shrink-0 items-center justify-end gap-2 pt-0.5">
-          {status === 'disconnected' && !isApiKey ? (
-            <Button variant="primary" size="sm" onClick={connect} disabled={busy}>
+          {!connected ? (
+            <Button variant="primary" size="sm" onClick={connect}>
               Connect
             </Button>
-          ) : null}
-          {status === 'connected' ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowManage(true)}
-              disabled={busy}
-            >
+          ) : (
+            <Button variant="secondary" size="sm" onClick={() => setShowManage(true)}>
               Manage
             </Button>
-          ) : null}
+          )}
         </div>
       </div>
-      {status === 'connected' ? (
+      {connected ? (
         <ConnectorManageSheet
           meta={meta}
           open={showManage}
@@ -246,6 +170,18 @@ export function ConnectorRow({
           slackDefaultAll={meta.id === 'slack' && allowlist.length === 0}
         />
       ) : null}
+      <ConnectionWizard
+        meta={meta}
+        config={config}
+        open={wizardOpen}
+        onOpenChange={(next) => {
+          setWizardOpen(next);
+          if (!next) setWizardInitialStepId(undefined);
+        }}
+        connected={connected}
+        connectedAs={connectedAs}
+        initialStepId={wizardInitialStepId}
+      />
     </div>
   );
 }
