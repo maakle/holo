@@ -12,7 +12,7 @@ type Provider = typeof PROVIDERS extends Set<infer T> ? T : never;
 type RunRow = {
   id: string;
   queue: string;
-  state: 'completed' | 'failed' | 'stalled' | 'active' | 'waiting' | 'delayed';
+  state: 'completed' | 'failed' | 'stalled' | 'cancelled' | 'active' | 'waiting' | 'delayed';
   enqueuedAt: number | null;
   processedOn: number | null;
   finishedOn: number | null;
@@ -116,7 +116,9 @@ export async function GET(
             ? 'failed'
             : r.status === 'stalled'
               ? 'stalled'
-              : 'active';
+              : r.status === 'cancelled'
+                ? 'cancelled'
+                : 'active';
       const problem = r.errorProblem ? redactSecrets(r.errorProblem) : null;
       const row: RunRow = {
         id: r.id,

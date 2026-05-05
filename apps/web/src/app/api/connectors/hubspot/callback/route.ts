@@ -113,7 +113,10 @@ export async function GET(req: Request) {
 
     await enqueueInitialSync(db, orgId, 'hubspot').catch(() => {});
 
-    return NextResponse.redirect(new URL('/connections', env.BETTER_AUTH_URL));
+    const ok = new URL('/connections/oauth-complete', env.BETTER_AUTH_URL);
+    ok.searchParams.set('provider', 'hubspot');
+    ok.searchParams.set('status', 'ok');
+    return NextResponse.redirect(ok);
   } catch (e) {
     let appOrigin: string;
     try {
@@ -122,15 +125,16 @@ export async function GET(req: Request) {
     } catch {
       appOrigin = new URL(req.url).origin;
     }
+    const u = new URL('/connections/oauth-complete', appOrigin);
+    u.searchParams.set('provider', 'hubspot');
+    u.searchParams.set('status', 'error');
     if (e instanceof HoloError) {
-      const u = new URL('/connections', appOrigin);
-      u.searchParams.set('connect_error', e.code);
-      u.searchParams.set('connect_fix', e.fix);
-      return NextResponse.redirect(u);
+      u.searchParams.set('code', e.code);
+      u.searchParams.set('fix', e.fix);
+    } else {
+      console.error(e);
+      u.searchParams.set('code', 'HOLO_INTERNAL');
     }
-    console.error(e);
-    return NextResponse.redirect(
-      new URL('/connections?connect_error=HOLO_INTERNAL', appOrigin),
-    );
+    return NextResponse.redirect(u);
   }
 }

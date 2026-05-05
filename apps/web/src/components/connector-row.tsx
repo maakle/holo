@@ -1,5 +1,7 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { openOAuthPopup } from '@/lib/oauth-popup';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +61,7 @@ export function ConnectorRow({
   lastSyncedAt,
   lastSyncStatus,
 }: Props) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
@@ -68,6 +71,13 @@ export function ConnectorRow({
   const showApiKeyForm = isApiKey && status === 'disconnected';
 
   async function connect() {
+    // Slack has a multi-step wizard that owns the OAuth flow itself: opening
+    // the popup is step 1 inside the dialog so the user gets context before
+    // the redirect. For other providers we go straight to the popup.
+    if (meta.id === 'slack') {
+      window.dispatchEvent(new CustomEvent('holo:slack-onboarding-start'));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -81,11 +91,19 @@ export function ConnectorRow({
         setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
         return;
       }
-      if (body.authorizeUrl) {
-        window.open(body.authorizeUrl, '_blank', 'noopener,noreferrer');
+      if (!body.authorizeUrl) {
+        setError('unexpected response from initiate');
         return;
       }
-      setError('unexpected response from initiate');
+      const result = await openOAuthPopup(body.authorizeUrl, meta.id);
+      if (result.status === 'error') {
+        setError(result.fix ?? `Connection failed${result.code ? ` (${result.code})` : ''}`);
+        return;
+      }
+      // Refresh server data so the row flips to "connected" without a reload.
+      // Done for both 'ok' and 'closed' — user may have completed OAuth in
+      // the popup even if the postMessage was lost.
+      router.refresh();
     } finally {
       setBusy(false);
     }

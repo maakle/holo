@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
@@ -48,6 +48,10 @@ export async function POST(
 
     let removed = 0;
     let activeRunning = 0;
+    // Track which (queueName, jobId) pairs we yanked so we can finalize the
+    // matching sync_runs rows below — without this the DB row sits as
+    // 'running' until the worker's next bootstrap reconciler marks it stalled.
+    const cancelledByQueue = new Map<string, string[]>();
     for (const name of activeQueueNames(provider)) {
       const queue = getQueueByName(name);
       const jobs = await queue.getJobs(['waiting', 'delayed', 'active']);
@@ -67,12 +71,39 @@ export async function POST(
         try {
           const state = await j.getState();
           if (state === 'active') activeRunning += 1;
+          const jobId = String(j.id ?? '');
           await j.remove();
           removed += 1;
+          if (jobId) {
+            const list = cancelledByQueue.get(name) ?? [];
+            list.push(jobId);
+            cancelledByQueue.set(name, list);
+          }
         } catch {
           // Ignore individual remove failures; report the count we did manage.
         }
       }
+    }
+
+    // Finalize sync_runs rows we just yanked. Only flip 'running' rows so we
+    // don't clobber a row the worker already marked ok/failed in the narrow
+    // window between getJobs() and remove().
+    for (const [queueName, jobIds] of cancelledByQueue) {
+      if (jobIds.length === 0) continue;
+      await db
+        .update(schema.syncRuns)
+        .set({
+          status: 'cancelled',
+          finishedAt: new Date(),
+          durationMs: sql`EXTRACT(EPOCH FROM (NOW() - ${schema.syncRuns.startedAt})) * 1000`,
+        })
+        .where(
+          and(
+            eq(schema.syncRuns.queueName, queueName),
+            inArray(schema.syncRuns.jobId, jobIds),
+            eq(schema.syncRuns.status, 'running'),
+          ),
+        );
     }
 
     return NextResponse.json({

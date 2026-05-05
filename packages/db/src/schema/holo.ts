@@ -218,7 +218,7 @@ export const syncRuns = pgTable(
     provider: text('provider').notNull(),
     queueName: text('queue_name').notNull(),
     jobId: text('job_id').notNull(),
-    status: text('status', { enum: ['running', 'ok', 'failed', 'stalled'] }).notNull(),
+    status: text('status', { enum: ['running', 'ok', 'failed', 'stalled', 'cancelled'] }).notNull(),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
     durationMs: integer('duration_ms'),

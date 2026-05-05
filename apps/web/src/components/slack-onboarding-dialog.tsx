@@ -12,10 +12,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { notifySyncTriggered } from '@/lib/sync-events';
+import { openOAuthPopup } from '@/lib/oauth-popup';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  slackConnected?: boolean;
   connectedAs?: string;
 }
 
@@ -38,9 +40,18 @@ const STEP_LABELS: Record<Step, string> = {
   4: 'First sync',
 };
 
-export function SlackOnboardingDialog({ open, onOpenChange, connectedAs }: Props) {
+export function SlackOnboardingDialog({
+  open,
+  onOpenChange,
+  slackConnected = false,
+  connectedAs,
+}: Props) {
   const router = useRouter();
-  const [step, setStep] = useState<Step>(2);
+  // Lazy initial: if the user wasn't connected when the wizard opened, start
+  // at step 1 (Install). If already connected (soft heuristic), skip to step 2.
+  // We don't want this to react to slackConnected flipping mid-wizard — the
+  // install handler advances the step explicitly.
+  const [step, setStep] = useState<Step>(() => (slackConnected ? 2 : 1));
   const [channels, setChannels] = useState<Channel[] | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -54,10 +65,11 @@ export function SlackOnboardingDialog({ open, onOpenChange, connectedAs }: Props
   const [syncStartedAt, setSyncStartedAt] = useState<number | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Step 2: lazy-load channels when dialog opens. Start with nothing
-  // selected — users opt in via "Select all" or per-channel checkboxes.
+  // Step 2: lazy-load channels when the user reaches the channel-pick step.
+  // Gated on step (not just open) so we don't fetch before OAuth completes —
+  // hitting /channels pre-install would 404 and leave a stuck spinner.
   useEffect(() => {
-    if (!open || channels !== null) return;
+    if (step !== 2 || channels !== null) return;
     let cancelled = false;
     setBusy(true);
     void (async () => {
@@ -86,7 +98,7 @@ export function SlackOnboardingDialog({ open, onOpenChange, connectedAs }: Props
     return () => {
       cancelled = true;
     };
-  }, [open, channels]);
+  }, [step, channels]);
 
   // Step 4: poll sync status. Advance when chunks start indexing OR sync
   // completes (running flips false). Caps at 90s to avoid spinning forever.
@@ -137,6 +149,37 @@ export function SlackOnboardingDialog({ open, onOpenChange, connectedAs }: Props
         ? new Set()
         : new Set(channels.map((c) => c.id)),
     );
+  }
+
+  async function installSlack() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/connectors/slack/initiate', { method: 'POST' });
+      const body = (await res.json().catch(() => ({}))) as {
+        authorizeUrl?: string;
+        fix?: string;
+        problem?: string;
+      };
+      if (!res.ok || !body.authorizeUrl) {
+        setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
+        return;
+      }
+      const result = await openOAuthPopup(body.authorizeUrl, 'slack');
+      if (result.status === 'error') {
+        setError(result.fix ?? `Install failed${result.code ? ` (${result.code})` : ''}`);
+        return;
+      }
+      if (result.status === 'closed') {
+        // User dismissed the popup without finishing. Stay on step 1.
+        return;
+      }
+      // ok: refresh server data so the row flips to connected, then advance.
+      router.refresh();
+      setStep(2);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveChannels() {
@@ -228,19 +271,32 @@ export function SlackOnboardingDialog({ open, onOpenChange, connectedAs }: Props
           })}
         </ol>
 
-        {/* Step 1 — installed (auto-done). Briefly visible if user manually
-            navigates back; the dialog opens at step 2 by default. */}
         {step === 1 ? (
-          <div className="rounded-md border border-success/40 bg-[color-mix(in_srgb,var(--success,#16a34a)_8%,transparent)] px-3 py-2 text-[13px] text-text">
-            <div className="flex items-center gap-2">
-              <Check className="h-4 w-4 text-success" aria-hidden />
-              <span className="font-medium">App installed</span>
+          slackConnected ? (
+            <div className="rounded-md border border-success/40 bg-[color-mix(in_srgb,var(--success,#16a34a)_8%,transparent)] px-3 py-2 text-[13px] text-text">
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-success" aria-hidden />
+                <span className="font-medium">App installed</span>
+              </div>
+              <p className="mt-1 text-text-muted">
+                The holo Slack app is installed on{' '}
+                <span className="font-medium text-text">{connectedAs ?? 'your workspace'}</span>.
+              </p>
             </div>
-            <p className="mt-1 text-text-muted">
-              The holo Slack app is installed on{' '}
-              <span className="font-medium text-text">{connectedAs ?? 'your workspace'}</span>.
-            </p>
-          </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <p className="text-[13px] text-text-muted">
+                Install the holo Slack app on your workspace. We&apos;ll open Slack in a popup;
+                approve the permissions and you&apos;ll come straight back here to pick channels.
+              </p>
+              <ul className="flex flex-col gap-1 text-[12px] text-text-muted">
+                <li>· Read messages from channels you select (no DMs)</li>
+                <li>· Auto-join public channels you pick so we can index them</li>
+                <li>· Disconnect any time from this page</li>
+              </ul>
+              {error ? <p className="text-[12px] text-error">{error}</p> : null}
+            </div>
+          )
         ) : null}
 
         {step === 2 ? (
@@ -413,6 +469,22 @@ export function SlackOnboardingDialog({ open, onOpenChange, connectedAs }: Props
         ) : null}
 
         <AlertDialogFooter>
+          {step === 1 ? (
+            slackConnected ? (
+              <Button variant="primary" onClick={() => setStep(2)}>
+                Continue
+              </Button>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={close} disabled={busy}>
+                  Cancel
+                </Button>
+                <Button variant="primary" onClick={installSlack} disabled={busy}>
+                  {busy ? 'Opening Slack…' : 'Install Slack app'}
+                </Button>
+              </>
+            )
+          ) : null}
           {step === 2 ? (
             <>
               <Button variant="secondary" onClick={close} disabled={busy}>

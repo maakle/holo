@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { notifySyncTriggered } from '@/lib/sync-events';
+import { openOAuthPopup } from '@/lib/oauth-popup';
 
 interface Props {
   meta: ConnectorMeta;
@@ -186,11 +187,18 @@ export function ConnectorManageSheet({
         setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
         return;
       }
-      if (body.authorizeUrl) {
-        window.location.href = body.authorizeUrl;
+      if (!body.authorizeUrl) {
+        setError('unexpected response from initiate');
         return;
       }
-      setError('unexpected response from initiate');
+      const result = await openOAuthPopup(body.authorizeUrl, meta.id);
+      if (result.status === 'error') {
+        setError(result.fix ?? `Reconnect failed${result.code ? ` (${result.code})` : ''}`);
+        return;
+      }
+      if (result.status === 'ok') {
+        router.refresh();
+      }
     } finally {
       setBusy(false);
     }

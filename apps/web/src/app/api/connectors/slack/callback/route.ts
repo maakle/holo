@@ -115,12 +115,14 @@ export async function GET(req: Request) {
       // the recurring scheduler will pick it up at the next tick.
     });
 
-    // ?onboard_slack=1 triggers the SlackOnboardingDialog on /connections so
-    // the user lands directly in the channel-pick step instead of an inert
-    // "connected but never synced" row.
-    return NextResponse.redirect(
-      new URL('/connections?onboard_slack=1', env.BETTER_AUTH_URL),
-    );
+    // OAuth lands in a popup window; the oauth-complete page postMessages
+    // the result to the opener tab (which keeps the wizard open) and closes
+    // itself. Falls back to a normal /connections redirect if the user got
+    // here in a regular tab (e.g. popup blocker triggered same-tab nav).
+    const ok = new URL('/connections/oauth-complete', env.BETTER_AUTH_URL);
+    ok.searchParams.set('provider', 'slack');
+    ok.searchParams.set('status', 'ok');
+    return NextResponse.redirect(ok);
   } catch (e) {
     // Resolve the user-facing app origin for redirects. Fall back to req.url
     // if env resolution itself failed (otherwise we'd mask the original error).
@@ -131,15 +133,16 @@ export async function GET(req: Request) {
     } catch {
       appOrigin = new URL(req.url).origin;
     }
+    const u = new URL('/connections/oauth-complete', appOrigin);
+    u.searchParams.set('provider', 'slack');
+    u.searchParams.set('status', 'error');
     if (e instanceof HoloError) {
-      const u = new URL('/connections', appOrigin);
-      u.searchParams.set('connect_error', e.code);
-      u.searchParams.set('connect_fix', e.fix);
-      return NextResponse.redirect(u);
+      u.searchParams.set('code', e.code);
+      u.searchParams.set('fix', e.fix);
+    } else {
+      console.error(e);
+      u.searchParams.set('code', 'HOLO_INTERNAL');
     }
-    console.error(e);
-    return NextResponse.redirect(
-      new URL('/connections?connect_error=HOLO_INTERNAL', appOrigin),
-    );
+    return NextResponse.redirect(u);
   }
 }

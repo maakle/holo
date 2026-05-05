@@ -1,13 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { CheckCircle2, ChevronRight, Clock, Loader2, XCircle } from 'lucide-react';
+import { Ban, CheckCircle2, ChevronRight, Clock, Loader2, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { onSyncTriggered } from '@/lib/sync-events';
 
 type Run = {
   id: string;
   queue: string;
-  state: 'completed' | 'failed' | 'active' | 'waiting' | 'delayed';
+  state: 'completed' | 'failed' | 'cancelled' | 'stalled' | 'active' | 'waiting' | 'delayed';
   enqueuedAt: number | null;
   processedOn: number | null;
   finishedOn: number | null;
@@ -74,6 +74,13 @@ function StateBadge({ state }: { state: Run['state'] }) {
     return (
       <Badge variant="accent" className="gap-1">
         <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> active
+      </Badge>
+    );
+  }
+  if (state === 'cancelled') {
+    return (
+      <Badge variant="neutral" className="gap-1">
+        <Ban className="h-3 w-3" aria-hidden /> cancelled
       </Badge>
     );
   }

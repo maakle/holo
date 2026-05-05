@@ -150,15 +150,21 @@ export async function GET(req: Request) {
       });
     }
 
-    return NextResponse.redirect(new URL('/connections', req.url));
+    const ok = new URL('/connections/oauth-complete', req.url);
+    ok.searchParams.set('provider', 'github');
+    ok.searchParams.set('status', 'ok');
+    return NextResponse.redirect(ok);
   } catch (e) {
+    const u = new URL('/connections/oauth-complete', req.url);
+    u.searchParams.set('provider', 'github');
+    u.searchParams.set('status', 'error');
     if (e instanceof HoloError) {
-      const u = new URL('/connections', req.url);
-      u.searchParams.set('connect_error', e.code);
-      u.searchParams.set('connect_fix', e.fix);
-      return NextResponse.redirect(u);
+      u.searchParams.set('code', e.code);
+      u.searchParams.set('fix', e.fix);
+    } else {
+      console.error(e);
+      u.searchParams.set('code', 'HOLO_INTERNAL');
     }
-    console.error(e);
-    return NextResponse.redirect(new URL('/connections?connect_error=HOLO_INTERNAL', req.url));
+    return NextResponse.redirect(u);
   }
 }

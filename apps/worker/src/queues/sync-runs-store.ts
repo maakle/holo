@@ -5,7 +5,7 @@ import type { Sql } from 'postgres';
 import { HoloError } from '@holo/errors';
 import type { QueueName, SyncJobPayload } from './types';
 
-export type RunStatus = 'running' | 'ok' | 'failed' | 'stalled';
+export type RunStatus = 'running' | 'ok' | 'failed' | 'stalled' | 'cancelled';
 
 export interface StartRunArgs {
   queueName: QueueName;
@@ -56,6 +56,9 @@ export interface FinishOkArgs {
 }
 
 export async function finishSyncRunOk(sql: Sql, args: FinishOkArgs): Promise<void> {
+  // status filter: don't overwrite 'cancelled' if /stop got there first.
+  // Cancellation is the user's decision and outranks a late "ok" report from
+  // a worker that hadn't yet noticed its BullMQ job was removed.
   await sql`
     UPDATE sync_runs
        SET status = 'ok',
@@ -63,7 +66,9 @@ export async function finishSyncRunOk(sql: Sql, args: FinishOkArgs): Promise<voi
            duration_ms = (EXTRACT(EPOCH FROM (now() - started_at)) * 1000)::int,
            artifact_count = ${args.artifactCount},
            skip_reason = ${args.skipReason ?? null}
-     WHERE queue_name = ${args.queueName} AND job_id = ${args.jobId}
+     WHERE queue_name = ${args.queueName}
+       AND job_id = ${args.jobId}
+       AND status = 'running'
   `;
 }
 
@@ -75,6 +80,9 @@ export interface FinishFailArgs {
 
 export async function finishSyncRunFailed(sql: Sql, args: FinishFailArgs): Promise<void> {
   const { code, problem, cause } = describeError(args.error);
+  // Same guard as finishSyncRunOk — a late failure report (e.g. the worker
+  // throwing because /stop yanked its BullMQ job) shouldn't clobber the
+  // 'cancelled' status the API already wrote.
   await sql`
     UPDATE sync_runs
        SET status = 'failed',
@@ -83,7 +91,9 @@ export async function finishSyncRunFailed(sql: Sql, args: FinishFailArgs): Promi
            error_code = ${code},
            error_problem = ${problem},
            error_cause = ${cause}
-     WHERE queue_name = ${args.queueName} AND job_id = ${args.jobId}
+     WHERE queue_name = ${args.queueName}
+       AND job_id = ${args.jobId}
+       AND status = 'running'
   `;
 }
 
