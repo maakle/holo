@@ -81,11 +81,25 @@ export async function POST(
         )
         .onConflictDoNothing();
 
-      // Update proposal status → 'accepted'
-      await tx
+      // Update proposal status → 'accepted' (atomic guard against concurrent accepts)
+      const updated = await tx
         .update(schema.procedureProposals)
         .set({ status: 'accepted' })
-        .where(eq(schema.procedureProposals.id, proposalId));
+        .where(
+          and(
+            eq(schema.procedureProposals.id, proposalId),
+            eq(schema.procedureProposals.status, 'pending'),
+          ),
+        )
+        .returning({ id: schema.procedureProposals.id });
+
+      if (updated.length === 0) {
+        throw holoError({
+          code: ErrorCode.HOLO_NOT_FOUND,
+          problem: 'Proposal not found or is not pending',
+          fix: 'Check the proposal ID and ensure it is still pending.',
+        });
+      }
 
       // Insert decision row
       await tx.insert(schema.procedureProposalDecisions).values({
