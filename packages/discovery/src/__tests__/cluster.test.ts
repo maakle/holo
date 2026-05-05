@@ -40,13 +40,14 @@ describe('clusterArtifacts', () => {
     expect(eps[0]!.entityKey).toBe('deal:42');
   });
 
-  it('rejects clusters that come from only one source', () => {
+  it('rejects clusters that come from only one source when minDistinctSources >= 2', () => {
     const arts: ArtifactInput[] = [
       artifact({ id: 'a', sourceId: 's1', entityHints: ['deal:7'] }),
       artifact({ id: 'b', sourceId: 's1', entityHints: ['deal:7'] }),
       artifact({ id: 'c', sourceId: 's1', entityHints: ['deal:7'] }),
     ];
-    expect(clusterArtifacts(arts, DEFAULT_CLUSTER_OPTIONS)).toEqual([]);
+    const eps = clusterArtifacts(arts, { ...DEFAULT_CLUSTER_OPTIONS, minDistinctSources: 2 });
+    expect(eps).toEqual([]);
   });
 
   it('groups by embedding similarity when no entity hints exist', () => {
@@ -62,16 +63,17 @@ describe('clusterArtifacts', () => {
   });
 
   it('does not merge artifacts outside the time window', () => {
-    // 'a' is far in the past; 'b' and 'c' are within window of each other.
-    // Resulting cluster contains only b+c, never 'a'.
+    // 'a' is far in the past; 'b', 'c', 'd' are within window of each other.
+    // Resulting cluster contains b+c+d, never 'a'.
     const arts: ArtifactInput[] = [
       artifact({ id: 'a', sourceId: 's1', entityHints: ['deal:9'], fetchedAt: new Date('2026-01-01') }),
       artifact({ id: 'b', sourceId: 's2', entityHints: ['deal:9'], fetchedAt: new Date('2026-05-01') }),
       artifact({ id: 'c', sourceId: 's3', entityHints: ['deal:9'], fetchedAt: new Date('2026-05-02') }),
+      artifact({ id: 'd', sourceId: 's4', entityHints: ['deal:9'], fetchedAt: new Date('2026-05-03') }),
     ];
     const eps = clusterArtifacts(arts, DEFAULT_CLUSTER_OPTIONS);
     expect(eps).toHaveLength(1);
-    expect(eps[0]!.artifactIds.sort()).toEqual(['b', 'c']);
+    expect(eps[0]!.artifactIds.sort()).toEqual(['b', 'c', 'd']);
     expect(eps[0]!.artifactIds).not.toContain('a');
   });
 
