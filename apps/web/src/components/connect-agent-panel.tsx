@@ -1,46 +1,25 @@
 'use client';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
 
 interface Props {
   mcpUrl: string;
 }
 
-const CONFIG_TABS = ['Cursor', 'Claude Desktop', 'curl', 'Python', 'TypeScript'] as const;
+const CONFIG_TABS = ['Cursor', 'Claude', 'ChatGPT', 'Slack'] as const;
 type Tab = (typeof CONFIG_TABS)[number];
 
-function getConfig(tab: Tab, mcpUrl: string, token: string): string {
+function mcpJsonConfig(mcpUrl: string, token: string): string {
   const t = token || '<YOUR_HOLO_TOKEN>';
-  switch (tab) {
-    case 'Cursor':
-      return JSON.stringify(
-        {
-          mcpServers: {
-            holo: { url: mcpUrl, headers: { Authorization: `Bearer ${t}` } },
-          },
-        },
-        null,
-        2,
-      );
-    case 'Claude Desktop':
-      return JSON.stringify(
-        {
-          mcpServers: {
-            holo: { url: mcpUrl, headers: { Authorization: `Bearer ${t}` } },
-          },
-        },
-        null,
-        2,
-      );
-    case 'curl':
-      return `curl -X POST ${mcpUrl} \\
-  -H "Authorization: Bearer ${t}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"search","arguments":{"q":"your query"}},"id":1}'`;
-    case 'Python':
-      return `import httpx\n\nMCP_URL = "${mcpUrl}"\nTOKEN = "${t}"\n\nresp = httpx.post(MCP_URL, headers={"Authorization": f"Bearer {TOKEN}"},\n    json={"jsonrpc":"2.0","method":"tools/call","params":{"name":"search","arguments":{"q":"your query"}},"id":1})\nprint(resp.json())`;
-    case 'TypeScript':
-      return `const res = await fetch("${mcpUrl}", {\n  method: "POST",\n  headers: { "Authorization": "Bearer ${t}", "Content-Type": "application/json" },\n  body: JSON.stringify({ jsonrpc: "2.0", method: "tools/call",\n    params: { name: "search", arguments: { q: "your query" } }, id: 1 }),\n});\nconsole.log(await res.json());`;
-  }
+  return JSON.stringify(
+    {
+      mcpServers: {
+        holo: { url: mcpUrl, headers: { Authorization: `Bearer ${t}` } },
+      },
+    },
+    null,
+    2,
+  );
 }
 
 export function ConnectAgentPanel({ mcpUrl }: Props) {
@@ -77,12 +56,12 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
       .writeText(text)
       .then(() => {
         setCopied(key);
+        toast.success('Copied to clipboard');
         setTimeout(() => setCopied(null), 1500);
       })
       .catch(() => {});
   }
 
-  const config = getConfig(activeTab, mcpUrl, token);
   const inputCls =
     'rounded-sm border border-gray-300 bg-white px-3 py-1.5 text-sm font-mono dark:border-gray-700 dark:bg-gray-950';
   const btnPrimary =
@@ -138,10 +117,10 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
         )}
       </div>
 
-      {/* Config snippets */}
-      <div className="space-y-2">
+      {/* Setup */}
+      <div className="space-y-3">
         <p className="text-xs font-medium uppercase tracking-[0.04em] text-gray-500 dark:text-gray-400">
-          Agent config
+          Setup
         </p>
         <div className="flex gap-1 border-b border-gray-200 dark:border-gray-800">
           {CONFIG_TABS.map((tab) => (
@@ -158,23 +137,292 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
             </button>
           ))}
         </div>
-        <div className="relative rounded-sm bg-[#0F0F11] dark:bg-[#0F0F11] border border-gray-800">
-          <pre className="p-4 text-xs font-mono text-gray-200 overflow-x-auto whitespace-pre-wrap">
-            {config}
-          </pre>
-          <button
-            onClick={() => copy(config, 'config')}
-            className="absolute top-2 right-2 text-xs text-gray-400 hover:text-gray-200 bg-gray-800 hover:bg-gray-700 rounded px-2 py-1 transition-colors"
-          >
-            {copied === 'config' ? 'Copied!' : 'Copy'}
-          </button>
-        </div>
-        {!token && (
+
+        {activeTab === 'Cursor' && (
+          <CursorSetup
+            mcpUrl={mcpUrl}
+            token={token}
+            copied={copied}
+            onCopy={copy}
+          />
+        )}
+        {activeTab === 'Claude' && (
+          <ClaudeSetup
+            mcpUrl={mcpUrl}
+            token={token}
+            copied={copied}
+            onCopy={copy}
+          />
+        )}
+        {activeTab === 'ChatGPT' && (
+          <ChatGPTSetup mcpUrl={mcpUrl} token={token} />
+        )}
+        {activeTab === 'Slack' && <SlackSetup />}
+
+        {!token && activeTab !== 'Slack' && (
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            Generate a token above to see it substituted into the config.
+            Generate a token above to see it pre-filled below.
           </p>
         )}
       </div>
     </div>
+  );
+}
+
+// --- Tab content -----------------------------------------------------------
+
+function Step({ n, children }: { n: number; children: ReactNode }) {
+  return (
+    <li className="flex gap-3 text-[13px] leading-6 text-gray-700 dark:text-gray-300">
+      <span className="shrink-0 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 text-[11px] font-medium flex items-center justify-center mt-0.5 text-gray-600 dark:text-gray-400">
+        {n}
+      </span>
+      <div className="flex-1 space-y-2">{children}</div>
+    </li>
+  );
+}
+
+function Snippet({
+  text,
+  copyKey,
+  copied,
+  onCopy,
+  language,
+}: {
+  text: string;
+  copyKey: string;
+  copied: string | null;
+  onCopy: (text: string, key: string) => void;
+  language?: string;
+}) {
+  return (
+    <div className="relative rounded-sm bg-[#0F0F11] border border-gray-800">
+      {language && (
+        <div className="absolute top-2 left-3 text-[10px] uppercase tracking-[0.06em] text-gray-500 font-mono">
+          {language}
+        </div>
+      )}
+      <pre className={`p-4 ${language ? 'pt-7' : ''} text-xs font-mono text-gray-200 overflow-x-auto whitespace-pre-wrap`}>
+        {text}
+      </pre>
+      <button
+        onClick={() => onCopy(text, copyKey)}
+        className="absolute top-2 right-2 text-xs text-gray-400 hover:text-gray-200 bg-gray-800 hover:bg-gray-700 rounded px-2 py-1 transition-colors"
+      >
+        {copied === copyKey ? 'Copied!' : 'Copy'}
+      </button>
+    </div>
+  );
+}
+
+function InlineCode({ children }: { children: ReactNode }) {
+  return (
+    <code className="font-mono text-[12px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-800 dark:text-gray-200">
+      {children}
+    </code>
+  );
+}
+
+function CursorSetup({
+  mcpUrl,
+  token,
+  copied,
+  onCopy,
+}: {
+  mcpUrl: string;
+  token: string;
+  copied: string | null;
+  onCopy: (text: string, key: string) => void;
+}) {
+  const config = mcpJsonConfig(mcpUrl, token);
+  return (
+    <ol className="space-y-4 list-none">
+      <Step n={1}>
+        Open Cursor → <InlineCode>Settings</InlineCode> → <InlineCode>MCP</InlineCode>, or
+        edit <InlineCode>~/.cursor/mcp.json</InlineCode> directly.
+      </Step>
+      <Step n={2}>
+        Paste this server entry. If the file already has an <InlineCode>mcpServers</InlineCode>{' '}
+        block, merge the <InlineCode>holo</InlineCode> key into it.
+        <Snippet
+          text={config}
+          copyKey="cursor-config"
+          copied={copied}
+          onCopy={onCopy}
+          language="mcp.json"
+        />
+      </Step>
+      <Step n={3}>
+        Restart Cursor (or hit the refresh icon in the MCP settings panel). The{' '}
+        <InlineCode>holo</InlineCode> server should appear with a green dot.
+      </Step>
+      <Step n={4}>
+        Try it: ask Cursor &ldquo;use holo to find context for X.&rdquo; You&apos;ll see the
+        request show up under <InlineCode>Skills → Runs</InlineCode>.
+      </Step>
+    </ol>
+  );
+}
+
+function ClaudeSetup({
+  mcpUrl,
+  token,
+  copied,
+  onCopy,
+}: {
+  mcpUrl: string;
+  token: string;
+  copied: string | null;
+  onCopy: (text: string, key: string) => void;
+}) {
+  const config = mcpJsonConfig(mcpUrl, token);
+  return (
+    <ol className="space-y-4 list-none">
+      <Step n={1}>
+        Open <InlineCode>Claude → Settings → Developer → Edit Config</InlineCode>. This opens{' '}
+        <InlineCode>claude_desktop_config.json</InlineCode> in your editor.
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          File location:{' '}
+          <InlineCode>~/Library/Application Support/Claude/</InlineCode> (macOS) ·{' '}
+          <InlineCode>%APPDATA%\Claude\</InlineCode> (Windows)
+        </p>
+      </Step>
+      <Step n={2}>
+        Paste this into the file. Merge <InlineCode>holo</InlineCode> into an existing{' '}
+        <InlineCode>mcpServers</InlineCode> block if you have one.
+        <Snippet
+          text={config}
+          copyKey="claude-config"
+          copied={copied}
+          onCopy={onCopy}
+          language="claude_desktop_config.json"
+        />
+      </Step>
+      <Step n={3}>
+        Quit Claude completely and reopen. Look for the{' '}
+        <InlineCode>holo</InlineCode> tools in the &ldquo;Search and tools&rdquo; menu (slider
+        icon, bottom-left of the chat input).
+      </Step>
+      <Step n={4}>
+        Mobile / Claude.ai web: same URL works as a Custom Connector under{' '}
+        <InlineCode>Settings → Connectors → Add custom connector</InlineCode>. Paste the URL
+        above; auth uses the same Bearer token.
+      </Step>
+    </ol>
+  );
+}
+
+function ChatGPTSetup({ mcpUrl, token }: { mcpUrl: string; token: string }) {
+  const t = token || '<YOUR_HOLO_TOKEN>';
+  return (
+    <ol className="space-y-4 list-none">
+      <Step n={1}>
+        Requires ChatGPT Pro, Business, Enterprise, or Edu (Developer Mode for MCP is not
+        available on Free/Plus today).
+      </Step>
+      <Step n={2}>
+        In ChatGPT, go to <InlineCode>Settings → Connectors → Advanced</InlineCode> and turn
+        on <InlineCode>Developer mode</InlineCode>.
+      </Step>
+      <Step n={3}>
+        Open <InlineCode>Settings → Connectors → Create</InlineCode> and fill in:
+        <ul className="text-[13px] leading-6 space-y-1 ml-1 mt-1">
+          <li>
+            <span className="text-gray-500 dark:text-gray-400">Name:</span>{' '}
+            <InlineCode>holo</InlineCode>
+          </li>
+          <li>
+            <span className="text-gray-500 dark:text-gray-400">MCP server URL:</span>{' '}
+            <InlineCode>{mcpUrl}</InlineCode>
+          </li>
+          <li>
+            <span className="text-gray-500 dark:text-gray-400">Authentication:</span>{' '}
+            <InlineCode>Custom (Bearer)</InlineCode>
+          </li>
+          <li>
+            <span className="text-gray-500 dark:text-gray-400">Token:</span>{' '}
+            <InlineCode>{t}</InlineCode>
+          </li>
+        </ul>
+      </Step>
+      <Step n={4}>
+        Trust the connector when prompted. In a new chat, enable <InlineCode>holo</InlineCode>{' '}
+        from the <InlineCode>+</InlineCode> menu (or the &ldquo;Use connectors&rdquo; tool).
+      </Step>
+      <Step n={5}>
+        For custom GPTs / Actions (OpenAPI route), see the{' '}
+        <a
+          href="https://docs.holo.dev/connect/chatgpt-actions"
+          className="text-[#3F47FF] hover:underline"
+        >
+          OpenAPI guide
+        </a>
+        . Most users should use the MCP path above.
+      </Step>
+    </ol>
+  );
+}
+
+function SlackSetup() {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded">
+            Beta
+          </span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            Private beta — request access below
+          </span>
+        </div>
+        <p className="text-[13px] leading-6 text-gray-700 dark:text-gray-300">
+          The holo Slack app lets your team query holo from any channel or DM. Mention{' '}
+          <InlineCode>@holo</InlineCode> to retrieve context, run a skill, or attach a run
+          summary back to the thread.
+        </p>
+      </div>
+
+      <ol className="space-y-4 list-none">
+        <Step n={1}>
+          Click <strong>Add to Slack</strong> below. You&apos;ll be redirected to Slack to
+          install <InlineCode>@holo</InlineCode> in your workspace.
+        </Step>
+        <Step n={2}>
+          Pick the channels the bot should be able to read and post in. holo only sees
+          messages it&apos;s explicitly invited to.
+        </Step>
+        <Step n={3}>
+          Invite <InlineCode>@holo</InlineCode> into a channel and try{' '}
+          <InlineCode>@holo what do we know about X?</InlineCode>
+        </Step>
+      </ol>
+
+      <div className="flex items-center gap-3 pt-1">
+        <a
+          href="/api/connect/slack/install"
+          className="inline-flex items-center gap-2 rounded-md bg-[#4A154B] px-3 py-2 text-xs font-medium text-white hover:bg-[#611f63] transition-colors"
+        >
+          <SlackMark />
+          Add to Slack
+        </a>
+        <a
+          href="https://docs.holo.dev/connect/slack-self-hosted"
+          className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+        >
+          Self-hosting your own bot? →
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function SlackMark() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M5 14.5a2 2 0 1 1 2 2H5v-2zm1-1a2 2 0 1 1-2-2h2v2zM10.5 5a2 2 0 1 1 2 2v2h-2V5zm1 1a2 2 0 1 1-2 2v-2h2zM19 9.5a2 2 0 1 1-2-2h2v2zm-1 1a2 2 0 1 1 2 2h-2v-2zM13.5 19a2 2 0 1 1-2-2v-2h2v4zm-1-1a2 2 0 1 1 2-2v2h-2z"
+        fill="currentColor"
+      />
+    </svg>
   );
 }

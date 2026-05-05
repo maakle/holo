@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface ReplayPanelsProps {
   inputJson: Record<string, unknown>;
@@ -39,6 +40,7 @@ function Panel({
     try {
       await navigator.clipboard.writeText(body);
       setCopied(true);
+      toast.success(`${title} copied`);
       setTimeout(() => setCopied(false), 1200);
     } catch {
       // clipboard blocked in some sandboxes; ignore

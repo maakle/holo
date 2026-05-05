@@ -169,6 +169,13 @@
       "when": 1778140800000,
       "tag": "0023_sync_runs_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1778227200000,
+      "tag": "0024_procedure_discovery",
+      "breakpoints": true
     }
   ]
 }

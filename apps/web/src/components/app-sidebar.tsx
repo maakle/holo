@@ -5,12 +5,10 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutGrid,
   Plug,
-  Sparkles,
   Activity,
   ScrollText,
   Users,
   Terminal,
-  History,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -28,19 +26,21 @@ type NavSection = {
   items: NavItem[];
 };
 
+// Skills (manual labeling, synthesis, runs, marketplace) and procedure auto-discovery
+// are deferred from the MVP. See README roadmap. Implementation lives in git history
+// (most recently on branch `feat/procedure-auto-discovery`) and in
+// packages/discovery/, packages/skills/, and apps/web/src/lib/synthesize-and-persist.ts.
 const sections: NavSection[] = [
   {
     items: [
       { href: '/dashboard', label: 'Overview', icon: LayoutGrid },
       { href: '/connections', label: 'Connections', icon: Plug },
-      { href: '/skills', label: 'Skills', icon: Sparkles },
     ],
   },
   {
     label: 'Agent runtime',
     items: [
       { href: '/observability', label: 'Observability', icon: Activity },
-      { href: '/skills/runs', label: 'Skill runs', icon: History },
       { href: '/connect-agent', label: 'Connect agent', icon: Terminal },
     ],
   },

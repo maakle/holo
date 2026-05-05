@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { useConnectorStatus } from '@/lib/connectors-status-store';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
@@ -168,6 +169,7 @@ export function ConnectorManageSheet({
         return;
       }
       if (result.status === 'ok') {
+        toast.success(`${meta.displayName} reconnected`);
         router.refresh();
       }
     } finally {
@@ -191,6 +193,7 @@ export function ConnectorManageSheet({
       }
       setConfirmingDisconnect(false);
       onOpenChange(false);
+      toast.success(`${meta.displayName} disconnected`);
       router.refresh();
     } finally {
       setBusy(false);

@@ -121,6 +121,21 @@ Two GitHub OAuth apps are required (login + connector); see [decision 0001](./do
 - [`docs/VISION.md`](./docs/VISION.md) — why holo exists, in 200 words
 - [`docs/decisions/`](./docs/decisions/) — architectural decision records
 
+### Deferred from the MVP
+
+The MVP is intentionally narrow: **connect tools → unify into a substrate → expose via MCP and OpenAPI → bring your own agent (Claude, Cursor, ChatGPT, Slack bot, etc.)**. Anything beyond that is parked.
+
+Specifically, the following surfaces ship as **501 stubs** today and are deferred to a post-launch milestone:
+
+- **Skills** (`/skills`) — manual artifact labeling and Claude-driven skill synthesis from labeled examples
+- **Procedure auto-discovery** (`/skills/discover`, nightly cron) — clusters cross-connector artifacts into work episodes and proposes named procedures for the user to accept / reject
+- **Skill runs** (`/skills/runs`) — execution history and observability for synthesized skills
+- **Marketplace** (`/marketplace`) — publishing accepted skills for other orgs to install
+
+The implementation is preserved in the repo (`packages/skills/`, `packages/discovery/`, `apps/web/src/lib/synthesize-and-persist.ts`, `apps/web/src/lib/discovery-db.ts`, the `procedure_*` tables) so re-enabling is route-handler restoration, not a re-build. The plan that produced the auto-discovery code is at [`docs/superpowers/plans/2026-05-05-procedure-auto-discovery.md`](./docs/superpowers/plans/2026-05-05-procedure-auto-discovery.md). Full implementation history is on the `feat/procedure-auto-discovery` branch through commit `38f49de`.
+
+**Why deferred:** the auto-discovery loop only pays off once the substrate has rich cross-connector signal (Slack threads referencing PRs, Grain calls tagged to HubSpot deals, etc.). MVP design partners' data is mostly single-connector — the algorithm is correct but starves for input. We'd rather ship the substrate, expose it via MCP/OpenAPI, watch agents use it for a quarter, and let the procedure layer emerge from real usage instead of synthesizing it speculatively.
+
 ## Contributing
 
 Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) before opening a PR. First-time contributors will be prompted to sign the [`CLA`](./CLA.md). Good first issues tagged `good-first-issue`.

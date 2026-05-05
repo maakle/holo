@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Check, Copy, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import type { WizardContext } from '../types';
@@ -61,6 +62,7 @@ function ApiKeyStep<TState>({
         setError(body.fix ?? body.problem ?? 'Connection failed');
         return;
       }
+      toast.success(`${meta.displayName} connected`);
       ctx.refreshServer();
       ctx.goNext();
     } finally {
@@ -181,6 +183,7 @@ function ScopeList({
     try {
       await navigator.clipboard.writeText(value);
       setCopied(key);
+      toast.success('Scope copied');
       setTimeout(() => setCopied((c) => (c === key ? null : c)), 1200);
     } catch {
       // clipboard unavailable; user can still triple-click to select.
@@ -192,6 +195,7 @@ function ScopeList({
     try {
       await navigator.clipboard.writeText(all);
       setAllCopied(true);
+      toast.success('All scopes copied');
       setTimeout(() => setAllCopied(false), 1200);
     } catch {
       // ignore

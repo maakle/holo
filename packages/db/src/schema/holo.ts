@@ -576,3 +576,80 @@ export const userSubjectsCache = pgTable(
     userIdx: index('user_subjects_cache_user_idx').on(t.userId),
   }),
 );
+
+export const procedureEpisodes = pgTable(
+  'procedure_episodes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    sourceArtifactIds: uuid('source_artifact_ids').array().notNull(),
+    centroidEmbedding: vector('centroid_embedding', { dimensions: 1024 }),
+    entityKey: text('entity_key'),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgLastSeenIdx: index('procedure_episodes_org_last_seen_idx').on(
+      t.organizationId,
+      t.lastSeenAt,
+    ),
+    orgEntityIdx: index('procedure_episodes_org_entity_idx').on(t.organizationId, t.entityKey),
+  }),
+);
+
+export const procedureProposals = pgTable(
+  'procedure_proposals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    episodeId: uuid('episode_id')
+      .notNull()
+      .references(() => procedureEpisodes.id, { onDelete: 'cascade' }),
+    proposedSlug: text('proposed_slug').notNull(),
+    proposedName: text('proposed_name').notNull(),
+    summary: text('summary').notNull(),
+    status: text('status', { enum: ['pending', 'accepted', 'rejected', 'superseded'] })
+      .notNull()
+      .default('pending'),
+    rejectionReasonHash: text('rejection_reason_hash'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgStatusCreatedIdx: index('procedure_proposals_org_status_created_idx').on(
+      t.organizationId,
+      t.status,
+      t.createdAt,
+    ),
+    orgEpisodePendingUniq: uniqueIndex('procedure_proposals_org_episode_pending_uniq')
+      .on(t.organizationId, t.episodeId)
+      .where(sql`${t.status} = 'pending'`),
+  }),
+);
+
+export const procedureProposalDecisions = pgTable(
+  'procedure_proposal_decisions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    proposalId: uuid('proposal_id')
+      .notNull()
+      .references(() => procedureProposals.id, { onDelete: 'cascade' }),
+    decision: text('decision', { enum: ['accept', 'reject'] }).notNull(),
+    finalSlug: text('final_slug'),
+    decidedBy: uuid('decided_by').notNull().references(() => user.id),
+    decidedAt: timestamp('decided_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgDecidedAtIdx: index('procedure_proposal_decisions_org_decided_at_idx').on(
+      t.organizationId,
+      t.decidedAt,
+    ),
+  }),
+);
