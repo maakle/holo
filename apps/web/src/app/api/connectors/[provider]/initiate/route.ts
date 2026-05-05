@@ -5,7 +5,6 @@ import {
   shared,
   createSlackConnector,
   createGrainConnector,
-  createHubspotConnector,
   type Connector,
 } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
@@ -86,24 +85,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
         clientId: env.GRAIN_CONNECTOR_CLIENT_ID,
         clientSecret: env.GRAIN_CONNECTOR_CLIENT_SECRET,
       });
-    } else if (provider === 'hubspot') {
-      if (!env.HUBSPOT_CONNECTOR_CLIENT_ID || !env.HUBSPOT_CONNECTOR_CLIENT_SECRET) {
-        throw holoError({
-          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
-          problem: 'HubSpot connector credentials are not configured',
-          fix: 'Set HUBSPOT_CONNECTOR_CLIENT_ID and HUBSPOT_CONNECTOR_CLIENT_SECRET in the environment.',
-        });
-      }
-      redirectUri = `${publicOrigin}/api/connectors/hubspot/callback`;
-      conn = createHubspotConnector({
-        clientId: env.HUBSPOT_CONNECTOR_CLIENT_ID,
-        clientSecret: env.HUBSPOT_CONNECTOR_CLIENT_SECRET,
-      });
     } else {
       throw holoError({
         code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
-        problem: `${provider} connector is not implemented`,
-        fix: 'OAuth-redirect connectors: GitHub, Slack, Grain, HubSpot. API-key connectors (Notion, Pylon) use their own /connect endpoints.',
+        problem: `${provider} connector does not use the OAuth initiate flow`,
+        fix: 'OAuth-redirect connectors: GitHub, Slack, Grain. API-key connectors (Notion, Pylon, HubSpot) use their own /connect endpoints.',
       });
     }
 

@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Check, Eye, EyeOff } from 'lucide-react';
+import { Check, Copy, Eye, EyeOff } from 'lucide-react';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import type { WizardContext } from '../types';
@@ -16,6 +16,8 @@ interface Args {
   permissions?: string[];
   /** Numbered setup steps shown above the token input. */
   instructions?: string[];
+  /** Code-styled scope strings rendered for click-to-select copy. */
+  scopes?: { required: string[]; optional?: string[] };
 }
 
 /**
@@ -114,6 +116,9 @@ function ApiKeyStep<TState>({
               ))}
             </ul>
           ) : null}
+          {args.scopes && args.scopes.required.length > 0 ? (
+            <ScopeList required={args.scopes.required} optional={args.scopes.optional} />
+          ) : null}
           <div className="relative">
             <input
               type={revealed ? 'text' : 'password'}
@@ -159,5 +164,111 @@ function ApiKeyStep<TState>({
         )}
       </AlertDialogFooter>
     </>
+  );
+}
+
+function ScopeList({
+  required,
+  optional,
+}: {
+  required: string[];
+  optional?: string[];
+}) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const [allCopied, setAllCopied] = useState(false);
+
+  async function copy(value: string, key: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(key);
+      setTimeout(() => setCopied((c) => (c === key ? null : c)), 1200);
+    } catch {
+      // clipboard unavailable; user can still triple-click to select.
+    }
+  }
+
+  async function copyAll() {
+    const all = [...required, ...(optional ?? [])].join(' ');
+    try {
+      await navigator.clipboard.writeText(all);
+      setAllCopied(true);
+      setTimeout(() => setAllCopied(false), 1200);
+    } catch {
+      // ignore
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] uppercase tracking-[0.04em] text-text-subtle">
+          Scopes
+        </span>
+        <button
+          type="button"
+          onClick={copyAll}
+          className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-text-muted hover:text-text focus:outline-hidden focus:focus-ring"
+        >
+          {allCopied ? (
+            <>
+              <Check className="h-3 w-3 text-success" aria-hidden /> Copied
+            </>
+          ) : (
+            <>
+              <Copy className="h-3 w-3" aria-hidden /> Copy all
+            </>
+          )}
+        </button>
+      </div>
+      <ScopeBlock label="Required" items={required} copied={copied} onCopy={copy} />
+      {optional && optional.length > 0 ? (
+        <ScopeBlock
+          label="Optional (granular engagement scopes — add if your portal lists them)"
+          items={optional}
+          copied={copied}
+          onCopy={copy}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ScopeBlock({
+  label,
+  items,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  items: string[];
+  copied: string | null;
+  onCopy: (value: string, key: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] text-text-subtle">{label}</span>
+      <ul className="flex flex-col gap-0.5">
+        {items.map((scope) => (
+          <li
+            key={scope}
+            className="group flex items-center justify-between gap-2 rounded-sm px-1.5 py-1 hover:bg-surface"
+          >
+            <code className="font-mono text-[12px] text-text">{scope}</code>
+            <button
+              type="button"
+              onClick={() => onCopy(scope, scope)}
+              aria-label={`Copy ${scope}`}
+              className="flex shrink-0 items-center gap-1 rounded-sm px-1 py-0.5 text-[11px] text-text-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:text-text focus:opacity-100 focus:outline-hidden focus:focus-ring"
+            >
+              {copied === scope ? (
+                <Check className="h-3 w-3 text-success" aria-hidden />
+              ) : (
+                <Copy className="h-3 w-3" aria-hidden />
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

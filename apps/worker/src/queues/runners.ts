@@ -410,29 +410,22 @@ export function createPylonRunner(deps: RunnerDeps): SyncRunner {
 // ── HubSpot ──────────────────────────────────────────────────────────────────
 export function createHubspotRunner(deps: RunnerDeps): SyncRunner {
   const enqueueEmbed: HubspotEmbedEnqueueFn = makeEnqueueEmbed(deps.embedQueue);
-  const buildConnector = (): ReturnType<typeof createHubspotConnector> =>
-    createHubspotConnector({
-      // OAuth client credentials are only needed for buildAuthorizeUrl/exchange/refresh,
-      // which the worker never invokes. Worker-side we only need db + enqueueEmbed.
-      clientId: process.env.HUBSPOT_CONNECTOR_CLIENT_ID ?? '',
-      clientSecret: process.env.HUBSPOT_CONNECTOR_CLIENT_SECRET ?? '',
-      db: deps.db,
-      enqueueEmbed,
-    });
 
   return {
     async full(payload: SyncJobPayload): Promise<SyncResult> {
-      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'hubspot');
-      const result = await buildConnector().fullSync(
-        { accessToken },
+      const apiKey = await loadConnectorToken(deps.db, payload.organizationId, 'hubspot');
+      const connector = createHubspotConnector({ apiKey, db: deps.db, enqueueEmbed });
+      const result = await connector.fullSync(
+        { accessToken: apiKey },
         { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
       );
       return { artifactCount: result.artifactCount, newCursor: result.newCursor };
     },
     async incremental(payload: SyncJobPayload): Promise<SyncResult> {
-      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'hubspot');
-      const result = await buildConnector().incrementalSync(
-        { accessToken },
+      const apiKey = await loadConnectorToken(deps.db, payload.organizationId, 'hubspot');
+      const connector = createHubspotConnector({ apiKey, db: deps.db, enqueueEmbed });
+      const result = await connector.incrementalSync(
+        { accessToken: apiKey },
         { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
       );
       return { artifactCount: result.artifactCount, newCursor: result.newCursor };

@@ -19,161 +19,57 @@ import type {
   NormalizedWebhookEvent,
 } from '../contract';
 
-/**
- * HubSpot OAuth scopes — read-only across the three CRM objects plus the
- * engagement timelines (notes/calls/emails/meetings/tasks) we ingest as
- * separate chunks per record.
- */
-const HUBSPOT_SCOPES = [
-  'oauth',
-  'crm.objects.contacts.read',
-  'crm.objects.deals.read',
-  'crm.objects.companies.read',
-  'sales-email-read',
-];
-
-const AUTHORIZE_URL = 'https://app.hubspot.com/oauth/authorize';
-const TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token';
-const ACCESS_TOKEN_INFO_URL = 'https://api.hubapi.com/oauth/v1/access-tokens';
-
 export interface HubspotConnectorOptions {
-  clientId: string;
-  clientSecret: string;
+  apiKey: string;
   fetchImpl?: typeof fetch;
-  /** Override scopes if a downstream install needs additional surface area. */
-  scopes?: string[];
   /** Required when the worker invokes fullSync/incrementalSync. */
   db?: DB;
   enqueueEmbed?: HubspotEmbedEnqueueFn;
 }
 
-interface HubspotTokenResponse {
-  access_token: string;
-  refresh_token?: string;
-  expires_in?: number;
-  token_type?: string;
-}
-
-interface HubspotAccessTokenInfo {
-  hub_id: number;
-  hub_domain?: string;
-  user?: string;
-  app_id: number;
-  user_id: number;
-  scopes: string[];
-  token_type: string;
-}
-
 export function createHubspotConnector(opts: HubspotConnectorOptions): Connector {
   const fetchImpl = opts.fetchImpl ?? fetch;
-  const scopes = (opts.scopes ?? HUBSPOT_SCOPES).join(' ');
 
   return {
     id: 'hubspot',
     displayName: 'HubSpot',
 
-    buildAuthorizeUrl(input: BuildAuthorizeUrlInput): string {
-      const params = new URLSearchParams({
-        client_id: opts.clientId,
-        scope: scopes,
-        redirect_uri: input.redirectUri,
-        state: input.state,
-        response_type: 'code',
+    buildAuthorizeUrl(_input: BuildAuthorizeUrlInput): string {
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+        problem: 'HubSpot uses Service Keys, not OAuth — buildAuthorizeUrl is not applicable.',
+        fix: 'Generate a Service Key in your HubSpot developer account and pass it as apiKey.',
       });
-      return `${AUTHORIZE_URL}?${params.toString()}`;
     },
 
-    async exchangeCode(input: ExchangeCodeInput): Promise<ConnectorTokens> {
-      const body = new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: opts.clientId,
-        client_secret: opts.clientSecret,
-        redirect_uri: input.redirectUri,
-        code: input.code,
+    async exchangeCode(_input: ExchangeCodeInput): Promise<ConnectorTokens> {
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+        problem: 'HubSpot uses Service Keys, not OAuth — exchangeCode is not applicable.',
+        fix: 'Generate a Service Key in your HubSpot developer account and pass it as apiKey.',
       });
-      const res = await fetchImpl(TOKEN_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-      });
-      if (!res.ok) {
-        throw holoError({
-          code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
-          problem: `HubSpot OAuth code exchange failed with status ${res.status}`,
-          cause: await res.text(),
-          fix: 'Restart the connect flow. Verify HUBSPOT_CONNECTOR_CLIENT_ID/SECRET and the OAuth app callback URL.',
-        });
-      }
-      const json = (await res.json()) as HubspotTokenResponse;
-      if (!json.access_token) {
-        throw holoError({
-          code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
-          problem: 'HubSpot token response missing access_token',
-          fix: 'Check the HubSpot OAuth app configuration.',
-        });
-      }
-      return {
-        accessToken: json.access_token,
-        refreshToken: json.refresh_token,
-        scope: scopes,
-        expiresAt: json.expires_in
-          ? new Date(Date.now() + json.expires_in * 1000)
-          : undefined,
-      };
     },
 
-    async refresh(input: RefreshInput): Promise<ConnectorTokens> {
-      const body = new URLSearchParams({
-        grant_type: 'refresh_token',
-        client_id: opts.clientId,
-        client_secret: opts.clientSecret,
-        refresh_token: input.refreshToken,
+    async refresh(_input: RefreshInput): Promise<ConnectorTokens> {
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+        problem: 'HubSpot Service Keys are long-lived — refresh is not applicable.',
+        fix: 'Service Keys do not expire; rotate manually in the HubSpot developer dashboard if needed.',
       });
-      const res = await fetchImpl(TOKEN_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-      });
-      if (!res.ok) {
-        throw holoError({
-          code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
-          problem: `HubSpot OAuth refresh failed with status ${res.status}`,
-          cause: await res.text(),
-          fix: 'User may need to re-authorize HubSpot from /connections.',
-        });
-      }
-      const json = (await res.json()) as HubspotTokenResponse;
-      return {
-        accessToken: json.access_token,
-        refreshToken: json.refresh_token ?? input.refreshToken,
-        scope: scopes,
-        expiresAt: json.expires_in
-          ? new Date(Date.now() + json.expires_in * 1000)
-          : undefined,
-      };
     },
 
-    async testConnection(tokens: ConnectorTokens): Promise<TestConnectionResult> {
-      const res = await fetchImpl(`${ACCESS_TOKEN_INFO_URL}/${tokens.accessToken}`, {
-        method: 'GET',
-      });
-      if (!res.ok) {
-        throw holoError({
-          code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
-          problem: `HubSpot token introspection failed with status ${res.status}`,
-          fix: 'Reconnect HubSpot from /connections to get a fresh token.',
-        });
-      }
-      const info = (await res.json()) as HubspotAccessTokenInfo;
+    async testConnection(_tokens: ConnectorTokens): Promise<TestConnectionResult> {
+      const client = createHubspotApiClient(opts.apiKey, fetchImpl);
+      const data = await client.testConnection();
       return {
         ok: true,
-        externalId: String(info.hub_id),
-        name: info.hub_domain ?? `Hub ${info.hub_id}`,
-        raw: { hub_id: info.hub_id, hub_domain: info.hub_domain, scopes: info.scopes },
+        externalId: data.id,
+        name: data.name,
+        raw: { hub_id: data.id, hub_name: data.name },
       };
     },
 
-    async fullSync(tokens: ConnectorTokens, ctx: SyncContext): Promise<SyncResult> {
+    async fullSync(_tokens: ConnectorTokens, ctx: SyncContext): Promise<SyncResult> {
       if (!opts.db || !opts.enqueueEmbed) {
         throw holoError({
           code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
@@ -183,7 +79,7 @@ export function createHubspotConnector(opts: HubspotConnectorOptions): Connector
       }
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
       const result = await runHubspotSync({
-        client: createHubspotApiClient(tokens.accessToken, fetchImpl),
+        client: createHubspotApiClient(opts.apiKey, fetchImpl),
         cursor: {},
         organizationId: ctx.organizationId,
         sourceId: ctx.sourceId,
@@ -194,7 +90,7 @@ export function createHubspotConnector(opts: HubspotConnectorOptions): Connector
       return { artifactCount: result.artifactCount, newCursor: new Date() };
     },
 
-    async incrementalSync(tokens: ConnectorTokens, ctx: SyncContext): Promise<SyncResult> {
+    async incrementalSync(_tokens: ConnectorTokens, ctx: SyncContext): Promise<SyncResult> {
       if (!opts.db || !opts.enqueueEmbed) {
         throw holoError({
           code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
@@ -205,7 +101,7 @@ export function createHubspotConnector(opts: HubspotConnectorOptions): Connector
       const cursor = await loadHubspotCursor(opts.db, ctx.sourceId);
       const existingHashes = await loadExistingHashes(opts.db, ctx.organizationId);
       const result = await runHubspotSync({
-        client: createHubspotApiClient(tokens.accessToken, fetchImpl),
+        client: createHubspotApiClient(opts.apiKey, fetchImpl),
         cursor,
         organizationId: ctx.organizationId,
         sourceId: ctx.sourceId,
@@ -217,18 +113,14 @@ export function createHubspotConnector(opts: HubspotConnectorOptions): Connector
     },
 
     verifyWebhook(_env: WebhookEnvelope, _secret: string): boolean {
-      throw holoError({
-        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
-        problem: 'HubSpot webhook verification is not yet implemented',
-        fix: 'Webhook ingestion lands with the sync engine.',
-      });
+      return false;
     },
 
     normalizeWebhook(_env: WebhookEnvelope): NormalizedWebhookEvent {
       throw holoError({
         code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
-        problem: 'HubSpot webhook normalization is not yet implemented',
-        fix: 'Webhook ingestion lands with the sync engine.',
+        problem: 'HubSpot Service Keys cannot authenticate webhooks',
+        fix: 'Holo polls HubSpot via incremental sync; webhook ingestion would require a full OAuth app.',
       });
     },
   };

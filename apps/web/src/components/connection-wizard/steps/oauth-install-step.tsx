@@ -8,7 +8,7 @@ import type { WizardContext } from '../types';
 
 interface Args {
   /** Bullet points of permissions/effects shown to the user. */
-  permissions: string[];
+  permissions?: string[];
   /** Label for the install/connect CTA button. */
   installButtonLabel?: string;
 }
@@ -86,7 +86,7 @@ function OAuthInstallStep<TState>({
             We&apos;ll open {meta.displayName} in a popup. Approve the permissions and you&apos;ll
             come straight back here.
           </p>
-          {args.permissions.length > 0 ? (
+          {args.permissions && args.permissions.length > 0 ? (
             <ul className="flex flex-col gap-1 text-[12px] text-text-muted">
               {args.permissions.map((p) => (
                 <li key={p}>· {p}</li>

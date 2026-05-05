@@ -47,6 +47,6 @@ export const CONNECTORS: ConnectorMeta[] = [
     displayName: 'HubSpot',
     description: 'CRM contacts, deals, companies, and engagement timelines.',
     implemented: true,
-    flowType: 'oauth',
+    flowType: 'apikey',
   },
 ];

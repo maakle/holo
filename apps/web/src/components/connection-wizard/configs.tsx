@@ -35,11 +35,6 @@ const slackConfig: ConnectorWizardConfig<SlackChannelsState> = {
       render: (ctx) =>
         oauthInstallStep(ctx, {
           installButtonLabel: 'Install Slack app',
-          permissions: [
-            'Read messages from channels you select (no DMs)',
-            'Auto-join public channels you pick so we can index them',
-            'Disconnect any time from this page',
-          ],
         }),
     },
     { id: 'channels', label: 'Pick channels', render: slackChannelsStep },
@@ -57,11 +52,6 @@ const githubConfig: ConnectorWizardConfig = {
       render: (ctx) =>
         oauthInstallStep(ctx, {
           installButtonLabel: 'Install GitHub app',
-          permissions: [
-            'Read code, pull requests, issues, and markdown docs',
-            'Repository access scoped via GitHub’s "Select repositories" UI',
-            'Webhooks for incremental updates so we don’t over-fetch',
-          ],
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
@@ -77,11 +67,6 @@ const grainConfig: ConnectorWizardConfig = {
       render: (ctx) =>
         oauthInstallStep(ctx, {
           installButtonLabel: 'Authorize Grain',
-          permissions: [
-            'Read meeting recordings + transcripts',
-            'Read participant + summary metadata',
-            'Disconnect any time from this page',
-          ],
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
@@ -92,16 +77,35 @@ const hubspotConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
     {
-      id: 'install',
-      label: 'Authorize',
+      id: 'apikey',
+      label: 'Service Key',
       render: (ctx) =>
-        oauthInstallStep(ctx, {
-          installButtonLabel: 'Authorize HubSpot',
-          permissions: [
-            'Read CRM contacts, deals, companies',
-            'Read engagement timelines (calls, emails, notes)',
-            'Disconnect any time from this page',
+        apiKeyStep(ctx, {
+          placeholder: 'HubSpot Service Key',
+          helpText:
+            'Service Keys (beta) give Holo portal-wide read access without an OAuth dance. Generate one in your HubSpot developer account → Keys → Service Keys.',
+          helpUrl:
+            'https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/account-service-keys',
+          instructions: [
+            'In HubSpot, open your developer account → Development → Keys → Service Keys (beta), then click "Create service key".',
+            'Add the scopes below (use the copy buttons to paste each into HubSpot\'s scope picker).',
+            'Copy the generated key and paste it below.',
           ],
+          scopes: {
+            required: [
+              'crm.objects.contacts.read',
+              'crm.objects.deals.read',
+              'crm.objects.companies.read',
+              'crm.objects.owners.read',
+              'sales-email-read',
+            ],
+            optional: [
+              'crm.objects.notes.read',
+              'crm.objects.calls.read',
+              'crm.objects.meetings.read',
+              'crm.objects.tasks.read',
+            ],
+          },
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
@@ -141,7 +145,7 @@ const pylonConfig: ConnectorWizardConfig = {
         apiKeyStep(ctx, {
           placeholder: 'Pylon API key',
           helpText: 'Create an API key in Pylon (Settings → API) and paste it here.',
-          helpUrl: 'https://app.usepylon.com/settings/api-keys',
+          helpUrl: 'https://docs.usepylon.com/pylon-docs/developer/api',
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
