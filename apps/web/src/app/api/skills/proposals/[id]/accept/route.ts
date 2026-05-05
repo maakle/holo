@@ -111,10 +111,16 @@ export async function POST(
       });
     });
 
-    // After commit, synthesize and persist the skill
-    const { skillId } = await synthesizeAndPersist({ db, orgId, userId, skillSlug: finalSlug, apiKey });
-
-    return NextResponse.json({ skillId, slug: finalSlug });
+    // After commit, synthesize and persist the skill (best-effort — transaction already committed)
+    try {
+      const { skillId } = await synthesizeAndPersist({ db, orgId, userId, skillSlug: finalSlug, apiKey });
+      return NextResponse.json({ skillId, slug: finalSlug });
+    } catch (synthErr) {
+      console.error('[accept] synthesizeAndPersist failed:', synthErr);
+      const synthesisError =
+        synthErr instanceof Error ? synthErr.message : 'Synthesis failed unexpectedly.';
+      return NextResponse.json({ skillId: null, slug: finalSlug, synthesisError }, { status: 207 });
+    }
   } catch (e) {
     if (e instanceof HoloError) {
       const status =
