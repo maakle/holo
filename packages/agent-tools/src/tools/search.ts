@@ -44,6 +44,12 @@ function deriveSnippetUrl(result: SearchResult): string | undefined {
   if (provider === 'grain' && typeof m['recording_id'] === 'string') {
     return `https://grain.com/share/recording/${m['recording_id']}`;
   }
+  // TODO(pylon): verify against real Pylon data once a customer has Pylon
+  // connected. Pylon's API returns both `id` (UUID, stored as ticket_id) and
+  // `number` (human-readable, stored as issue_number); we use the latter
+  // because the app URL is `?issueNumber=<n>`. If it turns out Pylon's `id`
+  // actually equals the issue number in some environments, simplify to use
+  // ticket_id directly.
   if (provider === 'pylon' && typeof m['issue_number'] === 'number') {
     return `https://app.usepylon.com/issues?issueNumber=${m['issue_number']}`;
   }
