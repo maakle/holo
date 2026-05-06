@@ -109,4 +109,41 @@ describe('runAgent', () => {
       properties: { q: { type: 'string' } },
     });
   });
+
+  it('supports multi-hop: search → get_thread → final answer', async () => {
+    const { client, create } = makeFakeAnthropic([
+      {
+        stop_reason: 'tool_use',
+        content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'incident' } }],
+      },
+      {
+        stop_reason: 'tool_use',
+        content: [{ type: 'tool_use', id: 't2', name: 'get_thread', input: { channel: 'C1', ts: '1.1' } }],
+      },
+      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'The incident was caused by a stale cache.' }] },
+    ]);
+
+    const searchRun = vi.fn(async () => ({ results: [] }));
+    const threadRun = vi.fn(async () => ({ messages: [{ user: 'U1', text: 'cache fix' }] }));
+
+    const tools: ToolDefinition[] = [
+      { name: 'search', description: '', inputSchema: {}, run: searchRun },
+      { name: 'get_thread', description: '', inputSchema: {}, run: threadRun },
+    ];
+
+    const result = await runAgent({
+      db: fakeDb,
+      organizationId: 'org-1',
+      userSubjects: ['org:org-1'],
+      question: 'what happened in the incident?',
+      client,
+      tools,
+      orgName: 'Acme',
+    });
+
+    expect(result.answer).toBe('The incident was caused by a stale cache.');
+    expect(searchRun).toHaveBeenCalledTimes(1);
+    expect(threadRun).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledTimes(3);
+  });
 });
