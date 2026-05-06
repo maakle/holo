@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { executeSkillInputSchema } from '../src/tools/execute-skill.js';
+import { executeSkillInputSchema } from '@holo/agent-tools';
 
 describe('executeSkillInputSchema', () => {
   it('accepts skillSlug + query', () => {

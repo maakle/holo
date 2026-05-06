@@ -10,9 +10,11 @@ import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import type { DB } from '@holo/db';
 import { getSubjectsForUser } from '@holo/user-subjects';
 import type { McpSessionVars } from '../middleware/session.js';
-import { runListSkillsTool } from '../tools/list-skills.js';
-import { runGetSkillTool } from '../tools/get-skill.js';
-import { runSearchTool } from '../tools/search.js';
+import {
+  runListSkillsTool,
+  runGetSkillTool,
+  runSearchTool,
+} from '@holo/agent-tools';
 import { z } from '@hono/zod-openapi';
 import {
   ErrorSchema,
