@@ -30,7 +30,7 @@ export function HoloLogo({
       </span>
       <span
         className={cn(
-          'font-display text-[15px] font-semibold tracking-tight leading-none',
+          'font-display text-[18px] font-semibold tracking-tight leading-none',
           wordmarkClassName,
         )}
       >

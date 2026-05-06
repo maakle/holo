@@ -25,7 +25,8 @@ const EMPTY: ConnectorSyncStatus = {
 const ACTIVE_INTERVAL_MS = 3000;
 const IDLE_INTERVAL_MS = 30_000;
 
-let snapshot: Statuses = {};
+const EMPTY_STATUSES: Statuses = {};
+let snapshot: Statuses = EMPTY_STATUSES;
 const listeners = new Set<() => void>();
 let refCount = 0;
 let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -110,7 +111,7 @@ function getSnapshot(): Statuses {
 }
 
 function getServerSnapshot(): Statuses {
-  return {};
+  return EMPTY_STATUSES;
 }
 
 export function useAllConnectorsStatus(): Statuses {
