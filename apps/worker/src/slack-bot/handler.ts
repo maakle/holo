@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { eq, and } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
@@ -7,6 +8,7 @@ import {
 } from '@holo/connectors';
 import { listTools } from '@holo/agent-tools';
 import { holoError, ErrorCode } from '@holo/errors';
+import { recordAgentEvent } from '@holo/audit';
 import { runAgent, type AgentResult, type Source } from './agent.js';
 import { buildAgentAnswerBlocks, buildErrorBlocks, ERROR_FALLBACK_TEXT } from './blocks.js';
 
@@ -110,6 +112,60 @@ function cleanQuery(text: string): string {
 }
 
 const PLACEHOLDER_TEXT = '_holo is thinking…_';
+
+function recordAgentEventForSlack(args: {
+  db: DB;
+  organizationId: string;
+  traceId: string;
+  agentIdentity: string;
+  event: 'model_call' | 'tool_call' | 'tool_error';
+  fields: Record<string, unknown>;
+}): void {
+  const { db, organizationId, traceId, agentIdentity, event, fields } = args;
+  if (event === 'model_call') {
+    const model = typeof fields.model === 'string' ? fields.model : 'unknown';
+    recordAgentEvent({
+      db,
+      organizationId,
+      kind: 'llm_call',
+      name: model,
+      agentIdentity,
+      traceId,
+      latencyMs: typeof fields.durationMs === 'number' ? fields.durationMs : 0,
+      metadata: {
+        callIndex: fields.callIndex,
+        stopReason: fields.stopReason,
+        inputTokens: fields.inputTokens,
+        outputTokens: fields.outputTokens,
+        cacheCreationInputTokens: fields.cacheCreationInputTokens,
+        cacheReadInputTokens: fields.cacheReadInputTokens,
+      },
+    });
+    return;
+  }
+  // tool_call / tool_error
+  const toolName = typeof fields.tool === 'string' ? fields.tool : 'unknown';
+  const isError = event === 'tool_error';
+  recordAgentEvent({
+    db,
+    organizationId,
+    kind: 'tool_call',
+    name: toolName,
+    agentIdentity,
+    traceId,
+    latencyMs: typeof fields.durationMs === 'number' ? fields.durationMs : 0,
+    inputJson:
+      fields.input && typeof fields.input === 'object'
+        ? (fields.input as Record<string, unknown>)
+        : {},
+    outputJson: isError
+      ? { error: fields.error }
+      : fields.output && typeof fields.output === 'object'
+        ? (fields.output as Record<string, unknown>)
+        : null,
+    errorCode: isError ? 'TOOL_ERROR' : null,
+  });
+}
 
 /**
  * Map an agent log event to a short Slack-friendly progress phrase. Returns
@@ -342,6 +398,32 @@ export async function handleSlackBotJob(
   // (subject `org:<id>`). No per-user filtering — confirmed product decision.
   const userSubjects = [`org:${workspace.organizationId}`];
 
+  // Trace id groups every event from this Slack interaction (inbound message,
+  // every model_call, every tool_call, the outbound answer). The
+  // observability UI uses this to collapse one Slack thread reply into a
+  // single expandable row.
+  const traceId = randomUUID();
+  const agentIdentity = `slack:${workspace.organizationId.slice(0, 8)}`;
+
+  recordAgentEvent({
+    db: deps.db,
+    organizationId: workspace.organizationId,
+    kind: 'slack_message',
+    name: 'inbound',
+    agentIdentity,
+    traceId,
+    inputJson: {
+      jobKind: job.kind,
+      channel: job.channel,
+      asker: job.asker,
+      text: job.text,
+    },
+    metadata: {
+      teamId: job.teamId,
+      threadTs: 'threadTs' in job ? job.threadTs : undefined,
+    },
+  });
+
   // Lazy default agent runner: only touches listTools + Anthropic when no
   // override is supplied. Tests inject `agentImpl` and bypass both.
   const agentRunner =
@@ -383,6 +465,14 @@ export async function handleSlackBotJob(
           logInfo(`slack-bot: agent ${event}`, {
             organizationId: input.organizationId,
             ...fields,
+          });
+          recordAgentEventForSlack({
+            db: deps.db,
+            organizationId: input.organizationId,
+            traceId,
+            agentIdentity,
+            event,
+            fields,
           });
           if (input.progress) {
             const text = progressTextForEvent(event, fields);
@@ -439,6 +529,16 @@ export async function handleSlackBotJob(
       sources: agentResult.sources,
       fetchImpl: deps.fetchImpl,
     });
+    recordAgentEvent({
+      db: deps.db,
+      organizationId: workspace.organizationId,
+      kind: 'slack_message',
+      name: 'outbound',
+      agentIdentity,
+      traceId,
+      outputJson: { answer: agentResult.answer, sources: agentResult.sources },
+      metadata: { jobKind: 'slash_command', inChannel: isPublic },
+    });
     return { ok: true };
   }
 
@@ -491,6 +591,17 @@ export async function handleSlackBotJob(
     placeholder,
     answer: agentResult.answer,
     sources: agentResult.sources,
+  });
+
+  recordAgentEvent({
+    db: deps.db,
+    organizationId: workspace.organizationId,
+    kind: 'slack_message',
+    name: 'outbound',
+    agentIdentity,
+    traceId,
+    outputJson: { answer: agentResult.answer, sources: agentResult.sources },
+    metadata: { jobKind: job.kind, channel: job.channel, threadTs },
   });
 
   return { ok: true };
