@@ -15,18 +15,36 @@ export type OAuthPopupResult =
   | { status: 'error'; provider: string; code?: string; fix?: string }
   | { status: 'closed'; provider: string };
 
+/**
+ * Open a blank popup synchronously inside the user's click handler. Must run
+ * before any `await` — once the gesture is consumed, Chrome blocks `window.open`.
+ * Returns null if the popup was blocked anyway (e.g. browser-level block).
+ */
+export function openBlankOAuthPopup(provider: string): Window | null {
+  const features = 'popup=yes,width=600,height=750,noopener=no,noreferrer=no';
+  return window.open('about:blank', `holo-oauth-${provider}`, features);
+}
+
 export function openOAuthPopup(
   authorizeUrl: string,
   provider: string,
+  existingPopup?: Window | null,
 ): Promise<OAuthPopupResult> {
   return new Promise((resolve) => {
     const features = 'popup=yes,width=600,height=750,noopener=no,noreferrer=no';
-    const popup = window.open(authorizeUrl, `holo-oauth-${provider}`, features);
+    let popup: Window | null = existingPopup ?? null;
+    if (popup && !popup.closed) {
+      try {
+        popup.location.href = authorizeUrl;
+      } catch {
+        popup = null;
+      }
+    }
+    if (!popup || popup.closed) {
+      popup = window.open(authorizeUrl, `holo-oauth-${provider}`, features);
+    }
     if (!popup) {
-      // Popup blocked. Same-tab navigation is the safe fallback — the user
-      // loses any in-progress page state, but the OAuth flow still works.
       window.location.href = authorizeUrl;
-      // Promise never resolves because the page is navigating away.
       return;
     }
 
@@ -45,7 +63,6 @@ export function openOAuthPopup(
       }
     };
 
-    // Detect manual popup close (user dismissed without finishing OAuth).
     const closeTimer = window.setInterval(() => {
       if (popup.closed) {
         cleanup();

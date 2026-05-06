@@ -109,6 +109,11 @@ function SlackChannelsStep({ ctx }: { ctx: WizardContext<SlackChannelsState> }) 
   async function save() {
     setBusy(true);
     setError(null);
+    // Server-side work auto-joins channels via Slack API (rate-limit prone).
+    // Without a client timeout the button can sit on "Saving…" forever with
+    // no recovery path; 60s is generous but bounded.
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 60_000);
     try {
       const payload =
         allChecked && channels ? { defaultAll: true } : { channels: [...selected] };
@@ -116,6 +121,7 @@ function SlackChannelsStep({ ctx }: { ctx: WizardContext<SlackChannelsState> }) 
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
       const body = (await res.json().catch(() => ({}))) as {
         fix?: string;
@@ -139,7 +145,17 @@ function SlackChannelsStep({ ctx }: { ctx: WizardContext<SlackChannelsState> }) 
       setState(patch);
       ctx.refreshServer();
       ctx.goNext();
+    } catch (e) {
+      const aborted = e instanceof DOMException && e.name === 'AbortError';
+      setError(
+        aborted
+          ? 'Save timed out after 60s. Slack may be rate-limiting; try again or pick fewer channels.'
+          : e instanceof Error
+            ? e.message
+            : 'Save failed.',
+      );
     } finally {
+      window.clearTimeout(timeoutId);
       setBusy(false);
     }
   }

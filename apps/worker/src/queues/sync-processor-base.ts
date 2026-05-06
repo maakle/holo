@@ -118,6 +118,35 @@ export abstract class SyncProcessorBase extends WorkerHost {
       });
     };
 
+    // Cooperative cancellation. The /stop endpoint flips sync_runs.status to
+    // 'cancelled' but can't actually interrupt this Node promise — we poll our
+    // own row and abort the controller when the user pressed Stop. Connectors
+    // that thread the signal through (Slack today; others as they're wired)
+    // exit at the next checkpoint instead of running to natural completion.
+    const controller = new AbortController();
+    const cancelPoll = setInterval(() => {
+      sql<{ status: string }[]>`
+        SELECT status FROM sync_runs
+         WHERE queue_name = ${this.queueName} AND job_id = ${jobId}
+         LIMIT 1
+      `
+        .then((rows) => {
+          if (rows[0]?.status === 'cancelled' && !controller.signal.aborted) {
+            controller.abort(
+              holoError({
+                code: ErrorCode.HOLO_SYNC_CANCELLED,
+                problem: 'sync was cancelled by user',
+                fix: 'Re-run the sync from the connector panel.',
+              }),
+            );
+          }
+        })
+        .catch(() => {
+          // A transient DB blip shouldn't kill the sync — just try again on
+          // the next tick.
+        });
+    }, 1500);
+
     try {
       const result = await runSyncJob({
         queue: this.queueName,
@@ -127,6 +156,7 @@ export abstract class SyncProcessorBase extends WorkerHost {
         cursorStore: getCursorStore(),
         checkpointStore: getCheckpointStore(),
         reportProgress,
+        signal: controller.signal,
       });
       try {
         await finishSyncRunOk(sql, {
@@ -141,6 +171,12 @@ export abstract class SyncProcessorBase extends WorkerHost {
       this.logger.log(`synced ${ctx} artifacts=${result.artifactCount}`);
       return result;
     } catch (err) {
+      // User-initiated cancellation: the row is already 'cancelled' (set by
+      // /stop), and finishSyncRunFailed's `WHERE status='running'` guard will
+      // no-op against it. Log calmly and rethrow so BullMQ marks the job
+      // failed without retry-spam.
+      const cancelled =
+        err instanceof HoloError && err.code === ErrorCode.HOLO_SYNC_CANCELLED;
       try {
         await finishSyncRunFailed(sql, {
           queueName: this.queueName,
@@ -149,6 +185,10 @@ export abstract class SyncProcessorBase extends WorkerHost {
         });
       } catch (e) {
         this.logger.warn(`sync_runs fail update failed ${ctx}: ${(e as Error).message}`);
+      }
+      if (cancelled) {
+        this.logger.log(`cancelled ${ctx}`);
+        throw err;
       }
       // Surface failures in the worker terminal with full HoloError context
       // (code + problem + cause + fix). Without this, BullMQ would swallow the
@@ -169,6 +209,8 @@ export abstract class SyncProcessorBase extends WorkerHost {
         this.logger.error(`failed ${ctx}${code} ${e.stack ?? String(e)}${cause}`);
       }
       throw err;
+    } finally {
+      clearInterval(cancelPoll);
     }
   }
 }

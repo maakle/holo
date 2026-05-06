@@ -56,10 +56,40 @@ export function ConnectorRow({
   lastSyncStatus,
 }: Props) {
   const [showManage, setShowManage] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardInitialStepId, setWizardInitialStepId] = useState<string | undefined>(undefined);
+  // Persist wizard open-state + current step to sessionStorage so the wizard
+  // survives any page reload (notably: next dev's Fast Refresh hard-reload
+  // when the OAuth popup hits new routes that get lazy-compiled).
+  const wizardOpenKey = `holo:wizard-open:${meta.id}`;
+  const wizardStepKey = `holo:wizard-step:${meta.id}`;
+  const [wizardOpen, setWizardOpenState] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem(wizardOpenKey) === '1';
+  });
+  const [wizardInitialStepId, setWizardInitialStepIdState] = useState<string | undefined>(() => {
+    if (typeof window === 'undefined') return undefined;
+    return sessionStorage.getItem(wizardStepKey) ?? undefined;
+  });
   const config = getWizardConfig(meta.id);
   const connected = status === 'connected';
+
+  function setWizardOpen(open: boolean) {
+    setWizardOpenState(open);
+    if (typeof window !== 'undefined') {
+      if (open) sessionStorage.setItem(wizardOpenKey, '1');
+      else {
+        sessionStorage.removeItem(wizardOpenKey);
+        sessionStorage.removeItem(wizardStepKey);
+      }
+    }
+  }
+
+  function setWizardInitialStepId(id: string | undefined) {
+    setWizardInitialStepIdState(id);
+    if (typeof window !== 'undefined') {
+      if (id) sessionStorage.setItem(wizardStepKey, id);
+      else sessionStorage.removeItem(wizardStepKey);
+    }
+  }
 
   // Listen for page-level requests to open this provider's wizard at a
   // specific step (e.g. Slack's soft heuristic firing post-load when the
@@ -73,6 +103,7 @@ export function ConnectorRow({
     };
     window.addEventListener(eventName, handler);
     return () => window.removeEventListener(eventName, handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta.id]);
 
   function connect() {

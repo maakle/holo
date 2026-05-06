@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { openOAuthPopup } from '@/lib/oauth-popup';
+import { openBlankOAuthPopup, openOAuthPopup } from '@/lib/oauth-popup';
 import type { WizardContext } from '../types';
 
 interface Args {
@@ -38,6 +38,11 @@ function OAuthInstallStep<TState>({
   const [error, setError] = useState<string | null>(null);
 
   async function install() {
+    // Open the popup synchronously inside the click gesture. If we wait until
+    // after the fetch below, Chrome treats window.open as programmatic and
+    // blocks it — which then falls back to navigating the parent tab through
+    // OAuth and back, wiping the wizard state on return.
+    const placeholder = openBlankOAuthPopup(meta.id);
     setBusy(true);
     setError(null);
     try {
@@ -48,10 +53,11 @@ function OAuthInstallStep<TState>({
         problem?: string;
       };
       if (!res.ok || !body.authorizeUrl) {
+        if (placeholder && !placeholder.closed) placeholder.close();
         setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
         return;
       }
-      const result = await openOAuthPopup(body.authorizeUrl, meta.id);
+      const result = await openOAuthPopup(body.authorizeUrl, meta.id, placeholder);
       if (result.status === 'error') {
         setError(result.fix ?? `Install failed${result.code ? ` (${result.code})` : ''}`);
         return;

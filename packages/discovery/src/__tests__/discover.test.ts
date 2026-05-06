@@ -1,6 +1,7 @@
 // packages/discovery/src/__tests__/discover.test.ts
 import { describe, it, expect, vi } from 'vitest';
 import { runDiscovery, type DiscoveryDb, type DiscoveryInput } from '../discover.js';
+import type { ProposeInput } from '../propose.js';
 import type { ArtifactInput, Proposal } from '../types.js';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ const artifact = (overrides: Partial<ArtifactInput>): ArtifactInput => ({
   ...overrides,
 });
 
-const mockPropose = vi.fn<() => Promise<Proposal>>();
+const mockPropose = vi.fn<(input: ProposeInput) => Promise<Proposal>>();
 
 function makeDb(
   artifacts: ArtifactInput[],
@@ -65,7 +66,7 @@ describe('runDiscovery', () => {
       orgId: 'org-1',
       apiKey: 'test-key',
       db,
-      propose: mockPropose as any,
+      propose: mockPropose,
     };
 
     const result = await runDiscovery(input);
@@ -97,7 +98,7 @@ describe('runDiscovery', () => {
       orgId: 'org-1',
       apiKey: 'test-key',
       db,
-      propose: mockPropose as any,
+      propose: mockPropose,
     };
 
     const result = await runDiscovery(input);

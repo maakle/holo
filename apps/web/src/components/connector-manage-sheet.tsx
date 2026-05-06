@@ -94,6 +94,7 @@ export function ConnectorManageSheet({
       const body = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
         removed?: number;
+        cancelled?: number;
         activeRunning?: number;
         fix?: string;
         problem?: string;
@@ -103,12 +104,24 @@ export function ConnectorManageSheet({
         return;
       }
       const removed = body.removed ?? 0;
+      const cancelled = body.cancelled ?? 0;
       const active = body.activeRunning ?? 0;
-      setInfo(
-        removed === 0
-          ? 'Nothing was running.'
-          : `Stopped ${removed} job(s)${active ? ` (${active} were mid-run; the worker will exit shortly)` : ''}.`,
-      );
+      if (removed === 0 && cancelled === 0) {
+        setInfo('Nothing was running.');
+      } else {
+        const parts: string[] = [];
+        if (removed > 0) parts.push(`dropped ${removed} queued`);
+        if (cancelled > 0) parts.push(`cancelled ${cancelled} running`);
+        const tail =
+          active > 0
+            ? ' — the worker will exit at the next checkpoint (within seconds).'
+            : '.';
+        setInfo(`Stopped: ${parts.join(', ')}${tail}`);
+        // Force the bulk-status store to repoll immediately so the action bar
+        // flips from "Stop sync" → "Sync now" without waiting for the next
+        // 3s tick. Same hook used after Sync now / channel-picker save.
+        notifySyncTriggered(meta.id);
+      }
     } finally {
       setBusy(false);
     }

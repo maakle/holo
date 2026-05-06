@@ -107,7 +107,15 @@ export function SyncHistoryPanel({ provider }: Props) {
 
     async function run(): Promise<void> {
       try {
-        const res = await fetch(`/api/connectors/${provider}/runs`, { cache: 'no-store' });
+        let res: Response;
+        try {
+          res = await fetch(`/api/connectors/${provider}/runs`, { cache: 'no-store' });
+        } catch (err) {
+          // Network blip (dev server restart, offline, etc.) — keep the
+          // existing data on screen and try again on the next poll tick.
+          if (!cancelled) setError((err as Error).message);
+          return;
+        }
         const body = (await res.json().catch(() => ({}))) as {
           runs?: Run[];
           problem?: string;

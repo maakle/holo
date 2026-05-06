@@ -81,10 +81,28 @@ export async function GET() {
       allSourceIds.push(s.id);
     }
 
-    // Walk each unique queue once; bucket active/waiting jobs into the
-    // owning provider via the source they reference. This replaces
-    // N (providers) × M (queues per provider) round trips with a single
-    // pass per distinct queue.
+    // "Running" comes from two signals:
+    //   1. sync_runs.status='running' — the worker has started the job and
+    //      hasn't reported completion. This is also what /stop flips to
+    //      'cancelled', so the status here drops to false the moment the
+    //      user presses Stop, even before the worker exits at its next
+    //      checkpoint. (Reading BullMQ 'active' instead would keep the
+    //      connector marked running until the runner physically returns.)
+    //   2. BullMQ 'waiting' — a queued job that hasn't started yet.
+    const runningRuns = await db
+      .select({ provider: schema.syncRuns.provider })
+      .from(schema.syncRuns)
+      .where(
+        and(
+          eq(schema.syncRuns.organizationId, orgId),
+          eq(schema.syncRuns.status, 'running'),
+        ),
+      );
+    for (const r of runningRuns) {
+      const p = r.provider as Provider;
+      if (p in statuses) statuses[p].running = true;
+    }
+
     const distinctQueueNames = new Set<string>();
     for (const p of PROVIDERS) {
       for (const q of activeQueueNames(p)) distinctQueueNames.add(q);
@@ -92,7 +110,7 @@ export async function GET() {
     await Promise.all(
       [...distinctQueueNames].map(async (name) => {
         const queue = getQueueByName(name);
-        const jobs = await queue.getJobs(['active', 'waiting']);
+        const jobs = await queue.getJobs(['waiting']);
         for (const j of jobs) {
           const payload = j.data as { sourceId?: string; organizationId?: string } | undefined;
           if (payload?.organizationId !== orgId || !payload.sourceId) continue;

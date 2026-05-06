@@ -171,11 +171,17 @@ export function createSlackRunner(deps: RunnerDeps): SyncRunner {
     });
 
   return {
-    async full(payload: SyncJobPayload): Promise<SyncResult> {
+    async full(payload: SyncJobPayload, opts): Promise<SyncResult> {
       const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'slack');
       const result = await buildConnector().fullSync(
         { accessToken },
-        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
+        {
+          sourceId: payload.sourceId,
+          organizationId: payload.organizationId,
+          cursorScope: 'sync',
+          signal: opts?.signal,
+          reportProgress: opts?.reportProgress,
+        },
       );
       return {
         artifactCount: result.artifactCount,
@@ -184,11 +190,17 @@ export function createSlackRunner(deps: RunnerDeps): SyncRunner {
         skipReason: result.skipReason,
       };
     },
-    async incremental(payload: SyncJobPayload): Promise<SyncResult> {
+    async incremental(payload: SyncJobPayload, _cursor, opts): Promise<SyncResult> {
       const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'slack');
       const result = await buildConnector().incrementalSync(
         { accessToken },
-        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
+        {
+          sourceId: payload.sourceId,
+          organizationId: payload.organizationId,
+          cursorScope: 'sync',
+          signal: opts?.signal,
+          reportProgress: opts?.reportProgress,
+        },
       );
       return {
         artifactCount: result.artifactCount,

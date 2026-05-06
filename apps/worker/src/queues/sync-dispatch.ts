@@ -40,6 +40,8 @@ export type ReportProgressFn = (input: {
 
 export type SyncRunnerOpts = {
   reportProgress?: ReportProgressFn;
+  /** Cooperative cancellation; aborts when the user presses "Stop sync". */
+  signal?: AbortSignal;
 };
 
 export type SyncRunner = {
@@ -65,6 +67,7 @@ export type RunSyncJobArgs = {
   cursorStore: SyncCursorStore;
   checkpointStore: CheckpointStore;
   reportProgress?: ReportProgressFn;
+  signal?: AbortSignal;
 };
 
 // Executes one sync job: read cursor → decide mode → invoke runner wrapped in
@@ -81,6 +84,7 @@ export async function runSyncJob(args: RunSyncJobArgs): Promise<SyncResult> {
     run: () =>
       invokeRunner(mode, args.runner, args.payload, cursor, {
         reportProgress: args.reportProgress,
+        signal: args.signal,
       }),
   });
 

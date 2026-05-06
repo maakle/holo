@@ -168,6 +168,8 @@ export function createSlackConnector(opts: SlackConnectorOptions): Connector {
         existingHashes,
         enqueueEmbed: opts.enqueueEmbed,
         flushCursor: (metadata) => upsertCursorMetadata(db, ctx.sourceId, ctx.organizationId, metadata),
+        signal: ctx.signal,
+        reportProgress: ctx.reportProgress,
       });
       return {
         artifactCount: result.artifactCount,
@@ -205,6 +207,8 @@ export function createSlackConnector(opts: SlackConnectorOptions): Connector {
         existingHashes,
         enqueueEmbed: opts.enqueueEmbed,
         flushCursor: (metadata) => upsertCursorMetadata(db, ctx.sourceId, ctx.organizationId, metadata),
+        signal: ctx.signal,
+        reportProgress: ctx.reportProgress,
       });
       return {
         artifactCount: result.artifactCount,

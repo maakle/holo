@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check } from 'lucide-react';
 import {
@@ -17,12 +17,8 @@ interface Props<TState> {
   config: ConnectorWizardConfig<TState>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Server-driven flag: is the connector currently connected? */
   connected: boolean;
-  /** Display name of the connected workspace/account, when available. */
   connectedAs?: string;
-  /** Step to start at (defaults to the first step). Useful for soft-heuristic
-   *  re-entry that wants to skip already-completed steps. */
   initialStepId?: string;
 }
 
@@ -44,6 +40,31 @@ export function ConnectionWizard<TState>({
 
   const [stepIndex, setStepIndex] = useState(initialIndex);
   const [state, setState] = useState<TState>(config.initialState);
+  const [refreshPending, setRefreshPending] = useState(false);
+
+  // Persist the active step to sessionStorage so we restore to the same step
+  // after any reload (next dev's Fast Refresh hard-reload while the OAuth
+  // popup is open is the motivating case).
+  const stepKey = `holo:wizard-step:${meta.id}`;
+  useEffect(() => {
+    if (!open) return;
+    const stepId = config.steps[stepIndex]?.id;
+    if (stepId && typeof window !== 'undefined') {
+      sessionStorage.setItem(stepKey, stepId);
+    }
+  }, [open, stepIndex, config.steps, stepKey]);
+
+  function close() {
+    onOpenChange(false);
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem(`holo:wizard-open:${meta.id}`);
+      sessionStorage.removeItem(stepKey);
+    }
+    if (refreshPending) {
+      setRefreshPending(false);
+      router.refresh();
+    }
+  }
 
   const ctx: WizardContext<TState> = {
     meta,
@@ -53,8 +74,8 @@ export function ConnectionWizard<TState>({
     setState: (patch) => setState((prev) => ({ ...prev, ...patch })),
     goNext: () => setStepIndex((i) => Math.min(i + 1, config.steps.length - 1)),
     goPrev: () => setStepIndex((i) => Math.max(i - 1, 0)),
-    close: () => onOpenChange(false),
-    refreshServer: () => router.refresh(),
+    close,
+    refreshServer: () => setRefreshPending(true),
   };
 
   const current = config.steps[stepIndex];

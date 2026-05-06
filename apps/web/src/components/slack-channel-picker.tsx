@@ -60,14 +60,7 @@ export function SlackChannelPicker({ initialSelectedCount, initialDefaultAll }: 
           setChannels(list);
           setTeamId(body.teamId ?? null);
           setDefaultAll(Boolean(body.defaultAll));
-          // In default-all mode the server returns selected=false on every row
-          // (no allowlist rows). Pre-check everything in the UI so the user
-          // sees "everything is on" and can uncheck to narrow.
-          if (body.defaultAll) {
-            setSelected(new Set(list.map((c) => c.id)));
-          } else {
-            setSelected(new Set(list.filter((c) => c.selected).map((c) => c.id)));
-          }
+          setSelected(new Set(list.filter((c) => c.selected).map((c) => c.id)));
           setError(null);
         }
       } finally {

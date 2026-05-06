@@ -43,6 +43,14 @@ export interface SyncContext {
     total?: number | null;
     message?: string;
   }) => void;
+  /**
+   * Cooperative cancellation. The worker fires this when the user presses
+   * "Stop sync" (or the run row otherwise flips to 'cancelled'). Connectors
+   * should check `signal.throwIfAborted()` at meaningful boundaries — between
+   * pages, channels, repos, etc. — so the in-flight sync exits promptly
+   * instead of running to natural completion.
+   */
+  signal?: AbortSignal;
 }
 
 export interface SyncResult {

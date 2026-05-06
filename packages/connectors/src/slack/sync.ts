@@ -40,7 +40,19 @@ export interface RunSlackSyncInput {
    * absent, runSlackSync returns metadata only at the end (legacy behavior).
    */
   flushCursor?: (metadata: Record<string, unknown>) => Promise<void>;
-  logger?: { warn(obj: unknown): void };
+  logger?: { warn(obj: unknown): void; info?(obj: unknown): void };
+  /**
+   * Cooperative cancellation. Checked between channels and between pages so
+   * "Stop sync" exits within seconds instead of running to completion. Already-
+   * fetched chunks for the current channel are not enqueued once aborted, and
+   * the partial cursor is flushed for the channels we did finish.
+   */
+  signal?: AbortSignal;
+  reportProgress?: (input: {
+    current: number;
+    total?: number | null;
+    message?: string;
+  }) => void;
 }
 
 export interface RunSlackSyncOutput {
@@ -57,7 +69,15 @@ export async function runSlackSync(input: RunSlackSyncInput): Promise<RunSlackSy
     });
   }
 
-  const logger = input.logger ?? { warn: () => {} };
+  const logger = {
+    warn: input.logger?.warn ?? (() => {}),
+    info: input.logger?.info ?? ((obj: unknown) => {
+      // Default to stdout so progress shows up in `pnpm dev` worker logs
+      // even when no NestJS logger is plumbed through.
+      const msg = typeof obj === 'string' ? obj : JSON.stringify(obj);
+      process.stdout.write(`[slack-sync] ${msg}\n`);
+    }),
+  };
   const oldestPerChannel: Record<string, string> = {
     ...((input.cursorMetadata['oldest_per_channel'] as Record<string, string>) ?? {}),
   };
@@ -65,21 +85,52 @@ export async function runSlackSync(input: RunSlackSyncInput): Promise<RunSlackSy
     ...((input.cursorMetadata['bot_not_in_channel'] as string[]) ?? []),
   ];
 
+  const totalChannels = input.allowedChannelIds.length;
+  input.reportProgress?.({
+    current: 0,
+    total: totalChannels,
+    message: 'Loading workspace users…',
+  });
   const userMap = await buildUserMap(input.client);
   let totalArtifacts = 0;
 
-  for (const channelId of input.allowedChannelIds) {
+  for (let channelIdx = 0; channelIdx < input.allowedChannelIds.length; channelIdx += 1) {
+    const channelId = input.allowedChannelIds[channelIdx]!;
+    input.signal?.throwIfAborted();
     const channel = await input.client.conversationsInfo(channelId);
     if (!channel) continue;
+    input.reportProgress?.({
+      current: channelIdx + 1,
+      total: totalChannels,
+      message: `#${channel.name} · scanning…`,
+    });
+    logger.info(`channel ${channelIdx + 1}/${totalChannels}: #${channel.name} starting`);
 
     const oldest = oldestPerChannel[channelId] ?? '0';
-    const chunksForChannel: ChunkPayload[] = [];
     let maxTsSeen = oldest;
 
     let nextCursor: string | undefined;
     let bailed = false;
+    let pageNum = 0;
+    let threadsScanned = 0;
+    let chunksThisChannel = 0;
+    let pendingChunks: ChunkPayload[] = [];
+
+    const flushPending = async (): Promise<void> => {
+      if (pendingChunks.length === 0) return;
+      const batch = pendingChunks;
+      pendingChunks = [];
+      await input.enqueueEmbed({
+        channelId,
+        chunks: batch,
+        organizationId: input.organizationId,
+        sourceId: input.sourceId,
+      });
+    };
 
     do {
+      input.signal?.throwIfAborted();
+      pageNum += 1;
       let page: Awaited<ReturnType<SlackApiClient['conversationsHistory']>>;
       try {
         page = await input.client.conversationsHistory(channelId, { oldest, cursor: nextCursor });
@@ -99,6 +150,15 @@ export async function runSlackSync(input: RunSlackSyncInput): Promise<RunSlackSy
         throw err;
       }
 
+      const parentsThisPage = page.messages.filter((m) => {
+        if (isBot(m, userMap)) return false;
+        return !m.thread_ts || m.thread_ts === m.ts;
+      });
+      logger.info(
+        `#${channel.name} page ${pageNum}: ${page.messages.length} msgs, ${parentsThisPage.length} thread parents`,
+      );
+
+      let parentIdx = 0;
       for (const msg of page.messages) {
         if (isBot(msg, userMap)) continue;
         const ts = msg.ts;
@@ -107,6 +167,17 @@ export async function runSlackSync(input: RunSlackSyncInput): Promise<RunSlackSy
         // Only process thread parents (msg.thread_ts absent = standalone, or thread_ts === ts = parent)
         const isParent = !msg.thread_ts || msg.thread_ts === ts;
         if (!isParent) continue;
+        parentIdx += 1;
+        threadsScanned += 1;
+
+        // Heartbeat per-thread so the UI ticks while we're paced waiting on
+        // conversations.replies (1.5s each). The worker debounces these to
+        // ~1/sec so calling on every iteration is safe.
+        input.reportProgress?.({
+          current: channelIdx + 1,
+          total: totalChannels,
+          message: `#${channel.name} · page ${pageNum} · thread ${parentIdx}/${parentsThisPage.length} · ${chunksThisChannel} chunks`,
+        });
 
         const threadTs = ts;
         let parent: { user: string; ts: string; text: string };
@@ -147,7 +218,7 @@ export async function runSlackSync(input: RunSlackSyncInput): Promise<RunSlackSy
         for (const c of chunks) {
           const hash = chunkHash('slack-thread', c.content);
           if (input.existingHashes.has(hash)) continue;
-          chunksForChannel.push({
+          pendingChunks.push({
             kind: 'slack-thread',
             content: c.content,
             metadata: c.metadata,
@@ -158,21 +229,25 @@ export async function runSlackSync(input: RunSlackSyncInput): Promise<RunSlackSy
             sourceId: input.sourceId,
             organizationId: input.organizationId,
           });
+          chunksThisChannel += 1;
+          totalArtifacts += 1;
+
+          // Stream complete batches to the embed queue as we go so the UI's
+          // live chunk count ticks up during a long sync, instead of dumping
+          // everything at the end of the channel.
+          if (pendingChunks.length >= BATCH_SIZE) {
+            await flushPending();
+          }
         }
       }
       nextCursor = page.nextCursor;
     } while (nextCursor && !bailed);
 
-    if (!bailed && chunksForChannel.length > 0) {
-      for (let i = 0; i < chunksForChannel.length; i += BATCH_SIZE) {
-        await input.enqueueEmbed({
-          channelId,
-          chunks: chunksForChannel.slice(i, i + BATCH_SIZE),
-          organizationId: input.organizationId,
-          sourceId: input.sourceId,
-        });
-      }
-      totalArtifacts += chunksForChannel.length;
+    if (!bailed) {
+      await flushPending();
+      logger.info(
+        `#${channel.name} done: ${threadsScanned} threads scanned, ${chunksThisChannel} new chunks queued`,
+      );
     }
 
     if (!bailed && maxTsSeen !== oldest) {

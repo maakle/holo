@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
@@ -46,16 +46,17 @@ export async function POST(
       );
     const sourceIds = new Set(sourceRows.map((s) => s.id));
 
+    // Drop queued/delayed BullMQ jobs cleanly. We deliberately skip 'active'
+    // here — j.remove() on an active job throws ("Could not remove active
+    // job") in modern BullMQ, and even if it succeeded it wouldn't interrupt
+    // the worker's in-flight promise. Active jobs are stopped via the
+    // sync_runs.status flip below, which the worker polls and reacts to.
     let removed = 0;
-    let activeRunning = 0;
-    // Track which (queueName, jobId) pairs we yanked so we can finalize the
-    // matching sync_runs rows below — without this the DB row sits as
-    // 'running' until the worker's next bootstrap reconciler marks it stalled.
-    const cancelledByQueue = new Map<string, string[]>();
+    let activeFound = 0;
     for (const name of activeQueueNames(provider)) {
       const queue = getQueueByName(name);
-      const jobs = await queue.getJobs(['waiting', 'delayed', 'active']);
-      for (const j of jobs) {
+      const queuedJobs = await queue.getJobs(['waiting', 'delayed']);
+      for (const j of queuedJobs) {
         const payload = j.data as { sourceId?: string; organizationId?: string } | undefined;
         if (
           payload?.organizationId !== orgId ||
@@ -64,52 +65,54 @@ export async function POST(
         ) {
           continue;
         }
-        // Removing a waiting/delayed job drops it cleanly. Removing an active
-        // job orphans it on the worker — the worker's next BullMQ update call
-        // throws and the runner exits without writing a cursor, equivalent to
-        // a crash. That's the right semantic for "stop now".
         try {
-          const state = await j.getState();
-          if (state === 'active') activeRunning += 1;
-          const jobId = String(j.id ?? '');
           await j.remove();
           removed += 1;
-          if (jobId) {
-            const list = cancelledByQueue.get(name) ?? [];
-            list.push(jobId);
-            cancelledByQueue.set(name, list);
-          }
         } catch {
-          // Ignore individual remove failures; report the count we did manage.
+          // Race: another worker just picked it up. The sync_runs flip below
+          // will catch it once the row appears.
+        }
+      }
+      // Count active jobs for the user-facing message — purely informational.
+      const activeJobs = await queue.getJobs(['active']);
+      for (const j of activeJobs) {
+        const payload = j.data as { sourceId?: string; organizationId?: string } | undefined;
+        if (
+          payload?.organizationId === orgId &&
+          payload.sourceId &&
+          sourceIds.has(payload.sourceId)
+        ) {
+          activeFound += 1;
         }
       }
     }
 
-    // Finalize sync_runs rows we just yanked. Only flip 'running' rows so we
-    // don't clobber a row the worker already marked ok/failed in the narrow
-    // window between getJobs() and remove().
-    for (const [queueName, jobIds] of cancelledByQueue) {
-      if (jobIds.length === 0) continue;
-      await db
-        .update(schema.syncRuns)
-        .set({
-          status: 'cancelled',
-          finishedAt: new Date(),
-          durationMs: sql`EXTRACT(EPOCH FROM (NOW() - ${schema.syncRuns.startedAt})) * 1000`,
-        })
-        .where(
-          and(
-            eq(schema.syncRuns.queueName, queueName),
-            inArray(schema.syncRuns.jobId, jobIds),
-            eq(schema.syncRuns.status, 'running'),
-          ),
-        );
-    }
+    // Cancel every in-flight sync_runs row for this org+provider. The worker's
+    // per-job poll loop sees status='cancelled' within ~1.5s and aborts the
+    // runner at the next checkpoint (between channels/pages/repos). Any
+    // orphaned 'running' rows from a crashed worker also get cleaned up here
+    // instead of waiting 30 min for the boot reconciler.
+    const cancelled = await db
+      .update(schema.syncRuns)
+      .set({
+        status: 'cancelled',
+        finishedAt: new Date(),
+        durationMs: sql`EXTRACT(EPOCH FROM (NOW() - ${schema.syncRuns.startedAt})) * 1000`,
+      })
+      .where(
+        and(
+          eq(schema.syncRuns.organizationId, orgId),
+          eq(schema.syncRuns.provider, provider),
+          eq(schema.syncRuns.status, 'running'),
+        ),
+      )
+      .returning({ id: schema.syncRuns.id });
 
     return NextResponse.json({
       ok: true,
       removed,
-      activeRunning,
+      cancelled: cancelled.length,
+      activeRunning: activeFound,
     });
   } catch (e) {
     if (e instanceof HoloError) {
