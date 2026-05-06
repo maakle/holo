@@ -29,14 +29,13 @@ function deriveSnippetUrl(result: SearchResult): string | undefined {
     if (kind === 'doc' && typeof m['file_path'] === 'string') {
       return `https://github.com/${repo}/blob/HEAD/${m['file_path']}`;
     }
-    if (
-      kind === 'code' &&
-      typeof m['commit_sha'] === 'string' &&
-      typeof m['file_path'] === 'string'
-    ) {
+    if (kind === 'code' && typeof m['file_path'] === 'string') {
+      // Prefer commit_sha when indexed; otherwise fall back to HEAD so the
+      // link still resolves (line anchors work the same).
+      const ref = typeof m['commit_sha'] === 'string' ? m['commit_sha'] : 'HEAD';
       const start = m['start_line'] !== undefined ? `#L${m['start_line']}` : '';
       const end = m['end_line'] !== undefined ? `-L${m['end_line']}` : '';
-      return `https://github.com/${repo}/blob/${m['commit_sha']}/${m['file_path']}${start}${end}`;
+      return `https://github.com/${repo}/blob/${ref}/${m['file_path']}${start}${end}`;
     }
   }
   if (provider === 'notion' && typeof m['notion_page_id'] === 'string') {
