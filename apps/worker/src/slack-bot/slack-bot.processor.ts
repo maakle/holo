@@ -23,6 +23,8 @@ export class SlackBotProcessor extends WorkerHost {
       const result = await handleSlackBotJob(job.data, {
         db: this.db,
         anthropicApiKey: this.anthropicApiKey,
+        logError: (msg, err) =>
+          this.logger.error(msg, err instanceof Error ? err.stack : err),
       });
       if (!result.ok) {
         this.logger.warn(

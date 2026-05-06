@@ -225,12 +225,14 @@ export interface SlackBotHandlerDeps {
     question: string;
   }) => Promise<AgentResult>;
   anthropicApiKey?: string;
+  logError?: (message: string, err?: unknown) => void;
 }
 
 export async function handleSlackBotJob(
   job: SlackBotJob,
   deps: SlackBotHandlerDeps,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const logError = deps.logError ?? ((msg, err) => console.error(msg, err));
   const workspace = await resolveWorkspace(deps.db, job.teamId);
   if (!workspace) {
     return { ok: false, reason: 'workspace_not_connected' };
@@ -247,6 +249,7 @@ export async function handleSlackBotJob(
   const agentRunner =
     deps.agentImpl ??
     (async (input) => {
+      // TODO(task-12): startup validation in worker main.ts makes this unreachable in production.
       if (!deps.anthropicApiKey) {
         throw new Error('ANTHROPIC_API_KEY not configured');
       }
@@ -291,7 +294,7 @@ export async function handleSlackBotJob(
         question: query,
       });
     } catch (err) {
-      console.error('slack-bot: agent failed', err);
+      logError('slack-bot: agent failed', err);
       await postSlashResponse({
         responseUrl: job.responseUrl,
         inChannel: false,
@@ -331,7 +334,7 @@ export async function handleSlackBotJob(
       question: query,
     });
   } catch (err) {
-    console.error('slack-bot: agent failed', err);
+    logError('slack-bot: agent failed', err);
     await postAgentErrorViaPlaceholder({ client, channel: job.channel, threadTs });
     return { ok: true };
   }

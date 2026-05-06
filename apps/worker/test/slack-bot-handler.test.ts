@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { handleSlackBotJob, type SlackBotJob } from '../src/slack-bot/handler';
+import { ERROR_FALLBACK_TEXT } from '../src/slack-bot/blocks';
 
 // Fake DB with chainable .select().from().where().limit() returning canned rows.
 // Drizzle's actual chain is rich; we mimic just enough surface area for the
@@ -242,9 +243,9 @@ describe('handleSlackBotJob', () => {
     const found = calls.some((c) => {
       const body = (c[1] as RequestInit | undefined)?.body;
       if (typeof body !== 'string') return false;
-      // Slack API client encodes the body as form-urlencoded.
+      // SlackApiClient encodes the body as form-urlencoded; decode before searching.
       const decoded = decodeURIComponent(body.replace(/\+/g, ' '));
-      return decoded.includes('Something went wrong');
+      return decoded.includes(ERROR_FALLBACK_TEXT);
     });
     expect(found).toBe(true);
   });
