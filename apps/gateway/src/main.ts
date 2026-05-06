@@ -166,6 +166,7 @@ async function main() {
         ],
         activeToolAllowlist,
         anthropicApiKey: env.ANTHROPIC_API_KEY,
+        agentIdentity: user.agentIdentity,
       };
     },
   });

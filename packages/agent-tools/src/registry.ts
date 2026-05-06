@@ -18,6 +18,8 @@ export interface ToolContext {
   activeToolAllowlist?: string[];
   userId?: string;
   anthropicApiKey?: string;
+  /** Stable label identifying the calling agent. See McpSessionVars.user.agentIdentity. */
+  agentIdentity?: string;
 }
 
 export interface ToolDefinition {
