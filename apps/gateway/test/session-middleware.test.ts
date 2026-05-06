@@ -57,8 +57,9 @@ describe('createSessionMiddleware', () => {
       headers: { cookie: 'better-auth.session_token=mw-token' },
     });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { userId: string };
+    const body = (await res.json()) as { userId: string; agentIdentity: string };
     expect(body.userId).toBe(userId);
+    expect(body.agentIdentity).toBe('web');
   });
 
   it('returns 401 with HoloError JSON when cookie missing', async () => {

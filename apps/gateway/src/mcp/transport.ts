@@ -11,6 +11,22 @@ import { checkToolAllowed } from '../middleware/allowlist.js';
 import type { McpSessionVars } from '../middleware/session.js';
 import { logger } from '../logger.js';
 
+interface InvocationLog {
+  organizationId: string;
+  agentIdentity: string | null;
+  toolName: string;
+  inputJson: Record<string, unknown>;
+  outputJson: Record<string, unknown> | null;
+  errorCode: string | null;
+  latencyMs: number;
+}
+
+function recordInvocation(db: DB, row: InvocationLog): void {
+  db.insert(schema.mcpInvocations)
+    .values(row)
+    .catch((err: unknown) => logger.error({ err }, 'mcp invocation log failed'));
+}
+
 export interface MountMcpOpts {
   db: DB;
   resolveContext(c: Context<{ Variables: McpSessionVars }>): Promise<ToolContext> | ToolContext;
@@ -37,26 +53,82 @@ function buildServer(getCtx: () => ToolContext): Server {
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const tools = await listTools(getCtx());
-    return {
-      tools: tools.map((t) => ({
-        name: t.name,
-        description: t.description,
-        inputSchema: t.inputSchema,
-      })),
-    };
+    const ctx = getCtx();
+    const t0 = performance.now();
+    let errorCode: string | null = null;
+    let tools: Awaited<ReturnType<typeof listTools>> = [];
+    try {
+      tools = await listTools(ctx);
+      return {
+        tools: tools.map((t) => ({
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema,
+        })),
+      };
+    } catch (err) {
+      errorCode = err instanceof HoloError ? err.code : 'INTERNAL';
+      throw err;
+    } finally {
+      const latencyMs = Math.round(performance.now() - t0);
+      recordInvocation(ctx.db, {
+        organizationId: ctx.organizationId,
+        agentIdentity: ctx.agentIdentity ?? null,
+        toolName: '__list_tools__',
+        inputJson: {},
+        outputJson: errorCode ? null : { count: tools.length },
+        errorCode,
+        latencyMs,
+      });
+    }
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const ctx = getCtx();
-    const all = await listTools(ctx);
+    const t0 = performance.now();
+    const inputJson = (req.params.arguments ?? {}) as Record<string, unknown>;
+    const logFailure = (err: unknown): never => {
+      const latencyMs = Math.round(performance.now() - t0);
+      const errorCode = err instanceof HoloError ? err.code : 'INTERNAL';
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      logger.warn(
+        {
+          event: 'mcp_tool_call_failed',
+          tool: req.params.name,
+          org: ctx.organizationId,
+          agent: ctx.agentIdentity ?? null,
+          errorCode,
+          latencyMs,
+        },
+        'mcp tool call failed',
+      );
+      recordInvocation(ctx.db, {
+        organizationId: ctx.organizationId,
+        agentIdentity: ctx.agentIdentity ?? null,
+        toolName: req.params.name,
+        inputJson,
+        outputJson: { error: errorMessage } as Record<string, unknown>,
+        errorCode,
+        latencyMs,
+      });
+      throw err;
+    };
+
+    let all: Awaited<ReturnType<typeof listTools>>;
+    try {
+      all = await listTools(ctx);
+    } catch (err) {
+      return logFailure(err);
+    }
     const tool = all.find((t) => t.name === req.params.name);
     if (!tool) {
-      throw holoError({
-        code: ErrorCode.HOLO_NOT_FOUND,
-        problem: `Unknown tool: ${req.params.name}`,
-        fix: 'Call tools/list to see available tools.',
-      });
+      return logFailure(
+        holoError({
+          code: ErrorCode.HOLO_NOT_FOUND,
+          problem: `Unknown tool: ${req.params.name}`,
+          fix: 'Call tools/list to see available tools.',
+        }),
+      );
     }
 
     const customNames = new Set(all.filter((t) => t.isCustom).map((t) => t.name));
@@ -65,39 +137,41 @@ function buildServer(getCtx: () => ToolContext): Server {
         customToolNames: customNames,
       })
     ) {
-      throw holoError({
-        code: ErrorCode.HOLO_ALLOWLIST_EMPTY,
-        problem: `Tool '${req.params.name}' not in active skill allowlist`,
-        fix: 'Add the tool to the active skill\'s toolAllowlist, or activate a different skill.',
-      });
+      return logFailure(
+        holoError({
+          code: ErrorCode.HOLO_ALLOWLIST_EMPTY,
+          problem: `Tool '${req.params.name}' not in active skill allowlist`,
+          fix: 'Add the tool to the active skill\'s toolAllowlist, or activate a different skill.',
+        }),
+      );
     }
 
-    const t0 = performance.now();
-    const result = await tool.run(ctx, req.params.arguments);
-    const latencyMs = Math.round(performance.now() - t0);
-    logger.info(
-      {
-        event: 'mcp_tool_call',
-        tool: req.params.name,
-        org: ctx.organizationId,
-        latencyMs,
-      },
-      'mcp tool call',
-    );
-
-    ctx.db
-      .insert(schema.mcpInvocations)
-      .values({
+    try {
+      const result = await tool.run(ctx, req.params.arguments);
+      const latencyMs = Math.round(performance.now() - t0);
+      logger.info(
+        {
+          event: 'mcp_tool_call',
+          tool: req.params.name,
+          org: ctx.organizationId,
+          agent: ctx.agentIdentity ?? null,
+          latencyMs,
+        },
+        'mcp tool call',
+      );
+      recordInvocation(ctx.db, {
         organizationId: ctx.organizationId,
-        agentIdentity: null,
+        agentIdentity: ctx.agentIdentity ?? null,
         toolName: req.params.name,
-        inputJson: (req.params.arguments ?? {}) as Record<string, unknown>,
+        inputJson,
         outputJson: result as Record<string, unknown>,
+        errorCode: null,
         latencyMs,
-      })
-      .catch((err: unknown) => logger.error({ err }, 'mcp invocation log failed'));
-
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    } catch (err) {
+      return logFailure(err);
+    }
   });
 
   return server;

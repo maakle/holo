@@ -42,6 +42,7 @@ export interface ValidatedToken {
   organizationId: string;
   scopes: string[];
   clientId: string;
+  clientName: string | null;
 }
 
 export async function validateAccessToken(
@@ -50,8 +51,18 @@ export async function validateAccessToken(
 ): Promise<ValidatedToken | null> {
   const tokenHash = sha256Hex(token);
   const rows = await db
-    .select()
+    .select({
+      userId: schema.oauthAccessTokens.userId,
+      organizationId: schema.oauthAccessTokens.organizationId,
+      scopes: schema.oauthAccessTokens.scopes,
+      clientId: schema.oauthAccessTokens.clientId,
+      clientName: schema.oauthClients.clientName,
+    })
     .from(schema.oauthAccessTokens)
+    .leftJoin(
+      schema.oauthClients,
+      eq(schema.oauthClients.clientId, schema.oauthAccessTokens.clientId),
+    )
     .where(
       and(
         eq(schema.oauthAccessTokens.tokenHash, tokenHash),
@@ -67,6 +78,7 @@ export async function validateAccessToken(
     organizationId: row.organizationId,
     scopes: row.scopes,
     clientId: row.clientId,
+    clientName: row.clientName,
   };
 }
 

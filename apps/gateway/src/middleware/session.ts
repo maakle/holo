@@ -8,7 +8,19 @@ import { validateAccessToken } from '@holo/oauth-provider';
 import { logger } from '../logger.js';
 
 export interface McpSessionVars {
-  user: { userId: string; organizationId: string; email?: string };
+  user: {
+    userId: string;
+    organizationId: string;
+    email?: string;
+    /**
+     * Stable label for the calling agent, written to mcp_invocations.agent_identity
+     * so the observability UI can group calls by client. Format:
+     *   - oauth:<client_name|client_id>
+     *   - token:<label>
+     *   - web
+     */
+    agentIdentity: string;
+  };
 }
 
 export function createSessionMiddleware(
@@ -26,6 +38,7 @@ export function createSessionMiddleware(
           userId: oauth.userId,
           organizationId: oauth.organizationId,
           email: '',
+          agentIdentity: `oauth:${oauth.clientName ?? oauth.clientId}`,
         });
         await next();
         return;
@@ -37,6 +50,7 @@ export function createSessionMiddleware(
         .select({
           userId: schema.apiTokens.userId,
           organizationId: schema.apiTokens.organizationId,
+          label: schema.apiTokens.label,
         })
         .from(schema.apiTokens)
         .where(
@@ -57,6 +71,7 @@ export function createSessionMiddleware(
           userId: row.userId,
           organizationId: row.organizationId,
           email: '',
+          agentIdentity: `token:${row.label}`,
         });
         await next();
         return;
@@ -66,7 +81,7 @@ export function createSessionMiddleware(
     // 3) Session cookie (first-party web)
     const cookie = c.req.header('cookie');
     const session = await validateSessionCookie(db, cookie);
-    c.set('user', session);
+    c.set('user', { ...session, agentIdentity: 'web' });
     await next();
   };
 }
