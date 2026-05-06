@@ -110,16 +110,22 @@ describe('runAgent', () => {
     });
   });
 
-  it('wraps schemas missing top-level type as type:object for Anthropic', async () => {
+  it('flattens anyOf union schemas into a merged properties object for Anthropic', async () => {
     const { client, create } = makeFakeAnthropic([
       { stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] },
     ]);
 
-    // Zod unions (e.g. get_doc) produce { anyOf: [...] } with no `type` at root.
-    // Anthropic rejects that with "input_schema.type: Field required".
-    const unionSchema = { anyOf: [{ properties: { a: { type: 'string' } } }] };
+    // Zod unions (e.g. get_doc) produce { anyOf: [...] } at root. Anthropic
+    // rejects both root-level `anyOf` and missing `type:object`. We flatten.
+    const unionSchema = {
+      anyOf: [
+        { type: 'object', properties: { artifact_id: { type: 'string' } }, required: ['artifact_id'] },
+        { type: 'object', properties: { notion_page_id: { type: 'string' } }, required: ['notion_page_id'] },
+        { type: 'object', properties: { repo: { type: 'string' }, github_path: { type: 'string' } }, required: ['repo', 'github_path'] },
+      ],
+    };
     const tools: ToolDefinition[] = [
-      { name: 'unioney', description: '', inputSchema: unionSchema, run: async () => ({}) },
+      { name: 'get_doc', description: '', inputSchema: unionSchema, run: async () => ({}) },
     ];
 
     await runAgent({
@@ -135,7 +141,12 @@ describe('runAgent', () => {
     const sentTools = (create.mock.calls[0][0] as { tools: Array<{ input_schema: Record<string, unknown> }> }).tools;
     expect(sentTools[0].input_schema).toEqual({
       type: 'object',
-      anyOf: [{ properties: { a: { type: 'string' } } }],
+      properties: {
+        artifact_id: { type: 'string' },
+        notion_page_id: { type: 'string' },
+        repo: { type: 'string' },
+        github_path: { type: 'string' },
+      },
     });
   });
 

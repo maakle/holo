@@ -135,11 +135,30 @@ class SourceCollector {
   }
 }
 
-// Anthropic's tool API requires `type: "object"` at the root of input_schema.
-// Zod's z.toJSONSchema emits `anyOf`/`allOf` (no top-level `type`) for unions
-// and refined objects. Wrap so those schemas pass validation.
+// Anthropic's tool API requires `type: "object"` at the root of input_schema
+// AND rejects `anyOf`/`oneOf`/`allOf` at the top level. Zod's z.toJSONSchema
+// emits exactly those for unions (e.g. get_doc) and refined objects
+// (e.g. get_skill). Flatten the branches into a merged `properties` map; the
+// tool runner still validates via the original zod schema at runtime.
 function toAnthropicInputSchema(raw: unknown): Record<string, unknown> {
   const schema = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const branches =
+    (schema['anyOf'] as unknown) ??
+    (schema['oneOf'] as unknown) ??
+    (schema['allOf'] as unknown);
+
+  if (Array.isArray(branches)) {
+    const properties: Record<string, unknown> = {};
+    for (const branch of branches) {
+      if (branch && typeof branch === 'object') {
+        const branchProps = (branch as { properties?: Record<string, unknown> }).properties;
+        if (branchProps) Object.assign(properties, branchProps);
+      }
+    }
+    const { anyOf: _a, oneOf: _o, allOf: _al, type: _t, properties: _p, ...rest } = schema;
+    return { ...rest, type: 'object', properties };
+  }
+
   if (schema['type'] === 'object') return schema;
   return { type: 'object', ...schema };
 }
