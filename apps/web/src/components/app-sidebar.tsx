@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import { OrgSwitcher, type OrgSummary } from '@/components/org-switcher';
 import { UserMenu } from '@/components/user-menu';
+import { HoloLogo } from '@/components/holo-logo';
 
 type NavItem = {
   href: string;
@@ -71,6 +72,15 @@ export function AppSidebar({
       className="hidden lg:flex w-[256px] shrink-0 flex-col border-r border-border bg-bg"
       aria-label="Primary"
     >
+      {/* Brand */}
+      <Link
+        href="/dashboard"
+        aria-label="holo home"
+        className="flex h-14 items-center border-b border-border px-4 text-text"
+      >
+        <HoloLogo />
+      </Link>
+
       {/* Org switcher */}
       <div className="px-2 pt-3 pb-2">
         <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { getServerAuth } from '@/lib/server-context';
+import { HoloLogo } from '@/components/holo-logo';
 
 const GITHUB_URL = 'https://github.com/maakle/holo';
 const DOCS_URL = `${GITHUB_URL}#readme`;
@@ -33,8 +34,8 @@ function SiteHeader({ isAuthed }: { isAuthed: boolean }) {
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-bg/80 backdrop-blur-sm supports-backdrop-filter:bg-bg/60">
       <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between px-6">
-        <Link href="/" className="font-display text-[15px] font-semibold tracking-tight">
-          holo
+        <Link href="/" aria-label="holo home" className="text-text">
+          <HoloLogo />
         </Link>
         <nav className="flex items-center gap-6">
           <a href={DOCS_URL} className="text-[13px] text-text-muted hover:text-text">

@@ -1,15 +1,13 @@
 import Link from 'next/link';
 import { SignInForm } from '@/components/sign-in-form';
+import { HoloLogo } from '@/components/holo-logo';
 
 export default function SignInPage() {
   return (
     <main className="relative flex min-h-screen flex-col bg-bg text-text">
       <header className="px-6 py-4">
-        <Link
-          href="/"
-          className="font-display text-[15px] font-semibold tracking-tight"
-        >
-          holo
+        <Link href="/" aria-label="holo home" className="text-text">
+          <HoloLogo />
         </Link>
       </header>
       <div className="flex flex-1 items-center justify-center px-6 pb-16">
