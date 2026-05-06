@@ -4,6 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { parseSkill } from '../format.js';
 import type { SkillDoc } from '../types.js';
 
+// CommonJS consumers (e.g. apps/worker, which uses `module: "CommonJS"` for
+// NestJS decorators) typecheck this file's source through pnpm's workspace
+// symlinks, and tsc rejects `import.meta` under CommonJS even though it
+// works fine at runtime under tsx. @ts-ignore (rather than @ts-expect-error)
+// because skills' own ESM tsconfig has no error here.
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore TS1343
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const GOLDEN_FILES = [

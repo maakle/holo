@@ -1,0 +1,27 @@
+{
+  "name": "@holo/agent-tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@holo/custom-tools": "workspace:*",
+    "@holo/db": "workspace:*",
+    "@holo/errors": "workspace:*",
+    "@holo/retrieval-core": "workspace:*",
+    "@holo/skills": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "zod": "4.4.2"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3"
+  }
+}

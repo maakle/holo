@@ -43,7 +43,16 @@ function buildEmbedderClient(): EmbedderClient {
 }
 
 async function bootstrap() {
-  parseEnv(process.env);
+  const env = parseEnv(process.env);
+  if (!env.ANTHROPIC_API_KEY) {
+    // Required for the Slack bot agent. Fail fast rather than returning
+    // "Something went wrong" to every Slack mention.
+    throw holoError({
+      code: ErrorCode.HOLO_ENV_INVALID,
+      problem: 'ANTHROPIC_API_KEY is required for the worker',
+      fix: 'Set ANTHROPIC_API_KEY in your .env. The Slack bot agent cannot run without it.',
+    });
+  }
   await initCrypto();
   setEmbedderClient(buildEmbedderClient());
   const app = await NestFactory.createApplicationContext(AppModule, {

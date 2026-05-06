@@ -13,7 +13,7 @@ import {
 import { mountMcp } from '../src/mcp/transport.js';
 import { init, call } from './helpers/mcp-client.js';
 import { createSessionMiddleware } from '../src/middleware/session.js';
-import type { ToolContext } from '../src/tools/index.js';
+import type { ToolContext } from '@holo/agent-tools';
 
 const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';
 const VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';

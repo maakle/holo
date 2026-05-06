@@ -10,15 +10,24 @@ export const SLACK_BOT_QUEUE = 'slack-bot';
 export class SlackBotProcessor extends WorkerHost {
   private readonly logger = new Logger(SlackBotProcessor.name);
   private readonly db: DB;
+  private readonly anthropicApiKey: string | undefined;
 
   constructor() {
     super();
     this.db = createDb(process.env.DATABASE_URL ?? '');
+    this.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
   }
 
   async process(job: Job<SlackBotJob>): Promise<{ ok: boolean; reason?: string }> {
     try {
-      const result = await handleSlackBotJob(job.data, { db: this.db });
+      const result = await handleSlackBotJob(job.data, {
+        db: this.db,
+        anthropicApiKey: this.anthropicApiKey,
+        logError: (msg, err) =>
+          this.logger.error(msg, err instanceof Error ? err.stack : err),
+        logInfo: (msg, fields) =>
+          this.logger.log(fields ? `${msg} ${JSON.stringify(fields)}` : msg),
+      });
       if (!result.ok) {
         this.logger.warn(
           `slack-bot job ${job.id} skipped: ${result.reason} team=${job.data.teamId}`,
