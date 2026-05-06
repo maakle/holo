@@ -1,6 +1,9 @@
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import type { AgentEventKind } from '@holo/db';
+import { redactSensitive } from './redact.js';
+
+export { redactSensitive } from './redact.js';
 
 export type AuditEventType =
   | 'skill_run.started'
@@ -139,11 +142,11 @@ export async function recordAgentEventReturning(
       parentId: parentId ?? null,
       agentIdentity: agentIdentity ?? null,
       toolName: name,
-      inputJson: inputJson ?? {},
-      outputJson: outputJson ?? null,
+      inputJson: redactSensitive(inputJson ?? {}),
+      outputJson: outputJson ? redactSensitive(outputJson) : null,
       errorCode: errorCode ?? null,
       latencyMs: latencyMs ?? 0,
-      metadata: metadata ?? null,
+      metadata: metadata ? redactSensitive(metadata) : null,
     })
     .returning({ id: schema.mcpInvocations.id });
   return rows[0]!.id;

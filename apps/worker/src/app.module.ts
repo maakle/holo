@@ -14,6 +14,7 @@ import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 import { SyncRunnersModule } from './queues/runners.module';
 import { SlackSubjectsModule } from './slack-subjects/slack-subjects.module';
 import { SlackBotModule } from './slack-bot/slack-bot.module';
+import { ObservabilityModule } from './observability/observability.module';
 
 function parseRedisUrl(url: string): { host: string; port: number } {
   const u = new URL(url);
@@ -45,6 +46,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     HeartbeatModule,
     SlackSubjectsModule,
     SlackBotModule,
+    ObservabilityModule,
     GithubCodeSyncModule,
     GithubProseSyncModule,
     SlackSyncModule,
