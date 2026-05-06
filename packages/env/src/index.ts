@@ -33,7 +33,7 @@ const EnvSchema = z.object({
    * gateway. If absent, the bot endpoints reject all incoming requests so a
    * misconfigured deploy never silently processes unsigned input.
    */
-  SLACK_SIGNING_SECRET: z.string().optional(),
+  SLACK_CONNECTOR_SIGNING_SECRET: z.string().optional(),
   GRAIN_CONNECTOR_CLIENT_ID: z.string().optional(),
   GRAIN_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),

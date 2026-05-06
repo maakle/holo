@@ -30,7 +30,7 @@ export function mountSlackCommands(
 ): void {
   app.post('/slack/commands', async (c) => {
     if (!opts.signingSecret) {
-      logger.warn('slack commands: SLACK_SIGNING_SECRET unset, rejecting');
+      logger.warn('slack commands: SLACK_CONNECTOR_SIGNING_SECRET unset, rejecting');
       return c.json({ error: 'slack signing secret not configured' }, 503);
     }
 
