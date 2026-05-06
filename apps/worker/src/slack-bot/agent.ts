@@ -78,8 +78,17 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
   const messages: Message[] = [{ role: 'user', content: deps.question }];
   const maxToolCalls = deps.maxToolCalls ?? 20;
   let toolCallCount = 0;
+  const wallClockMs = deps.wallClockMs ?? 60_000;
+  const now = deps.now ?? Date.now;
+  const startedAt = now();
 
   while (true) {
+    if (now() - startedAt > wallClockMs) {
+      throw new AgentRunawayError(
+        'wall_clock_cap',
+        `agent exceeded wall clock budget (${wallClockMs}ms)`,
+      );
+    }
     const response = (await deps.client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,

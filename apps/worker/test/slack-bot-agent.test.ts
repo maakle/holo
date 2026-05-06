@@ -214,4 +214,32 @@ describe('runAgent', () => {
       }),
     ).rejects.toMatchObject({ name: 'AgentRunawayError', reason: 'tool_call_cap' });
   });
+
+  it('throws AgentRunawayError when wall clock budget exceeded', async () => {
+    const { client } = makeFakeAnthropic([
+      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: {} }] },
+      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'done' }] },
+    ]);
+
+    const ticks = [0, 200_000];
+    const now = vi.fn(() => ticks.shift() ?? 200_000);
+
+    const tools: ToolDefinition[] = [
+      { name: 'search', description: '', inputSchema: {}, run: async () => ({ results: [] }) },
+    ];
+
+    await expect(
+      runAgent({
+        db: fakeDb,
+        organizationId: 'org-1',
+        userSubjects: ['org:org-1'],
+        question: 'x?',
+        client,
+        tools,
+        orgName: 'Acme',
+        wallClockMs: 60_000,
+        now,
+      }),
+    ).rejects.toMatchObject({ name: 'AgentRunawayError', reason: 'wall_clock_cap' });
+  });
 });
