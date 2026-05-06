@@ -6,6 +6,7 @@ import {
   type SlackApiClient,
 } from '@holo/connectors';
 import { listTools } from '@holo/agent-tools';
+import { holoError, ErrorCode } from '@holo/errors';
 import { runAgent, type AgentResult, type Source } from './agent.js';
 import { buildAgentAnswerBlocks, buildErrorBlocks, ERROR_FALLBACK_TEXT } from './blocks.js';
 
@@ -348,7 +349,11 @@ export async function handleSlackBotJob(
     (async (input) => {
       // TODO(task-12): startup validation in worker main.ts makes this unreachable in production.
       if (!deps.anthropicApiKey) {
-        throw new Error('ANTHROPIC_API_KEY not configured');
+        throw holoError({
+          code: ErrorCode.HOLO_ENV_INVALID,
+          problem: 'ANTHROPIC_API_KEY not configured for the Slack bot agent',
+          fix: 'Set ANTHROPIC_API_KEY in the worker env. The boot check in apps/worker/src/main.ts should normally prevent this branch from being reached.',
+        });
       }
       const orgName = await fetchOrgName(deps.db, input.organizationId);
       const tools = await listTools({

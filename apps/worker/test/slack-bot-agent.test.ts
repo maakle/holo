@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runAgent, AgentRunawayError } from '../src/slack-bot/agent';
+import { runAgent } from '../src/slack-bot/agent';
 import type { ToolDefinition } from '@holo/agent-tools';
 
 function makeFakeAnthropic(responses: Array<{
