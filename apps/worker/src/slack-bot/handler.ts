@@ -1,11 +1,13 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { eq, and } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import {
   createSlackApiClient,
   type SlackApiClient,
-  type SlackBlock,
 } from '@holo/connectors';
-import { search, type SearchResult } from '@holo/retrieval-core';
+import { listTools } from '@holo/agent-tools';
+import { runAgent, type AgentResult, type Source } from './agent.js';
+import { buildAgentAnswerBlocks, buildErrorBlocks, ERROR_FALLBACK_TEXT } from './blocks.js';
 
 export type SlackBotJob =
   | {
@@ -88,6 +90,15 @@ async function resolveWorkspace(db: DB, teamId: string): Promise<WorkspaceCreds 
   return { organizationId: orgId, accessToken: top.accessToken };
 }
 
+async function fetchOrgName(db: DB, organizationId: string): Promise<string> {
+  const rows = await db
+    .select({ name: schema.organization.name })
+    .from(schema.organization)
+    .where(eq(schema.organization.id, organizationId))
+    .limit(1);
+  return rows[0]?.name ?? 'this organization';
+}
+
 /**
  * Strip a leading `<@UXXX>` mention so the search query is the user's actual
  * question, not our own bot ID. Slack puts the mention at the start of the
@@ -97,64 +108,14 @@ function cleanQuery(text: string): string {
   return text.replace(/^\s*<@[^>]+>\s*/, '').trim();
 }
 
-function truncate(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max - 1) + '…';
-}
-
-function buildAnswerBlocks(query: string, results: SearchResult[]): SlackBlock[] {
-  if (results.length === 0) {
-    return [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `No results for *${truncate(query, 120)}*. Try rephrasing or check that the source you're looking for is connected.`,
-        },
-      },
-    ];
-  }
-
-  const blocks: SlackBlock[] = [
-    {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*Top results for* _${truncate(query, 120)}_`,
-      },
-    },
-    { type: 'divider' },
-  ];
-
-  // Cap at 3 in-line results — Slack message size limits get hairy fast and
-  // long block lists are unreadable.
-  for (const r of results.slice(0, 3)) {
-    const provider = r.source.provider;
-    const kind = r.source.artifactKind;
-    const snippet = truncate(r.content.replace(/\s+/g, ' '), 280);
-    const headerParts = [`*${provider}*`, `_${kind}_`];
-    if (r.snippetUrl) {
-      headerParts.push(`<${r.snippetUrl}|view>`);
-    }
-    blocks.push({
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `${headerParts.join(' · ')}\n${snippet}`,
-      },
-    });
-  }
-
-  return blocks;
-}
-
 const PLACEHOLDER_TEXT = '_holo is thinking…_';
 
-async function answerInChannel(args: {
+async function postAgentAnswer(args: {
   client: SlackApiClient;
   channel: string;
   threadTs?: string;
-  query: string;
-  results: SearchResult[];
+  answer: string;
+  sources: Source[];
 }): Promise<void> {
   const placeholder = await args.client.chatPostMessage({
     channel: args.channel,
@@ -162,11 +123,8 @@ async function answerInChannel(args: {
     thread_ts: args.threadTs,
   });
 
-  const blocks = buildAnswerBlocks(args.query, args.results);
-  const fallback =
-    args.results[0] === undefined
-      ? `No results for ${args.query}`
-      : `Top result: ${truncate(args.results[0].content, 200)}`;
+  const blocks = buildAgentAnswerBlocks(args.answer, args.sources);
+  const fallback = args.answer || 'holo answered your question.';
 
   if (placeholder.ok && placeholder.ts && placeholder.channel) {
     await args.client.chatUpdate({
@@ -187,19 +145,59 @@ async function answerInChannel(args: {
   });
 }
 
+/**
+ * Post the standard error message via chat.update on a placeholder so we
+ * don't leave a dangling "thinking..." in the channel. If the placeholder
+ * post fails, fall back to a single chat.postMessage.
+ */
+async function postAgentErrorViaPlaceholder(args: {
+  client: SlackApiClient;
+  channel: string;
+  threadTs?: string;
+}): Promise<void> {
+  const placeholder = await args.client.chatPostMessage({
+    channel: args.channel,
+    text: PLACEHOLDER_TEXT,
+    thread_ts: args.threadTs,
+  });
+  const blocks = buildErrorBlocks();
+  if (placeholder.ok && placeholder.ts && placeholder.channel) {
+    await args.client.chatUpdate({
+      channel: placeholder.channel,
+      ts: placeholder.ts,
+      text: ERROR_FALLBACK_TEXT,
+      blocks,
+    });
+    return;
+  }
+  await args.client.chatPostMessage({
+    channel: args.channel,
+    thread_ts: args.threadTs,
+    text: ERROR_FALLBACK_TEXT,
+    blocks,
+  });
+}
+
 async function postSlashResponse(args: {
   responseUrl: string;
   inChannel: boolean;
-  query: string;
-  results: SearchResult[];
+  answer: string;
+  sources: Source[];
   fetchImpl?: typeof fetch;
 }): Promise<void> {
   const fetchImpl = args.fetchImpl ?? fetch;
-  const blocks = buildAnswerBlocks(args.query, args.results);
-  const fallback =
-    args.results[0] === undefined
-      ? `No results for ${args.query}`
-      : `Top result: ${truncate(args.results[0].content, 200)}`;
+  const blocks = args.answer
+    ? buildAgentAnswerBlocks(args.answer, args.sources)
+    : [
+        {
+          type: 'section' as const,
+          text: {
+            type: 'mrkdwn' as const,
+            text: 'Ask me a question — e.g. `/holo what do we know about onboarding?`',
+          },
+        },
+      ];
+  const fallback = args.answer || 'holo answered your question.';
   await fetchImpl(args.responseUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -216,10 +214,17 @@ export interface SlackBotHandlerDeps {
   db: DB;
   fetchImpl?: typeof fetch;
   /**
-   * Override search for tests. Receives the same shape as @holo/retrieval-core
-   * search() and returns results.
+   * Override the agent loop for tests. In production, the default factory
+   * lazily creates an Anthropic client and calls listTools + runAgent.
+   * Injecting this avoids touching either, which keeps tests light.
    */
-  searchImpl?: typeof search;
+  agentImpl?: (input: {
+    db: DB;
+    organizationId: string;
+    userSubjects: string[];
+    question: string;
+  }) => Promise<AgentResult>;
+  anthropicApiKey?: string;
 }
 
 export async function handleSlackBotJob(
@@ -232,11 +237,36 @@ export async function handleSlackBotJob(
   }
 
   const client = createSlackApiClient(workspace.accessToken, deps.fetchImpl);
-  const searchFn = deps.searchImpl ?? search;
 
   // Per-workspace ACL: bot answers using the workspace's full corpus
   // (subject `org:<id>`). No per-user filtering — confirmed product decision.
   const userSubjects = [`org:${workspace.organizationId}`];
+
+  // Lazy default agent runner: only touches listTools + Anthropic when no
+  // override is supplied. Tests inject `agentImpl` and bypass both.
+  const agentRunner =
+    deps.agentImpl ??
+    (async (input) => {
+      if (!deps.anthropicApiKey) {
+        throw new Error('ANTHROPIC_API_KEY not configured');
+      }
+      const orgName = await fetchOrgName(deps.db, input.organizationId);
+      const tools = await listTools({
+        db: input.db,
+        organizationId: input.organizationId,
+        userSubjects: input.userSubjects,
+      });
+      const anthropicClient = new Anthropic({ apiKey: deps.anthropicApiKey });
+      return runAgent({
+        db: input.db,
+        organizationId: input.organizationId,
+        userSubjects: input.userSubjects,
+        question: input.question,
+        client: anthropicClient,
+        tools,
+        orgName,
+      });
+    });
 
   if (job.kind === 'slash_command') {
     const trimmed = job.text.trim();
@@ -246,53 +276,72 @@ export async function handleSlackBotJob(
       await postSlashResponse({
         responseUrl: job.responseUrl,
         inChannel: false,
-        query: '',
-        results: [],
+        answer: '',
+        sources: [],
         fetchImpl: deps.fetchImpl,
       });
       return { ok: true };
     }
-    const results = await searchFn({
-      db: deps.db,
-      organizationId: workspace.organizationId,
-      q: query,
-      topK: 5,
-      userSubjects,
-    });
+    let agentResult: AgentResult;
+    try {
+      agentResult = await agentRunner({
+        db: deps.db,
+        organizationId: workspace.organizationId,
+        userSubjects,
+        question: query,
+      });
+    } catch (err) {
+      console.error('slack-bot: agent failed', err);
+      await postSlashResponse({
+        responseUrl: job.responseUrl,
+        inChannel: false,
+        answer: ERROR_FALLBACK_TEXT,
+        sources: [],
+        fetchImpl: deps.fetchImpl,
+      });
+      return { ok: true };
+    }
     await postSlashResponse({
       responseUrl: job.responseUrl,
       inChannel: isPublic,
-      query,
-      results,
+      answer: agentResult.answer,
+      sources: agentResult.sources,
       fetchImpl: deps.fetchImpl,
     });
     return { ok: true };
   }
 
   const query = cleanQuery(job.text);
+  const threadTs = 'threadTs' in job ? job.threadTs : undefined;
   if (!query) {
     await client.chatPostMessage({
       channel: job.channel,
-      thread_ts: 'threadTs' in job ? job.threadTs : undefined,
+      thread_ts: threadTs,
       text: 'Ask me a question — e.g. `@holo what do we know about onboarding?`',
     });
     return { ok: true };
   }
 
-  const results = await searchFn({
-    db: deps.db,
-    organizationId: workspace.organizationId,
-    q: query,
-    topK: 5,
-    userSubjects,
-  });
+  let agentResult: AgentResult;
+  try {
+    agentResult = await agentRunner({
+      db: deps.db,
+      organizationId: workspace.organizationId,
+      userSubjects,
+      question: query,
+    });
+  } catch (err) {
+    console.error('slack-bot: agent failed', err);
+    await postAgentErrorViaPlaceholder({ client, channel: job.channel, threadTs });
+    return { ok: true };
+  }
 
-  await answerInChannel({
+  await postAgentAnswer({
     client,
     channel: job.channel,
-    threadTs: 'threadTs' in job ? job.threadTs : undefined,
-    query,
-    results,
+    threadTs,
+    answer: agentResult.answer,
+    sources: agentResult.sources,
   });
 
   return { ok: true };
