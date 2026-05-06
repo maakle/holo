@@ -1,20 +1,17 @@
 // packages/discovery/src/__tests__/propose.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { LLMClient, LLMResponse } from '@holo/llm';
 import { proposeProcedureName } from '../propose.js';
 
-const mockCreate = vi.fn();
-vi.mock('@anthropic-ai/sdk', () => ({
-  default: vi.fn().mockImplementation(() => ({
-    messages: { create: mockCreate },
-  })),
-}));
+const complete = vi.fn<(...args: unknown[]) => Promise<LLMResponse>>();
+const fakeClient: LLMClient = { complete };
 
 describe('proposeProcedureName', () => {
-  beforeEach(() => mockCreate.mockReset());
+  beforeEach(() => complete.mockReset());
 
   it('parses slug, name, and summary from Claude output', async () => {
-    mockCreate.mockResolvedValue({
-      stop_reason: 'end_turn',
+    complete.mockResolvedValue({
+      stopReason: 'end_turn',
       content: [
         {
           type: 'text',
@@ -25,6 +22,7 @@ describe('proposeProcedureName', () => {
 
     const result = await proposeProcedureName({
       apiKey: 'k',
+      client: fakeClient,
       artifacts: [
         { kind: 'slack.message', content: 'customer asking about refund' },
         { kind: 'hubspot.deal', content: 'Acme Corp - $50k' },
@@ -38,9 +36,13 @@ describe('proposeProcedureName', () => {
   });
 
   it('throws if Claude output is truncated', async () => {
-    mockCreate.mockResolvedValue({ stop_reason: 'max_tokens', content: [] });
+    complete.mockResolvedValue({ stopReason: 'max_tokens', content: [] });
     await expect(
-      proposeProcedureName({ apiKey: 'k', artifacts: [{ kind: 'x', content: 'y' }] }),
+      proposeProcedureName({
+        apiKey: 'k',
+        client: fakeClient,
+        artifacts: [{ kind: 'x', content: 'y' }],
+      }),
     ).rejects.toThrow();
   });
 });

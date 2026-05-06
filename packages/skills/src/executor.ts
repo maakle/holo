@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { AnthropicLLMClient, type LLMClient } from '@holo/llm';
 import { holoError, ErrorCode } from '@holo/errors';
 import type { SkillDoc } from './types.js';
 
@@ -33,6 +33,8 @@ export interface ExecuteSkillInput {
   userQuery: string;
   apiKey: string;
   maxSteps?: number;
+  /** Inject for tests. Defaults to AnthropicLLMClient(apiKey). */
+  client?: LLMClient;
 }
 
 export interface StepTrace {
@@ -54,7 +56,7 @@ export interface ExecuteSkillResult {
  */
 export async function executeSkill(input: ExecuteSkillInput): Promise<ExecuteSkillResult> {
   const { skill, userQuery, apiKey, maxSteps = 10 } = input;
-  const client = new Anthropic({ apiKey });
+  const client = input.client ?? new AnthropicLLMClient({ apiKey });
 
   const systemPrompt = `You are executing a skill procedure. The skill is:
 
@@ -73,11 +75,11 @@ For each step I give you, explain concisely (1-3 sentences) what you would do fo
     const stepResult = runSkillStep(skill.body, stepIndex);
     if (!stepResult) break;
 
-    let response: Anthropic.Message;
+    let response;
     try {
-      response = await client.messages.create({
+      response = await client.complete({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 512,
+        maxTokens: 512,
         system: systemPrompt,
         messages: [{ role: 'user', content: `Execute: ${stepResult.stepText}` }],
       });
@@ -90,7 +92,7 @@ For each step I give you, explain concisely (1-3 sentences) what you would do fo
     }
 
     const llmText = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
       .map((b) => b.text)
       .join('');
 
@@ -112,9 +114,9 @@ For each step I give you, explain concisely (1-3 sentences) what you would do fo
 
   let summary: string;
   try {
-    const summaryResponse = await client.messages.create({
+    const summaryResponse = await client.complete({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 256,
+      maxTokens: 256,
       messages: [
         {
           role: 'user',
@@ -123,7 +125,7 @@ For each step I give you, explain concisely (1-3 sentences) what you would do fo
       ],
     });
     summary = summaryResponse.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
       .map((b) => b.text)
       .join('') || `Completed ${steps.length} steps.`;
   } catch {

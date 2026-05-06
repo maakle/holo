@@ -587,15 +587,15 @@ importers:
 
   packages/discovery:
     dependencies:
-      '@anthropic-ai/sdk':
-        specifier: ^0.92.0
-        version: 0.92.0(zod@4.4.2)
       '@holo/db':
         specifier: workspace:*
         version: link:../db
       '@holo/errors':
         specifier: workspace:*
         version: link:../errors
+      '@holo/llm':
+        specifier: workspace:*
+        version: link:../llm
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(kysely@0.28.17)(postgres@3.4.9)
@@ -652,6 +652,19 @@ importers:
         version: 5.6.3
       vitest:
         specifier: 2.1.3
+        version: 2.1.3(@types/node@22.19.17)(lightningcss@1.32.0)(msw@2.4.9(typescript@5.6.3))
+
+  packages/llm:
+    dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.92.0
+        version: 0.92.0(zod@4.4.2)
+    devDependencies:
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: ^2.1.3
         version: 2.1.3(@types/node@22.19.17)(lightningcss@1.32.0)(msw@2.4.9(typescript@5.6.3))
 
   packages/oauth-provider:
@@ -715,6 +728,9 @@ importers:
       '@holo/errors':
         specifier: workspace:^
         version: link:../errors
+      '@holo/llm':
+        specifier: workspace:*
+        version: link:../llm
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3

@@ -1,11 +1,13 @@
 // packages/discovery/src/propose.ts
-import Anthropic from '@anthropic-ai/sdk';
+import { AnthropicLLMClient, type LLMClient } from '@holo/llm';
 import { holoError, ErrorCode } from '@holo/errors';
 import type { Proposal } from './types.js';
 
 export interface ProposeInput {
   apiKey: string;
   artifacts: { kind: string; content: string }[];
+  /** Inject for tests. Defaults to AnthropicLLMClient(apiKey). */
+  client?: LLMClient;
 }
 
 const SYSTEM = `You are a procedure-naming assistant. Given a small bundle of related work artifacts (Slack messages, deals, meetings, docs, tickets) that all appear to be part of one repeatable process, propose a name for that procedure.
@@ -22,16 +24,16 @@ function truncate(s: string, n: number): string {
 }
 
 export async function proposeProcedureName(input: ProposeInput): Promise<Proposal> {
-  const client = new Anthropic({ apiKey: input.apiKey });
+  const client = input.client ?? new AnthropicLLMClient({ apiKey: input.apiKey });
   const userBlock = input.artifacts
     .map((a, i) => `Artifact ${i + 1} (${a.kind}):\n${truncate(a.content, 1500)}`)
     .join('\n\n---\n\n');
 
-  let response: Anthropic.Message;
+  let response;
   try {
-    response = await client.messages.create({
+    response = await client.complete({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
+      maxTokens: 400,
       system: SYSTEM,
       messages: [{ role: 'user', content: userBlock }],
     });
@@ -43,7 +45,7 @@ export async function proposeProcedureName(input: ProposeInput): Promise<Proposa
     });
   }
 
-  if (response.stop_reason !== 'end_turn') {
+  if (response.stopReason !== 'end_turn') {
     throw holoError({
       code: ErrorCode.HOLO_INTERNAL,
       problem: 'Procedure naming output was truncated',
@@ -52,7 +54,7 @@ export async function proposeProcedureName(input: ProposeInput): Promise<Proposa
   }
 
   const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
     .map((b) => b.text)
     .join('');
 
