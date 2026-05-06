@@ -47,6 +47,9 @@ importers:
       '@holo/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@holo/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
       '@holo/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
@@ -86,6 +89,9 @@ importers:
       '@scalar/hono-api-reference':
         specifier: ^0.10.13
         version: 0.10.13(hono@4.6.7)
+      bullmq:
+        specifier: 5.20.1
+        version: 5.20.1
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(kysely@0.28.17)(postgres@3.4.9)
@@ -262,6 +268,9 @@ importers:
       '@holo/errors':
         specifier: workspace:*
         version: link:../../packages/errors
+      '@holo/retrieval-core':
+        specifier: workspace:*
+        version: link:../../packages/retrieval-core
       '@holo/user-subjects':
         specifier: workspace:*
         version: link:../../packages/user-subjects

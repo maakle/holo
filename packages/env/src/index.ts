@@ -27,6 +27,13 @@ const EnvSchema = z.object({
   GITHUB_APP_WEBHOOK_SECRET: z.string().min(16).optional(),
   SLACK_CONNECTOR_CLIENT_ID: z.string().optional(),
   SLACK_CONNECTOR_CLIENT_SECRET: z.string().optional(),
+  /**
+   * Slack signing secret — Basic Information → App Credentials at api.slack.com.
+   * Required to verify event payloads and slash command requests on the
+   * gateway. If absent, the bot endpoints reject all incoming requests so a
+   * misconfigured deploy never silently processes unsigned input.
+   */
+  SLACK_SIGNING_SECRET: z.string().optional(),
   GRAIN_CONNECTOR_CLIENT_ID: z.string().optional(),
   GRAIN_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),

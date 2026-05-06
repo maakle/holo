@@ -33,17 +33,46 @@ oauth_config:
     bot:
       - channels:history
       - channels:read
+      - channels:join
       - groups:history
       - groups:read
       - users:read
       - team:read
+      # Bot interaction (the @holo bot — see "Bot setup" below):
+      - app_mentions:read
+      - chat:write
+      - im:history
+      - im:read
+      - im:write
+      - commands
 settings:
+  event_subscriptions:
+    request_url: https://your-gateway-domain.com/slack/events
+    bot_events:
+      - app_mention
+      - message.im
+      - app_uninstalled
+  interactivity:
+    is_enabled: false
+  slash_commands:
+    - command: /holo
+      url: https://your-gateway-domain.com/slack/commands
+      description: Ask holo for context
+      usage_hint: "[--public] your question"
+      should_escape: false
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false
 ```
 
 4. Click **Create**, then **Install to Workspace** to authorize the bot.
+
+> **Bot vs. ingest scopes.** The first block of bot scopes (`channels:history` …
+> `team:read`) is the read-only ingest set. The second block
+> (`app_mentions:read` … `commands`) powers the @holo bot. If you previously
+> installed Holo with only the ingest scopes, your existing install keeps
+> working — but users will need to re-authorize once to grant the new bot
+> scopes. The Connect-agent → Slack tab surfaces this prompt automatically.
 
 ### Local development
 
@@ -60,15 +89,17 @@ In the app's sidebar → **Basic Information** → **App Credentials**:
 
 - **Client ID** → `SLACK_CONNECTOR_CLIENT_ID`
 - **Client Secret** → `SLACK_CONNECTOR_CLIENT_SECRET`
+- **Signing Secret** → `SLACK_SIGNING_SECRET` (required for the @holo bot — events and slash commands are HMAC-verified against this)
 
-Add both to `.env.local`:
+Add all three to `.env.local`:
 
 ```
 SLACK_CONNECTOR_CLIENT_ID=...
 SLACK_CONNECTOR_CLIENT_SECRET=...
+SLACK_SIGNING_SECRET=...
 ```
 
-Restart `apps/web` to pick up the env vars. The Slack card on `/integrations` will flip from "Not connected" to connectable.
+Restart `apps/web` and `apps/gateway` to pick up the env vars. The Slack card on `/integrations` will flip from "Not connected" to connectable.
 
 ## Scope rationale
 
@@ -88,6 +119,35 @@ User scopes power the allowlist picker (defined in [apps/web/src/app/api/connect
 | `channels:read`, `groups:read`, `im:read`, `mpim:read` | Show the connecting user the channels they personally see, so they can pick which ones Holo should ingest |
 
 DMs and MPIMs are **read for listing only** — the bot scopes deliberately omit `im:history` / `mpim:history`, so Holo never ingests DM contents.
+
+## Bot setup (@holo)
+
+The Slack bot rides on the same Slack app as ingest. Once the OAuth flow has
+been re-run to grant the bot scopes (the Connect-agent → Slack tab prompts for
+this), the gateway exposes two endpoints:
+
+- `POST /slack/events` — Slack pushes `app_mention` and `message.im` events here. Verifies the `X-Slack-Signature` HMAC, dedupes by `event_id`, and enqueues a worker job on the `slack-bot` BullMQ queue.
+- `POST /slack/commands` — Slack hits this for the `/holo` slash command. Same verification + enqueue path, plus an immediate ephemeral "thinking…" ack so Slack's 3-second deadline isn't blown.
+
+The worker (`apps/worker/src/slack-bot/`) resolves the workspace credentials
+by `team_id`, runs a workspace-scoped search, and posts back via the bot
+token (or the slash command's `response_url`).
+
+### Pointing Slack at your gateway
+
+For prod, set the Event Subscriptions Request URL and the slash command URL
+to your gateway's public origin (e.g. `https://gateway.holo.dev/slack/events`).
+For local dev, you'll need a tunnel (`cloudflared` or `ngrok`) on top of
+`MCP_PORT` (default `8080`).
+
+### Per-workspace ACL
+
+The bot answers using the workspace's full indexed corpus (subject
+`org:<orgId>`), regardless of which user asked. We deliberately don't filter
+per-user — see the "Open decisions" thread in the launch PR for context. If
+you need per-user ACL, swap `userSubjects` in
+[`apps/worker/src/slack-bot/handler.ts`](../../apps/worker/src/slack-bot/handler.ts)
+to resolve via `slackUserCredentials` + `getSubjectsForUser`.
 
 ## Allowlist enforcement
 

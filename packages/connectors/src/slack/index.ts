@@ -16,7 +16,12 @@ import type {
 } from '../contract';
 import type { DB } from '@holo/db';
 
-const SCOPES = [
+/**
+ * Read-only scopes — sufficient for ingest sync. Existing installs from before
+ * the bot launch consented to exactly this set, so they keep working without
+ * re-auth as long as you don't ask for the bot scopes.
+ */
+export const SLACK_INGEST_SCOPES = [
   'channels:history',
   'channels:read',
   'channels:join',
@@ -24,7 +29,36 @@ const SCOPES = [
   'groups:read',
   'users:read',
   'team:read',
-];
+] as const;
+
+/**
+ * Additional scopes required for the @holo bot (mentions, DMs, slash commands,
+ * outbound posting). Requesting these on top of SLACK_INGEST_SCOPES triggers a
+ * Slack re-auth prompt for any workspace whose install predates the bot.
+ */
+export const SLACK_BOT_SCOPES = [
+  'app_mentions:read',
+  'chat:write',
+  'im:history',
+  'im:read',
+  'im:write',
+  'commands',
+] as const;
+
+/**
+ * Sentinel scope used to detect whether a stored credential row was authorized
+ * with the bot scope set. The `scope` column on connectorCredentials is a
+ * comma-separated string returned by Slack at OAuth completion.
+ */
+const BOT_SENTINEL_SCOPE = 'app_mentions:read';
+
+export function hasSlackBotScopes(scope: string | null | undefined): boolean {
+  if (!scope) return false;
+  const set = new Set(scope.split(',').map((s) => s.trim()));
+  return set.has(BOT_SENTINEL_SCOPE);
+}
+
+const SCOPES = [...SLACK_INGEST_SCOPES, ...SLACK_BOT_SCOPES];
 
 export interface SlackConnectorOptions {
   clientId: string;

@@ -14,6 +14,7 @@
   "dependencies": {
     "@holo/audit": "workspace:*",
     "@holo/auth": "workspace:*",
+    "@holo/connectors": "workspace:*",
     "@holo/crypto": "workspace:*",
     "@holo/custom-tools": "workspace:*",
     "@holo/db": "workspace:*",
@@ -23,6 +24,7 @@
     "@holo/retrieval-core": "workspace:*",
     "@holo/skills": "workspace:^",
     "@holo/user-subjects": "workspace:*",
+    "bullmq": "5.20.1",
     "@hono/node-server": "1.13.2",
     "@hono/zod-openapi": "^1.3.0",
     "@modelcontextprotocol/sdk": "^1.18.0",

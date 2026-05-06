@@ -21,6 +21,27 @@ export interface SlackMessage {
   reply_count?: number;
 }
 
+export interface SlackBlock {
+  type: string;
+  [key: string]: unknown;
+}
+
+export interface SlackPostMessageInput {
+  channel: string;
+  text: string;
+  thread_ts?: string;
+  blocks?: SlackBlock[];
+  unfurl_links?: boolean;
+  unfurl_media?: boolean;
+}
+
+export interface SlackPostMessageResult {
+  ok: boolean;
+  channel?: string;
+  ts?: string;
+  error?: string;
+}
+
 export interface SlackApiClient {
   usersList(): Promise<SlackMember[]>;
   /**
@@ -37,6 +58,27 @@ export interface SlackApiClient {
     channelId: string,
     ts: string,
   ): Promise<SlackMessage[]>;
+  /**
+   * Post a message back to a channel, DM, or thread. Returns the channel and
+   * `ts` so callers can chatUpdate the same message later (e.g. replacing a
+   * "Thinking…" placeholder with the real answer).
+   */
+  chatPostMessage(input: SlackPostMessageInput): Promise<SlackPostMessageResult>;
+  /**
+   * Replace the content of a previously-posted message. `ts` must be the
+   * value returned from chatPostMessage; the bot can only edit its own posts.
+   */
+  chatUpdate(input: {
+    channel: string;
+    ts: string;
+    text: string;
+    blocks?: SlackBlock[];
+  }): Promise<SlackPostMessageResult>;
+  /**
+   * Open or fetch the IM channel ID for a user. Required before posting a DM —
+   * Slack does not allow posting directly to a user ID.
+   */
+  conversationsOpen(userId: string): Promise<string | null>;
 }
 
 /**
@@ -226,6 +268,54 @@ export function createSlackApiClient(
         fetchImpl,
       );
       return (res['messages'] as SlackMessage[] | undefined) ?? [];
+    },
+
+    async chatPostMessage(input) {
+      const body: Record<string, string> = {
+        channel: input.channel,
+        text: input.text,
+      };
+      if (input.thread_ts) body['thread_ts'] = input.thread_ts;
+      // Slack accepts `blocks` as a JSON-encoded string when the request is
+      // form-urlencoded (which slackPost uses for consistent rate-limit handling).
+      if (input.blocks) body['blocks'] = JSON.stringify(input.blocks);
+      if (input.unfurl_links === false) body['unfurl_links'] = 'false';
+      if (input.unfurl_media === false) body['unfurl_media'] = 'false';
+      const res = await slackPost(token, 'chat.postMessage', body, fetchImpl);
+      return {
+        ok: res['ok'] === true,
+        channel: res['channel'] as string | undefined,
+        ts: res['ts'] as string | undefined,
+        error: res['error'] as string | undefined,
+      };
+    },
+
+    async chatUpdate(input) {
+      const body: Record<string, string> = {
+        channel: input.channel,
+        ts: input.ts,
+        text: input.text,
+      };
+      if (input.blocks) body['blocks'] = JSON.stringify(input.blocks);
+      const res = await slackPost(token, 'chat.update', body, fetchImpl);
+      return {
+        ok: res['ok'] === true,
+        channel: res['channel'] as string | undefined,
+        ts: res['ts'] as string | undefined,
+        error: res['error'] as string | undefined,
+      };
+    },
+
+    async conversationsOpen(userId) {
+      const res = await slackPost(
+        token,
+        'conversations.open',
+        { users: userId },
+        fetchImpl,
+      );
+      if (!res['ok']) return null;
+      const channel = res['channel'] as { id?: string } | undefined;
+      return channel?.id ?? null;
     },
   };
 }

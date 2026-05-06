@@ -176,6 +176,13 @@
       "when": 1778227200000,
       "tag": "0024_procedure_discovery",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1778313600000,
+      "tag": "0025_slack_event_dedupe",
+      "breakpoints": true
     }
   ]
 }
