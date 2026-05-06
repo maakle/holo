@@ -110,33 +110,120 @@ function cleanQuery(text: string): string {
 
 const PLACEHOLDER_TEXT = '_holo is thinking…_';
 
-async function postAgentAnswer(args: {
+/**
+ * Map an agent log event to a short Slack-friendly progress phrase. Returns
+ * null when the event shouldn't trigger a placeholder update (e.g. the very
+ * first model call — the placeholder already says "thinking").
+ */
+function progressTextForEvent(
+  event: 'model_call' | 'tool_call' | 'tool_error',
+  fields: Record<string, unknown>,
+): string | null {
+  if (event === 'tool_call' || event === 'tool_error') {
+    const tool = String(fields.tool ?? '');
+    if (tool === 'search') return '_🔍 searching your sources…_';
+    if (
+      tool === 'get_doc' ||
+      tool === 'get_pr' ||
+      tool === 'get_thread' ||
+      tool === 'get_call' ||
+      tool === 'get_ticket'
+    ) {
+      return '_📄 reading sources…_';
+    }
+    if (tool === 'list_skills' || tool === 'get_skill' || tool === 'execute_skill') {
+      return '_🛠 using a skill…_';
+    }
+    return `_🛠 using ${tool}…_`;
+  }
+  if (event === 'model_call') {
+    const callIndex = typeof fields.callIndex === 'number' ? fields.callIndex : 0;
+    if (callIndex > 1) return '_🧠 reasoning…_';
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Throttled chat.update wrapper. Slack's `chat.update` is Tier 3 and
+ * rate-limits aggressively per-channel — we coalesce updates to one every
+ * 750ms. The latest pending text always wins; transient intermediate states
+ * may be skipped (fine — they're ephemeral). `flush` is a no-op here; the
+ * caller does a final chat.update with the actual answer/error blocks.
+ */
+function makePlaceholderProgress(args: {
+  client: SlackApiClient;
+  channel: string;
+  ts: string;
+}): { update: (text: string) => void } {
+  const intervalMs = 750;
+  let lastSentAt = 0;
+  let pendingText: string | null = null;
+  let timer: NodeJS.Timeout | null = null;
+  let lastSentText = PLACEHOLDER_TEXT;
+
+  const send = async (text: string): Promise<void> => {
+    if (text === lastSentText) return;
+    lastSentText = text;
+    lastSentAt = Date.now();
+    try {
+      await args.client.chatUpdate({
+        channel: args.channel,
+        ts: args.ts,
+        text,
+      });
+    } catch {
+      // Progress is best-effort; don't fail the agent if a chat.update slips.
+    }
+  };
+
+  return {
+    update: (text: string) => {
+      pendingText = text;
+      const elapsed = Date.now() - lastSentAt;
+      if (elapsed >= intervalMs) {
+        const t = pendingText;
+        pendingText = null;
+        void send(t);
+        return;
+      }
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        if (pendingText !== null) {
+          const t = pendingText;
+          pendingText = null;
+          void send(t);
+        }
+      }, intervalMs - elapsed);
+    },
+  };
+}
+
+/**
+ * Finalize an existing placeholder with the agent's answer + sources. If no
+ * placeholder was successfully posted (rate limit, scope, etc.), fall back to
+ * a direct chat.postMessage so the user isn't left hanging.
+ */
+async function finalizeAgentAnswer(args: {
   client: SlackApiClient;
   channel: string;
   threadTs?: string;
+  placeholder: { ts: string; channel: string } | null;
   answer: string;
   sources: Source[];
 }): Promise<void> {
-  const placeholder = await args.client.chatPostMessage({
-    channel: args.channel,
-    text: PLACEHOLDER_TEXT,
-    thread_ts: args.threadTs,
-  });
-
   const blocks = buildAgentAnswerBlocks(args.answer, args.sources);
   const fallback = args.answer || 'holo answered your question.';
-
-  if (placeholder.ok && placeholder.ts && placeholder.channel) {
+  if (args.placeholder) {
     await args.client.chatUpdate({
-      channel: placeholder.channel,
-      ts: placeholder.ts,
+      channel: args.placeholder.channel,
+      ts: args.placeholder.ts,
       text: fallback,
       blocks,
     });
     return;
   }
-  // Placeholder failed (rate limit, missing scope, etc.) — try a single
-  // direct post as a fallback so the user isn't left hanging.
   await args.client.chatPostMessage({
     channel: args.channel,
     thread_ts: args.threadTs,
@@ -146,25 +233,20 @@ async function postAgentAnswer(args: {
 }
 
 /**
- * Post the standard error message via chat.update on a placeholder so we
- * don't leave a dangling "thinking..." in the channel. If the placeholder
- * post fails, fall back to a single chat.postMessage.
+ * Replace a placeholder with the standard error message. Same fallback shape
+ * as finalizeAgentAnswer.
  */
-async function postAgentErrorViaPlaceholder(args: {
+async function finalizeAgentError(args: {
   client: SlackApiClient;
   channel: string;
   threadTs?: string;
+  placeholder: { ts: string; channel: string } | null;
 }): Promise<void> {
-  const placeholder = await args.client.chatPostMessage({
-    channel: args.channel,
-    text: PLACEHOLDER_TEXT,
-    thread_ts: args.threadTs,
-  });
   const blocks = buildErrorBlocks();
-  if (placeholder.ok && placeholder.ts && placeholder.channel) {
+  if (args.placeholder) {
     await args.client.chatUpdate({
-      channel: placeholder.channel,
-      ts: placeholder.ts,
+      channel: args.placeholder.channel,
+      ts: args.placeholder.ts,
       text: ERROR_FALLBACK_TEXT,
       blocks,
     });
@@ -223,6 +305,7 @@ export interface SlackBotHandlerDeps {
     organizationId: string;
     userSubjects: string[];
     question: string;
+    progress?: (text: string) => void;
   }) => Promise<AgentResult>;
   anthropicApiKey?: string;
   logError?: (message: string, err?: unknown) => void;
@@ -291,11 +374,16 @@ export async function handleSlackBotJob(
         tools,
         orgName,
         wallClockMs: 180_000,
-        logEvent: (event, fields) =>
+        logEvent: (event, fields) => {
           logInfo(`slack-bot: agent ${event}`, {
             organizationId: input.organizationId,
             ...fields,
-          }),
+          });
+          if (input.progress) {
+            const text = progressTextForEvent(event, fields);
+            if (text) input.progress(text);
+          }
+        },
       });
       logInfo('slack-bot: agent finished', {
         organizationId: input.organizationId,
@@ -360,6 +448,22 @@ export async function handleSlackBotJob(
     return { ok: true };
   }
 
+  // Post the placeholder up front so progress updates have a target. If the
+  // post itself fails (rate limit, missing scope), fall back to no-progress
+  // mode — finalize* still has a chat.postMessage path.
+  const placeholderResp = await client.chatPostMessage({
+    channel: job.channel,
+    thread_ts: threadTs,
+    text: PLACEHOLDER_TEXT,
+  });
+  const placeholder =
+    placeholderResp.ok && placeholderResp.ts && placeholderResp.channel
+      ? { ts: placeholderResp.ts, channel: placeholderResp.channel }
+      : null;
+  const progress = placeholder
+    ? makePlaceholderProgress({ client, ...placeholder }).update
+    : undefined;
+
   let agentResult: AgentResult;
   try {
     agentResult = await agentRunner({
@@ -367,17 +471,19 @@ export async function handleSlackBotJob(
       organizationId: workspace.organizationId,
       userSubjects,
       question: query,
+      progress,
     });
   } catch (err) {
     logError('slack-bot: agent failed', err);
-    await postAgentErrorViaPlaceholder({ client, channel: job.channel, threadTs });
+    await finalizeAgentError({ client, channel: job.channel, threadTs, placeholder });
     return { ok: true };
   }
 
-  await postAgentAnswer({
+  await finalizeAgentAnswer({
     client,
     channel: job.channel,
     threadTs,
+    placeholder,
     answer: agentResult.answer,
     sources: agentResult.sources,
   });
