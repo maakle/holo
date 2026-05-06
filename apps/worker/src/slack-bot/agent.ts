@@ -135,12 +135,21 @@ class SourceCollector {
   }
 }
 
+// Anthropic's tool API requires `type: "object"` at the root of input_schema.
+// Zod's z.toJSONSchema emits `anyOf`/`allOf` (no top-level `type`) for unions
+// and refined objects. Wrap so those schemas pass validation.
+function toAnthropicInputSchema(raw: unknown): Record<string, unknown> {
+  const schema = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  if (schema['type'] === 'object') return schema;
+  return { type: 'object', ...schema };
+}
+
 export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
   const system = SYSTEM_PROMPT_TEMPLATE.replace('{org_name}', deps.orgName);
   const anthropicTools: AnthropicTool[] = deps.tools.map((t) => ({
     name: t.name,
     description: t.description,
-    input_schema: t.inputSchema,
+    input_schema: toAnthropicInputSchema(t.inputSchema),
   }));
   const toolByName = new Map(deps.tools.map((t) => [t.name, t]));
 

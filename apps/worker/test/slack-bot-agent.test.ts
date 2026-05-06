@@ -110,6 +110,35 @@ describe('runAgent', () => {
     });
   });
 
+  it('wraps schemas missing top-level type as type:object for Anthropic', async () => {
+    const { client, create } = makeFakeAnthropic([
+      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] },
+    ]);
+
+    // Zod unions (e.g. get_doc) produce { anyOf: [...] } with no `type` at root.
+    // Anthropic rejects that with "input_schema.type: Field required".
+    const unionSchema = { anyOf: [{ properties: { a: { type: 'string' } } }] };
+    const tools: ToolDefinition[] = [
+      { name: 'unioney', description: '', inputSchema: unionSchema, run: async () => ({}) },
+    ];
+
+    await runAgent({
+      db: fakeDb,
+      organizationId: 'org-1',
+      userSubjects: ['org:org-1'],
+      question: '?',
+      client,
+      tools,
+      orgName: 'Acme',
+    });
+
+    const sentTools = (create.mock.calls[0][0] as { tools: Array<{ input_schema: Record<string, unknown> }> }).tools;
+    expect(sentTools[0].input_schema).toEqual({
+      type: 'object',
+      anyOf: [{ properties: { a: { type: 'string' } } }],
+    });
+  });
+
   it('supports multi-hop: search → get_thread → final answer', async () => {
     const { client, create } = makeFakeAnthropic([
       {
