@@ -20,6 +20,11 @@ export interface ToolContext {
   anthropicApiKey?: string;
   /** Stable label identifying the calling agent. See McpSessionVars.user.agentIdentity. */
   agentIdentity?: string;
+  /**
+   * Trace identifier grouping all events from one logical interaction
+   * (typically the MCP session id). Set per-request by the gateway.
+   */
+  traceId?: string;
 }
 
 export interface ToolDefinition {
