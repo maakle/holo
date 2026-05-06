@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 export function HoloMark({ className }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 1254 1254"
+      viewBox="183 106 902 980"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
       aria-label="holo"
