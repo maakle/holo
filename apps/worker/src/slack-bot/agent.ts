@@ -62,6 +62,27 @@ type Message = { role: 'user' | 'assistant'; content: unknown };
 
 const META_TOOLS = new Set(['list_skills', 'get_skill', 'execute_skill']);
 
+function deriveSearchSourceTitle(args: {
+  url: string;
+  provider: string;
+  kind: string;
+  metadata: Record<string, unknown> | undefined;
+}): string {
+  const filePath = args.metadata?.file_path;
+  if (typeof filePath === 'string' && filePath.length > 0) {
+    const basename = filePath.split('/').pop();
+    if (basename) return basename;
+  }
+  try {
+    const u = new URL(args.url);
+    const pathBasename = u.pathname.split('/').filter(Boolean).pop();
+    if (pathBasename) return pathBasename;
+  } catch {
+    // not a parseable URL — fall through
+  }
+  return `${args.provider} · ${args.kind}`;
+}
+
 class SourceCollector {
   private readonly seen = new Set<string>();
   private readonly entries: Source[] = [];
@@ -81,11 +102,20 @@ class SourceCollector {
     for (const r of results.slice(0, 3)) {
       if (!r || typeof r !== 'object') continue;
       const url = (r as { snippet_url?: unknown }).snippet_url;
-      const src = (r as { source?: { provider?: unknown; artifact_kind?: unknown } }).source;
+      const src = (r as {
+        source?: {
+          provider?: unknown;
+          artifact_kind?: unknown;
+          metadata?: Record<string, unknown>;
+        };
+      }).source;
       if (typeof url !== 'string' || !url) continue;
       const provider = typeof src?.provider === 'string' ? src.provider : 'unknown';
       const kind = typeof src?.artifact_kind === 'string' ? src.artifact_kind : 'unknown';
-      this.add({ provider, kind, title: `${provider} · ${kind}`, url });
+      const metadata =
+        src?.metadata && typeof src.metadata === 'object' ? src.metadata : undefined;
+      const title = deriveSearchSourceTitle({ url, provider, kind, metadata });
+      this.add({ provider, kind, title, url });
     }
   }
 
@@ -145,7 +175,12 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
 
     messages.push({ role: 'assistant', content: response.content });
 
-    if (response.stop_reason === 'end_turn' || response.stop_reason !== 'tool_use') {
+    if (response.stop_reason !== 'tool_use') {
+      if (response.stop_reason === 'max_tokens') {
+        console.warn(
+          `[runAgent] response truncated by max_tokens for org=${deps.organizationId}`,
+        );
+      }
       const text = response.content
         .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
         .map((b) => b.text)
@@ -166,6 +201,12 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
         throw new AgentRunawayError(
           'tool_call_cap',
           `agent exceeded max tool calls (${maxToolCalls})`,
+        );
+      }
+      if (now() - startedAt > wallClockMs) {
+        throw new AgentRunawayError(
+          'wall_clock_cap',
+          `agent exceeded wall clock budget (${wallClockMs}ms)`,
         );
       }
       const tool = toolByName.get(use.name);

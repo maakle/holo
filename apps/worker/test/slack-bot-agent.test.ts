@@ -280,9 +280,9 @@ describe('runAgent', () => {
 
     expect(result.answer).toBe('Deploys go via Vercel.');
     expect(result.sources).toEqual([
-      { provider: 'github', kind: 'doc', title: 'github · doc', url: 'https://github.com/acme/web/blob/HEAD/A.md' },
-      { provider: 'github', kind: 'doc', title: 'github · doc', url: 'https://github.com/acme/web/blob/HEAD/B.md' },
-      { provider: 'github', kind: 'doc', title: 'github · doc', url: 'https://github.com/acme/web/blob/HEAD/C.md' },
+      { provider: 'github', kind: 'doc', title: 'A.md', url: 'https://github.com/acme/web/blob/HEAD/A.md' },
+      { provider: 'github', kind: 'doc', title: 'B.md', url: 'https://github.com/acme/web/blob/HEAD/B.md' },
+      { provider: 'github', kind: 'doc', title: 'C.md', url: 'https://github.com/acme/web/blob/HEAD/C.md' },
       { provider: 'notion', kind: 'doc', title: 'Deploy Runbook', url: 'https://www.notion.so/abc' },
     ]);
   });
