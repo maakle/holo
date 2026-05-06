@@ -87,23 +87,29 @@ export function recordAgentEvent(
     latencyMs,
     metadata,
   } = input;
-  db.insert(schema.mcpInvocations)
-    .values({
-      organizationId,
-      kind,
-      traceId: traceId ?? null,
-      parentId: parentId ?? null,
-      agentIdentity: agentIdentity ?? null,
-      toolName: name,
-      inputJson: inputJson ?? {},
-      outputJson: outputJson ?? null,
-      errorCode: errorCode ?? null,
-      latencyMs: latencyMs ?? 0,
-      metadata: metadata ?? null,
-    })
-    .catch((err: unknown) => {
-      if (onError) onError(err);
-    });
+  try {
+    db.insert(schema.mcpInvocations)
+      .values({
+        organizationId,
+        kind,
+        traceId: traceId ?? null,
+        parentId: parentId ?? null,
+        agentIdentity: agentIdentity ?? null,
+        toolName: name,
+        inputJson: inputJson ?? {},
+        outputJson: outputJson ?? null,
+        errorCode: errorCode ?? null,
+        latencyMs: latencyMs ?? 0,
+        metadata: metadata ?? null,
+      })
+      .catch((err: unknown) => {
+        if (onError) onError(err);
+      });
+  } catch (err) {
+    // Synchronous failures (e.g. DB stub in tests without insert()) are also
+    // non-fatal — agent event logging must never break the caller.
+    if (onError) onError(err);
+  }
 }
 
 /** Variant that awaits the insert and returns the new event id. */

@@ -198,19 +198,34 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
       );
     }
     const modelStart = now();
+    const model = 'claude-sonnet-4-6';
     const response = (await deps.client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model,
       max_tokens: 4096,
       system,
       messages: [...messages] as never,
       tools: anthropicTools as never,
-    })) as { stop_reason: string; content: ContentBlock[] };
+    })) as {
+      stop_reason: string;
+      content: ContentBlock[];
+      usage?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_creation_input_tokens?: number;
+        cache_read_input_tokens?: number;
+      };
+    };
     modelCallCount += 1;
     logEvent('model_call', {
       callIndex: modelCallCount,
+      model,
       durationMs: now() - modelStart,
       stopReason: response.stop_reason,
       elapsedMs: now() - startedAt,
+      inputTokens: response.usage?.input_tokens,
+      outputTokens: response.usage?.output_tokens,
+      cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+      cacheReadInputTokens: response.usage?.cache_read_input_tokens,
     });
 
     messages.push({ role: 'assistant', content: response.content });
@@ -264,6 +279,8 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
         const output = await tool.run(ctx, use.input);
         logEvent('tool_call', {
           tool: use.name,
+          input: use.input,
+          output,
           durationMs: now() - toolStart,
           elapsedMs: now() - startedAt,
         });
@@ -281,6 +298,7 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
         const message = err instanceof Error ? err.message : String(err);
         logEvent('tool_error', {
           tool: use.name,
+          input: use.input,
           durationMs: now() - toolStart,
           elapsedMs: now() - startedAt,
           error: message,
