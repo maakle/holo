@@ -4,27 +4,36 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { DB } from '@holo/db';
-import { schema } from '@holo/db';
 import { HoloError, holoError, ErrorCode } from '@holo/errors';
+import { recordAgentEvent } from '@holo/audit';
+import type { AgentEventKind } from '@holo/db';
 import { listTools, type ToolContext } from './registry.js';
 import { checkToolAllowed } from '../middleware/allowlist.js';
 import type { McpSessionVars } from '../middleware/session.js';
 import { logger } from '../logger.js';
 
-interface InvocationLog {
-  organizationId: string;
-  agentIdentity: string | null;
-  toolName: string;
-  inputJson: Record<string, unknown>;
-  outputJson: Record<string, unknown> | null;
-  errorCode: string | null;
-  latencyMs: number;
-}
-
-function recordInvocation(db: DB, row: InvocationLog): void {
-  db.insert(schema.mcpInvocations)
-    .values(row)
-    .catch((err: unknown) => logger.error({ err }, 'mcp invocation log failed'));
+function logEvent(
+  ctx: ToolContext,
+  args: {
+    kind: AgentEventKind;
+    name: string;
+    inputJson?: Record<string, unknown>;
+    outputJson?: Record<string, unknown> | null;
+    errorCode?: string | null;
+    latencyMs: number;
+    metadata?: Record<string, unknown>;
+  },
+): void {
+  recordAgentEvent(
+    {
+      db: ctx.db,
+      organizationId: ctx.organizationId,
+      agentIdentity: ctx.agentIdentity,
+      traceId: ctx.traceId,
+      ...args,
+    },
+    (err) => logger.error({ err }, 'agent event log failed'),
+  );
 }
 
 export interface MountMcpOpts {
@@ -71,11 +80,9 @@ function buildServer(getCtx: () => ToolContext): Server {
       throw err;
     } finally {
       const latencyMs = Math.round(performance.now() - t0);
-      recordInvocation(ctx.db, {
-        organizationId: ctx.organizationId,
-        agentIdentity: ctx.agentIdentity ?? null,
-        toolName: '__list_tools__',
-        inputJson: {},
+      logEvent(ctx, {
+        kind: 'mcp_list',
+        name: '__list_tools__',
         outputJson: errorCode ? null : { count: tools.length },
         errorCode,
         latencyMs,
@@ -102,12 +109,11 @@ function buildServer(getCtx: () => ToolContext): Server {
         },
         'mcp tool call failed',
       );
-      recordInvocation(ctx.db, {
-        organizationId: ctx.organizationId,
-        agentIdentity: ctx.agentIdentity ?? null,
-        toolName: req.params.name,
+      logEvent(ctx, {
+        kind: 'mcp_call',
+        name: req.params.name,
         inputJson,
-        outputJson: { error: errorMessage } as Record<string, unknown>,
+        outputJson: { error: errorMessage },
         errorCode,
         latencyMs,
       });
@@ -159,13 +165,11 @@ function buildServer(getCtx: () => ToolContext): Server {
         },
         'mcp tool call',
       );
-      recordInvocation(ctx.db, {
-        organizationId: ctx.organizationId,
-        agentIdentity: ctx.agentIdentity ?? null,
-        toolName: req.params.name,
+      logEvent(ctx, {
+        kind: 'mcp_call',
+        name: req.params.name,
         inputJson,
         outputJson: result as Record<string, unknown>,
-        errorCode: null,
         latencyMs,
       });
       return { content: [{ type: 'text', text: JSON.stringify(result) }] };

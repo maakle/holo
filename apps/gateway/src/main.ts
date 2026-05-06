@@ -13,6 +13,8 @@ import { mountSlackEvents } from './slack/events.js';
 import { mountSlackCommands } from './slack/commands.js';
 import { logger } from './logger.js';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function main() {
   const env = parseEnv(process.env);
   await initCrypto();
@@ -155,6 +157,8 @@ async function main() {
       }
 
       const extraSubjects = await getSubjectsForUser(db, user.userId);
+      const sessionId = c.req.header('mcp-session-id');
+      const traceId = sessionId && UUID_RE.test(sessionId) ? sessionId : undefined;
       return {
         db,
         organizationId: user.organizationId,
@@ -167,6 +171,7 @@ async function main() {
         activeToolAllowlist,
         anthropicApiKey: env.ANTHROPIC_API_KEY,
         agentIdentity: user.agentIdentity,
+        traceId,
       };
     },
   });

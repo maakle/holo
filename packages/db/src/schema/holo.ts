@@ -331,6 +331,27 @@ export const skillLabels = pgTable(
   }),
 );
 
+/**
+ * Unified event log for agent activity. Despite the legacy table name,
+ * this stores not just MCP tool calls but every persistable event: LLM
+ * calls, Slack messages, agent steps, etc — discriminated by `kind`.
+ *
+ * Group events by `trace_id` to reconstruct a full interaction (e.g.
+ * one Slack thread → llm_call → tool_call → mcp_call). `parent_id`
+ * captures fine-grained nesting within a trace.
+ */
+export const agentEventKind = [
+  'mcp_call',
+  'mcp_list',
+  'llm_call',
+  'slack_message',
+  'agent_step',
+  'tool_call',
+  'connector_sync',
+  'rest_call',
+] as const;
+export type AgentEventKind = (typeof agentEventKind)[number];
+
 export const mcpInvocations = pgTable(
   'mcp_invocations',
   {
@@ -338,19 +359,36 @@ export const mcpInvocations = pgTable(
     organizationId: uuid('organization_id')
       .notNull()
       .references(() => organization.id),
+    kind: text('kind').notNull().default('mcp_call').$type<AgentEventKind>(),
+    traceId: uuid('trace_id'),
+    parentId: uuid('parent_id'),
     agentIdentity: text('agent_identity'),
     toolName: text('tool_name').notNull(),
     inputJson: jsonb('input_json').$type<Record<string, unknown>>().notNull(),
     outputJson: jsonb('output_json').$type<Record<string, unknown>>(),
     errorCode: text('error_code'),
     latencyMs: integer('latency_ms').notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     orgCreatedIdx: index('mcp_invocations_org_created_idx').on(t.organizationId, t.createdAt),
     orgToolIdx: index('mcp_invocations_org_tool_idx').on(t.organizationId, t.toolName),
+    orgTraceIdx: index('mcp_invocations_org_trace_idx').on(
+      t.organizationId,
+      t.traceId,
+      t.createdAt,
+    ),
+    orgKindCreatedIdx: index('mcp_invocations_org_kind_created_idx').on(
+      t.organizationId,
+      t.kind,
+      t.createdAt,
+    ),
   }),
 );
+
+/** Forward-compatible alias. Prefer this in new code. */
+export const agentEvents = mcpInvocations;
 
 export const apiTokens = pgTable(
   'api_tokens',
