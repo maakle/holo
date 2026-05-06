@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { SignInForm } from '@/components/sign-in-form';
-import { HoloLogo } from '@/components/holo-logo';
+import { HoloLogo } from '@/components/logo';
 
 export default function SignInPage() {
   return (

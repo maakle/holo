@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import { OrgSwitcher, type OrgSummary } from '@/components/org-switcher';
 import { UserMenu } from '@/components/user-menu';
-import { HoloLogo } from '@/components/holo-logo';
+import { HoloLogo } from '@/components/logo';
 
 type NavItem = {
   href: string;

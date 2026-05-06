@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { getServerAuth } from '@/lib/server-context';
-import { HoloLogo } from '@/components/holo-logo';
+import { HoloLogo } from '@/components/logo';
 
 const GITHUB_URL = 'https://github.com/maakle/holo';
 const DOCS_URL = `${GITHUB_URL}#readme`;
