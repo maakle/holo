@@ -44,6 +44,11 @@ const EnvSchema = z.object({
   MCP_PUBLIC_URL: z.url().default('http://localhost:8080'),
   WEB_PUBLIC_URL: z.url().optional(),
   MCP_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
+  /**
+   * Days to retain agent_events (mcp_invocations) before the worker's
+   * retention job prunes them. Set to 0 to disable retention.
+   */
+  OBSERVABILITY_TTL_DAYS: z.coerce.number().int().min(0).default(30),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
