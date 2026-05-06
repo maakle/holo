@@ -31,6 +31,8 @@ export interface RunAgentDeps {
   wallClockMs?: number;
   /** Injected for tests; defaults to Date.now. */
   now?: () => number;
+  /** Optional trace callback; receives one event per model call and per tool call. */
+  logEvent?: (event: 'model_call' | 'tool_call' | 'tool_error', fields: Record<string, unknown>) => void;
 }
 
 export class AgentRunawayError extends Error {
@@ -185,6 +187,8 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
   const now = deps.now ?? Date.now;
   const startedAt = now();
   const sources = new SourceCollector();
+  const logEvent = deps.logEvent ?? (() => {});
+  let modelCallCount = 0;
 
   while (true) {
     if (now() - startedAt > wallClockMs) {
@@ -193,6 +197,7 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
         `agent exceeded wall clock budget (${wallClockMs}ms)`,
       );
     }
+    const modelStart = now();
     const response = (await deps.client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
@@ -200,6 +205,13 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
       messages: [...messages] as never,
       tools: anthropicTools as never,
     })) as { stop_reason: string; content: ContentBlock[] };
+    modelCallCount += 1;
+    logEvent('model_call', {
+      callIndex: modelCallCount,
+      durationMs: now() - modelStart,
+      stopReason: response.stop_reason,
+      elapsedMs: now() - startedAt,
+    });
 
     messages.push({ role: 'assistant', content: response.content });
 
@@ -247,8 +259,14 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
         });
         continue;
       }
+      const toolStart = now();
       try {
         const output = await tool.run(ctx, use.input);
+        logEvent('tool_call', {
+          tool: use.name,
+          durationMs: now() - toolStart,
+          elapsedMs: now() - startedAt,
+        });
         if (use.name === 'search') {
           sources.ingestSearchResult(output);
         } else if (!META_TOOLS.has(use.name)) {
@@ -261,6 +279,12 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        logEvent('tool_error', {
+          tool: use.name,
+          durationMs: now() - toolStart,
+          elapsedMs: now() - startedAt,
+          error: message,
+        });
         toolResults.push({
           type: 'tool_result',
           tool_use_id: use.id,

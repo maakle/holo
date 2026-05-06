@@ -25,6 +25,8 @@ export class SlackBotProcessor extends WorkerHost {
         anthropicApiKey: this.anthropicApiKey,
         logError: (msg, err) =>
           this.logger.error(msg, err instanceof Error ? err.stack : err),
+        logInfo: (msg, fields) =>
+          this.logger.log(fields ? `${msg} ${JSON.stringify(fields)}` : msg),
       });
       if (!result.ok) {
         this.logger.warn(

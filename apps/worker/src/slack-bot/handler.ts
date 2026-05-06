@@ -226,6 +226,7 @@ export interface SlackBotHandlerDeps {
   }) => Promise<AgentResult>;
   anthropicApiKey?: string;
   logError?: (message: string, err?: unknown) => void;
+  logInfo?: (message: string, fields?: Record<string, unknown>) => void;
 }
 
 export async function handleSlackBotJob(
@@ -233,10 +234,23 @@ export async function handleSlackBotJob(
   deps: SlackBotHandlerDeps,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const logError = deps.logError ?? ((msg, err) => console.error(msg, err));
+  const logInfo = deps.logInfo ?? ((msg, fields) => console.log(msg, fields ?? {}));
+  logInfo('slack-bot: job received', {
+    kind: job.kind,
+    teamId: job.teamId,
+    channel: job.channel,
+    asker: job.asker,
+    textPreview: job.text.slice(0, 80),
+  });
   const workspace = await resolveWorkspace(deps.db, job.teamId);
   if (!workspace) {
+    logInfo('slack-bot: workspace not connected', { teamId: job.teamId });
     return { ok: false, reason: 'workspace_not_connected' };
   }
+  logInfo('slack-bot: workspace resolved', {
+    teamId: job.teamId,
+    organizationId: workspace.organizationId,
+  });
 
   const client = createSlackApiClient(workspace.accessToken, deps.fetchImpl);
 
@@ -259,8 +273,16 @@ export async function handleSlackBotJob(
         organizationId: input.organizationId,
         userSubjects: input.userSubjects,
       });
+      logInfo('slack-bot: agent starting', {
+        organizationId: input.organizationId,
+        orgName,
+        toolCount: tools.length,
+        toolNames: tools.map((t) => t.name),
+        questionPreview: input.question.slice(0, 120),
+      });
       const anthropicClient = new Anthropic({ apiKey: deps.anthropicApiKey });
-      return runAgent({
+      const startedAt = Date.now();
+      const result = await runAgent({
         db: input.db,
         organizationId: input.organizationId,
         userSubjects: input.userSubjects,
@@ -268,7 +290,20 @@ export async function handleSlackBotJob(
         client: anthropicClient,
         tools,
         orgName,
+        wallClockMs: 180_000,
+        logEvent: (event, fields) =>
+          logInfo(`slack-bot: agent ${event}`, {
+            organizationId: input.organizationId,
+            ...fields,
+          }),
       });
+      logInfo('slack-bot: agent finished', {
+        organizationId: input.organizationId,
+        durationMs: Date.now() - startedAt,
+        answerLength: result.answer.length,
+        sourceCount: result.sources.length,
+      });
+      return result;
     });
 
   if (job.kind === 'slash_command') {
