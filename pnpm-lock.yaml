@@ -253,6 +253,12 @@ importers:
 
   apps/worker:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.92.0
+        version: 0.92.0(zod@4.4.2)
+      '@holo/agent-tools':
+        specifier: workspace:*
+        version: link:../../packages/agent-tools
       '@holo/connectors':
         specifier: workspace:*
         version: link:../../packages/connectors
