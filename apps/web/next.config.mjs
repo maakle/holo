@@ -2,7 +2,9 @@
 const nextConfig = {
   output: 'standalone',
   typedRoutes: false,
-  allowedDevOrigins: ['omnidirectional-corrinne-nonheroically.ngrok-free.dev'],
+  allowedDevOrigins: [
+    'holo-app.maakle.com',
+  ],
   // Next.js App Router doesn't serve routes from dot-prefixed directories,
   // so the OAuth metadata file lives under /well-known/* and is exposed at
   // its RFC-mandated /.well-known/* path via this rewrite.
