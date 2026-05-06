@@ -48,25 +48,80 @@ Rules:
 - If you cannot find an answer, say so directly — do not invent one.
 - Do not list sources at the end of your answer; the system appends them.`;
 
+type AnthropicTool = { name: string; description: string; input_schema: Record<string, unknown> };
+type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
+type ToolResultBlock = {
+  type: 'tool_result';
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+};
+type Message = { role: 'user' | 'assistant'; content: unknown };
+
 export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
   const system = SYSTEM_PROMPT_TEMPLATE.replace('{org_name}', deps.orgName);
-  const messages: Array<{ role: 'user' | 'assistant'; content: unknown }> = [
-    { role: 'user', content: deps.question },
-  ];
+  const anthropicTools: AnthropicTool[] = deps.tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.inputSchema,
+  }));
+  const toolByName = new Map(deps.tools.map((t) => [t.name, t]));
 
-  const response = await deps.client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    system,
-    messages: messages as never,
-    tools: [] as never,
-  });
+  const ctx = {
+    db: deps.db,
+    organizationId: deps.organizationId,
+    userSubjects: deps.userSubjects,
+  };
 
-  const text = (response.content ?? [])
-    .filter((b: { type: string }) => b.type === 'text')
-    .map((b: { type: string; text?: string }) => b.text ?? '')
-    .join('\n')
-    .trim();
+  const messages: Message[] = [{ role: 'user', content: deps.question }];
 
-  return { answer: text, sources: [] };
+  while (true) {
+    const response = (await deps.client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      system,
+      messages: [...messages] as never,
+      tools: anthropicTools as never,
+    })) as { stop_reason: string; content: ContentBlock[] };
+
+    messages.push({ role: 'assistant', content: response.content });
+
+    if (response.stop_reason === 'end_turn' || response.stop_reason !== 'tool_use') {
+      const text = response.content
+        .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+        .map((b) => b.text)
+        .join('\n')
+        .trim();
+      return { answer: text, sources: [] };
+    }
+
+    const toolUses = response.content.filter(
+      (b): b is { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> } =>
+        b.type === 'tool_use',
+    );
+
+    const toolResults: ToolResultBlock[] = [];
+    for (const use of toolUses) {
+      const tool = toolByName.get(use.name);
+      if (!tool) {
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: use.id,
+          content: `tool ${use.name} not registered`,
+          is_error: true,
+        });
+        continue;
+      }
+      const output = await tool.run(ctx, use.input);
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: use.id,
+        content: JSON.stringify(output),
+      });
+    }
+
+    messages.push({ role: 'user', content: toolResults });
+  }
 }
