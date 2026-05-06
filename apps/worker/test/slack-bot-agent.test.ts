@@ -189,4 +189,29 @@ describe('runAgent', () => {
     expect(toolResult.is_error).toBe(true);
     expect(toolResult.content).toContain('database connection lost');
   });
+
+  it('throws AgentRunawayError when tool call count exceeds maxToolCalls', async () => {
+    const responses = Array.from({ length: 25 }, (_, i) => ({
+      stop_reason: 'tool_use' as const,
+      content: [{ type: 'tool_use' as const, id: `t${i}`, name: 'search', input: { q: 'x' } }],
+    }));
+    const { client } = makeFakeAnthropic(responses);
+
+    const tools: ToolDefinition[] = [
+      { name: 'search', description: '', inputSchema: {}, run: async () => ({ results: [] }) },
+    ];
+
+    await expect(
+      runAgent({
+        db: fakeDb,
+        organizationId: 'org-1',
+        userSubjects: ['org:org-1'],
+        question: 'x?',
+        client,
+        tools,
+        orgName: 'Acme',
+        maxToolCalls: 3,
+      }),
+    ).rejects.toMatchObject({ name: 'AgentRunawayError', reason: 'tool_call_cap' });
+  });
 });

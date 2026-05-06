@@ -76,6 +76,8 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
   };
 
   const messages: Message[] = [{ role: 'user', content: deps.question }];
+  const maxToolCalls = deps.maxToolCalls ?? 20;
+  let toolCallCount = 0;
 
   while (true) {
     const response = (await deps.client.messages.create({
@@ -104,6 +106,13 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
 
     const toolResults: ToolResultBlock[] = [];
     for (const use of toolUses) {
+      toolCallCount += 1;
+      if (toolCallCount > maxToolCalls) {
+        throw new AgentRunawayError(
+          'tool_call_cap',
+          `agent exceeded max tool calls (${maxToolCalls})`,
+        );
+      }
       const tool = toolByName.get(use.name);
       if (!tool) {
         toolResults.push({
