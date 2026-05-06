@@ -103,7 +103,6 @@ export function ConnectorRow({
     };
     window.addEventListener(eventName, handler);
     return () => window.removeEventListener(eventName, handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta.id]);
 
   function connect() {

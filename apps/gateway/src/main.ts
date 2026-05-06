@@ -31,6 +31,23 @@ async function main() {
           : err.code === 'HOLO_CONNECTOR_NOT_IMPLEMENTED'
             ? 501
             : 500;
+      // RFC 9728: a 401 from /mcp must point clients at the protected-resource
+      // metadata so MCP clients (Claude, Cursor) can discover the OAuth
+      // authorization server and start the OAuth flow. Use MCP_PUBLIC_URL —
+      // c.req.url reflects the origin's inner scheme (http behind Cloudflare's
+      // TLS termination), which would send clients to a broken URL.
+      if (
+        status === 401 &&
+        new URL(c.req.url).pathname === '/mcp'
+      ) {
+        const prmUrl = new URL(
+          '/.well-known/oauth-protected-resource',
+          mcpPublicUrl,
+        ).toString();
+        return c.json(err.toJSON(), 401, {
+          'WWW-Authenticate': `Bearer resource_metadata="${prmUrl}"`,
+        });
+      }
       return c.json(err.toJSON(), status);
     }
     logger.error({ err }, 'unhandled gateway error');
@@ -46,16 +63,22 @@ async function main() {
     c.json({ user: c.get('user') }),
   );
 
-  // OAuth 2.1 Authorization Server Metadata (RFC 8414)
+  // OAuth 2.1 Authorization Server Metadata (RFC 8414).
+  // Note: the protected-resource metadata below points clients at the
+  // dashboard as the authorization server, so this gateway-served copy is for
+  // discovery clients that probe the resource origin directly. Endpoint paths
+  // must match what the dashboard actually implements.
   app.get('/.well-known/oauth-authorization-server', (c) =>
     c.json({
       issuer: mcpPublicUrl,
       authorization_endpoint: `${webPublicUrl}/oauth/authorize`,
-      token_endpoint: `${webPublicUrl}/oauth/token`,
+      token_endpoint: `${webPublicUrl}/api/oauth/token`,
+      registration_endpoint: `${webPublicUrl}/api/oauth/register`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],
       token_endpoint_auth_methods_supported: ['none'],
+      scopes_supported: ['search', 'skills:read', 'skills:write'],
     }),
   );
 

@@ -86,7 +86,7 @@ export async function POST(req: Request) {
       resourceId: inserted?.id,
     });
 
-    return NextResponse.json({ token: rawToken, label });
+    return NextResponse.json({ id: inserted?.id, token: rawToken, label });
   } catch (e) {
     if (e instanceof HoloError)
       return NextResponse.json(e.toJSON(), {

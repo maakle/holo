@@ -3,6 +3,17 @@ const nextConfig = {
   output: 'standalone',
   typedRoutes: false,
   allowedDevOrigins: ['omnidirectional-corrinne-nonheroically.ngrok-free.dev'],
+  // Next.js App Router doesn't serve routes from dot-prefixed directories,
+  // so the OAuth metadata file lives under /well-known/* and is exposed at
+  // its RFC-mandated /.well-known/* path via this rewrite.
+  async rewrites() {
+    return [
+      {
+        source: '/.well-known/:path*',
+        destination: '/well-known/:path*',
+      },
+    ];
+  },
   // Native modules (use node-gyp-build / prebuilds) — must NOT be bundled by
   // webpack; load from node_modules at runtime instead.
   serverExternalPackages: [

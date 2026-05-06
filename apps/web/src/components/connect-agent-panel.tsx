@@ -24,10 +24,12 @@ function mcpJsonConfig(mcpUrl: string, token: string): string {
 
 export function ConnectAgentPanel({ mcpUrl }: Props) {
   const [token, setToken] = useState('');
+  const [tokenId, setTokenId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('Cursor');
+  const [lastUsedAt, setLastUsedAt] = useState<string | null>(null);
 
   async function generateToken() {
     setGenerating(true);
@@ -38,9 +40,11 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label: 'agent' }),
       });
-      const data = (await res.json()) as { token?: string; problem?: string };
+      const data = (await res.json()) as { id?: string; token?: string; problem?: string };
       if (res.ok && data.token) {
         setToken(data.token);
+        setTokenId(data.id ?? null);
+        setLastUsedAt(null);
       } else {
         setGenError(data.problem ?? 'Failed to generate token.');
       }
@@ -50,6 +54,26 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
       setGenerating(false);
     }
   }
+
+  // Poll for first MCP request after token generation.
+  useEffect(() => {
+    if (!tokenId || lastUsedAt) return;
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/tokens/${tokenId}/last-used`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { lastUsedAt?: string | null };
+        if (!cancelled && data.lastUsedAt) setLastUsedAt(data.lastUsedAt);
+      } catch {
+        // swallow — keep polling
+      }
+    }, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [tokenId, lastUsedAt]);
 
   function copy(text: string, key: string) {
     navigator.clipboard
@@ -87,9 +111,21 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
 
       {/* Token */}
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-[0.04em] text-gray-500 dark:text-gray-400">
-          API token
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-medium uppercase tracking-[0.04em] text-gray-500 dark:text-gray-400">
+            API token
+          </p>
+          {!token && (
+            <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded">
+              Required
+            </span>
+          )}
+        </div>
+        {!token && (
+          <p className="text-[13px] leading-6 text-gray-600 dark:text-gray-400">
+            Generate a token first — the setup snippets below won&apos;t authenticate without one.
+          </p>
+        )}
         {token ? (
           <div className="rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3 space-y-2">
             <p className="text-xs text-amber-600 dark:text-amber-400">
@@ -117,6 +153,15 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
         )}
       </div>
 
+      {/* Verify */}
+      <VerifySection
+        mcpUrl={mcpUrl}
+        token={token}
+        copied={copied}
+        onCopy={copy}
+        lastUsedAt={lastUsedAt}
+      />
+
       {/* Setup */}
       <div className="space-y-3">
         <p className="text-xs font-medium uppercase tracking-[0.04em] text-gray-500 dark:text-gray-400">
@@ -137,6 +182,22 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
             </button>
           ))}
         </div>
+
+        {!token && activeTab !== 'Slack' && activeTab !== 'Claude' && (
+          <div className="rounded-md border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5 flex gap-3 items-start">
+            <span
+              aria-hidden
+              className="mt-[3px] inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white"
+            >
+              !
+            </span>
+            <div className="text-[13px] leading-6 text-amber-900 dark:text-amber-200">
+              <span className="font-medium">No token generated yet.</span> The snippet below
+              shows <InlineCode>&lt;YOUR_HOLO_TOKEN&gt;</InlineCode> as a placeholder — replace it
+              with a real token, or generate one above to have it filled in automatically.
+            </div>
+          </div>
+        )}
 
         {activeTab === 'Cursor' && (
           <CursorSetup
@@ -159,12 +220,82 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
         )}
         {activeTab === 'Slack' && <SlackSetup />}
 
-        {!token && activeTab !== 'Slack' && (
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            Generate a token above to see it pre-filled below.
-          </p>
-        )}
       </div>
+    </div>
+  );
+}
+
+// --- Verify ----------------------------------------------------------------
+
+function curlVerify(mcpUrl: string, token: string): string {
+  const t = token || '<YOUR_HOLO_TOKEN>';
+  return [
+    `curl -i ${mcpUrl} \\`,
+    `  -H "Authorization: Bearer ${t}" \\`,
+    `  -H "Content-Type: application/json" \\`,
+    `  -H "Accept: application/json, text/event-stream" \\`,
+    `  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl","version":"0"}}}'`,
+  ].join('\n');
+}
+
+function VerifySection({
+  mcpUrl,
+  token,
+  copied,
+  onCopy,
+  lastUsedAt,
+}: {
+  mcpUrl: string;
+  token: string;
+  copied: string | null;
+  onCopy: (text: string, key: string) => void;
+  lastUsedAt: string | null;
+}) {
+  const cmd = curlVerify(mcpUrl, token);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-medium uppercase tracking-[0.04em] text-gray-500 dark:text-gray-400">
+        Verify
+      </p>
+      <p className="text-[13px] leading-6 text-gray-600 dark:text-gray-400">
+        Before wiring up a client, confirm the gateway accepts your token. Paste this into a
+        terminal — we&apos;ll detect the request live and confirm below. A{' '}
+        <InlineCode>200</InlineCode> response with <InlineCode>serverInfo</InlineCode> means
+        you&apos;re good; <InlineCode>401 HOLO_AUTH_NO_SESSION</InlineCode> means the token
+        wasn&apos;t accepted.
+      </p>
+      <Snippet
+        text={cmd}
+        copyKey="verify-curl"
+        copied={copied}
+        onCopy={onCopy}
+        language="curl"
+      />
+      {token && (
+        <VerifyStatus lastUsedAt={lastUsedAt} />
+      )}
+    </div>
+  );
+}
+
+function VerifyStatus({ lastUsedAt }: { lastUsedAt: string | null }) {
+  if (!lastUsedAt) {
+    return (
+      <div className="flex items-center gap-2 text-[13px] text-gray-600 dark:text-gray-400">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+        </span>
+        Waiting for first request from your terminal…
+      </div>
+    );
+  }
+  const when = new Date(lastUsedAt).toLocaleTimeString();
+  return (
+    <div className="flex items-center gap-2 text-[13px] text-emerald-600 dark:text-emerald-400">
+      <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+      ✓ Received request at {when}. Token works — go configure your client.
     </div>
   );
 }
@@ -212,6 +343,25 @@ function Snippet({
         {copied === copyKey ? 'Copied!' : 'Copy'}
       </button>
     </div>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
   );
 }
 
@@ -275,40 +425,92 @@ function ClaudeSetup({
   copied: string | null;
   onCopy: (text: string, key: string) => void;
 }) {
+  const [showManual, setShowManual] = useState(false);
   const config = mcpJsonConfig(mcpUrl, token);
   return (
-    <ol className="space-y-4 list-none">
-      <Step n={1}>
-        Open <InlineCode>Claude → Settings → Developer → Edit Config</InlineCode>. This opens{' '}
-        <InlineCode>claude_desktop_config.json</InlineCode> in your editor.
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          File location:{' '}
-          <InlineCode>~/Library/Application Support/Claude/</InlineCode> (macOS) ·{' '}
-          <InlineCode>%APPDATA%\Claude\</InlineCode> (Windows)
-        </p>
-      </Step>
-      <Step n={2}>
-        Paste this into the file. Merge <InlineCode>holo</InlineCode> into an existing{' '}
-        <InlineCode>mcpServers</InlineCode> block if you have one.
-        <Snippet
-          text={config}
-          copyKey="claude-config"
-          copied={copied}
-          onCopy={onCopy}
-          language="claude_desktop_config.json"
-        />
-      </Step>
-      <Step n={3}>
-        Quit Claude completely and reopen. Look for the{' '}
-        <InlineCode>holo</InlineCode> tools in the &ldquo;Search and tools&rdquo; menu (slider
-        icon, bottom-left of the chat input).
-      </Step>
-      <Step n={4}>
-        Mobile / Claude.ai web: same URL works as a Custom Connector under{' '}
-        <InlineCode>Settings → Connectors → Add custom connector</InlineCode>. Paste the URL
-        above; auth uses the same Bearer token.
-      </Step>
-    </ol>
+    <div className="space-y-4">
+      <div className="rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-[13px] leading-6 text-gray-700 dark:text-gray-300">
+        <span className="font-medium">Recommended.</span> Claude.ai web, mobile, and recent
+        Desktop versions support remote MCP servers via the Custom Connector UI — no JSON
+        editing, no bearer token, OAuth sign-in handled for you.
+      </div>
+      <ol className="space-y-4 list-none">
+        <Step n={1}>
+          In Claude, open <InlineCode>Settings → Connectors → Add custom connector</InlineCode>.
+        </Step>
+        <Step n={2}>
+          Fill in:
+          <ul className="text-[13px] leading-6 space-y-1 ml-1 mt-1">
+            <li>
+              <span className="text-gray-500 dark:text-gray-400">Name:</span>{' '}
+              <InlineCode>holo</InlineCode>
+            </li>
+            <li>
+              <span className="text-gray-500 dark:text-gray-400">Remote MCP server URL:</span>{' '}
+              <InlineCode>{mcpUrl}</InlineCode>
+              <button
+                onClick={() => onCopy(mcpUrl, 'claude-mcp-url')}
+                aria-label="Copy MCP server URL"
+                className="ml-1.5 inline-flex items-center align-middle text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              >
+                {copied === 'claude-mcp-url' ? (
+                  <span className="text-[11px]">Copied!</span>
+                ) : (
+                  <CopyIcon />
+                )}
+              </button>
+            </li>
+          </ul>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Leave OAuth Client ID / Secret blank — holo registers Claude automatically via
+            dynamic client registration.
+          </p>
+        </Step>
+        <Step n={3}>
+          Click <InlineCode>Add</InlineCode>. Claude opens a holo sign-in window — approve, and
+          you&apos;re connected. No API token needed for this path.
+        </Step>
+        <Step n={4}>
+          Enable <InlineCode>holo</InlineCode> from the tool picker (slider icon, bottom of the
+          chat input) and try: &ldquo;use holo to find context for X.&rdquo;
+        </Step>
+      </ol>
+
+      <button
+        onClick={() => setShowManual((v) => !v)}
+        className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+      >
+        {showManual ? '− Hide' : '+ Show'} manual setup (older Claude Desktop, no Connectors UI)
+      </button>
+
+      {showManual && (
+        <ol className="space-y-4 list-none border-l border-gray-200 dark:border-gray-800 pl-4">
+          <Step n={1}>
+            Open <InlineCode>Claude → Settings → Developer → Edit Config</InlineCode>.
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              File location:{' '}
+              <InlineCode>~/Library/Application Support/Claude/</InlineCode> (macOS) ·{' '}
+              <InlineCode>%APPDATA%\Claude\</InlineCode> (Windows)
+            </p>
+          </Step>
+          <Step n={2}>
+            Paste this — uses your bearer token, not OAuth. Merge <InlineCode>holo</InlineCode>{' '}
+            into an existing <InlineCode>mcpServers</InlineCode> block if present.
+            <Snippet
+              text={config}
+              copyKey="claude-config"
+              copied={copied}
+              onCopy={onCopy}
+              language="claude_desktop_config.json"
+            />
+          </Step>
+          <Step n={3}>
+            Quit Claude completely and reopen. The <InlineCode>holo</InlineCode> tools appear in
+            the &ldquo;Search and tools&rdquo; menu.
+          </Step>
+        </ol>
+      )}
+    </div>
   );
 }
 

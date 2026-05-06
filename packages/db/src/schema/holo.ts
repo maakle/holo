@@ -440,9 +440,10 @@ export const oauthClients = pgTable(
   'oauth_clients',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    organizationId: uuid('organization_id')
-      .notNull()
-      .references(() => organization.id),
+    // Nullable: dynamic client registration (RFC 7591) is unauthenticated, so
+    // the org binding only exists once a user authorizes a grant — see
+    // oauth_auth_codes / oauth_access_tokens.
+    organizationId: uuid('organization_id').references(() => organization.id),
     clientId: text('client_id').notNull(),
     clientName: text('client_name').notNull(),
     redirectUris: text('redirect_uris').array().notNull().default(sql`'{}'::text[]`),

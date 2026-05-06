@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
-import { eq } from 'drizzle-orm';
 import { getServerContext } from '@/lib/server-context';
 import { schema } from '@holo/db';
 import { z } from 'zod';
@@ -14,16 +12,13 @@ const registrationSchema = z.object({
   response_types: z.array(z.string()).optional().default(['code']),
 });
 
+// RFC 7591 Dynamic Client Registration — unauthenticated.
+// MCP clients (Claude, Cursor) discover this endpoint via
+// /.well-known/oauth-authorization-server and self-register at "Connect" time.
+// The client row is org-less until a user signs in at /oauth/authorize and
+// approves; auth codes and access tokens carry the per-grant user+org binding.
 export async function POST(req: Request): Promise<Response> {
-  const { db, auth } = await getServerContext();
-
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) {
-    return NextResponse.json(
-      { error: 'unauthorized', error_description: 'Sign in to register an OAuth client.' },
-      { status: 401 },
-    );
-  }
+  const { db } = await getServerContext();
 
   const body = await req.json().catch(() => null);
   if (!body) {
@@ -38,27 +33,10 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  // Resolve organizationId from session.user; fall back to DB lookup if the
-  // additionalFields surface isn't carried through the typed session.
-  const sessionUser = session.user as { id: string; organizationId?: string };
-  let organizationId = sessionUser.organizationId;
-  if (!organizationId) {
-    const rows = await db
-      .select({ organizationId: schema.user.organizationId })
-      .from(schema.user)
-      .where(eq(schema.user.id, sessionUser.id))
-      .limit(1);
-    if (!rows[0]) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-    }
-    organizationId = rows[0].organizationId;
-  }
-
   const clientId = `holo_client_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
   const scopes = parsed.data.scope.split(' ').filter(Boolean);
 
   await db.insert(schema.oauthClients).values({
-    organizationId,
     clientId,
     clientName: parsed.data.client_name,
     redirectUris: parsed.data.redirect_uris,
