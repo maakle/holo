@@ -41,6 +41,12 @@ function deriveSnippetUrl(result: SearchResult): string | undefined {
   if (provider === 'notion' && typeof m['notion_page_id'] === 'string') {
     return `https://www.notion.so/${(m['notion_page_id'] as string).replace(/-/g, '')}`;
   }
+  if (provider === 'grain' && typeof m['recording_id'] === 'string') {
+    return `https://grain.com/recordings/${m['recording_id']}`;
+  }
+  if (provider === 'pylon' && typeof m['ticket_id'] === 'string') {
+    return `https://app.usepylon.com/issues/${m['ticket_id']}`;
+  }
   return undefined;
 }
 
