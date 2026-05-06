@@ -60,6 +60,51 @@ type ToolResultBlock = {
 };
 type Message = { role: 'user' | 'assistant'; content: unknown };
 
+const META_TOOLS = new Set(['list_skills', 'get_skill', 'execute_skill']);
+
+class SourceCollector {
+  private readonly seen = new Set<string>();
+  private readonly entries: Source[] = [];
+  private readonly cap = 8;
+
+  add(source: Source): void {
+    if (this.entries.length >= this.cap) return;
+    if (this.seen.has(source.url)) return;
+    this.seen.add(source.url);
+    this.entries.push(source);
+  }
+
+  ingestSearchResult(output: unknown): void {
+    if (!output || typeof output !== 'object') return;
+    const results = (output as { results?: unknown }).results;
+    if (!Array.isArray(results)) return;
+    for (const r of results.slice(0, 3)) {
+      if (!r || typeof r !== 'object') continue;
+      const url = (r as { snippet_url?: unknown }).snippet_url;
+      const src = (r as { source?: { provider?: unknown; artifact_kind?: unknown } }).source;
+      if (typeof url !== 'string' || !url) continue;
+      const provider = typeof src?.provider === 'string' ? src.provider : 'unknown';
+      const kind = typeof src?.artifact_kind === 'string' ? src.artifact_kind : 'unknown';
+      this.add({ provider, kind, title: `${provider} · ${kind}`, url });
+    }
+  }
+
+  ingestArtifact(toolName: string, output: unknown): void {
+    if (!output || typeof output !== 'object') return;
+    const o = output as Record<string, unknown>;
+    const url = typeof o.url === 'string' ? o.url : undefined;
+    if (!url) return;
+    const provider = typeof o.provider === 'string' ? o.provider : toolName;
+    const kind = typeof o.kind === 'string' ? o.kind : 'artifact';
+    const title = typeof o.title === 'string' ? o.title : `${provider} · ${kind}`;
+    this.add({ provider, kind, title, url });
+  }
+
+  toArray(): Source[] {
+    return this.entries.slice();
+  }
+}
+
 export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
   const system = SYSTEM_PROMPT_TEMPLATE.replace('{org_name}', deps.orgName);
   const anthropicTools: AnthropicTool[] = deps.tools.map((t) => ({
@@ -81,6 +126,7 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
   const wallClockMs = deps.wallClockMs ?? 60_000;
   const now = deps.now ?? Date.now;
   const startedAt = now();
+  const sources = new SourceCollector();
 
   while (true) {
     if (now() - startedAt > wallClockMs) {
@@ -105,7 +151,7 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
         .map((b) => b.text)
         .join('\n')
         .trim();
-      return { answer: text, sources: [] };
+      return { answer: text, sources: sources.toArray() };
     }
 
     const toolUses = response.content.filter(
@@ -134,6 +180,11 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
       }
       try {
         const output = await tool.run(ctx, use.input);
+        if (use.name === 'search') {
+          sources.ingestSearchResult(output);
+        } else if (!META_TOOLS.has(use.name)) {
+          sources.ingestArtifact(use.name, output);
+        }
         toolResults.push({
           type: 'tool_result',
           tool_use_id: use.id,

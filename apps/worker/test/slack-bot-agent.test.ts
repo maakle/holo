@@ -242,4 +242,93 @@ describe('runAgent', () => {
       }),
     ).rejects.toMatchObject({ name: 'AgentRunawayError', reason: 'wall_clock_cap' });
   });
+
+  it('collects sources from search top-3 results and get_* artifact urls', async () => {
+    const { client } = makeFakeAnthropic([
+      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'deploy' } }] },
+      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't2', name: 'get_doc', input: { artifact_id: 'a1' } }] },
+      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Deploys go via Vercel.' }] },
+    ]);
+
+    const tools: ToolDefinition[] = [
+      {
+        name: 'search', description: '', inputSchema: {},
+        run: async () => ({
+          results: [
+            { chunk_id: 'c1', content: 'one', score: 0.9, source: { provider: 'github', artifact_kind: 'doc', metadata: {} }, snippet_url: 'https://github.com/acme/web/blob/HEAD/A.md' },
+            { chunk_id: 'c2', content: 'two', score: 0.8, source: { provider: 'github', artifact_kind: 'doc', metadata: {} }, snippet_url: 'https://github.com/acme/web/blob/HEAD/B.md' },
+            { chunk_id: 'c3', content: 'three', score: 0.7, source: { provider: 'github', artifact_kind: 'doc', metadata: {} }, snippet_url: 'https://github.com/acme/web/blob/HEAD/C.md' },
+            { chunk_id: 'c4', content: 'four', score: 0.6, source: { provider: 'github', artifact_kind: 'doc', metadata: {} }, snippet_url: 'https://github.com/acme/web/blob/HEAD/D.md' },
+          ],
+        }),
+      },
+      {
+        name: 'get_doc', description: '', inputSchema: {},
+        run: async () => ({ provider: 'notion', kind: 'doc', title: 'Deploy Runbook', url: 'https://www.notion.so/abc' }),
+      },
+    ];
+
+    const result = await runAgent({
+      db: fakeDb,
+      organizationId: 'org-1',
+      userSubjects: ['org:org-1'],
+      question: 'how do we deploy?',
+      client,
+      tools,
+      orgName: 'Acme',
+    });
+
+    expect(result.answer).toBe('Deploys go via Vercel.');
+    expect(result.sources).toEqual([
+      { provider: 'github', kind: 'doc', title: 'github · doc', url: 'https://github.com/acme/web/blob/HEAD/A.md' },
+      { provider: 'github', kind: 'doc', title: 'github · doc', url: 'https://github.com/acme/web/blob/HEAD/B.md' },
+      { provider: 'github', kind: 'doc', title: 'github · doc', url: 'https://github.com/acme/web/blob/HEAD/C.md' },
+      { provider: 'notion', kind: 'doc', title: 'Deploy Runbook', url: 'https://www.notion.so/abc' },
+    ]);
+  });
+
+  it('dedupes sources by url and caps at 8', async () => {
+    const dupUrl = 'https://example.com/x';
+    const { client } = makeFakeAnthropic([
+      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: {} }] },
+      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't2', name: 'search', input: {} }] },
+      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] },
+    ]);
+
+    const makeResults = (urls: string[]) => ({
+      results: urls.map((u, i) => ({
+        chunk_id: `c${u}-${i}`,
+        content: '', score: 0.5,
+        source: { provider: 'github', artifact_kind: 'doc', metadata: {} },
+        snippet_url: u,
+      })),
+    });
+
+    let call = 0;
+    const tools: ToolDefinition[] = [
+      {
+        name: 'search', description: '', inputSchema: {},
+        run: async () => {
+          call += 1;
+          if (call === 1) return makeResults([dupUrl, 'https://a', 'https://b']);
+          return makeResults([dupUrl, 'https://c', 'https://d', 'https://e', 'https://f', 'https://g', 'https://h', 'https://i']);
+        },
+      },
+    ];
+
+    const result = await runAgent({
+      db: fakeDb,
+      organizationId: 'org-1',
+      userSubjects: ['org:org-1'],
+      question: '?',
+      client,
+      tools,
+      orgName: 'Acme',
+    });
+
+    expect(result.sources.length).toBeLessThanOrEqual(8);
+    const urls = result.sources.map((s) => s.url);
+    expect(new Set(urls).size).toBe(urls.length);
+    expect(urls[0]).toBe(dupUrl);
+  });
 });
