@@ -146,4 +146,47 @@ describe('runAgent', () => {
     expect(threadRun).toHaveBeenCalledTimes(1);
     expect(create).toHaveBeenCalledTimes(3);
   });
+
+  it('forwards tool runner exceptions as tool_result with is_error: true', async () => {
+    const { client, create } = makeFakeAnthropic([
+      {
+        stop_reason: 'tool_use',
+        content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'x' } }],
+      },
+      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'I could not search.' }] },
+    ]);
+
+    const tools: ToolDefinition[] = [
+      {
+        name: 'search',
+        description: '',
+        inputSchema: {},
+        run: async () => { throw new Error('database connection lost'); },
+      },
+    ];
+
+    const result = await runAgent({
+      db: fakeDb,
+      organizationId: 'org-1',
+      userSubjects: ['org:org-1'],
+      question: 'x?',
+      client,
+      tools,
+      orgName: 'Acme',
+    });
+
+    expect(result.answer).toBe('I could not search.');
+    const secondCallMessages = (create.mock.calls[1][0] as {
+      messages: Array<{ role: string; content: unknown }>;
+    }).messages;
+    const toolResult = (
+      secondCallMessages[secondCallMessages.length - 1].content as Array<{
+        type: string;
+        is_error?: boolean;
+        content: string;
+      }>
+    )[0];
+    expect(toolResult.is_error).toBe(true);
+    expect(toolResult.content).toContain('database connection lost');
+  });
 });

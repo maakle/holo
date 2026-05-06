@@ -114,12 +114,22 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
         });
         continue;
       }
-      const output = await tool.run(ctx, use.input);
-      toolResults.push({
-        type: 'tool_result',
-        tool_use_id: use.id,
-        content: JSON.stringify(output),
-      });
+      try {
+        const output = await tool.run(ctx, use.input);
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: use.id,
+          content: JSON.stringify(output),
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: use.id,
+          content: `tool error: ${message}`,
+          is_error: true,
+        });
+      }
     }
 
     messages.push({ role: 'user', content: toolResults });
