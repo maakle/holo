@@ -42,10 +42,10 @@ function deriveSnippetUrl(result: SearchResult): string | undefined {
     return `https://www.notion.so/${(m['notion_page_id'] as string).replace(/-/g, '')}`;
   }
   if (provider === 'grain' && typeof m['recording_id'] === 'string') {
-    return `https://grain.com/recordings/${m['recording_id']}`;
+    return `https://grain.com/share/recording/${m['recording_id']}`;
   }
-  if (provider === 'pylon' && typeof m['ticket_id'] === 'string') {
-    return `https://app.usepylon.com/issues/${m['ticket_id']}`;
+  if (provider === 'pylon' && typeof m['issue_number'] === 'number') {
+    return `https://app.usepylon.com/issues?issueNumber=${m['issue_number']}`;
   }
   return undefined;
 }

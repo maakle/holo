@@ -65,6 +65,7 @@ export async function runPylonSync(input: RunPylonSyncInput): Promise<RunPylonSy
 
       const ticketInput = {
         ticketId: issue.id,
+        issueNumber: issue.number,
         title: issue.title,
         status: issue.state,
         priority: undefined,

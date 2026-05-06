@@ -10,6 +10,8 @@ export interface PylonMessage {
 
 export interface PylonTicketInput {
   ticketId: string;
+  /** Human-readable issue number used in app URLs (e.g. ?issueNumber=22963). */
+  issueNumber?: number;
   title: string;
   status: string;
   priority?: string;
@@ -36,6 +38,7 @@ export const pylonTicketChunker: Chunker<PylonTicketInput> = {
     const aclSubjects = [`org:${ctx.organizationId}`];
     const baseMetadata = {
       ticket_id: input.ticketId,
+      ...(input.issueNumber !== undefined ? { issue_number: input.issueNumber } : {}),
       title: input.title,
       status: input.status,
       priority: input.priority,
