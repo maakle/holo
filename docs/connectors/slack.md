@@ -89,14 +89,14 @@ In the app's sidebar → **Basic Information** → **App Credentials**:
 
 - **Client ID** → `SLACK_CONNECTOR_CLIENT_ID`
 - **Client Secret** → `SLACK_CONNECTOR_CLIENT_SECRET`
-- **Signing Secret** → `SLACK_SIGNING_SECRET` (required for the @holo bot — events and slash commands are HMAC-verified against this)
+- **Signing Secret** → `SLACK_CONNECTOR_SIGNING_SECRET` (required for the @holo bot — events and slash commands are HMAC-verified against this)
 
 Add all three to `.env.local`:
 
 ```
 SLACK_CONNECTOR_CLIENT_ID=...
 SLACK_CONNECTOR_CLIENT_SECRET=...
-SLACK_SIGNING_SECRET=...
+SLACK_CONNECTOR_SIGNING_SECRET=...
 ```
 
 Restart `apps/web` and `apps/gateway` to pick up the env vars. The Slack card on `/integrations` will flip from "Not connected" to connectable.

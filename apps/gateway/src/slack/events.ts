@@ -41,7 +41,7 @@ interface SlackEventEnvelope {
  * POST /slack/events — Slack pushes every subscribed event here.
  *
  * Three responsibilities, in order:
- *   1. Verify HMAC signature against SLACK_SIGNING_SECRET. Reject otherwise.
+ *   1. Verify HMAC signature against SLACK_CONNECTOR_SIGNING_SECRET. Reject otherwise.
  *      (If the secret is unset on the server, reject everything — failing
  *      closed prevents silently accepting unsigned input.)
  *   2. Handle url_verification handshakes by echoing the challenge.
@@ -55,7 +55,7 @@ export function mountSlackEvents(
 ): void {
   app.post('/slack/events', async (c) => {
     if (!opts.signingSecret) {
-      logger.warn('slack events: SLACK_SIGNING_SECRET unset, rejecting');
+      logger.warn('slack events: SLACK_CONNECTOR_SIGNING_SECRET unset, rejecting');
       return c.json({ error: 'slack signing secret not configured' }, 503);
     }
 

@@ -91,11 +91,11 @@ async function main() {
   // routed through the MCP middleware stack.
   mountSlackEvents(app, {
     db,
-    signingSecret: env.SLACK_SIGNING_SECRET,
+    signingSecret: env.SLACK_CONNECTOR_SIGNING_SECRET,
     redisUrl: env.REDIS_URL,
   });
   mountSlackCommands(app, {
-    signingSecret: env.SLACK_SIGNING_SECRET,
+    signingSecret: env.SLACK_CONNECTOR_SIGNING_SECRET,
     redisUrl: env.REDIS_URL,
   });
 
