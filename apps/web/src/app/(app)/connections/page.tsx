@@ -15,12 +15,12 @@ export default async function ConnectionsPage({
   searchParams: Promise<{ connect_error?: string; connect_fix?: string }>;
 }) {
   const sp = await searchParams;
-  const { auth, db } = await getServerContext();
+  const { auth, db, defaultOrgId } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
   const userId = session.user.id;
-  const orgId = resolveActiveOrgId(session);
+  const orgId = resolveActiveOrgId(session, defaultOrgId);
 
   const credRows = await db
     .select({

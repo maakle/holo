@@ -7,6 +7,14 @@ import { schema, type DB } from '@holo/db';
 // Every API route under apps/web/src/app/api/connectors/[provider]/ validates
 // against SYNC_PROVIDERS — adding a new connector means adding an entry to
 // QUEUE_NAMES_BY_PROVIDER below. The route validators pick it up automatically.
+//
+// Other places that enumerate providers (e.g. /api/connectors/status) MUST
+// import SYNC_PROVIDERS instead of restating the list. A duplicated array
+// drifts and silently drops new connectors out of the bulk-status poll —
+// symptom: the connection wizard's first-sync step flashes "Sync finished —
+// no new content" while the worker is happily indexing, and the dashboard's
+// "Connect → Manage" flip + sync badges never update.
+// See CONTRIBUTING.md § "Adding a connector" for the full registration list.
 export const SYNC_PROVIDERS = [
   'github',
   'slack',

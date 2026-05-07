@@ -31,7 +31,7 @@ export async function fetchLlmsIndex(
     });
   }
   const text = await res.text();
-  return parseLlmsIndex(text);
+  return parseLlmsIndex(text, baseUrl);
 }
 
 /**
@@ -52,8 +52,14 @@ export async function fetchLlmsIndex(
  * We're permissive: ignore lines we don't recognize, accept absolute and
  * site-relative URLs, accept H1/H2/H3 section headers, accept bullets with
  * or without inline descriptions.
+ *
+ * `baseUrl` is used to filter cross-origin links — Mintlify sites often
+ * include changelog/status/community links to external hosts. Without
+ * this filter we'd fetch `<baseUrl><externalPath>.md` and 404 every one
+ * (or hit a TLS handshake failure on the external host's CDN).
  */
-export function parseLlmsIndex(text: string): LlmsIndex {
+export function parseLlmsIndex(text: string, baseUrl?: string): LlmsIndex {
+  const baseHost = baseUrl ? safeHost(baseUrl) : null;
   const lines = text.split(/\r?\n/);
   let title = '';
   let description: string | undefined;
@@ -91,9 +97,7 @@ export function parseLlmsIndex(text: string): LlmsIndex {
     const href = m[2]!.trim();
     const desc = m[3]?.trim();
 
-    // Convert absolute URLs back to a path; skip cross-origin links (mintlify
-    // sometimes links to external docs from the index).
-    const path = toSitePath(href);
+    const path = toSitePath(href, baseHost);
     if (!path) continue;
 
     pages.push({
@@ -111,18 +115,42 @@ export function parseLlmsIndex(text: string): LlmsIndex {
   };
 }
 
-function toSitePath(href: string): string | null {
-  if (href.startsWith('/')) return href;
-  if (href.startsWith('http://') || href.startsWith('https://')) {
+function safeHost(url: string): string | null {
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
+}
+
+function toSitePath(href: string, baseHost: string | null): string | null {
+  let path: string;
+  if (href.startsWith('/')) {
+    path = href;
+  } else if (href.startsWith('http://') || href.startsWith('https://')) {
     try {
       const u = new URL(href);
-      return u.pathname + (u.search ?? '');
+      // Drop cross-origin links — they belong to other hosts (changelog,
+      // status pages, community forums) and aren't part of the docs site.
+      // Fetching them as `<baseUrl><externalPath>.md` 404s at best and
+      // triggers a TLS handshake failure at worst. When baseHost is null
+      // (legacy callers without baseUrl), preserve the old permissive
+      // behavior so existing tests still pass.
+      if (baseHost && u.host !== baseHost) return null;
+      path = u.pathname + (u.search ?? '');
     } catch {
       return null;
     }
+  } else {
+    // Relative paths without a leading `/` — assume site-relative.
+    path = `/${href}`;
   }
-  // Relative paths without a leading `/` — assume site-relative.
-  return `/${href}`;
+  // Some Mintlify sites (e.g. docs.kombo.dev) ship llms.txt with the `.md`
+  // suffix already in the href. Strip it so the path is the canonical
+  // page URL — `fetchPageMarkdown` re-appends `.md` to hit the markdown
+  // twin, and chunks/cursors key off the clean path.
+  if (path.endsWith('.md')) path = path.slice(0, -3);
+  return path;
 }
 
 /** Fetch one page's markdown via the `.md` twin Mintlify auto-publishes. */

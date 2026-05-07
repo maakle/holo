@@ -34,8 +34,6 @@ const EnvSchema = z.object({
    * misconfigured deploy never silently processes unsigned input.
    */
   SLACK_CONNECTOR_SIGNING_SECRET: z.string().optional(),
-  GRAIN_CONNECTOR_CLIENT_ID: z.string().optional(),
-  GRAIN_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   LINEAR_CONNECTOR_CLIENT_ID: z.string().optional(),
   LINEAR_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),

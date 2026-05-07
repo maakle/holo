@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { eq, and } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { iterateArticlesIncremental } from '@holo/connectors';
@@ -16,7 +15,8 @@ import { enqueueInitialSync } from '@/lib/sync-queue';
  * 'https://kombo.zendesk.com'.
  *
  * Validation: probe the public help-center API at
- * `<url>/api/v2/help_center/incremental/articles.json?start_time=0&per_page=1`.
+ * `<url>/api/v2/help_center/articles.json` (the public listing — Zendesk's
+ * `/incremental/...` path requires admin auth even on public help centers).
  * If reachable + parseable, the site is a Zendesk help center we can
  * sync. Persist a sources row keyed on the normalised URL — the framework
  * runtime reads `metadata.baseUrl` via `ctx.sourceMetadata` on each sync.
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
       throw holoError({
         code: ErrorCode.HOLO_FETCH_FAILED,
         problem: status
-          ? `${baseUrl}/api/v2/help_center/incremental/articles.json returned ${status}`
+          ? `${baseUrl}/api/v2/help_center/articles.json returned ${status}`
           : `Couldn't reach Zendesk Help Center API at ${baseUrl}`,
         cause: (err as Error).message,
         fix: 'Verify the URL is a Zendesk-hosted help center (custom domain or *.zendesk.com).',
@@ -102,26 +102,28 @@ export async function POST(req: Request) {
     const userId = session.user.id;
 
     // Singleton connector_credentials row per (org, user). Public surface
-    // so the access-token slot stores an empty string. Reuse if already present.
-    const existing = await db
-      .select({ id: schema.connectorCredentials.id })
-      .from(schema.connectorCredentials)
-      .where(
-        and(
-          eq(schema.connectorCredentials.organizationId, orgId),
-          eq(schema.connectorCredentials.userId, userId),
-          eq(schema.connectorCredentials.provider, 'zendesk'),
-        ),
-      );
-    if (!existing[0]) {
-      await db.insert(schema.connectorCredentials).values({
+    // so the access-token slot stores an empty string. Upsert (not
+    // insert-if-not-exists) so a prior attempt that left a row in any
+    // non-active state — or with a stale token — gets reactivated; otherwise
+    // the connections page filter (`status='active'`) keeps showing
+    // "Not connected" even though the source row is healthy.
+    await db
+      .insert(schema.connectorCredentials)
+      .values({
         organizationId: orgId,
         userId,
         provider: 'zendesk',
         accessToken: '',
         status: 'active',
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.connectorCredentials.organizationId,
+          schema.connectorCredentials.provider,
+          schema.connectorCredentials.userId,
+        ],
+        set: { accessToken: '', status: 'active' },
       });
-    }
 
     const siteName = baseUrl.replace(/^https?:\/\//, '');
     await db

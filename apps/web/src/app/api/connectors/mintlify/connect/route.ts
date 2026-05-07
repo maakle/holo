@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { eq, and } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { fetchLlmsIndex, normalizeBaseUrl } from '@holo/connectors';
@@ -98,26 +97,27 @@ export async function POST(req: Request) {
     const userId = session.user.id;
 
     // One connector_credentials row per (org, user). Public surface so the
-    // token slot stores an empty string. Reuse if already present.
-    const existing = await db
-      .select({ id: schema.connectorCredentials.id })
-      .from(schema.connectorCredentials)
-      .where(
-        and(
-          eq(schema.connectorCredentials.organizationId, orgId),
-          eq(schema.connectorCredentials.userId, userId),
-          eq(schema.connectorCredentials.provider, 'mintlify'),
-        ),
-      );
-    if (!existing[0]) {
-      await db.insert(schema.connectorCredentials).values({
+    // token slot stores an empty string. Upsert so a stale row from a prior
+    // attempt (any non-active status, or a leftover token) gets reactivated;
+    // otherwise the connections page's `status='active'` filter keeps the
+    // row stuck on "Not connected" even after a successful reconnect.
+    await db
+      .insert(schema.connectorCredentials)
+      .values({
         organizationId: orgId,
         userId,
         provider: 'mintlify',
         accessToken: '',
         status: 'active',
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.connectorCredentials.organizationId,
+          schema.connectorCredentials.provider,
+          schema.connectorCredentials.userId,
+        ],
+        set: { accessToken: '', status: 'active' },
       });
-    }
 
     // sources keyed on the URL — multiple sites per org sit side-by-side.
     // The framework's sync runner reads `metadata.baseUrl` via

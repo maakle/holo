@@ -10,10 +10,10 @@ import { StatsSection, StatsSkeleton } from './_components/stats-section';
 import { RecentInvocations, RecentInvocationsSkeleton } from './_components/recent-invocations';
 
 export default async function DashboardPage() {
-  const { auth } = await getServerContext();
+  const { auth, defaultOrgId } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
-  const orgId = resolveActiveOrgId(session);
+  const orgId = resolveActiveOrgId(session, defaultOrgId);
   if (!orgId) redirect('/sign-in');
 
   return (

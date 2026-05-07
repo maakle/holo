@@ -20,11 +20,11 @@ export default async function ObservabilityPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const { auth, db } = await getServerContext();
+  const { auth, db, defaultOrgId } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
-  const orgId = resolveActiveOrgId(session);
+  const orgId = resolveActiveOrgId(session, defaultOrgId);
   if (!orgId) redirect('/sign-in');
 
   const params = await searchParams;
@@ -41,7 +41,7 @@ export default async function ObservabilityPage({
     conditions.push(
       sql`(${schema.mcpInvocations.toolName} ilike ${'%' + query + '%'}
         or ${schema.mcpInvocations.agentIdentity} ilike ${'%' + query + '%'}
-        or ${schema.mcpInvocations.traceId} ilike ${'%' + query + '%'})`,
+        or ${schema.mcpInvocations.traceId}::text ilike ${'%' + query + '%'})`,
     );
   }
 

@@ -196,6 +196,12 @@ export type { PylonSpecOptions } from './spec';
 - **`packages/db/src/schema/holo.ts`** — add the provider id to the
   `connectorCredentials.provider` `text` enum array. **No migration needed**
   — it's a Drizzle TS-enum on a plain text column.
+- **`apps/worker/src/queues/framework-bridge.ts`** — if your spec uses
+  `auth: none()` (public docs / help-center connectors like Mintlify and
+  Zendesk), add the provider id to the no-auth short-circuit in `loadTokens`.
+  Otherwise the runtime will look up `connector_credentials`, see the empty
+  `accessToken: ''` row written by the connect route, treat it as falsy, and
+  throw `HOLO_AUTH_NO_SESSION` on every sync.
 - **OAuth provider:** add a branch to
   `apps/web/src/app/api/connectors/[provider]/initiate/route.ts` and create
   `apps/web/src/app/api/connectors/<x>/callback/route.ts` (model on Linear's).
@@ -257,5 +263,9 @@ The framework (`@holo/connector-framework`) gives every spec these primitives:
   the spec id.
 - **Cursor watermarks should be monotonic.** Track the highest seen
   `updatedAt` across paging and persist that — not the per-page max.
+- **`auth: none()` connectors must be allow-listed in `framework-bridge.ts`.**
+  The bridge's `loadTokens` falls through to `connector_credentials` for
+  unknown providers, and treats an empty `accessToken` as missing. Add the
+  provider to the mintlify/zendesk short-circuit when registering it.
 - **Engagement / sub-resource fetch failures** should be caught and the
   parent record still indexed. Use a `try/catch` around the sub-fetch.

@@ -62,6 +62,15 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
         return { accessToken: token };
       }
 
+      // Mintlify and Zendesk Help Center use the framework's `none()` auth
+      // strategy — public docs/help-center sites with no credential to load.
+      // The per-source baseUrl lives on `sources.metadata` and is read by the
+      // spec directly. Return an empty token so the framework's authHeader
+      // no-op fires.
+      if (providerId === 'mintlify' || providerId === 'zendesk') {
+        return { accessToken: '' };
+      }
+
       const rows = await deps.db
         .select({
           accessToken: schema.connectorCredentials.accessToken,

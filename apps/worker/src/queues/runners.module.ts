@@ -91,16 +91,7 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
         createGenericRunner(githubSpec, deps, { resources: ['code'], shape: 'code' }),
       );
     }
-    setSyncRunner(
-      QUEUE_NAMES.GRAIN_SYNC,
-      createGenericRunner(
-        createGrainSpec({
-          clientId: process.env.GRAIN_CONNECTOR_CLIENT_ID ?? '',
-          clientSecret: process.env.GRAIN_CONNECTOR_CLIENT_SECRET ?? '',
-        }),
-        deps,
-      ),
-    );
+    setSyncRunner(QUEUE_NAMES.GRAIN_SYNC, createGenericRunner(createGrainSpec(), deps));
     setSyncRunner(QUEUE_NAMES.PYLON_SYNC, createGenericRunner(createPylonSpec(), deps));
     setSyncRunner(QUEUE_NAMES.HUBSPOT_SYNC, createGenericRunner(createHubspotSpec(), deps));
     // Linear is the first framework-native connector. createGenericRunner

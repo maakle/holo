@@ -5,9 +5,13 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
-import { activeQueueNames, getQueueByName } from '@/lib/sync-queue';
+import { activeQueueNames, getQueueByName, SYNC_PROVIDERS } from '@/lib/sync-queue';
 
-const PROVIDERS = ['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot'] as const;
+// Drive from sync-queue's source-of-truth list so adding a connector there
+// automatically surfaces in the status poll. Hardcoding here previously left
+// mintlify/linear/zendesk reporting "running=false, chunksIndexed=0" forever
+// — the wizard's first-sync step then mis-fires "no new content" after 4s.
+const PROVIDERS = SYNC_PROVIDERS;
 type Provider = (typeof PROVIDERS)[number];
 
 export type ConnectorSyncStatus = {
@@ -45,14 +49,9 @@ export async function GET() {
     }
     const orgId = resolveActiveOrgId(session, defaultOrgId);
 
-    const statuses: Record<Provider, ConnectorSyncStatus> = {
-      github: emptyStatus(),
-      slack: emptyStatus(),
-      notion: emptyStatus(),
-      grain: emptyStatus(),
-      pylon: emptyStatus(),
-      hubspot: emptyStatus(),
-    };
+    const statuses = Object.fromEntries(
+      PROVIDERS.map((p) => [p, emptyStatus()]),
+    ) as Record<Provider, ConnectorSyncStatus>;
 
     const sourceRows = await db
       .select({ id: schema.sources.id, provider: schema.sources.provider })
@@ -64,14 +63,9 @@ export async function GET() {
     }
 
     const sourceIdToProvider = new Map<string, Provider>();
-    const sourceIdsByProvider: Record<Provider, Set<string>> = {
-      github: new Set(),
-      slack: new Set(),
-      notion: new Set(),
-      grain: new Set(),
-      pylon: new Set(),
-      hubspot: new Set(),
-    };
+    const sourceIdsByProvider = Object.fromEntries(
+      PROVIDERS.map((p) => [p, new Set<string>()]),
+    ) as Record<Provider, Set<string>>;
     const allSourceIds: string[] = [];
     for (const s of sourceRows) {
       const p = s.provider as Provider;

@@ -166,8 +166,8 @@ export async function deleteWorkspace(
   if (!org) {
     return { ok: false, error: 'Workspace not found.' };
   }
-  if (confirmName.trim() !== org.name) {
-    return { ok: false, error: 'Confirmation text does not match the workspace name.' };
+  if (confirmName.trim().toLowerCase() !== 'delete') {
+    return { ok: false, error: 'Type "delete" to confirm.' };
   }
 
   const [me] = await db

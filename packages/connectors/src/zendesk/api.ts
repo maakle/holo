@@ -2,9 +2,11 @@
  * Zendesk Help Center API helpers — built on raw fetch, no Authorization
  * header (public help centers don't need one). Two listing strategies:
  *
- *   1. Incremental export — `/api/v2/help_center/incremental/articles.json
- *      ?start_time=<unix>` returns articles updated AT OR AFTER `start_time`.
- *      This is THE official path for keeping a content index in sync.
+ *   1. Public articles listing — `/api/v2/help_center/articles.json
+ *      ?sort_by=updated_at&sort_order=desc`. Zendesk's `/incremental/...`
+ *      endpoints require admin auth even on publicly-readable help centers,
+ *      so we walk the public listing newest-first and stop once we cross
+ *      the caller's `startTime`. Same incremental behaviour, no token.
  *
  *   2. Sections + categories — `/api/v2/help_center/sections.json` and
  *      `/api/v2/help_center/categories.json`. Fetched once at sync start
@@ -40,9 +42,10 @@ async function fetchJson<T>(url: string, opts: FetchJsonOpts = {}): Promise<T> {
 }
 
 /**
- * Iterate the incremental-articles export, yielding pages until the API
- * stops handing back a `next_page`. `startTime` is a Unix timestamp;
- * pass 0 for a full sweep.
+ * Iterate the public articles listing newest-first, yielding pages until
+ * either Zendesk runs out of `next_page` or we cross `startTime` (Unix
+ * seconds). Pass 0 for a full sweep. Articles older than `startTime` are
+ * filtered out of the final yielded page so the caller sees a clean cutoff.
  */
 export async function* iterateArticlesIncremental(
   baseUrl: string,
@@ -50,10 +53,21 @@ export async function* iterateArticlesIncremental(
   opts: FetchJsonOpts = {},
 ): AsyncGenerator<ZendeskArticlesPage> {
   const root = normalizeBaseUrl(baseUrl);
-  let url: string | null = `${root}/api/v2/help_center/incremental/articles.json?start_time=${startTime}`;
+  let url: string | null =
+    `${root}/api/v2/help_center/articles.json?sort_by=updated_at&sort_order=desc&per_page=100`;
   while (url) {
     const page: ZendeskArticlesPage = await fetchJson(url, opts);
-    yield page;
+    if (startTime > 0) {
+      const fresh = page.articles.filter((a) => {
+        const ts = Math.floor(new Date(a.updated_at).getTime() / 1000);
+        return ts >= startTime;
+      });
+      const reachedCursor = fresh.length < page.articles.length;
+      yield { ...page, articles: fresh, next_page: reachedCursor ? null : page.next_page };
+      if (reachedCursor) return;
+    } else {
+      yield page;
+    }
     url = page.next_page;
   }
 }

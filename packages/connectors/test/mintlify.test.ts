@@ -101,7 +101,7 @@ describe('parseLlmsIndex', () => {
     });
   });
 
-  it('converts absolute URLs back to site-relative paths', () => {
+  it('converts absolute URLs back to site-relative paths (legacy: no baseUrl)', () => {
     const idx = parseLlmsIndex(`
 # X
 
@@ -111,6 +111,39 @@ describe('parseLlmsIndex', () => {
 - [Baz](relative)
 `);
     expect(idx.pages.map((p) => p.path)).toEqual(['/foo', '/external', '/relative']);
+  });
+
+  it('drops cross-origin links when baseUrl is provided', () => {
+    // Real-world example: docs.kombo.dev's llms.txt links to changelog
+    // and status subdomains. Fetching those as <baseUrl><path>.md 404s
+    // at best and TLS-handshake-fails at worst — they belong on other hosts.
+    const idx = parseLlmsIndex(
+      `
+# Site
+
+## Section
+- [Internal](https://docs.example.com/internal)
+- [Changelog](https://changelog.example.com/v1.2)
+- [Status](https://status.example.com/)
+- [Relative](/foo)
+`,
+      'https://docs.example.com',
+    );
+    expect(idx.pages.map((p) => p.path)).toEqual(['/internal', '/foo']);
+  });
+
+  it('strips trailing `.md` from hrefs (Kombo-style llms.txt)', () => {
+    // Some Mintlify sites ship llms.txt with the .md suffix already in the
+    // link target. The path needs to be the canonical page URL so
+    // fetchPageMarkdown can re-append .md without producing /foo.md.md.
+    const idx = parseLlmsIndex(`
+# X
+
+## Section
+- [Foo](https://docs.example.com/foo.md): desc
+- [Bar](/bar.md)
+`);
+    expect(idx.pages.map((p) => p.path)).toEqual(['/foo', '/bar']);
   });
 
   it('returns empty pages list on a doc with no bullets', () => {

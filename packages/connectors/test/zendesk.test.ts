@@ -148,7 +148,7 @@ describe('Zendesk sync — articles', () => {
           next_page: null,
         };
       }
-      if (url.includes('/help_center/incremental/articles.json')) {
+      if (url.includes('/help_center/articles.json')) {
         // Single page response.
         return {
           articles: [
@@ -197,24 +197,37 @@ describe('Zendesk sync — articles', () => {
     const expectedTs = Math.floor(new Date('2026-05-02T10:00:00Z').getTime() / 1000);
     expect(cursor.updatedAt).toBe(expectedTs);
 
-    // Verify the incremental endpoint was called with start_time=0 (no cursor yet).
-    const incremental = calls.find((c) =>
-      c.url.includes('/help_center/incremental/articles.json'),
-    );
-    expect(incremental?.url).toContain('start_time=0');
+    // Verify the public articles endpoint was called sorted newest-first.
+    const articles = calls.find((c) => c.url.includes('/help_center/articles.json'));
+    expect(articles?.url).toContain('sort_by=updated_at');
+    expect(articles?.url).toContain('sort_order=desc');
   });
 
-  it('passes the stored cursor as start_time on incremental syncs', async () => {
-    const { fetchImpl, calls } = makeFetch((url) => {
+  it('stops paging once articles cross the stored cursor', async () => {
+    let articlesPage = 0;
+    const { fetchImpl } = makeFetch((url) => {
       if (url.includes('/sections.json')) return { sections: [], next_page: null };
       if (url.includes('/categories.json')) return { categories: [], next_page: null };
-      if (url.includes('/incremental/articles.json')) {
-        return { articles: [], next_page: null };
+      if (url.includes('/help_center/articles.json')) {
+        articlesPage += 1;
+        if (articlesPage === 1) {
+          return {
+            articles: [
+              // Newer than cursor (2025-01-01 = 1735689600) → kept
+              makeArticle({ id: 1, title: 'Fresh', updatedAt: '2026-05-01T10:00:00Z' }),
+              // Older than cursor → triggers early-exit
+              makeArticle({ id: 2, title: 'Stale', updatedAt: '2024-01-01T10:00:00Z' }),
+            ],
+            next_page: 'https://help.example.com/api/v2/help_center/articles.json?page=2',
+          };
+        }
+        // Should never be hit — we stopped paging.
+        return { articles: [makeArticle({ id: 3, title: 'NeverSeen', updatedAt: '2026-06-01T10:00:00Z' })], next_page: null };
       }
       return null;
     });
     const spec = createZendeskSpec({ fetchImpl });
-    const { stores } = makeStores({
+    const { stores, enqueued } = makeStores({
       cursors: { articles: { updatedAt: 1735689600 } },
       sourceMetadata: { baseUrl: 'https://help.example.com' },
     });
@@ -225,17 +238,15 @@ describe('Zendesk sync — articles', () => {
       sourceId: 's',
       fetchImpl,
     });
-    const incremental = calls.find((c) =>
-      c.url.includes('/incremental/articles.json'),
-    );
-    expect(incremental?.url).toContain('start_time=1735689600');
+    expect(enqueued).toHaveLength(1);
+    expect(articlesPage).toBe(1);
   });
 
   it('skips drafts and outdated articles (no chunks emitted)', async () => {
     const { fetchImpl } = makeFetch((url) => {
       if (url.includes('/sections.json')) return { sections: [], next_page: null };
       if (url.includes('/categories.json')) return { categories: [], next_page: null };
-      if (url.includes('/incremental/articles.json')) {
+      if (url.includes('/help_center/articles.json')) {
         return {
           articles: [
             makeArticle({ id: 1, title: 'Draft', updatedAt: '2026-05-01T10:00:00Z', draft: true }),
@@ -260,17 +271,17 @@ describe('Zendesk sync — articles', () => {
     expect(enqueued).toHaveLength(0);
   });
 
-  it('walks paginated incremental responses (next_page)', async () => {
+  it('walks paginated public-listing responses (next_page)', async () => {
     let articlesPage = 0;
     const { fetchImpl } = makeFetch((url) => {
       if (url.includes('/sections.json')) return { sections: [], next_page: null };
       if (url.includes('/categories.json')) return { categories: [], next_page: null };
-      if (url.includes('/incremental/articles.json')) {
+      if (url.includes('/help_center/articles.json')) {
         articlesPage += 1;
         if (articlesPage === 1) {
           return {
             articles: [makeArticle({ id: 1, title: 'A', updatedAt: '2026-05-01T10:00:00Z' })],
-            next_page: 'https://help.example.com/api/v2/help_center/incremental/articles.json?cursor=p2',
+            next_page: 'https://help.example.com/api/v2/help_center/articles.json?page=2',
           };
         }
         return {

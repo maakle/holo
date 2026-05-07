@@ -62,11 +62,19 @@ const grainConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
     {
-      id: 'install',
-      label: 'Authorize',
+      id: 'apikey',
+      label: 'Token',
       render: (ctx) =>
-        oauthInstallStep(ctx, {
-          installButtonLabel: 'Authorize Grain',
+        apiKeyStep(ctx, {
+          placeholder: 'Grain Workspace Access Token (or PAT for testing)',
+          helpText:
+            "A Workspace Access Token grants Holo read access to every recording in your Grain workspace — that's what you want for full coverage. A Personal Access Token works too (identical wire format) but only sees recordings the issuing user has access to, so use it for testing only.",
+          helpUrl: 'https://grain.com/app/settings/integrations?tab=api',
+          instructions: [
+            'Open grain.com → Settings → Integrations → API. (The "Where do I find this?" link below jumps straight there.)',
+            'Generate a Workspace Access Token (recommended). Only Grain workspace admins can create one. For testing, a Personal Access Token works the same way but only sees your own meetings.',
+            'Copy the token and paste it below. Holo validates it by listing recordings before saving.',
+          ],
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },

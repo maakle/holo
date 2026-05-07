@@ -106,8 +106,20 @@ function FirstSyncStep<TState>({
   const indexedSomething = chunksIndexed > 0;
   const elapsed = Date.now() - startedRef.current;
   const failedRun = latestRun?.state === 'failed' ? latestRun : null;
+  // Only declare "no new content" once the latest run has actually completed.
+  // The previous heuristic (elapsed > 4s + chunksIndexed=0) misfires before
+  // the worker picks the job up — or whenever /status hasn't refreshed yet
+  // — and is what made fresh connects flash "Sync finished — no new content"
+  // while the worker was still indexing.
+  const completedRun =
+    latestRun?.state === 'completed' ? latestRun : null;
   const syncDoneNoIndex =
-    !running && !indexedSomething && !failedRun && elapsed > 4000;
+    !running &&
+    !indexedSomething &&
+    !failedRun &&
+    completedRun !== null &&
+    (completedRun.artifactCount ?? 0) === 0 &&
+    (completedRun.liveArtifactCount ?? 0) === 0;
   // Prefer the connector's own heartbeat over the queue label — "Indexing
   // page 12 of 47" is more useful than "Pulling content from source".
   const stage =
@@ -207,10 +219,17 @@ function FirstSyncStep<TState>({
         </p>
       </div>
       <AlertDialogFooter>
+        {failedRun ? (
+          <Button variant="ghost" onClick={ctx.goPrev}>
+            Back
+          </Button>
+        ) : null}
         <Button variant="primary" onClick={ctx.close}>
-          {indexedSomething || syncDoneNoIndex
-            ? (args.doneLabel ?? 'Done')
-            : 'Close — keep syncing'}
+          {failedRun
+            ? 'Close'
+            : indexedSomething || syncDoneNoIndex
+              ? (args.doneLabel ?? 'Done')
+              : 'Close — keep syncing'}
         </Button>
       </AlertDialogFooter>
     </>

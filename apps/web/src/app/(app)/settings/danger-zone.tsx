@@ -46,7 +46,7 @@ export function DangerZone({
   const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [, formAction, pending] = useActionState(action, INITIAL);
-  const matches = confirmText.trim() === organizationName;
+  const matches = confirmText.trim().toLowerCase() === 'delete';
 
   return (
     <section className="space-y-3">
@@ -79,9 +79,9 @@ export function DangerZone({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="mt-4 space-y-1.5">
-                  <label className="caption text-text-subtle">
+                  <label className="text-[12px] text-text-subtle">
                     Type{' '}
-                    <span className="font-mono text-text">{organizationName}</span>{' '}
+                    <span className="font-mono text-text">delete</span>{' '}
                     to confirm
                   </label>
                   <input

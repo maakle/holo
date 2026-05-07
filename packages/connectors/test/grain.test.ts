@@ -75,8 +75,6 @@ function makeFetch(
   return { fetchImpl: fn, calls };
 }
 
-const opts = { clientId: 'cid', clientSecret: 'csec' };
-
 function makeRecording(partial: { id: string; startedAt: string; title?: string }): unknown {
   return {
     id: partial.id,
@@ -96,68 +94,12 @@ function makeRecording(partial: { id: string; startedAt: string; title?: string 
 
 describe('createGrainSpec', () => {
   it('declares one resource and uses Grain http base url', () => {
-    const spec = createGrainSpec(opts);
+    const spec = createGrainSpec();
     expect(spec.id).toBe('grain');
     expect(spec.http?.baseUrl).toBe('https://api.grain.com');
     expect(spec.resources).toHaveLength(1);
     expect(spec.resources[0]!.id).toBe('recordings');
-    expect(spec.auth.kind).toBe('oauth2');
-    expect(spec.auth.refreshable).toBe(true);
-  });
-
-  it('builds Grain authorize URL with client_id, redirect, state', () => {
-    const spec = createGrainSpec(opts);
-    const url = spec.auth.buildAuthorizeUrl!({
-      redirectUri: 'https://app/cb',
-      state: 'state-jwt',
-    });
-    expect(url).toContain('https://grain.com/_/public-api/oauth2/authorize?');
-    expect(url).toContain('client_id=cid');
-    expect(url).toContain('state=state-jwt');
-    expect(url).toContain('redirect_uri=https%3A%2F%2Fapp%2Fcb');
-  });
-});
-
-describe('Grain OAuth — JSON-encoded token exchange', () => {
-  it('POSTs application/json (not form-urlencoded) at the token endpoint', async () => {
-    const { fetchImpl, calls } = makeFetch((req) => {
-      if (req.url.endsWith('/oauth2/token')) {
-        return jsonResponse({
-          access_token: 'a',
-          refresh_token: 'r',
-          expires_in: 3600,
-        });
-      }
-      return jsonResponse({}, { status: 404 });
-    });
-    const spec = createGrainSpec({ ...opts, fetchImpl });
-    const tokens = await spec.auth.exchangeCode!({
-      code: 'auth-code',
-      redirectUri: 'https://app/cb',
-    });
-    expect(tokens.accessToken).toBe('a');
-    expect(tokens.refreshToken).toBe('r');
-    expect(calls[0]!.headers.get('Content-Type')).toBe('application/json');
-    // Body is parsed JSON (not URL-encoded).
-    expect(calls[0]!.body).toMatchObject({
-      grant_type: 'authorization_code',
-      code: 'auth-code',
-      client_id: 'cid',
-      client_secret: 'csec',
-    });
-  });
-
-  it('refresh() exchanges refresh_token grant via JSON body', async () => {
-    const { fetchImpl, calls } = makeFetch(() =>
-      jsonResponse({ access_token: 'new', refresh_token: 'new-r', expires_in: 3600 }),
-    );
-    const spec = createGrainSpec({ ...opts, fetchImpl });
-    const tokens = await spec.auth.refresh({ refreshToken: 'old-r' });
-    expect(tokens.accessToken).toBe('new');
-    expect(calls[0]!.body).toMatchObject({
-      grant_type: 'refresh_token',
-      refresh_token: 'old-r',
-    });
+    expect(spec.auth.kind).toBe('apiKey');
   });
 });
 
@@ -186,7 +128,7 @@ describe('Grain sync — full sweep', () => {
       ]);
     });
 
-    const spec = createGrainSpec({ ...opts, fetchImpl });
+    const spec = createGrainSpec({ fetchImpl });
     const { stores, enqueued, savedCursors } = makeStores();
 
     const result = await runConnectorSync({
@@ -223,7 +165,7 @@ describe('Grain sync — full sweep', () => {
     const { fetchImpl, calls } = makeFetch(() =>
       jsonResponse({ recordings: [], cursor: null }),
     );
-    const spec = createGrainSpec({ ...opts, fetchImpl });
+    const spec = createGrainSpec({ fetchImpl });
     const { stores } = makeStores();
     await runConnectorSync({
       spec,
@@ -233,6 +175,22 @@ describe('Grain sync — full sweep', () => {
       fetchImpl,
     });
     expect(calls[0]!.headers.get('Public-Api-Version')).toBe('2025-10-31');
+  });
+
+  it('sends Authorization: Bearer <token> on every API call', async () => {
+    const { fetchImpl, calls } = makeFetch(() =>
+      jsonResponse({ recordings: [], cursor: null }),
+    );
+    const spec = createGrainSpec({ fetchImpl });
+    const { stores } = makeStores();
+    await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+    expect(calls[0]!.headers.get('Authorization')).toBe('Bearer grain_test_token');
   });
 
   it('continues indexing the recording when its transcript call fails', async () => {
@@ -247,7 +205,7 @@ describe('Grain sync — full sweep', () => {
       transcriptAttempts += 1;
       return jsonResponse({}, { status: 500 });
     });
-    const spec = createGrainSpec({ ...opts, fetchImpl });
+    const spec = createGrainSpec({ fetchImpl });
     const { stores, enqueued } = makeStores();
     await runConnectorSync({
       spec,
@@ -273,7 +231,7 @@ describe('Grain sync — incremental', () => {
       }
       return jsonResponse([]);
     });
-    const spec = createGrainSpec({ ...opts, fetchImpl });
+    const spec = createGrainSpec({ fetchImpl });
     const { stores } = makeStores({
       cursors: { recordings: { latestStartedAt: '2026-05-04T00:00:00Z' } },
     });
@@ -298,13 +256,11 @@ describe('Grain testConnection', () => {
     const { fetchImpl } = makeFetch(() =>
       jsonResponse({ recordings: [], cursor: null }),
     );
-    const spec = createGrainSpec({ ...opts, fetchImpl });
-    const { createHttpClient, apiKey } = await import('@holo/connector-framework');
+    const spec = createGrainSpec({ fetchImpl });
+    const { createHttpClient } = await import('@holo/connector-framework');
     const api = createHttpClient({
       config: spec.http!,
-      // Use apiKey here so the test doesn't need the OAuth path; only the
-      // Authorization header differs.
-      auth: apiKey({ prefix: 'Bearer ' }),
+      auth: spec.auth,
       tokens: { accessToken: 'g' },
       fetchImpl,
       sleep: async () => {},

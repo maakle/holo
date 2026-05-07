@@ -163,6 +163,10 @@ describe('Linear sync (full)', () => {
     expect(calls[0]!.body?.variables['after']).toBeNull();
     expect(calls[1]!.body?.variables['after']).toBe('cursor-1');
 
+    // First sync (no stored cursor) anchors `since` to the unix epoch — Linear's
+    // `gte: null` filters out every issue, so we substitute an old ISO timestamp.
+    expect(calls[0]!.body?.variables['since']).toBe('1970-01-01T00:00:00.000Z');
+
     // Cursor advances to the highest updatedAt seen.
     expect(result.cursorPatch['issues']).toEqual({ updatedAt: '2026-05-03T10:00:00Z' });
     expect(savedCursors.at(-1)).toEqual({

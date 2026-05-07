@@ -65,7 +65,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     description: 'Meeting recordings + transcripts.',
     category: 'productivity',
     implemented: true,
-    flowType: 'oauth',
+    flowType: 'apikey',
   },
   {
     id: 'pylon',

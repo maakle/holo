@@ -40,7 +40,6 @@ export function ConnectionWizard<TState>({
 
   const [stepIndex, setStepIndex] = useState(initialIndex);
   const [state, setState] = useState<TState>(config.initialState);
-  const [refreshPending, setRefreshPending] = useState(false);
 
   // Persist the active step to sessionStorage so we restore to the same step
   // after any reload (next dev's Fast Refresh hard-reload while the OAuth
@@ -60,10 +59,6 @@ export function ConnectionWizard<TState>({
       sessionStorage.removeItem(`holo:wizard-open:${meta.id}`);
       sessionStorage.removeItem(stepKey);
     }
-    if (refreshPending) {
-      setRefreshPending(false);
-      router.refresh();
-    }
   }
 
   const ctx: WizardContext<TState> = {
@@ -75,14 +70,26 @@ export function ConnectionWizard<TState>({
     goNext: () => setStepIndex((i) => Math.min(i + 1, config.steps.length - 1)),
     goPrev: () => setStepIndex((i) => Math.max(i - 1, 0)),
     close,
-    refreshServer: () => setRefreshPending(true),
+    // Refresh the server-rendered dashboard right away so the row flips from
+    // "Not connected → Connected" the moment the credential row exists,
+    // instead of waiting until the wizard closes. The wizard stays open on
+    // top of the freshly-refreshed page while the first sync runs.
+    refreshServer: () => router.refresh(),
   };
 
   const current = config.steps[stepIndex];
   if (!current) return null;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        // Route every dismissal (escape, outside-click, programmatic) through
+        // close() so sessionStorage is cleared no matter how the user exits.
+        if (!next) close();
+        else onOpenChange(true);
+      }}
+    >
       <AlertDialogContent className="max-w-xl">
         <AlertDialogHeader>
           <AlertDialogTitle>Set up {meta.displayName}</AlertDialogTitle>

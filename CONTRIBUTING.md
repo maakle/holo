@@ -71,6 +71,8 @@ The most common contribution path. Shape:
 
 If you forget step 8, the connector will OAuth and ingest fine in the worker, but the dashboard will show `Use one of: …` instead of sync history — and "Sync now" / "Disconnect" will fail with the same error.
 
+**Don't hardcode another provider list.** The bulk-status poll at [`apps/web/src/app/api/connectors/status/route.ts`](./apps/web/src/app/api/connectors/status/route.ts) used to keep its own hardcoded `PROVIDERS` array; new connectors silently dropped out of the response. Symptom: the connection wizard's first-sync step flashed "Sync finished — no new content" while the worker was actively indexing, and the dashboard's "Connect → Manage" flip + sync badges never updated. The route now derives from `SYNC_PROVIDERS` — keep it that way. If you add another place that needs to enumerate providers, **import `SYNC_PROVIDERS` rather than restating the list.** Every duplicate list is a future "no new content" bug.
+
 ## Adding a skill (v0.5+)
 
 When `packages/skills` lands in v0.5, the contribution path for skills will be:

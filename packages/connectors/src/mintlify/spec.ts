@@ -126,7 +126,19 @@ export function createMintlifySpec(opts: MintlifySpecOptions = {}): ConnectorSpe
               message: `Fetching ${entry.title}`,
             });
 
-            const markdown = await fetchPageMarkdown(baseUrl, entry.path, fetchImpl);
+            // Per-page errors (TLS handshake failures, transient 5xx, DNS
+            // hiccups) shouldn't abort a sync that's already indexed hundreds
+            // of pages. Log + skip; the page will retry on the next
+            // scheduled run since its hash never landed in the cursor.
+            let markdown: string | null;
+            try {
+              markdown = await fetchPageMarkdown(baseUrl, entry.path, fetchImpl);
+            } catch (err) {
+              console.warn(
+                `[mintlify] skipping ${entry.path} after fetch error: ${(err as Error).message}`,
+              );
+              continue;
+            }
             if (!markdown) continue;
 
             const hash = await sha256(markdown);

@@ -78,7 +78,10 @@ export function ObservabilityView({
   }, [selected]);
 
   return (
-    <div className="-mx-6 -my-8 lg:-mx-10 lg:-my-10 flex h-[calc(100vh-56px)] min-h-0">
+    <div
+      data-fullwidth
+      className="-mx-6 -my-8 lg:-mx-10 lg:-my-10 flex h-[calc(100vh-56px)] min-h-0"
+    >
       <FilterRail
         kind={kind}
         status={status}

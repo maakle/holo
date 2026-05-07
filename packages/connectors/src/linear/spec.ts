@@ -82,10 +82,15 @@ export function createLinearSpec(opts: LinearSpecOptions): ConnectorSpec {
               message: `Fetching issues · page ${pageNum}`,
             });
 
+            // Linear's `filter: { updatedAt: { gte: $since } }` returns zero
+            // issues when $since is null — null isn't treated as "no filter".
+            // On first sync (cursor empty) we anchor to the unix epoch so the
+            // filter matches every issue. Incremental syncs pass the stored
+            // ISO timestamp.
             const data: LinearIssuesResponse = await graphql<LinearIssuesResponse>(
               ctx.api,
               ISSUES_QUERY,
-              { after, since: ctx.cursor.updatedAt ?? null },
+              { after, since: ctx.cursor.updatedAt ?? '1970-01-01T00:00:00.000Z' },
             );
 
             for (const issue of data.issues.nodes) {

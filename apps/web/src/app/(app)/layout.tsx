@@ -9,7 +9,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AppTopbar } from '@/components/app-topbar';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const { auth, db } = await getServerContext();
+  const { auth, db, defaultOrgId } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
@@ -23,7 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     .innerJoin(schema.organization, eq(schema.member.organizationId, schema.organization.id))
     .where(eq(schema.member.userId, session.user.id));
 
-  const activeOrgId = resolveActiveOrgId(session);
+  const activeOrgId = resolveActiveOrgId(session, defaultOrgId);
 
   return (
     <div className="flex h-screen bg-bg text-text">
@@ -36,7 +36,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppTopbar />
         <main className="min-h-0 flex-1 overflow-y-auto px-6 py-8 lg:px-10 lg:py-10">
-          <div className="mx-auto w-full max-w-[1280px]">{children}</div>
+          <div className="mx-auto w-full max-w-[1280px] [&:has([data-fullwidth])]:max-w-none">{children}</div>
         </main>
       </div>
     </div>

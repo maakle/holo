@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
+  apiKey,
   defineConnector,
-  oauth2,
   type ConnectorSpec,
   type ResourceSyncContext,
   type TestConnectionContext,
@@ -11,9 +11,7 @@ import { listRecordings } from './api';
 import { processRecording } from './chunking';
 
 export interface GrainSpecOptions {
-  clientId: string;
-  clientSecret: string;
-  /** Override fetch (tests). Threads through both the auth strategy and the runtime client. */
+  /** Override fetch (tests). */
   fetchImpl?: typeof fetch;
 }
 
@@ -26,22 +24,16 @@ const recordingsCursorSchema = z
 
 type RecordingsCursor = z.infer<typeof recordingsCursorSchema>;
 
-export function createGrainSpec(opts: GrainSpecOptions): ConnectorSpec {
+export function createGrainSpec(_opts: GrainSpecOptions = {}): ConnectorSpec {
   return defineConnector({
     id: 'grain',
     displayName: 'Grain',
 
-    auth: oauth2({
-      clientId: opts.clientId,
-      clientSecret: opts.clientSecret,
-      authorizeUrl: 'https://grain.com/_/public-api/oauth2/authorize',
-      tokenUrl: 'https://api.grain.com/_/public-api/oauth2/token',
-      scopes: [],
-      refreshable: true,
-      // Grain diverges from RFC 6749 by accepting JSON-encoded token bodies.
-      bodyEncoding: 'json',
-      fetchImpl: opts.fetchImpl,
-    }),
+    // Workspace Access Tokens see every recording in the Grain workspace;
+    // Personal Access Tokens are scoped to the issuing user. The wire format
+    // is identical (`Authorization: Bearer <token>`) so both work here — the
+    // wizard guides the operator toward a WAT for full coverage.
+    auth: apiKey({ prefix: 'Bearer ' }),
 
     http: {
       baseUrl: 'https://api.grain.com',
