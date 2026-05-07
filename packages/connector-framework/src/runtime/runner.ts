@@ -27,6 +27,13 @@ export interface RunConnectorSyncInput extends SyncJobInput {
   batchSize?: number;
   /** Override fetch (tests). */
   fetchImpl?: typeof fetch;
+  /**
+   * Run only these resource ids (in spec declaration order). When omitted
+   * every resource on the spec runs. Used by hosts that map one spec across
+   * multiple queues (e.g. GitHub: prose-queue runs `prose`, code-queue runs
+   * `code`).
+   */
+  resources?: ReadonlyArray<string>;
 }
 
 function chunkHash(kind: string, content: string): string {
@@ -78,7 +85,10 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
   const cursorPatch: Record<string, unknown> = {};
   const emptyResources: string[] = [];
 
+  const resourceFilter = input.resources ? new Set(input.resources) : null;
+
   for (const resource of spec.resources) {
+    if (resourceFilter && !resourceFilter.has(resource.id)) continue;
     input.signal?.throwIfAborted();
     const before = artifactCount;
 

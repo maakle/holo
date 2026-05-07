@@ -26,6 +26,7 @@ import {
   type ConnectorTokens,
   type RuntimeStores,
 } from '@holo/connector-framework';
+import { loadGithubInstallationToken, githubAppConfigFromEnv } from '@holo/connectors';
 import type { SyncRunner, SyncResult } from './sync-dispatch';
 import type { SyncJobPayload } from './types';
 import type { EmbedJobPayload, ChunkInsertPayload } from './embed-insert';
@@ -44,6 +45,23 @@ export interface GenericRunnerDeps {
 export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
   return {
     async loadTokens({ organizationId, providerId }): Promise<ConnectorTokens> {
+      // GitHub auth lives in `github_installations`, not `connector_credentials` —
+      // we mint a fresh installation access token on every sync via the App's
+      // private key. The framework spec sees this as `tokens.accessToken` and
+      // doesn't need to know about the installation flow.
+      if (providerId === 'github') {
+        const config = githubAppConfigFromEnv({
+          GITHUB_APP_ID: process.env.GITHUB_APP_ID,
+          GITHUB_APP_PRIVATE_KEY_B64: process.env.GITHUB_APP_PRIVATE_KEY_B64,
+        });
+        const { token } = await loadGithubInstallationToken({
+          db: deps.db,
+          organizationId,
+          config,
+        });
+        return { accessToken: token };
+      }
+
       const rows = await deps.db
         .select({
           accessToken: schema.connectorCredentials.accessToken,
@@ -210,18 +228,34 @@ function toChunkInsertPayload(c: ChunkRecord): ChunkInsertPayload {
  * not at the runner level. This collapses the per-connector runners
  * (createSlackRunner, createNotionRunner, etc.) into one generic call site.
  */
+export interface CreateGenericRunnerOptions {
+  /**
+   * Run only these resource ids. Used by hosts that map one spec across
+   * multiple BullMQ queues (e.g. GitHub: github-prose-sync runs `prose`,
+   * github-code-sync runs `code`). When omitted, every resource runs.
+   */
+  resources?: ReadonlyArray<string>;
+  /** Optional adapter for the github-code-sync queue's `codeInitial`/`codeIncremental` methods. */
+  shape?: 'standard' | 'code';
+}
+
 export function createGenericRunner(
   spec: ConnectorSpec,
   deps: GenericRunnerDeps,
+  opts: CreateGenericRunnerOptions = {},
 ): SyncRunner {
   const stores = createRuntimeStores(deps);
-  const run = async (payload: SyncJobPayload, opts?: { signal?: AbortSignal }): Promise<SyncResult> => {
+  const run = async (
+    payload: SyncJobPayload,
+    runOpts?: { signal?: AbortSignal },
+  ): Promise<SyncResult> => {
     const result = await runConnectorSync({
       spec,
       stores,
       organizationId: payload.organizationId,
       sourceId: payload.sourceId,
-      signal: opts?.signal,
+      signal: runOpts?.signal,
+      resources: opts.resources,
     });
     return {
       artifactCount: result.artifactCount,
@@ -236,8 +270,18 @@ export function createGenericRunner(
     };
   };
 
+  // The dispatcher selects between full/incremental and codeInitial/codeIncremental
+  // based on the queue. For the github-code-sync queue we expose the code-*
+  // methods; for everything else, full + incremental. Both delegate to `run`
+  // since the framework runtime decides per-resource what to do.
+  if (opts.shape === 'code') {
+    return {
+      codeInitial: (payload, runOpts) => run(payload, runOpts),
+      codeIncremental: (payload, _cursor, runOpts) => run(payload, runOpts),
+    };
+  }
   return {
-    full: (payload, opts) => run(payload, opts),
-    incremental: (payload, _cursor, opts) => run(payload, opts),
+    full: (payload, runOpts) => run(payload, runOpts),
+    incremental: (payload, _cursor, runOpts) => run(payload, runOpts),
   };
 }

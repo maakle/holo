@@ -9,7 +9,7 @@ import type {
   GithubApiClient,
   GithubPrReview,
   GithubPrReviewComment,
-} from './api-client';
+} from './api';
 import type { SyncLogger } from './sync-code';
 
 const BATCH_SIZE = 50;
