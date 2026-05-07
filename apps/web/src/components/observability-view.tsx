@@ -386,7 +386,7 @@ function LogTable({
           borderColor: 'var(--border)',
           color: 'var(--text-subtle)',
           background: 'var(--bg)',
-          gridTemplateColumns: '180px 60px 1fr 80px 1fr',
+          gridTemplateColumns: '180px 180px 1fr 80px 1fr',
           columnGap: '16px',
         }}
       >
@@ -437,12 +437,8 @@ function LogRow({
       <span style={{ color: 'var(--text-subtle)' }}>
         {formatTime(event.createdAt)}
       </span>
-      <span
-        style={{
-          color: hasError ? 'var(--error)' : 'var(--success)',
-        }}
-      >
-        {hasError ? event.errorCode ?? 'error' : 'ok'}
+      <span className="min-w-0">
+        <StatusTag hasError={hasError} code={event.errorCode} />
       </span>
       <span className="truncate" style={{ color: 'var(--text-muted)' }}>
         {event.agentIdentity ?? '—'}
@@ -457,6 +453,31 @@ function LogRow({
         </span>
       </span>
     </button>
+  );
+}
+
+function StatusTag({
+  hasError,
+  code,
+}: {
+  hasError: boolean;
+  code?: string | null;
+}) {
+  const label = hasError ? code ?? 'error' : 'ok';
+  const tone = hasError ? 'var(--error)' : 'var(--success)';
+  return (
+    <span
+      className="inline-flex max-w-full items-center truncate rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.04em]"
+      title={label}
+      style={{
+        background: hasError
+          ? 'color-mix(in srgb, var(--error) 12%, transparent)'
+          : 'color-mix(in srgb, var(--success) 12%, transparent)',
+        color: tone,
+      }}
+    >
+      {label}
+    </span>
   );
 }
 
