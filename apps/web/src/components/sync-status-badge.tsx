@@ -22,15 +22,10 @@ export function SyncStatusBadge({ provider }: Props) {
 
   if (!status.running) return null;
 
-  const counter =
-    status.embedQueued > 0
-      ? `${status.chunksIndexed.toLocaleString()} indexed · ${status.embedQueued.toLocaleString()} queued`
-      : `${status.chunksIndexed.toLocaleString()} indexed`;
-
   return (
     <Badge variant="neutral" className="gap-1.5">
       <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-      Syncing… <span className="text-text-muted/80">{counter}</span>
+      Syncing…
     </Badge>
   );
 }

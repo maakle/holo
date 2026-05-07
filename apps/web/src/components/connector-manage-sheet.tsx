@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 import { useConnectorStatus } from '@/lib/connectors-status-store';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
@@ -261,6 +262,19 @@ export function ConnectorManageSheet({
                 </Button>
               </div>
             </div>
+
+            {running ? (
+              <div className="flex items-center gap-2 text-[12px] text-text-muted [font-variant-numeric:tabular-nums]">
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                <span>Syncing…</span>
+                <span>
+                  {status.chunksIndexed.toLocaleString()} indexed
+                  {status.embedQueued > 0
+                    ? ` · ${status.embedQueued.toLocaleString()} queued`
+                    : ''}
+                </span>
+              </div>
+            ) : null}
 
             <AlertDialog open={confirmingDisconnect} onOpenChange={setConfirmingDisconnect}>
               <AlertDialogContent>
