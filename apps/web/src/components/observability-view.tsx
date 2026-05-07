@@ -437,7 +437,7 @@ function LogRow({
       <span style={{ color: 'var(--text-subtle)' }}>
         {formatTime(event.createdAt)}
       </span>
-      <span className="min-w-0">
+      <span className="flex min-w-0 items-center">
         <StatusTag hasError={hasError} code={event.errorCode} />
       </span>
       <span className="truncate" style={{ color: 'var(--text-muted)' }}>
@@ -467,7 +467,7 @@ function StatusTag({
   const tone = hasError ? 'var(--error)' : 'var(--success)';
   return (
     <span
-      className="inline-flex max-w-full items-center truncate rounded-sm px-1.5 py-px font-mono text-[10px] font-medium uppercase leading-[14px] tracking-[0.04em]"
+      className="inline-flex h-[18px] max-w-full items-center overflow-hidden whitespace-nowrap rounded-sm px-1.5 font-mono text-[10px] font-medium uppercase leading-none tracking-[0.04em]"
       title={label}
       style={{
         background: hasError
