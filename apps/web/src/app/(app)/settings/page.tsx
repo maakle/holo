@@ -6,6 +6,7 @@ import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { ApiTokens } from './api-tokens';
 import { DangerZone } from './danger-zone';
+import { Preferences } from './preferences';
 import { WorkspaceDetails } from './workspace-details';
 
 export const dynamic = 'force-dynamic';
@@ -23,11 +24,16 @@ export default async function SettingsPage() {
       id: schema.organization.id,
       name: schema.organization.name,
       slug: schema.organization.slug,
+      metadata: schema.organization.metadata,
     })
     .from(schema.organization)
     .where(eq(schema.organization.id, orgId))
     .limit(1);
   if (!org) redirect('/dashboard');
+
+  const hideSampleData = Boolean(
+    (org.metadata as { hideSampleData?: boolean } | null)?.hideSampleData,
+  );
 
   const [me] = await db
     .select({ role: schema.member.role })
@@ -62,6 +68,15 @@ export default async function SettingsPage() {
           role={me?.role ?? '—'}
           isOwner={isOwner}
           isDefaultOrg={isDefaultOrg}
+        />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-[15px] font-medium">Preferences</h2>
+        <Preferences
+          organizationId={org.id}
+          hideSampleData={hideSampleData}
+          isOwner={isOwner}
         />
       </section>
 

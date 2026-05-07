@@ -24,6 +24,7 @@ export type AuditEventType =
   | 'oauth.code_authorized'
   | 'workspace.deleted'
   | 'workspace.updated'
+  | 'workspace.preferences.updated'
   | 'sample_data.installed'
   | 'sample_data.removed';
 

@@ -23,6 +23,15 @@ export default async function ConnectionsPage({
   const userId = session.user.id;
   const orgId = resolveActiveOrgId(session, defaultOrgId);
 
+  const [orgRow] = await db
+    .select({ metadata: schema.organization.metadata })
+    .from(schema.organization)
+    .where(eq(schema.organization.id, orgId))
+    .limit(1);
+  const hideSampleData = Boolean(
+    (orgRow?.metadata as { hideSampleData?: boolean } | null)?.hideSampleData,
+  );
+
   const credRows = await db
     .select({
       provider: schema.connectorCredentials.provider,
@@ -81,7 +90,9 @@ export default async function ConnectionsPage({
     }
   }
 
-  const sampleStatus = await getSampleDataStatus(db, orgId);
+  const sampleStatus = hideSampleData
+    ? { active: false, artifactCount: 0 }
+    : await getSampleDataStatus(db, orgId);
 
   const allowlistRows = await db
     .select({
@@ -130,10 +141,6 @@ export default async function ConnectionsPage({
       {sp.connect_error ? (
         <ConnectErrorBanner code={sp.connect_error} fix={sp.connect_fix} />
       ) : null}
-      <SampleConnectorRow
-        installed={sampleStatus.active}
-        artifactCount={sampleStatus.artifactCount}
-      />
       <SlackOnboardingTrigger
         slackConnected={Boolean(connected.get('slack'))}
         slackAllowlistEmpty={(allowlistByProvider.get('slack') ?? []).length === 0}
@@ -143,6 +150,14 @@ export default async function ConnectionsPage({
         <nav className="hidden md:block">
           <div className="sticky top-6 flex flex-col gap-1">
             <span className="caption mb-2 text-text-subtle">Categories</span>
+            {!hideSampleData ? (
+              <a
+                href="#cat-sample"
+                className="text-[13px] leading-6 text-text-muted transition-colors duration-micro hover:text-text"
+              >
+                Sample data
+              </a>
+            ) : null}
             {CONNECTOR_CATEGORIES.filter((c) =>
               CONNECTORS.some((m) => m.category === c.id),
             ).map((cat) => (
@@ -158,6 +173,12 @@ export default async function ConnectionsPage({
         </nav>
 
         <div className="flex flex-col gap-8">
+          {!hideSampleData ? (
+            <SampleConnectorRow
+              installed={sampleStatus.active}
+              artifactCount={sampleStatus.artifactCount}
+            />
+          ) : null}
           {CONNECTOR_CATEGORIES.map((cat) => {
             const items = CONNECTORS.filter((m) => m.category === cat.id);
             if (items.length === 0) return null;

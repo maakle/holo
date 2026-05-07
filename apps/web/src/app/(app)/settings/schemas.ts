@@ -28,3 +28,9 @@ export const updateWorkspaceSchema = z.object({
   value: z.string(),
 });
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
+
+export const updateOrgPreferencesSchema = z.object({
+  organizationId: z.string().uuid({ message: 'Invalid workspace id.' }),
+  hideSampleData: z.boolean(),
+});
+export type UpdateOrgPreferencesInput = z.infer<typeof updateOrgPreferencesSchema>;
