@@ -11,7 +11,8 @@ type Provider =
   | 'pylon'
   | 'hubspot'
   | 'linear'
-  | 'mintlify';
+  | 'mintlify'
+  | 'zendesk';
 
 const QUEUE_NAMES_BY_PROVIDER: Record<Provider, string[]> = {
   github: ['github-code-sync', 'github-prose-sync'],
@@ -22,6 +23,7 @@ const QUEUE_NAMES_BY_PROVIDER: Record<Provider, string[]> = {
   hubspot: ['hubspot-sync'],
   linear: ['linear-sync'],
   mintlify: ['mintlify-sync'],
+  zendesk: ['zendesk-sync'],
 };
 
 function parseRedisUrl(url: string): { host: string; port: number } {

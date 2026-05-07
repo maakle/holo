@@ -30,6 +30,7 @@ const registry: Record<string, SyncRunner> = {
   'hubspot-sync': stubRunner('hubspot'),
   'linear-sync': stubRunner('linear'),
   'mintlify-sync': stubRunner('mintlify'),
+  'zendesk-sync': stubRunner('zendesk'),
 };
 
 export function getSyncRunner(queue: string): SyncRunner {

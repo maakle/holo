@@ -55,6 +55,19 @@ export type {
   LlmsIndex,
   LlmsIndexEntry,
 } from './mintlify/index';
+export {
+  createZendeskSpec,
+  iterateArticlesIncremental,
+  fetchAllSections as fetchAllZendeskSections,
+  fetchAllCategories as fetchAllZendeskCategories,
+} from './zendesk/index';
+export type {
+  ZendeskSpecOptions,
+  ZendeskArticle,
+  ZendeskSection,
+  ZendeskCategory,
+  ZendeskArticlesPage,
+} from './zendesk/index';
 
 // GitHub (framework-native spec + retained helpers for the bot, gateway,
 // install/uninstall flow, and the webhook receiver). All re-exported via

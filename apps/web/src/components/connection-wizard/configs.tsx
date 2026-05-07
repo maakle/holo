@@ -189,6 +189,28 @@ const mintlifyConfig: ConnectorWizardConfig = {
   ],
 };
 
+const zendeskConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'apikey',
+      label: 'Help center URL',
+      render: (ctx) =>
+        apiKeyStep(ctx, {
+          placeholder: 'https://help.example.com',
+          helpText:
+            'Paste the root URL of any public Zendesk help center. Holo ingests articles via Zendesk’s public Help Center API — no API token needed for public help centers.',
+          instructions: [
+            'Find the help-center root, e.g. https://help.kombo.dev or https://kombo.zendesk.com.',
+            'Paste it below — the path (/hc/en-us, /...) is ignored, just the host.',
+            'Connect again later to add more help centers; each one syncs independently.',
+          ],
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 // Registry holds heterogeneous configs (each connector has its own state
 // shape). Consumers don't introspect the state from the outside — they hand
 // the config to <ConnectionWizard> which threads the type through.
@@ -202,6 +224,7 @@ const REGISTRY: Record<ConnectorMeta['id'], ConnectorWizardConfig<any>> = {
   pylon: pylonConfig,
   linear: linearConfig,
   mintlify: mintlifyConfig,
+  zendesk: zendeskConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
