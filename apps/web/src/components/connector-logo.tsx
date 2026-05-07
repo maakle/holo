@@ -13,6 +13,7 @@ const FILE_BY_ID: Record<ConnectorMeta['id'], string> = {
   grain: '/connectors/grain.webp',
   pylon: '/connectors/usepylon.webp',
   hubspot: '/connectors/hubspot.webp',
+  linear: '/connectors/linear.webp',
 };
 
 export function ConnectorLogo({ id, className }: Props) {

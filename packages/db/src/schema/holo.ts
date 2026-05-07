@@ -33,7 +33,7 @@ export const connectorCredentials = pgTable(
       .notNull()
       .references(() => user.id),
     provider: text('provider', {
-      enum: ['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot'],
+      enum: ['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot', 'linear'],
     }).notNull(),
     accessToken: encryptedText('access_token'),
     refreshToken: encryptedText('refresh_token'),

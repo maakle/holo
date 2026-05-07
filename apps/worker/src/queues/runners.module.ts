@@ -14,6 +14,8 @@ import {
   createPylonRunner,
   createHubspotRunner,
 } from './runners';
+import { createGenericRunner } from './framework-bridge';
+import { createLinearSpec } from '@holo/connectors';
 import { setSyncRunner } from './sync-runner-registry';
 import { reconcileOrphanedRuns } from './sync-runs-store';
 import type { EmbedJobPayload } from './embed-insert';
@@ -56,8 +58,25 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     setSyncRunner(QUEUE_NAMES.GRAIN_SYNC, createGrainRunner(deps));
     setSyncRunner(QUEUE_NAMES.PYLON_SYNC, createPylonRunner(deps));
     setSyncRunner(QUEUE_NAMES.HUBSPOT_SYNC, createHubspotRunner(deps));
+    // Linear is the first framework-native connector. createGenericRunner
+    // turns any ConnectorSpec into a SyncRunner via the framework's
+    // runConnectorSync + a Drizzle-backed RuntimeStores in framework-bridge.
+    // OAuth credentials are present at boot only when the env vars are set;
+    // we still register the spec so the queue exists either way (a sync job
+    // will fail with NOT_IMPLEMENTED if creds are missing, matching how the
+    // other OAuth runners behave).
+    setSyncRunner(
+      QUEUE_NAMES.LINEAR_SYNC,
+      createGenericRunner(
+        createLinearSpec({
+          clientId: process.env.LINEAR_CONNECTOR_CLIENT_ID ?? '',
+          clientSecret: process.env.LINEAR_CONNECTOR_CLIENT_SECRET ?? '',
+        }),
+        deps,
+      ),
+    );
     this.logger.log(
-      'Registered real SyncRunners for slack, notion, github-prose, github-code, grain, pylon, hubspot',
+      'Registered real SyncRunners for slack, notion, github-prose, github-code, grain, pylon, hubspot, linear',
     );
 
     // Reap any 'running' rows the previous worker incarnation left behind

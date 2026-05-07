@@ -6,6 +6,7 @@ export const QUEUE_NAMES = {
   GRAIN_SYNC: 'grain-sync',
   PYLON_SYNC: 'pylon-sync',
   HUBSPOT_SYNC: 'hubspot-sync',
+  LINEAR_SYNC: 'linear-sync',
   EMBED: 'embed',
 } as const;
 
@@ -19,6 +20,7 @@ export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   'grain-sync': 2,
   'pylon-sync': 2,
   'hubspot-sync': 2,
+  'linear-sync': 2,
   embed: 5,
 };
 
