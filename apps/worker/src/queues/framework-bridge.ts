@@ -225,8 +225,9 @@ function toChunkInsertPayload(c: ChunkRecord): ChunkInsertPayload {
  * Single SyncRunner factory for any framework spec. Both `full` and
  * `incremental` invoke runConnectorSync — full vs. incremental decisions
  * live in each resource's cursor (presence of fields like `updatedAt`),
- * not at the runner level. This collapses the per-connector runners
- * (createSlackRunner, createNotionRunner, etc.) into one generic call site.
+ * not at the runner level. After Phase 4 every connector registers
+ * through this one factory; there are no per-connector createXxxRunner
+ * functions in the worker.
  */
 export interface CreateGenericRunnerOptions {
   /**
