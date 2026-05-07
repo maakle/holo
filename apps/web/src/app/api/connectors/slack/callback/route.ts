@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { shared, createSlackConnector } from '@holo/connectors';
+import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { enqueueInitialSync } from '@/lib/sync-queue';
 
@@ -113,6 +114,16 @@ export async function GET(req: Request) {
     await enqueueInitialSync(db, orgId, 'slack').catch(() => {
       // Initial sync is best-effort; if Redis is down or the queue rejects,
       // the recurring scheduler will pick it up at the next tick.
+    });
+
+    emitAuditEvent({
+      db,
+      organizationId: orgId,
+      userId,
+      eventType: 'connector.connected',
+      resourceType: 'connector',
+      resourceId: 'slack',
+      meta: { provider: 'slack', externalId: ident.externalId, name: ident.name },
     });
 
     // OAuth lands in a popup window; the oauth-complete page postMessages

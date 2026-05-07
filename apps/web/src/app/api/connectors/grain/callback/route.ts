@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { shared, createGrainConnector } from '@holo/connectors';
+import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { enqueueInitialSync } from '@/lib/sync-queue';
 
@@ -108,6 +109,16 @@ export async function GET(req: Request) {
       });
 
     await enqueueInitialSync(db, orgId, 'grain').catch(() => {});
+
+    emitAuditEvent({
+      db,
+      organizationId: orgId,
+      userId,
+      eventType: 'connector.connected',
+      resourceType: 'connector',
+      resourceId: 'grain',
+      meta: { provider: 'grain', externalId: ident.externalId, name: ident.name },
+    });
 
     const ok = new URL('/connections/oauth-complete', env.BETTER_AUTH_URL);
     ok.searchParams.set('provider', 'grain');

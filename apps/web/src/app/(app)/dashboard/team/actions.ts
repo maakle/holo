@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { holoError, ErrorCode } from '@holo/errors';
+import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { inviteMemberSchema, cancelInvitationSchema } from './schemas';
 
@@ -19,7 +20,7 @@ export async function inviteMember(formData: FormData): Promise<{
   }
   const { email, role } = parsed.data;
 
-  const { auth } = await getServerContext();
+  const { auth, db, defaultOrgId } = await getServerContext();
   const reqHeaders = await headers();
   const session = await auth.api.getSession({ headers: reqHeaders });
   if (!session) {
@@ -45,6 +46,17 @@ export async function inviteMember(formData: FormData): Promise<{
     };
   }
 
+  const orgId =
+    (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
+  emitAuditEvent({
+    db,
+    organizationId: orgId,
+    userId: session.user.id,
+    eventType: 'member.invited',
+    resourceType: 'invitation',
+    meta: { email, role },
+  });
+
   revalidatePath('/dashboard/team');
   return { ok: true };
 }
@@ -55,14 +67,27 @@ export async function cancelInvitation(formData: FormData): Promise<void> {
   });
   if (!parsed.success) return;
 
-  const { auth } = await getServerContext();
+  const { auth, db, defaultOrgId } = await getServerContext();
   const reqHeaders = await headers();
+  const session = await auth.api.getSession({ headers: reqHeaders });
 
   try {
     await auth.api.cancelInvitation({
       body: { invitationId: parsed.data.invitationId },
       headers: reqHeaders,
     });
+    if (session) {
+      const orgId =
+        (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
+      emitAuditEvent({
+        db,
+        organizationId: orgId,
+        userId: session.user.id,
+        eventType: 'member.invitation_cancelled',
+        resourceType: 'invitation',
+        resourceId: parsed.data.invitationId,
+      });
+    }
   } catch {
     // Silently swallow — revalidate will show whether it stuck.
   }

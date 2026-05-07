@@ -4,6 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { createHubspotConnector } from '@holo/connectors';
+import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { enqueueInitialSync } from '@/lib/sync-queue';
 
@@ -75,6 +76,16 @@ export async function POST(req: Request) {
       });
 
     await enqueueInitialSync(db, orgId, 'hubspot').catch(() => {});
+
+    emitAuditEvent({
+      db,
+      organizationId: orgId,
+      userId,
+      eventType: 'connector.connected',
+      resourceType: 'connector',
+      resourceId: 'hubspot',
+      meta: { provider: 'hubspot', externalId: ident.externalId, name: ident.name },
+    });
 
     return NextResponse.json({ ok: true });
   } catch (e) {

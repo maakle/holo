@@ -6,6 +6,7 @@ import {
   githubAppConfigFromEnv,
   mintAppJwt,
 } from '@holo/connectors';
+import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { enqueueInitialSync } from '@/lib/sync-queue';
 
@@ -149,6 +150,22 @@ export async function GET(req: Request) {
         // Best-effort. The 6h scheduler will catch it next tick.
       });
     }
+
+    emitAuditEvent({
+      db,
+      organizationId: orgId,
+      userId,
+      eventType: 'connector.connected',
+      resourceType: 'connector',
+      resourceId: 'github',
+      meta: {
+        provider: 'github',
+        installationId: installation.id,
+        accountLogin: installation.account.login,
+        accountType: installation.account.type,
+        setupAction,
+      },
+    });
 
     const ok = new URL('/connections/oauth-complete', req.url);
     ok.searchParams.set('provider', 'github');

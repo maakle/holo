@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { and, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
+import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { enqueueResync } from '@/lib/sync-queue';
 
@@ -35,6 +36,7 @@ export async function POST(
     }
     const orgId =
       (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
+    const userId = session.user.id;
 
     const sourceRows = await db
       .select({ id: schema.sources.id })
@@ -59,6 +61,16 @@ export async function POST(
       const r = await enqueueResync(provider, { sourceId: s.id, organizationId: orgId });
       enqueued.push(...r.enqueued);
     }
+
+    emitAuditEvent({
+      db,
+      organizationId: orgId,
+      userId,
+      eventType: 'connector.resync_triggered',
+      resourceType: 'connector',
+      resourceId: provider,
+      meta: { provider, sources: sourceRows.length, queues: enqueued },
+    });
 
     return NextResponse.json({
       ok: true,

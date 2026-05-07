@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { githubAppConfigFromEnv, uninstallApp } from '@holo/connectors';
+import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { drainJobsForOrg } from '@/lib/sync-queue';
 
@@ -95,6 +96,22 @@ export async function DELETE(
           ),
         )
         .returning({ id: schema.connectorAllowlists.id });
+      emitAuditEvent({
+        db,
+        organizationId: orgId,
+        userId,
+        eventType: 'connector.disconnected',
+        resourceType: 'connector',
+        resourceId: provider,
+        meta: {
+          provider,
+          remoteUninstalled,
+          remoteAlreadyGone,
+          removedInstallations: deletedInstalls.length,
+          removedSources: deletedSources.length,
+          removedAllowlistRows: deletedAllow.length,
+        },
+      });
       return NextResponse.json({
         ok: true,
         remoteUninstalled,
@@ -230,6 +247,22 @@ export async function DELETE(
         .returning({ id: schema.connectorAllowlists.id });
       removedAllowlistRows = deletedAllow.length;
     }
+
+    emitAuditEvent({
+      db,
+      organizationId: orgId,
+      userId,
+      eventType: 'connector.disconnected',
+      resourceType: 'connector',
+      resourceId: provider,
+      meta: {
+        provider,
+        removedSources,
+        removedAllowlistRows,
+        remainingCredentials: remaining.length,
+        slackRemoteUninstalled,
+      },
+    });
 
     return NextResponse.json({
       ok: true,
