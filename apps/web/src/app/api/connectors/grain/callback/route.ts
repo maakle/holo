@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { eq, and } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
-import { shared, createGrainConnector } from '@holo/connectors';
+import { shared, createGrainSpec } from '@holo/connectors';
+import { createHttpClient } from '@holo/connector-framework';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { enqueueInitialSync } from '@/lib/sync-queue';
@@ -47,12 +48,13 @@ export async function GET(req: Request) {
 
     const publicOrigin = (env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL).replace(/\/+$/, '');
     const redirectUri = `${publicOrigin}/api/connectors/grain/callback`;
-    const conn = createGrainConnector({
+    const spec = createGrainSpec({
       clientId: env.GRAIN_CONNECTOR_CLIENT_ID,
       clientSecret: env.GRAIN_CONNECTOR_CLIENT_SECRET,
     });
-    const tokens = await conn.exchangeCode({ code, redirectUri });
-    const ident = await conn.testConnection(tokens);
+    const tokens = await spec.auth.exchangeCode!({ code, redirectUri });
+    const api = createHttpClient({ config: spec.http!, auth: spec.auth, tokens });
+    const ident = await spec.testConnection({ api, tokens });
 
     const orgId = claims.organization_id;
     const userId = claims.user_id;

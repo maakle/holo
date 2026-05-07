@@ -4,7 +4,7 @@ import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import {
   shared,
   createSlackConnector,
-  createGrainConnector,
+  createGrainSpec,
   createLinearSpec,
   type Connector,
 } from '@holo/connectors';
@@ -85,10 +85,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
         });
       }
       redirectUri = `${publicOrigin}/api/connectors/grain/callback`;
-      conn = createGrainConnector({
+      const spec = createGrainSpec({
         clientId: env.GRAIN_CONNECTOR_CLIENT_ID,
         clientSecret: env.GRAIN_CONNECTOR_CLIENT_SECRET,
       });
+      const csrfNonce = shared.generateCsrfNonce();
+      const state = await shared.signState(
+        {
+          user_id: session.user.id,
+          organization_id: orgId,
+          csrf_nonce: csrfNonce,
+          provider,
+        },
+        env.BETTER_AUTH_SECRET,
+      );
+      const authorizeUrl = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
+      return NextResponse.json({ authorizeUrl });
     } else if (provider === 'linear') {
       // First framework-native connector — uses ConnectorSpec from
       // @holo/connector-framework instead of the legacy Connector facade.

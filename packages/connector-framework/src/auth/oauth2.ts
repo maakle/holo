@@ -19,6 +19,11 @@ export interface OAuth2Config {
   scopeSeparator?: ' ' | ',';
   /** 'Bearer' for most providers; some use a custom scheme. */
   authScheme?: string;
+  /**
+   * Token-exchange body encoding. RFC 6749 mandates form-urlencoded; some
+   * providers (e.g. Grain) diverge and accept JSON. Defaults to 'form'.
+   */
+  bodyEncoding?: 'form' | 'json';
   /** Slack-style: returns `{ ok: false, error }` on auth.test instead of HTTP error. */
   okPredicate?: (json: unknown) => boolean;
   /** Override token-response parsing for non-RFC-6749 providers. */
@@ -60,11 +65,19 @@ export function oauth2(config: OAuth2Config): AuthStrategy {
   const parseTokens = config.parseTokenResponse ?? defaultParseTokenResponse;
 
   async function exchange(form: URLSearchParams): Promise<ConnectorTokens> {
-    const res = await fetchImpl(config.tokenUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: form.toString(),
-    });
+    const useJson = config.bodyEncoding === 'json';
+    const init: RequestInit = useJson
+      ? {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(form)),
+        }
+      : {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: form.toString(),
+        };
+    const res = await fetchImpl(config.tokenUrl, init);
     const json = (await res.json()) as RawTokenResponse;
     if (!res.ok && (config.okPredicate ? !config.okPredicate(json) : true)) {
       throw holoError({
