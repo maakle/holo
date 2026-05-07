@@ -5,10 +5,13 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
-import { activeQueueNames, getQueueByName } from '@/lib/sync-queue';
-
-const PROVIDERS = new Set(['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot'] as const);
-type Provider = typeof PROVIDERS extends Set<infer T> ? T : never;
+import {
+  activeQueueNames,
+  getQueueByName,
+  isSyncProvider,
+  SYNC_PROVIDERS_FIX_HINT,
+  type Provider,
+} from '@/lib/sync-queue';
 
 type RunRow = {
   id: string;
@@ -62,14 +65,14 @@ export async function GET(
 ) {
   try {
     const { provider: rawProvider } = await params;
-    if (!PROVIDERS.has(rawProvider as Provider)) {
+    if (!isSyncProvider(rawProvider)) {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
         problem: `unknown provider '${rawProvider}'`,
-        fix: 'Use one of: github, slack, notion, grain, pylon, hubspot.',
+        fix: SYNC_PROVIDERS_FIX_HINT,
       });
     }
-    const provider = rawProvider as Provider;
+    const provider: Provider = rawProvider;
     const { auth, db, defaultOrgId } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {

@@ -3,16 +3,29 @@ import { Queue } from 'bullmq';
 import { and, eq } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 
-type Provider =
-  | 'github'
-  | 'slack'
-  | 'notion'
-  | 'grain'
-  | 'pylon'
-  | 'hubspot'
-  | 'linear'
-  | 'mintlify'
-  | 'zendesk';
+// Single source of truth for which providers can be synced from the dashboard.
+// Every API route under apps/web/src/app/api/connectors/[provider]/ validates
+// against SYNC_PROVIDERS — adding a new connector means adding an entry to
+// QUEUE_NAMES_BY_PROVIDER below. The route validators pick it up automatically.
+export const SYNC_PROVIDERS = [
+  'github',
+  'slack',
+  'notion',
+  'grain',
+  'pylon',
+  'hubspot',
+  'linear',
+  'mintlify',
+  'zendesk',
+] as const;
+export type Provider = (typeof SYNC_PROVIDERS)[number];
+
+export function isSyncProvider(value: string): value is Provider {
+  return (SYNC_PROVIDERS as readonly string[]).includes(value);
+}
+
+/** Human-readable list for HoloError fix strings. */
+export const SYNC_PROVIDERS_FIX_HINT = `Use one of: ${SYNC_PROVIDERS.join(', ')}.`;
 
 const QUEUE_NAMES_BY_PROVIDER: Record<Provider, string[]> = {
   github: ['github-code-sync', 'github-prose-sync'],

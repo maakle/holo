@@ -4,12 +4,23 @@ import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
 
-export const SYNC_PROVIDERS = ['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot'] as const;
+export const SYNC_PROVIDERS = [
+  'github',
+  'slack',
+  'notion',
+  'grain',
+  'pylon',
+  'hubspot',
+  'linear',
+  'mintlify',
+  'zendesk',
+] as const;
 export type SyncProvider = (typeof SYNC_PROVIDERS)[number];
 
-// Queue names per provider — mirrors apps/worker/src/queues/types.ts. Kept in
-// sync manually because that file lives in apps/worker (not a workspace
-// package); diverging it would silently route jobs into limbo.
+// Queue names per provider — mirrors apps/worker/src/queues/types.ts and
+// apps/web/src/lib/sync-queue.ts. Kept in sync manually because the CLI lives
+// in its own workspace package and can't import either; diverging would
+// silently route jobs into limbo.
 const QUEUE_NAMES_BY_PROVIDER: Record<SyncProvider, string[]> = {
   github: ['github-code-sync', 'github-prose-sync'],
   slack: ['slack-sync'],
@@ -17,6 +28,9 @@ const QUEUE_NAMES_BY_PROVIDER: Record<SyncProvider, string[]> = {
   grain: ['grain-sync'],
   pylon: ['pylon-sync'],
   hubspot: ['hubspot-sync'],
+  linear: ['linear-sync'],
+  mintlify: ['mintlify-sync'],
+  zendesk: ['zendesk-sync'],
 };
 
 export function isSyncProvider(value: string): value is SyncProvider {

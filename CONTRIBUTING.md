@@ -55,10 +55,21 @@ The most common contribution path. Shape:
 5. Webhook verification + normalization
 6. **ACL extraction** (most important — see below)
 7. Per-source chunker if needed
-8. Integration tests against fixtures
-9. Documentation — add a setup guide under [`docs/connectors/`](./docs/connectors/) (see [`slack.md`](./docs/connectors/slack.md) for the template)
+8. Register the new provider in the `SYNC_PROVIDERS` allowlists (see below) — without this the dashboard's Sync now / sync history / disconnect routes return `unknown provider`
+9. Integration tests against fixtures
+10. Documentation — add a setup guide under [`docs/connectors/`](./docs/connectors/) (see [`slack.md`](./docs/connectors/slack.md) for the template)
 
 **ACL extraction is non-negotiable.** Every connector must populate `acl_subjects text[]` on each document with the source's native permissions. If you can't figure out a source's permission model, ask in the issue before starting.
+
+**Register the provider in three places.** All three must list the new provider id and its queue name(s); the dashboard validates against `SYNC_PROVIDERS` before it will let users sync, view history, or disconnect.
+
+| File | What to add |
+|---|---|
+| [`apps/web/src/lib/sync-queue.ts`](./apps/web/src/lib/sync-queue.ts) | New entry in `SYNC_PROVIDERS` and `QUEUE_NAMES_BY_PROVIDER`. This is the source of truth — every API route under `apps/web/src/app/api/connectors/[provider]/` validates against it. |
+| [`apps/web/src/lib/connector-registry.ts`](./apps/web/src/lib/connector-registry.ts) | New entry in `CONNECTORS` (display name, category, flow type) so the connector renders on the connections page. |
+| [`packages/cli/src/commands/sync-run.ts`](./packages/cli/src/commands/sync-run.ts) | New entry in `SYNC_PROVIDERS` and `QUEUE_NAMES_BY_PROVIDER` so `holo sync <provider>` works. The CLI lives in its own package and can't import from `apps/web`, so the list is mirrored manually — keep them in sync. |
+
+If you forget step 8, the connector will OAuth and ingest fine in the worker, but the dashboard will show `Use one of: …` instead of sync history — and "Sync now" / "Disconnect" will fail with the same error.
 
 ## Adding a skill (v0.5+)
 
