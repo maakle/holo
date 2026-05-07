@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
-import { eq } from 'drizzle-orm';
-import { schema } from '@holo/db';
+import { and, eq } from 'drizzle-orm';
+import { schema, SAMPLE_PROVIDER } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { AppSidebar } from '@/components/app-sidebar';
@@ -25,6 +25,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   const activeOrgId = resolveActiveOrgId(session, defaultOrgId);
 
+  const sampleSourceRows = await db
+    .select({ id: schema.sources.id })
+    .from(schema.sources)
+    .where(
+      and(
+        eq(schema.sources.organizationId, activeOrgId),
+        eq(schema.sources.provider, SAMPLE_PROVIDER),
+      ),
+    )
+    .limit(1);
+  const sampleDataActive = sampleSourceRows.length > 0;
+
   return (
     <div className="flex h-screen bg-bg text-text">
       <AppSidebar
@@ -32,6 +44,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         userName={session.user.name}
         orgs={memberOrgs}
         activeOrgId={activeOrgId}
+        sampleDataActive={sampleDataActive}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppTopbar />
