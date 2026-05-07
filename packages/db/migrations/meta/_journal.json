@@ -204,6 +204,13 @@
       "when": 1778572800000,
       "tag": "0028_sync_runs_breakdown",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1778659200000,
+      "tag": "0029_api_tokens_prefix",
+      "breakpoints": true
     }
   ]
 }

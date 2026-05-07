@@ -23,9 +23,10 @@ export async function GET() {
     const tokens = await db
       .select({
         id: schema.apiTokens.id,
-        tokenHash: schema.apiTokens.tokenHash,
+        tokenPrefix: schema.apiTokens.tokenPrefix,
         label: schema.apiTokens.label,
         createdAt: schema.apiTokens.createdAt,
+        lastUsedAt: schema.apiTokens.lastUsedAt,
       })
       .from(schema.apiTokens)
       .where(
@@ -34,14 +35,16 @@ export async function GET() {
           eq(schema.apiTokens.userId, userId),
           isNull(schema.apiTokens.revokedAt),
         ),
-      );
+      )
+      .orderBy(schema.apiTokens.createdAt);
 
     return NextResponse.json({
       tokens: tokens.map((t) => ({
         id: t.id,
-        prefix: `holo_${t.tokenHash.slice(0, 6)}...`,
+        prefix: t.tokenPrefix ?? null,
         label: t.label,
         createdAt: t.createdAt,
+        lastUsedAt: t.lastUsedAt,
       })),
     });
   } catch (e) {
@@ -71,10 +74,11 @@ export async function POST(req: Request) {
 
     const rawToken = `holo_${randomBytes(32).toString('hex')}`;
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const tokenPrefix = rawToken.slice(0, 12);
 
     const [inserted] = await db
       .insert(schema.apiTokens)
-      .values({ organizationId: orgId, userId, tokenHash, label })
+      .values({ organizationId: orgId, userId, tokenHash, tokenPrefix, label })
       .returning({ id: schema.apiTokens.id });
 
     emitAuditEvent({

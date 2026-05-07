@@ -16,9 +16,9 @@ export default async function ConnectAgentPage() {
   if (!session) redirect('/sign-in');
   const orgId = resolveActiveOrgId(session, defaultOrgId);
 
-  const mcpBase = process.env['MCP_PUBLIC_URL']?.replace(/\/+$/, '')
+  const gatewayBase = process.env['MCP_PUBLIC_URL']?.replace(/\/+$/, '')
     ?? 'http://localhost:8080';
-  const mcpUrl = `${mcpBase}/mcp`;
+  const mcpUrl = `${gatewayBase}/mcp`;
 
   const initial = await loadBannerInitial(db, orgId);
 
@@ -30,12 +30,12 @@ export default async function ConnectAgentPage() {
           Point your agent at holo
         </h1>
         <p className="max-w-2xl text-[15px] leading-6 text-text-muted">
-          holo speaks the Model Context Protocol. Drop the URL below into any MCP-compatible
-          client to authenticate and start retrieving context.
+          holo speaks the Model Context Protocol and a small REST surface. Test the gateway,
+          then wire up your client below.
         </p>
       </header>
       <ConnectAgentBanner initial={initial} />
-      <ConnectAgentPanel mcpUrl={mcpUrl} />
+      <ConnectAgentPanel mcpUrl={mcpUrl} gatewayBase={gatewayBase} />
     </div>
   );
 }

@@ -410,6 +410,7 @@ export const apiTokens = pgTable(
       .notNull()
       .references(() => user.id),
     tokenHash: text('token_hash').notNull().unique(),
+    tokenPrefix: text('token_prefix'),
     label: text('label').notNull().default('default'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
