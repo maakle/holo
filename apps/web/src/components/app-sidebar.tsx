@@ -9,6 +9,7 @@ import {
   ScrollText,
   Users,
   Terminal,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -50,6 +51,7 @@ const sections: NavSection[] = [
     items: [
       { href: '/dashboard/team', label: 'Team', icon: Users },
       { href: '/audit', label: 'Audit log', icon: ScrollText },
+      { href: '/settings', label: 'Settings', icon: Settings },
     ],
   },
 ];

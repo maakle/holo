@@ -21,7 +21,8 @@ export type AuditEventType =
   | 'connector.disconnected'
   | 'connector.resync_triggered'
   | 'connector.stopped'
-  | 'oauth.code_authorized';
+  | 'oauth.code_authorized'
+  | 'workspace.deleted';
 
 export interface EmitAuditEventInput {
   db: DB;
