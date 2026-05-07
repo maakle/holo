@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { holoError, ErrorCode } from '@holo/errors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { inviteMemberSchema, cancelInvitationSchema } from './schemas';
 
 export async function inviteMember(formData: FormData): Promise<{
@@ -46,8 +47,7 @@ export async function inviteMember(formData: FormData): Promise<{
     };
   }
 
-  const orgId =
-    (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
+  const orgId = resolveActiveOrgId(session, defaultOrgId);
   emitAuditEvent({
     db,
     organizationId: orgId,
@@ -77,8 +77,7 @@ export async function cancelInvitation(formData: FormData): Promise<void> {
       headers: reqHeaders,
     });
     if (session) {
-      const orgId =
-        (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
+      const orgId = resolveActiveOrgId(session, defaultOrgId);
       emitAuditEvent({
         db,
         organizationId: orgId,

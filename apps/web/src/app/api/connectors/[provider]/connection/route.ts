@@ -6,6 +6,7 @@ import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { githubAppConfigFromEnv, uninstallApp } from '@holo/connectors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { drainJobsForOrg } from '@/lib/sync-queue';
 
 const PROVIDERS = new Set(['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot'] as const);
@@ -35,8 +36,7 @@ export async function DELETE(
         fix: 'Sign in first.',
       });
     }
-    const orgId =
-      (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
+    const orgId = resolveActiveOrgId(session, defaultOrgId);
     const userId = session.user.id;
 
     // GitHub uses an org-level App installation. Disconnect order matters:

@@ -5,6 +5,7 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { enqueueResync } from '@/lib/sync-queue';
 
 const PROVIDERS = new Set(['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot'] as const);
@@ -34,8 +35,7 @@ export async function POST(
         fix: 'Sign in first.',
       });
     }
-    const orgId =
-      (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
+    const orgId = resolveActiveOrgId(session, defaultOrgId);
     const userId = session.user.id;
 
     const sourceRows = await db

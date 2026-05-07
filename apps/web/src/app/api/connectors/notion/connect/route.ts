@@ -6,6 +6,7 @@ import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { createNotionConnector } from '@holo/connectors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { enqueueInitialSync } from '@/lib/sync-queue';
 
 export async function POST(req: Request) {
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     const connector = createNotionConnector();
     const ident = await connector.testConnection({ accessToken: token });
 
-    const orgId = defaultOrgId;
+    const orgId = resolveActiveOrgId(session, defaultOrgId);
     const userId = session.user.id;
 
     // Upsert connector_credentials

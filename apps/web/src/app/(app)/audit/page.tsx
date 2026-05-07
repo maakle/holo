@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { desc, eq } from 'drizzle-orm';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { schema } from '@holo/db';
 import { AuditLogTable } from '@/components/audit-log-table';
 
@@ -10,7 +11,7 @@ export default async function AuditPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
-  const orgId = (session.user as unknown as { organizationId?: string }).organizationId;
+  const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/sign-in');
 
   const events = await db
