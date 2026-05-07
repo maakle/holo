@@ -437,7 +437,7 @@ function LogRow({
       <span style={{ color: 'var(--text-subtle)' }}>
         {formatTime(event.createdAt)}
       </span>
-      <span className="min-w-0">
+      <span className="flex min-w-0 items-center">
         <StatusTag hasError={hasError} code={event.errorCode} />
       </span>
       <span className="truncate" style={{ color: 'var(--text-muted)' }}>
