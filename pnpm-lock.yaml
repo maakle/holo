@@ -512,6 +512,9 @@ importers:
       '@holo/chunker':
         specifier: workspace:*
         version: link:../chunker
+      '@holo/connector-framework':
+        specifier: workspace:*
+        version: link:../connector-framework
       '@holo/db':
         specifier: workspace:*
         version: link:../db
@@ -527,6 +530,9 @@ importers:
       minimatch:
         specifier: ^9.0.5
         version: 9.0.9
+      zod:
+        specifier: 4.4.2
+        version: 4.4.2
     devDependencies:
       msw:
         specifier: 2.4.9

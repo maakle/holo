@@ -39,6 +39,9 @@ export { createPylonConnector } from './pylon/index';
 export type { PylonConnectorOptions } from './pylon/index';
 export { createHubspotConnector } from './hubspot/index';
 export type { HubspotConnectorOptions } from './hubspot/index';
+// Framework-native specs (new shape — no legacy Connector facade).
+export { createLinearSpec } from './linear/index';
+export type { LinearSpecOptions } from './linear/index';
 export { runHubspotSync } from './hubspot/sync';
 export type {
   RunHubspotSyncInput,
