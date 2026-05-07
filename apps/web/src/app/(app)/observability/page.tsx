@@ -4,14 +4,14 @@ import { and, desc, eq, isNotNull, lt, sql } from 'drizzle-orm';
 import { schema, agentEventKind, type AgentEventKind } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
-import { InvocationTable, type EventRow } from '@/components/invocation-table';
-import { ObservabilityFilters } from '@/components/observability-filters';
+import { ObservabilityView, type EventRow } from '@/components/observability-view';
 
 const PAGE_SIZE = 200;
 
 interface SearchParams {
   kind?: string;
   status?: string;
+  q?: string;
   cursor?: string;
 }
 
@@ -31,11 +31,19 @@ export default async function ObservabilityPage({
   const kindFilter = isAgentEventKind(params.kind) ? params.kind : undefined;
   const statusFilter = params.status === 'error' ? 'error' : undefined;
   const cursor = params.cursor ? new Date(params.cursor) : undefined;
+  const query = typeof params.q === 'string' ? params.q.trim() : '';
 
   const conditions = [eq(schema.mcpInvocations.organizationId, orgId)];
   if (kindFilter) conditions.push(eq(schema.mcpInvocations.kind, kindFilter));
   if (statusFilter === 'error') conditions.push(isNotNull(schema.mcpInvocations.errorCode));
   if (cursor) conditions.push(lt(schema.mcpInvocations.createdAt, cursor));
+  if (query) {
+    conditions.push(
+      sql`(${schema.mcpInvocations.toolName} ilike ${'%' + query + '%'}
+        or ${schema.mcpInvocations.agentIdentity} ilike ${'%' + query + '%'}
+        or ${schema.mcpInvocations.traceId} ilike ${'%' + query + '%'})`,
+    );
+  }
 
   const rows = await db
     .select({
@@ -60,42 +68,34 @@ export default async function ObservabilityPage({
   const events: EventRow[] = rows.slice(0, PAGE_SIZE).map((r) => ({
     ...r,
     kind: r.kind as AgentEventKind,
+    createdAt: r.createdAt.toISOString(),
   }));
-  const nextCursor = hasMore ? events[events.length - 1]!.createdAt.toISOString() : null;
+  const nextCursor = hasMore ? events[events.length - 1]!.createdAt : null;
 
-  // Aggregate stats for the current page (cheap; one extra query keyed by org).
-  const [stats] = await db
+  const statsRow = await db
     .select({
       total: sql<number>`count(*)::int`.as('total'),
       errors: sql<number>`sum(case when ${schema.mcpInvocations.errorCode} is not null then 1 else 0 end)::int`.as('errors'),
     })
     .from(schema.mcpInvocations)
-    .where(and(eq(schema.mcpInvocations.organizationId, orgId)));
+    .where(and(eq(schema.mcpInvocations.organizationId, orgId)))
+    .then((r) => r[0]);
+
+  const stats = {
+    total: statsRow?.total ?? 0,
+    errors: statsRow?.errors ?? 0,
+  };
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-2">
-        <span className="caption">Observability</span>
-        <h1 className="font-display text-h1 font-semibold tracking-tight">Agent activity</h1>
-        <p className="max-w-2xl text-[15px] leading-6 text-text-muted">
-          Every MCP tool call, LLM request, Slack message, and agent step from your
-          organization. Events that share a trace are collapsed into one expandable row.
-        </p>
-        {stats ? (
-          <p className="text-[13px] text-text-muted">
-            {stats.total.toLocaleString()} events recorded · {stats.errors.toLocaleString()} errors
-          </p>
-        ) : null}
-      </header>
-
-      <ObservabilityFilters
-        kind={kindFilter}
-        status={statusFilter}
-        availableKinds={agentEventKind}
-      />
-
-      <InvocationTable events={events} nextCursor={nextCursor} />
-    </div>
+    <ObservabilityView
+      events={events}
+      nextCursor={nextCursor}
+      kind={kindFilter}
+      status={statusFilter}
+      query={query}
+      availableKinds={agentEventKind}
+      stats={stats}
+    />
   );
 }
 
