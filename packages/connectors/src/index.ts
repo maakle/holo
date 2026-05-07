@@ -35,30 +35,13 @@ export { createNotionConnector } from './notion/index';
 export type { NotionConnectorOptions } from './notion/index';
 export { createGrainConnector } from './grain/index';
 export type { GrainConnectorOptions } from './grain/index';
-export { createHubspotConnector } from './hubspot/index';
-export type { HubspotConnectorOptions } from './hubspot/index';
 // Framework-native specs (new shape — no legacy Connector facade).
 export { createLinearSpec } from './linear/index';
 export type { LinearSpecOptions } from './linear/index';
 export { createPylonSpec } from './pylon/index';
 export type { PylonSpecOptions } from './pylon/index';
-export { runHubspotSync } from './hubspot/sync';
-export type {
-  RunHubspotSyncInput,
-  RunHubspotSyncOutput,
-  HubspotChunkPayload,
-  HubspotChunkKind,
-  HubspotEmbedEnqueueFn,
-  HubspotCursor,
-} from './hubspot/sync';
-export { createHubspotApiClient } from './hubspot/api-client';
-export type {
-  HubspotApiClient,
-  HubspotRecord,
-  HubspotEngagement,
-  HubspotObjectType,
-  HubspotListPage,
-} from './hubspot/api-client';
+export { createHubspotSpec } from './hubspot/index';
+export type { HubspotSpecOptions } from './hubspot/index';
 
 // Underlying sync engines + API clients (used by the worker to bypass the
 // connector facade for github, where prose and code dispatch on different queues).

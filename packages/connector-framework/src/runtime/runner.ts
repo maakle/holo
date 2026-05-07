@@ -111,7 +111,9 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
           contentHash: hash,
           metadata: chunk.metadata,
           aclSubjects: chunk.aclSubjects,
-          sourceArtifactId: deriveSourceArtifactId(spec.id, chunk.kind, chunk.externalId),
+          sourceArtifactId:
+            chunk.sourceArtifactId ??
+            deriveSourceArtifactId(spec.id, chunk.kind, chunk.externalId),
           provider: spec.id,
           organizationId,
           sourceId,

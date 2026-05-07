@@ -28,6 +28,15 @@ export interface ChunkUpsert {
   content: string;
   metadata: Record<string, unknown>;
   aclSubjects: string[];
+  /**
+   * Override the synthetic source-artifact id. By default the runtime uses
+   * `${kind}:${externalId}`, which is right when one record = one chunk kind.
+   * Connectors that group multiple chunk kinds under the *same* parent
+   * record (e.g. a HubSpot contact and its engagement timeline both belong
+   * to `hubspot-contact:<id>`) supply this so all chunks share one
+   * `source_artifacts` row.
+   */
+  sourceArtifactId?: string;
 }
 
 export type ReportProgressFn = (input: {

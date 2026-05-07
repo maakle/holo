@@ -21,7 +21,6 @@ import {
   createNotionConnector,
   createGithubApiClient,
   createGrainConnector,
-  createHubspotConnector,
   resolveAllowlist,
   runGithubProseSync,
   runGithubCodeSync,
@@ -30,7 +29,6 @@ import {
   githubAppConfigFromEnv,
   type GithubProseEmbedEnqueueFn,
   type GithubCodeEmbedEnqueueFn,
-  type HubspotEmbedEnqueueFn,
   type GithubAppConfig,
 } from '@holo/connectors';
 import type { SyncRunner, SyncResult } from './sync-dispatch';
@@ -104,7 +102,7 @@ async function resolveGithubRepos(args: {
 async function loadConnectorToken(
   db: DB,
   organizationId: string,
-  provider: 'slack' | 'notion' | 'grain' | 'hubspot',
+  provider: 'slack' | 'notion' | 'grain',
 ): Promise<string> {
   const rows = await db
     .select({ accessToken: schema.connectorCredentials.accessToken })
@@ -392,31 +390,6 @@ export function createGrainRunner(deps: RunnerDeps): SyncRunner {
   };
 }
 
-// Pylon migrated to @holo/connector-framework — see runners.module.ts for
-// the registration via createGenericRunner(createPylonSpec(), deps).
-
-// ── HubSpot ──────────────────────────────────────────────────────────────────
-export function createHubspotRunner(deps: RunnerDeps): SyncRunner {
-  const enqueueEmbed: HubspotEmbedEnqueueFn = makeEnqueueEmbed(deps.embedQueue);
-
-  return {
-    async full(payload: SyncJobPayload): Promise<SyncResult> {
-      const apiKey = await loadConnectorToken(deps.db, payload.organizationId, 'hubspot');
-      const connector = createHubspotConnector({ apiKey, db: deps.db, enqueueEmbed });
-      const result = await connector.fullSync(
-        { accessToken: apiKey },
-        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
-      );
-      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
-    },
-    async incremental(payload: SyncJobPayload): Promise<SyncResult> {
-      const apiKey = await loadConnectorToken(deps.db, payload.organizationId, 'hubspot');
-      const connector = createHubspotConnector({ apiKey, db: deps.db, enqueueEmbed });
-      const result = await connector.incrementalSync(
-        { accessToken: apiKey },
-        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
-      );
-      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
-    },
-  };
-}
+// Pylon and HubSpot migrated to @holo/connector-framework — see
+// runners.module.ts for registration via
+// createGenericRunner(createPylonSpec | createHubspotSpec, deps).
