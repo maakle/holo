@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { headers } from 'next/headers';
 import { getServerAuth } from '@/lib/server-context';
 import { HoloLogo } from '@/components/logo';
+import { ToolsAgentGraph } from '@/components/tools-agent-graph';
 
 const GITHUB_URL = 'https://github.com/maakle/holo';
 const DOCS_URL = `${GITHUB_URL}#readme`;
@@ -19,6 +20,7 @@ export default async function Home() {
       <SiteHeader isAuthed={isAuthed} />
       <Hero isAuthed={isAuthed} />
       <ConnectorsStrip />
+      <ToolsAgentGraph />
       <PillarsBand />
       <CodeShowcase />
       <ObservabilityBand />
