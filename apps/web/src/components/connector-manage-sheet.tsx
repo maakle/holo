@@ -16,6 +16,7 @@ import {
 import { GithubRepoPicker } from '@/components/github-repo-picker';
 import { SlackChannelPicker } from '@/components/slack-channel-picker';
 import { SyncHistoryPanel } from '@/components/sync-history-panel';
+import { SyncedContentPanel } from '@/components/synced-content-panel';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -337,6 +338,15 @@ export function ConnectorManageSheet({
                 />
               </section>
             ) : null}
+
+            {/* Synchronized content — what got indexed and how much. */}
+            <section className="flex flex-col gap-2">
+              <div className="flex items-baseline justify-between">
+                <h3 className="text-[13px] font-medium text-text">Synchronized content</h3>
+                <Badge variant="neutral">snapshot</Badge>
+              </div>
+              <SyncedContentPanel provider={meta.id} />
+            </section>
 
             {/* Sync history */}
             <section className="flex flex-col gap-2">
