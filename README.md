@@ -4,13 +4,13 @@
 >
 > **Bring your own agent. Layer today. Agent OS tomorrow.**
 
-**Status:** Pre-alpha. 6/6 connectors live, hybrid RRF search, MCP + REST/OpenAPI, DCR OAuth provider, observability + audit + skill marketplace shipped. Not yet ready for production traffic; internal dogfood underway.
+**Status:** Pre-alpha. 9/9 connectors live (Slack, GitHub, Notion, Grain, Pylon, HubSpot, Linear, Mintlify Docs, Zendesk Help Center), hybrid RRF search, MCP + REST/OpenAPI, DCR OAuth provider, observability + audit + skill marketplace shipped. Not yet ready for production traffic; internal dogfood underway.
 
 ---
 
 ## How it works
 
-1. **Connect** the tools your work lives in (Slack, GitHub, Notion, Grain, Pylon, HubSpot — more on the roadmap). One OAuth per source, allowlist-scoped at ingestion.
+1. **Connect** the tools your work lives in (Slack, GitHub, Notion, Grain, Pylon, HubSpot, Linear, Mintlify Docs, Zendesk Help Center — more on the roadmap). One OAuth per source, allowlist-scoped at ingestion.
 2. **Unify.** Holo ingests, chunks, embeds, and indexes. Hybrid retrieval (pgvector + tsvector fused with RRF) over a single ACL-aware index.
 3. **Expose.** A small set of MCP tools and a parallel REST/OpenAPI surface let any agent — internal or external — search, fetch, and invoke learned procedures.
 4. **Observe.** Every agent call is logged, attributable, and replayable. Today: ingestion-time allowlists bound which channels, repos, and pages enter Holo at all. Next: per-agent tool allowlists and row-level data scopes finish the personas model.
@@ -92,7 +92,7 @@ flowchart LR
 | Cache / Queue | Redis 7 (`maxmemory-policy=noeviction`) |
 | Auth | Better Auth 1.6 — GitHub OAuth + email OTP (Resend); multi-tenant `organization` plugin; OAuth-provider routes for MCP DCR (RFC 7591 / 9728 / 8414). |
 | Search | `packages/retrieval-core` — pgvector + tsvector fused with RRF in a single SQL CTE; dual-model embedding fallback (OpenAI + Voyage); `acl_subjects && user_subjects` filter. |
-| Connectors | `packages/connectors` — Slack, GitHub, Notion, Grain, Pylon, HubSpot. Allowlist enforcement via the `connector_allowlists` table (glob or exact-id, audit-trailed). |
+| Connectors | `packages/connectors` — Slack, GitHub, Notion, Grain, Pylon, HubSpot, Linear, Mintlify Docs, Zendesk Help Center. Allowlist enforcement via the `connector_allowlists` table (glob or exact-id, audit-trailed). |
 | Skills | `packages/skills` — Anthropic skill format, golden-set + ROUGE-L eval harness, marketplace publish flow with redaction. MCP exposes `list_skills`, `get_skill`, `execute_skill`. |
 | Custom tools | `packages/custom-tools` — CLI-as-tool registration (e.g. `bq query`, `psql -c …`) without writing a connector. |
 | CLI | `packages/cli` — `npx @holo/cli init`. |

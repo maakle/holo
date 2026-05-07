@@ -10,6 +10,9 @@ Per-connector setup guides for developers running Holo locally or configuring a 
 | Grain | OAuth | _todo_ |
 | Pylon | API key | _todo_ |
 | HubSpot | OAuth | _todo_ |
+| Linear | OAuth | _todo_ |
+| Mintlify Docs | API key (none for public sites) | _todo_ |
+| Zendesk Help Center | API key (none for public help centers) | _todo_ |
 
 ## Conventions
 
@@ -18,3 +21,4 @@ Per-connector setup guides for developers running Holo locally or configuring a 
 - API-key connectors have their own `/connect/<provider>` flow.
 - Tokens are encrypted at rest with `HOLO_TOKEN_ENCRYPTION_KEY` before being written to `connector_accounts`.
 - Allowlist enforcement (`connector_allowlists`) is mandatory — see [`CONTRIBUTING.md`](../../CONTRIBUTING.md) § "Adding a connector".
+- **Provider must be in `SYNC_PROVIDERS`.** Every dashboard route under `apps/web/src/app/api/connectors/[provider]/` (sync now, runs, sync-status, stop, disconnect) validates against the `SYNC_PROVIDERS` list in [`apps/web/src/lib/sync-queue.ts`](../../apps/web/src/lib/sync-queue.ts) and the mirror in [`packages/cli/src/commands/sync-run.ts`](../../packages/cli/src/commands/sync-run.ts). A connector that ingests fine in the worker but is missing from this list will surface `Use one of: …` instead of its sync history. See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) § "Adding a connector" for the full registration checklist.

@@ -21,7 +21,7 @@ describe('isSyncProvider', () => {
   });
 
   it('rejects unknowns', () => {
-    expect(isSyncProvider('linear')).toBe(false);
+    expect(isSyncProvider('twitter')).toBe(false);
     expect(isSyncProvider('')).toBe(false);
   });
 });
