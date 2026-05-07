@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { and, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { ReplayPanels } from '@/components/replay-panels';
 
 interface ReplayPageProps {
@@ -20,7 +21,7 @@ export default async function ReplayPage({ params }: ReplayPageProps) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
-  const orgId = (session.user as unknown as { organizationId?: string }).organizationId;
+  const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/sign-in');
 
   const [invocation] = await db

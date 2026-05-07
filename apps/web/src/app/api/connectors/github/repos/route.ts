@@ -8,6 +8,7 @@ import {
   loadGithubInstallationToken,
 } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { enqueueResync } from '@/lib/sync-queue';
 
 type GithubRepo = {
@@ -70,8 +71,7 @@ export async function GET() {
         fix: 'Sign in first.',
       });
     }
-    const orgId =
-      (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
+    const orgId = resolveActiveOrgId(session, defaultOrgId);
 
     const config = githubAppConfigFromEnv(env);
     const { token } = await loadGithubInstallationToken({
@@ -144,8 +144,7 @@ export async function PUT(req: Request) {
         fix: 'Sign in first.',
       });
     }
-    const orgId =
-      (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
+    const orgId = resolveActiveOrgId(session, defaultOrgId);
     const userId = session.user.id;
 
     const body = (await req.json().catch(() => ({}))) as {

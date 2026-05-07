@@ -8,11 +8,13 @@ import {
   type Connector,
 } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 
 export async function POST(req: Request, { params }: { params: Promise<{ provider: string }> }) {
   try {
     const { provider } = await params;
     const { auth, env, defaultOrgId } = await getServerContext();
+    let orgId = defaultOrgId;
     const hdrs = await headers();
     // OAuth redirect_uri must be a publicly reachable URL the IdP can hit.
     // In dev with a tunnel, set WEB_PUBLIC_URL to the tunnel; BETTER_AUTH_URL
@@ -26,6 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
         fix: 'Sign in first.',
       });
     }
+    orgId = resolveActiveOrgId(session, defaultOrgId);
 
     // GitHub uses a GitHub App install flow rather than OAuth — the redirect
     // target is github.com/apps/<slug>/installations/new and the state cookie
@@ -42,7 +45,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
       const state = await shared.signState(
         {
           user_id: session.user.id,
-          organization_id: defaultOrgId,
+          organization_id: orgId,
           csrf_nonce: csrfNonce,
           provider: 'github',
         },
@@ -97,7 +100,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
     const state = await shared.signState(
       {
         user_id: session.user.id,
-        organization_id: defaultOrgId,
+        organization_id: orgId,
         csrf_nonce: csrfNonce,
         provider,
       },

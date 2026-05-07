@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { ArrowUpRight, Plug, Activity, Sparkles, ScrollText, type LucideIcon } from 'lucide-react';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatsSection, StatsSkeleton } from './_components/stats-section';
 import { RecentInvocations, RecentInvocationsSkeleton } from './_components/recent-invocations';
@@ -12,7 +13,7 @@ export default async function DashboardPage() {
   const { auth } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
-  const orgId = (session.user as unknown as { organizationId?: string }).organizationId;
+  const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/sign-in');
 
   return (

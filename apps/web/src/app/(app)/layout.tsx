@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppTopbar } from '@/components/app-topbar';
 
@@ -22,9 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     .innerJoin(schema.organization, eq(schema.member.organizationId, schema.organization.id))
     .where(eq(schema.member.userId, session.user.id));
 
-  const sessionRow = session.session as { activeOrganizationId?: string | null };
-  const homeOrgId = (session.user as unknown as { organizationId?: string }).organizationId ?? '';
-  const activeOrgId = sessionRow.activeOrganizationId ?? homeOrgId;
+  const activeOrgId = resolveActiveOrgId(session);
 
   return (
     <div className="flex min-h-screen bg-bg text-text">

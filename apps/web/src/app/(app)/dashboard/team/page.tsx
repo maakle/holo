@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { and, asc, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { Badge } from '@/components/ui/badge';
 import { InviteForm } from './invite-form';
 import { cancelInvitation } from './actions';
@@ -17,10 +18,8 @@ export default async function TeamPage() {
   const sessionUser = session.user as unknown as {
     id: string;
     email: string;
-    organizationId?: string;
   };
-  const sessionRow = session.session as { activeOrganizationId?: string | null };
-  const orgId = sessionRow.activeOrganizationId ?? sessionUser.organizationId ?? '';
+  const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/dashboard');
 
   const members = await db

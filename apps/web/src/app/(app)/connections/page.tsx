@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { eq, and } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { CONNECTORS, CONNECTOR_CATEGORIES } from '@/lib/connector-registry';
 import { ConnectorRow } from '@/components/connector-row';
 import { SlackOnboardingTrigger } from '@/components/slack-onboarding-trigger';
@@ -19,7 +20,7 @@ export default async function ConnectionsPage({
   if (!session) redirect('/sign-in');
 
   const userId = session.user.id;
-  const orgId = (session.user as unknown as { organizationId: string }).organizationId;
+  const orgId = resolveActiveOrgId(session);
 
   const credRows = await db
     .select({

@@ -4,6 +4,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { activeQueueNames, getQueueByName } from '@/lib/sync-queue';
 
 const PROVIDERS = ['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot'] as const;
@@ -42,8 +43,7 @@ export async function GET() {
         fix: 'Sign in first.',
       });
     }
-    const orgId =
-      (session.user as unknown as { organizationId?: string }).organizationId ?? defaultOrgId;
+    const orgId = resolveActiveOrgId(session, defaultOrgId);
 
     const statuses: Record<Provider, ConnectorSyncStatus> = {
       github: emptyStatus(),

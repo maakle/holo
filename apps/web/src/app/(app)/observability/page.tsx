@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { and, desc, eq, isNotNull, lt, sql } from 'drizzle-orm';
 import { schema, agentEventKind, type AgentEventKind } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { InvocationTable, type EventRow } from '@/components/invocation-table';
 import { ObservabilityFilters } from '@/components/observability-filters';
 
@@ -23,7 +24,7 @@ export default async function ObservabilityPage({
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
-  const orgId = (session.user as unknown as { organizationId?: string }).organizationId;
+  const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/sign-in');
 
   const params = await searchParams;
