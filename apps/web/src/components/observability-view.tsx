@@ -141,10 +141,10 @@ function FilterRail({
   return (
     <aside
       className="hidden w-[240px] shrink-0 flex-col overflow-y-auto border-r md:flex"
-      style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
+      style={{ borderColor: 'var(--border)' }}
     >
       <div
-        className="flex items-center justify-between border-b px-4 py-3"
+        className="flex h-12 shrink-0 items-center justify-between border-b px-4"
         style={{ borderColor: 'var(--border)' }}
       >
         <span
@@ -250,9 +250,11 @@ function FilterRadio({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between px-4 py-1.5 text-left text-[13px] transition-colors hover:bg-surface-2"
+      className={`flex w-full cursor-pointer items-center justify-between px-4 py-1.5 text-left text-[13px] transition-colors ${
+        active ? '' : 'hover:bg-surface-2'
+      }`}
       style={{
-        background: active ? 'var(--surface-2)' : 'transparent',
+        ...(active ? { background: 'var(--surface-2)' } : null),
         color: active ? 'var(--text)' : 'var(--text-muted)',
         borderLeft: active ? '2px solid var(--accent)' : '2px solid transparent',
       }}
@@ -317,8 +319,8 @@ function Toolbar({
 
   return (
     <div
-      className="flex shrink-0 items-center gap-3 border-b px-4 py-2.5"
-      style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}
+      className="flex h-12 shrink-0 items-center gap-3 border-b px-4"
+      style={{ borderColor: 'var(--border)' }}
     >
       <h1
         className="font-display text-[15px] font-semibold tracking-tight"
@@ -420,11 +422,13 @@ function LogRow({
     <button
       type="button"
       onClick={onClick}
-      className="grid w-full items-center px-4 py-1.5 text-left font-mono text-[12px] tabular-nums transition-colors hover:bg-surface-2"
+      className={`grid w-full cursor-pointer items-center px-4 py-1.5 text-left font-mono text-[12px] tabular-nums transition-colors ${
+        selected ? '' : 'hover:bg-surface-2'
+      }`}
       style={{
         gridTemplateColumns: '180px 60px 1fr 80px 1fr',
         columnGap: '16px',
-        background: selected ? 'var(--surface-2)' : 'transparent',
+        ...(selected ? { background: 'var(--surface-2)' } : null),
         borderLeft: selected ? '2px solid var(--accent)' : '2px solid transparent',
         borderBottom: '1px solid var(--border)',
         color: 'var(--text-muted)',
