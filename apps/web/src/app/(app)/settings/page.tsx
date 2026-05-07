@@ -5,6 +5,7 @@ import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { DangerZone } from './danger-zone';
+import { WorkspaceDetails } from './workspace-details';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,11 +54,14 @@ export default async function SettingsPage() {
 
       <section className="space-y-3">
         <h2 className="text-[15px] font-medium">Workspace details</h2>
-        <div className="overflow-hidden rounded-lg border border-border bg-surface">
-          <Row label="Name" value={org.name} />
-          <Row label="Slug" value={org.slug} />
-          <Row label="Your role" value={me?.role ?? '—'} />
-        </div>
+        <WorkspaceDetails
+          organizationId={org.id}
+          name={org.name}
+          slug={org.slug}
+          role={me?.role ?? '—'}
+          isOwner={isOwner}
+          isDefaultOrg={isDefaultOrg}
+        />
       </section>
 
       <DangerZone
@@ -72,15 +76,6 @@ export default async function SettingsPage() {
               : undefined
         }
       />
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between border-b border-border px-4 py-3 last:border-b-0">
-      <span className="text-[13px] text-text-subtle">{label}</span>
-      <span className="text-[13px] text-text">{value}</span>
     </div>
   );
 }
