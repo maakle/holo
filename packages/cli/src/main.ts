@@ -27,9 +27,14 @@ if (isMain) {
   try {
     await buildProgram().parseAsync(process.argv);
   } catch (err) {
-    const e = err as { code?: string; message?: string };
-    if (e.code === 'commander.unknownCommand' || e.code === 'commander.help') {
-      process.exit(e.code === 'commander.help' ? 0 : 1);
+    const e = err as { code?: string; message?: string; exitCode?: number };
+    if (
+      e.code === 'commander.helpDisplayed' ||
+      e.code === 'commander.help' ||
+      e.code === 'commander.version' ||
+      e.code === 'commander.unknownCommand'
+    ) {
+      process.exit(typeof e.exitCode === 'number' ? e.exitCode : 0);
     }
     if (e.code?.startsWith('HOLO_')) {
       console.error(`Error [${e.code}]: ${e.message}`);

@@ -5,6 +5,7 @@ export interface CliDeps {
   db: DB;
   organizationId: string;
   userId: string;
+  redisUrl: string;
 }
 
 let cached: CliDeps | undefined;
@@ -37,6 +38,11 @@ export function resolveDeps(): CliDeps {
     });
   }
 
-  cached = { db: createDb(dbUrl), organizationId: orgId, userId };
+  // REDIS_URL is only required by commands that enqueue worker jobs; we
+  // default it here so commands that don't touch BullMQ keep working without
+  // a Redis instance configured.
+  const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6382';
+
+  cached = { db: createDb(dbUrl), organizationId: orgId, userId, redisUrl };
   return cached;
 }
