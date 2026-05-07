@@ -4,9 +4,9 @@ import { Toaster } from 'sonner';
 import { ThemeScript } from '@/components/theme-script';
 
 export const metadata = {
-  title: 'holo — context layer for AI agents',
+  title: 'holo — the context layer for AI-native companies',
   description:
-    'Open-source, self-hostable MCP context layer. Serious infrastructure for serious AI work.',
+    "Open-source MCP context layer. Continuously syncs your company's knowledge into one ACL-aware index every agent can call — the substrate of an AI-native company.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
