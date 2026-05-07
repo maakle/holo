@@ -1,12 +1,11 @@
 [build]
 builder = "DOCKERFILE"
-watchPatterns = ["apps/web/**", "packages/**"]
+watchPatterns = ["apps/web/**", "apps/gateway/**", "apps/worker/**", "packages/**"]
 
 [[services]]
 name = "holo-web"
 source = "apps/web/Dockerfile"
 healthcheckPath = "/api/health"
-startCommand = "node apps/web/server.js"
 
 [services.variables]
 PORT = "3000"
@@ -16,10 +15,16 @@ NODE_ENV = "production"
 name = "holo-gateway"
 source = "apps/gateway/Dockerfile"
 healthcheckPath = "/health"
-startCommand = "node apps/gateway/dist/main.js"
 
 [services.variables]
 MCP_PORT = "8080"
+NODE_ENV = "production"
+
+[[services]]
+name = "holo-worker"
+source = "apps/worker/Dockerfile"
+
+[services.variables]
 NODE_ENV = "production"
 
 [[services]]
@@ -30,3 +35,7 @@ image = "pgvector/pgvector:pg16"
 POSTGRES_DB = "holo"
 POSTGRES_USER = "holo"
 POSTGRES_PASSWORD = "${{POSTGRES_PASSWORD}}"
+
+[[services]]
+name = "redis"
+image = "redis:7-alpine"
