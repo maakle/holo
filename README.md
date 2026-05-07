@@ -137,6 +137,32 @@ curl -X POST http://localhost:8080/v1/search \
 
 ---
 
+## Deploy (Railway · Coolify)
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https%3A%2F%2Fgithub.com%2Fmaakle%2Fholo)
+
+**Coolify** has no universal 1-click URL (instances are self-hosted). Import flow: in your Coolify dashboard → *New Resource* → *Public Repository* → paste `https://github.com/maakle/holo` → select `docker-compose.yml`. Coolify auto-detects services. The `coolify.json` at the repo root mirrors the same shape if you prefer the service-template path.
+
+Both templates provision five services: `holo-web` (Next.js), `holo-gateway` (Hono MCP + REST), `holo-worker` (NestJS + BullMQ), `postgres` (`pgvector/pgvector:pg16`), and `redis` (`7-alpine`).
+
+### How environment variables work
+
+Three categories, three different mechanisms:
+
+| Category | Vars | How they get set |
+|---|---|---|
+| **Auto-wired by the platform** | `DATABASE_URL`, `REDIS_URL` | Railway: reference variables (`${{Postgres.DATABASE_URL}}`, `${{Redis.REDIS_URL}}`) — set them once on `holo-web`/`holo-gateway`/`holo-worker` after the DB and Redis services come up. Coolify: when you attach a Postgres/Redis service to the project, both URLs are exposed as connection-string env vars on the same network. |
+| **You generate (secrets)** | `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `HOLO_TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32` for each. Paste into the project's env panel before the first deploy. `POSTGRES_PASSWORD` must match what `DATABASE_URL` references. |
+| **You provide (public URLs + OAuth)** | `BETTER_AUTH_URL`, `WEB_PUBLIC_URL`, `MCP_PUBLIC_URL`, `GITHUB_LOGIN_CLIENT_ID`/`_SECRET`, `ANTHROPIC_API_KEY` | Set after the first deploy gives you the public hostnames. `BETTER_AUTH_URL` and `WEB_PUBLIC_URL` point at `holo-web`'s public URL; `MCP_PUBLIC_URL` points at `holo-gateway`'s. The GitHub OAuth app's callback must be `${BETTER_AUTH_URL}/api/auth/callback/github`. |
+
+Connector credentials (Slack, GitHub App, HubSpot, Pylon, Notion, Grain) are **not** required at boot — leave them blank, deploy, then add them per-connector in the Holo dashboard once `apps/web` is reachable.
+
+Full env reference: [`.env.example`](./.env.example).
+
+> **Note on the Railway template format.** `railway.toml`'s multi-service block (`[[services]]`) is best-effort — Railway's first-class multi-service experience is via the published Template Marketplace, which we haven't shipped yet ([`docs/ROADMAP.md` ↗](./docs/ROADMAP.md)). After clicking the button, verify each service in the Railway dashboard and set reference variables. Tracking issue welcome.
+
+---
+
 ## Development
 
 ```bash

@@ -318,11 +318,9 @@ holo/
 │   ├── api-client/       # Generated typed client from OpenAPI
 │   ├── ui/               # shadcn components
 │   └── config/           # eslint/tsconfig/prettier
-├── deploy/
-│   ├── docker-compose.yml
-│   ├── docker-compose.advanced.yml   # ParadeDB swap, MinIO, GPU reranker
-│   ├── railway.json
-│   └── coolify/
+├── docker-compose.yml
+├── railway.toml          # 1-click deploy on Railway (5 services)
+├── coolify.json          # 1-click deploy on Coolify (5 services)
 ├── pnpm-workspace.yaml
 ├── turbo.json
 └── package.json
