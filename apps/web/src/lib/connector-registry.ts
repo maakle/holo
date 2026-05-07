@@ -17,7 +17,16 @@ export const CONNECTOR_CATEGORIES: ConnectorCategory[] = [
 ];
 
 export interface ConnectorMeta {
-  id: 'github' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot' | 'linear' | 'mintlify';
+  id:
+    | 'github'
+    | 'slack'
+    | 'notion'
+    | 'grain'
+    | 'pylon'
+    | 'hubspot'
+    | 'linear'
+    | 'mintlify'
+    | 'zendesk';
   displayName: string;
   description: string;
   category: ConnectorCategoryId;
@@ -87,6 +96,14 @@ export const CONNECTORS: ConnectorMeta[] = [
     displayName: 'Mintlify Docs',
     description: 'Public Mintlify-hosted documentation: pages and OpenAPI reference.',
     category: 'productivity',
+    implemented: true,
+    flowType: 'apikey',
+  },
+  {
+    id: 'zendesk',
+    displayName: 'Zendesk Help Center',
+    description: 'Public Zendesk help center articles, with section + category breadcrumb.',
+    category: 'customer',
     implemented: true,
     flowType: 'apikey',
   },

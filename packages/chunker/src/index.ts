@@ -23,3 +23,8 @@ export {
   type OpenApiEndpointInput,
   type OpenApiDocument,
 } from './openapi-endpoint.js';
+export {
+  zendeskArticleChunker,
+  stripHtmlToText,
+  type ZendeskArticleInput,
+} from './zendesk-article.js';

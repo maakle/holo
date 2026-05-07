@@ -11,6 +11,7 @@ import { PylonSyncModule } from './queues/pylon';
 import { HubspotSyncModule } from './queues/hubspot';
 import { LinearSyncModule } from './queues/linear';
 import { MintlifySyncModule } from './queues/mintlify';
+import { ZendeskSyncModule } from './queues/zendesk';
 import { EmbedModule } from './queues/embed';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 import { SyncRunnersModule } from './queues/runners.module';
@@ -58,6 +59,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     HubspotSyncModule,
     LinearSyncModule,
     MintlifySyncModule,
+    ZendeskSyncModule,
     EmbedModule,
     SyncRunnersModule,
     SyncSchedulerModule,

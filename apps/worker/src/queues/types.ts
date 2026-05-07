@@ -8,6 +8,7 @@ export const QUEUE_NAMES = {
   HUBSPOT_SYNC: 'hubspot-sync',
   LINEAR_SYNC: 'linear-sync',
   MINTLIFY_SYNC: 'mintlify-sync',
+  ZENDESK_SYNC: 'zendesk-sync',
   EMBED: 'embed',
 } as const;
 
@@ -23,6 +24,7 @@ export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   'hubspot-sync': 2,
   'linear-sync': 2,
   'mintlify-sync': 2,
+  'zendesk-sync': 2,
   embed: 5,
 };
 

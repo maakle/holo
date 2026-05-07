@@ -8,6 +8,7 @@ import { PylonSyncModule } from './pylon';
 import { HubspotSyncModule } from './hubspot';
 import { LinearSyncModule } from './linear';
 import { MintlifySyncModule } from './mintlify';
+import { ZendeskSyncModule } from './zendesk';
 import { SyncSchedulerService } from './sync-scheduler.service';
 
 @Module({
@@ -21,6 +22,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
     HubspotSyncModule,
     LinearSyncModule,
     MintlifySyncModule,
+    ZendeskSyncModule,
   ],
   providers: [SyncSchedulerService],
 })

@@ -15,6 +15,7 @@ import {
   createSlackSpec,
   createGithubSpec,
   createMintlifySpec,
+  createZendeskSpec,
   githubAppConfigFromEnv,
 } from '@holo/connectors';
 import { setSyncRunner } from './sync-runner-registry';
@@ -126,8 +127,14 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       QUEUE_NAMES.MINTLIFY_SYNC,
       createGenericRunner(createMintlifySpec(), deps),
     );
+    // Zendesk help centers, also fully public — same shape as Mintlify
+    // (per-source baseUrl on sources.metadata, none() auth).
+    setSyncRunner(
+      QUEUE_NAMES.ZENDESK_SYNC,
+      createGenericRunner(createZendeskSpec(), deps),
+    );
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, mintlify',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, mintlify, zendesk',
     );
 
     // Reap any 'running' rows the previous worker incarnation left behind
