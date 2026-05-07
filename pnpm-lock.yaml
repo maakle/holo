@@ -126,6 +126,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@holo/agent-tools':
+        specifier: workspace:*
+        version: link:../../packages/agent-tools
       '@holo/audit':
         specifier: workspace:*
         version: link:../../packages/audit
@@ -153,6 +156,9 @@ importers:
       '@holo/errors':
         specifier: workspace:*
         version: link:../../packages/errors
+      '@holo/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
       '@holo/oauth-provider':
         specifier: workspace:*
         version: link:../../packages/oauth-provider

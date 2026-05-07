@@ -10,6 +10,7 @@ import {
   Users,
   Terminal,
   Settings,
+  MessageSquare,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -45,6 +46,7 @@ const sections: NavSection[] = [
     items: [
       { href: '/observability', label: 'Observability', icon: Activity },
       { href: '/connect-agent', label: 'Connect agent', icon: Terminal },
+      { href: '/chat', label: 'Chat', icon: MessageSquare },
     ],
   },
   {
