@@ -4,7 +4,6 @@ import {
   createNotionRunner,
   createGithubProseRunner,
   createGithubCodeRunner,
-  createHubspotRunner,
 } from '../src/queues/runners';
 
 // Minimal mocks of the worker's runtime deps. Runners are factories — the
@@ -75,29 +74,10 @@ describe('runner factories', () => {
     expect(runner.incremental).toBeUndefined();
   });
 
-  it('createHubspotRunner exposes full + incremental', () => {
-    const runner = createHubspotRunner({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      db: mockDb() as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      embedQueue: mockEmbedQueue() as any,
-    });
-    expect(typeof runner.full).toBe('function');
-    expect(typeof runner.incremental).toBe('function');
-    expect(runner.codeInitial).toBeUndefined();
-  });
-
-  it('hubspot runner.full throws HOLO_AUTH_NO_SESSION when no token is found', async () => {
-    const runner = createHubspotRunner({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      db: mockDb() as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      embedQueue: mockEmbedQueue() as any,
-    });
-    await expect(
-      runner.full!({ sourceId: 'src-1', organizationId: 'org-1' }),
-    ).rejects.toMatchObject({ code: 'HOLO_AUTH_NO_SESSION' });
-  });
+  // HubSpot's runner moved to the framework via createGenericRunner +
+  // createHubspotSpec (see runners.module.ts). Coverage for that path lives
+  // in @holo/connector-framework's runtime tests + @holo/connectors's
+  // hubspot spec tests.
 
   it('slack runner.full throws HOLO_AUTH_NO_SESSION when no token is found', async () => {
     const runner = createSlackRunner({
