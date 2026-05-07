@@ -21,7 +21,6 @@ import {
   createNotionConnector,
   createGithubApiClient,
   createGrainConnector,
-  createPylonConnector,
   createHubspotConnector,
   resolveAllowlist,
   runGithubProseSync,
@@ -105,7 +104,7 @@ async function resolveGithubRepos(args: {
 async function loadConnectorToken(
   db: DB,
   organizationId: string,
-  provider: 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot',
+  provider: 'slack' | 'notion' | 'grain' | 'hubspot',
 ): Promise<string> {
   const rows = await db
     .select({ accessToken: schema.connectorCredentials.accessToken })
@@ -393,31 +392,8 @@ export function createGrainRunner(deps: RunnerDeps): SyncRunner {
   };
 }
 
-// ── Pylon ────────────────────────────────────────────────────────────────────
-export function createPylonRunner(deps: RunnerDeps): SyncRunner {
-  const enqueueEmbed = makeEnqueueEmbed(deps.embedQueue);
-
-  return {
-    async full(payload: SyncJobPayload): Promise<SyncResult> {
-      const apiKey = await loadConnectorToken(deps.db, payload.organizationId, 'pylon');
-      const connector = createPylonConnector({ apiKey, db: deps.db, enqueueEmbed });
-      const result = await connector.fullSync(
-        { accessToken: apiKey },
-        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
-      );
-      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
-    },
-    async incremental(payload: SyncJobPayload): Promise<SyncResult> {
-      const apiKey = await loadConnectorToken(deps.db, payload.organizationId, 'pylon');
-      const connector = createPylonConnector({ apiKey, db: deps.db, enqueueEmbed });
-      const result = await connector.incrementalSync(
-        { accessToken: apiKey },
-        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
-      );
-      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
-    },
-  };
-}
+// Pylon migrated to @holo/connector-framework — see runners.module.ts for
+// the registration via createGenericRunner(createPylonSpec(), deps).
 
 // ── HubSpot ──────────────────────────────────────────────────────────────────
 export function createHubspotRunner(deps: RunnerDeps): SyncRunner {
