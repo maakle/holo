@@ -386,7 +386,7 @@ function LogTable({
           borderColor: 'var(--border)',
           color: 'var(--text-subtle)',
           background: 'var(--bg)',
-          gridTemplateColumns: '180px 220px 1fr 80px 1fr',
+          gridTemplateColumns: '180px 80px 1fr 80px 1fr',
           columnGap: '16px',
         }}
       >
@@ -438,7 +438,7 @@ function LogRow({
         {formatTime(event.createdAt)}
       </span>
       <span className="flex min-w-0 items-center">
-        <StatusTag hasError={hasError} code={event.errorCode} />
+        <StatusTag hasError={hasError} />
       </span>
       <span className="truncate" style={{ color: 'var(--text-muted)' }}>
         {event.agentIdentity ?? '—'}
@@ -456,14 +456,8 @@ function LogRow({
   );
 }
 
-function StatusTag({
-  hasError,
-  code,
-}: {
-  hasError: boolean;
-  code?: string | null;
-}) {
-  const label = hasError ? code ?? 'error' : 'ok';
+function StatusTag({ hasError }: { hasError: boolean }) {
+  const label = hasError ? 'error' : 'ok';
   const tone = hasError ? 'var(--error)' : 'var(--success)';
   return (
     <span
