@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { getServerContext } from '@/lib/server-context';
 import { schema } from '@holo/db';
 import { mintAuthCode } from '@holo/oauth-provider';
+import { emitAuditEvent } from '@holo/audit';
 
 interface Props {
   searchParams: Promise<{
@@ -55,6 +56,16 @@ async function approveAction(formData: FormData) {
     scopes,
     codeChallenge,
     codeChallengeMethod: 'S256',
+  });
+
+  emitAuditEvent({
+    db,
+    organizationId,
+    userId: sessionUser.id,
+    eventType: 'oauth.code_authorized',
+    resourceType: 'oauth_client',
+    resourceId: clientId,
+    meta: { scopes, redirectUri },
   });
 
   redirect(`${redirectUri}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);

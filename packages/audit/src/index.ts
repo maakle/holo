@@ -14,8 +14,14 @@ export type AuditEventType =
   | 'skill.published'
   | 'skill.synthesized'
   | 'member.invited'
+  | 'member.invitation_cancelled'
   | 'custom_tool.invoked'
-  | 'user_subjects.refreshed';
+  | 'user_subjects.refreshed'
+  | 'connector.connected'
+  | 'connector.disconnected'
+  | 'connector.resync_triggered'
+  | 'connector.stopped'
+  | 'oauth.code_authorized';
 
 export interface EmitAuditEventInput {
   db: DB;
