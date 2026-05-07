@@ -12,7 +12,6 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@holo/agent-tools": "workspace:*",
     "@holo/audit": "workspace:*",
     "@holo/discovery": "workspace:*",
     "@holo/auth": "workspace:*",

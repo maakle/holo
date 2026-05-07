@@ -31,10 +31,10 @@ interface ChatApiResponse {
 }
 
 const SUGGESTIONS = [
-  'List the tools you have access to.',
   'Search for "onboarding" and summarize the top results.',
   'List all skills available to me.',
-  'What is the most recent Slack message indexed?',
+  'What do we know about authentication in our codebase?',
+  'Find recent discussions about deployment.',
 ];
 
 export function ChatPanel({ hasAnthropicKey }: { hasAnthropicKey: boolean }) {

@@ -18,9 +18,15 @@ export default async function ChatPage() {
           Talk to the holo agent
         </h1>
         <p className="max-w-2xl text-[15px] leading-6 text-text-muted">
-          Test the same agent loop your MCP clients see. Every message runs against your
-          indexed sources and skills with the full holo tool surface — search, fetch
-          artifacts, list and execute skills, plus any custom tools registered for this org.
+          Test the holo agent against your indexed content without leaving the dashboard.
+          The agent has read-only tools to <span className="font-mono text-text">search</span>{' '}
+          your sources and inspect <span className="font-mono text-text">skills</span>; for
+          the full MCP surface (artifact fetchers, skill execution, custom tools) point a
+          real client at the gateway from{' '}
+          <a href="/connect-agent" className="text-accent hover:underline">
+            Connect agent
+          </a>
+          .
         </p>
       </header>
       <ChatPanel hasAnthropicKey={hasAnthropicKey} />

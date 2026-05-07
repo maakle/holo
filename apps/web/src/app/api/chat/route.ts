@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { z } from 'zod';
+import { and, eq } from 'drizzle-orm';
+import { schema, type DB } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
-import { listTools, type ToolContext, type ToolDefinition } from '@holo/agent-tools';
+import { search } from '@holo/retrieval-core';
+import { parseSkill } from '@holo/skills';
 import { AnthropicLLMClient, type LLMMessage, type LLMTool } from '@holo/llm';
 import { getSubjectsForUser } from '@holo/user-subjects';
 import { getServerContext } from '@/lib/server-context';
@@ -31,38 +34,186 @@ interface ToolCallTrace {
   durationMs?: number;
 }
 
-const SYSTEM_PROMPT = `You are holo, a knowledge assistant. You have tools to search and fetch content from this organization's connected sources, plus tools to list and execute skills and any custom tools registered for the org. Use whichever tools you need to answer the user's question — do not assume which sources are available; let the tool list and tool results tell you.
+interface ToolCtx {
+  db: DB;
+  organizationId: string;
+  userSubjects: string[];
+}
+
+interface LocalTool {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  run: (ctx: ToolCtx, args: unknown) => Promise<unknown>;
+}
+
+const SYSTEM_PROMPT = `You are holo, a knowledge assistant. You have a small set of read-only tools to search and inspect this organization's indexed content and registered skills. Use them to ground your answer; do not speculate.
 
 Rules:
-- Ground every claim in a tool result. Do not speculate.
-- Keep answers concise. Use plain markdown if formatting helps; do not wrap responses in fenced code blocks unless quoting code.
-- If you cannot find an answer, say so directly — do not invent one.
+- Ground every claim in a tool result. Do not invent facts.
+- Keep answers concise. Use plain markdown if formatting helps.
+- If you cannot find an answer, say so directly.
 - This is an interactive web chat used to test the holo agent surface; explaining which tools you used is welcome when relevant.`;
 
-// Anthropic rejects anyOf/oneOf/allOf at the top level of input_schema and
-// requires { type: "object" }. Mirror the worker's flattener.
-function toAnthropicInputSchema(raw: unknown): Record<string, unknown> {
-  const schema = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const branches =
-    (schema['anyOf'] as unknown) ??
-    (schema['oneOf'] as unknown) ??
-    (schema['allOf'] as unknown);
+const searchInput = z.object({
+  q: z.string().min(1),
+  top_k: z.number().int().min(1).max(20).optional().default(8),
+  provider: z.enum(['github', 'slack', 'notion', 'grain', 'pylon']).optional(),
+});
 
-  if (Array.isArray(branches)) {
-    const properties: Record<string, unknown> = {};
-    for (const branch of branches) {
-      if (branch && typeof branch === 'object') {
-        const branchProps = (branch as { properties?: Record<string, unknown> }).properties;
-        if (branchProps) Object.assign(properties, branchProps);
+const listSkillsInput = z.object({
+  status: z.enum(['draft', 'active', 'archived']).optional().default('active'),
+});
+
+const getSkillInput = z
+  .object({
+    id: z.string().uuid().optional(),
+    slug: z.string().optional(),
+    version: z.number().int().positive().optional(),
+  })
+  .refine((d) => d.id !== undefined || d.slug !== undefined, {
+    message: 'Either id or slug must be provided',
+  });
+
+const TOOLS: LocalTool[] = [
+  {
+    name: 'search',
+    description:
+      'Hybrid search across all ingested artifacts (vector + BM25). Returns top-k chunks with snippet, score, and source metadata.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        q: { type: 'string', description: 'Natural-language query.' },
+        top_k: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 20,
+          default: 8,
+          description: 'Maximum number of results.',
+        },
+        provider: {
+          type: 'string',
+          enum: ['github', 'slack', 'notion', 'grain', 'pylon'],
+          description: 'Optional provider filter.',
+        },
+      },
+      required: ['q'],
+    },
+    async run(ctx, raw) {
+      const input = searchInput.parse(raw);
+      const results = await search({
+        db: ctx.db,
+        organizationId: ctx.organizationId,
+        q: input.q,
+        topK: input.top_k,
+        provider: input.provider,
+        userSubjects: ctx.userSubjects,
+      });
+      return {
+        results: results.map((r) => ({
+          chunk_id: r.chunkId,
+          score: r.score,
+          content: r.content,
+          source: {
+            provider: r.source.provider,
+            artifact_kind: r.source.artifactKind,
+            metadata: r.source.metadata,
+          },
+          ...(r.snippetUrl ? { snippet_url: r.snippetUrl } : {}),
+        })),
+      };
+    },
+  },
+  {
+    name: 'list_skills',
+    description:
+      'List skills available in this organization. Filter by status (default: active). Returns id, name, slug, version, status, description.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['draft', 'active', 'archived'],
+          default: 'active',
+        },
+      },
+    },
+    async run(ctx, raw) {
+      const input = listSkillsInput.parse(raw);
+      const rows = await ctx.db
+        .select({
+          id: schema.skills.id,
+          name: schema.skills.name,
+          slug: schema.skills.slug,
+          version: schema.skills.version,
+          status: schema.skills.status,
+          content: schema.skills.content,
+        })
+        .from(schema.skills)
+        .where(
+          and(
+            eq(schema.skills.organizationId, ctx.organizationId),
+            eq(schema.skills.status, input.status),
+          ),
+        );
+
+      const skills = [];
+      for (const r of rows) {
+        try {
+          const parsed = parseSkill(r.content);
+          skills.push({
+            id: r.id,
+            name: r.name,
+            slug: r.slug,
+            version: r.version,
+            status: r.status,
+            description: parsed.frontmatter.description,
+          });
+        } catch {
+          // Skip rows with malformed YAML — synthesis may produce invalid frontmatter.
+        }
       }
-    }
-    const { anyOf: _a, oneOf: _o, allOf: _al, type: _t, properties: _p, ...rest } = schema;
-    return { ...rest, type: 'object', properties };
-  }
+      return { skills };
+    },
+  },
+  {
+    name: 'get_skill',
+    description:
+      'Retrieve the full content of a skill by id or slug (optionally pinning version).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        slug: { type: 'string' },
+        version: { type: 'integer', minimum: 1 },
+      },
+    },
+    async run(ctx, raw) {
+      const input = getSkillInput.parse(raw);
+      const conditions = [eq(schema.skills.organizationId, ctx.organizationId)];
+      if (input.id !== undefined) conditions.push(eq(schema.skills.id, input.id));
+      if (input.slug !== undefined) conditions.push(eq(schema.skills.slug, input.slug));
+      if (input.version !== undefined)
+        conditions.push(eq(schema.skills.version, input.version));
 
-  if (schema['type'] === 'object') return schema;
-  return { type: 'object', ...schema };
-}
+      const rows = await ctx.db
+        .select({
+          id: schema.skills.id,
+          name: schema.skills.name,
+          slug: schema.skills.slug,
+          version: schema.skills.version,
+          status: schema.skills.status,
+          content: schema.skills.content,
+        })
+        .from(schema.skills)
+        .where(and(...conditions))
+        .limit(1);
+      const row = rows[0];
+      if (!row) return { skill: null };
+      return { skill: row };
+    },
+  },
+];
 
 export async function POST(req: Request) {
   try {
@@ -95,21 +246,17 @@ export async function POST(req: Request) {
     const orgId = resolveActiveOrgId(session, defaultOrgId);
     const userId = session.user.id;
     const extraSubjects = await getSubjectsForUser(db, userId);
-    const ctx: ToolContext = {
+    const ctx: ToolCtx = {
       db,
       organizationId: orgId,
-      userId,
       userSubjects: [`org:${orgId}`, `user:${userId}`, ...extraSubjects],
-      anthropicApiKey: env.ANTHROPIC_API_KEY,
-      agentIdentity: 'web-chat',
     };
 
-    const tools = await listTools(ctx);
-    const toolByName = new Map<string, ToolDefinition>(tools.map((t) => [t.name, t]));
-    const llmTools: LLMTool[] = tools.map((t) => ({
+    const toolByName = new Map<string, LocalTool>(TOOLS.map((t) => [t.name, t]));
+    const llmTools: LLMTool[] = TOOLS.map((t) => ({
       name: t.name,
       description: t.description,
-      inputSchema: toAnthropicInputSchema(t.inputSchema),
+      inputSchema: t.inputSchema,
     }));
 
     const client = new AnthropicLLMClient({ apiKey: env.ANTHROPIC_API_KEY });
@@ -149,7 +296,6 @@ export async function POST(req: Request) {
       });
       modelCalls += 1;
 
-      // Carry the assistant turn forward (text + any tool_use blocks).
       messages.push({ role: 'assistant', content: response.content });
 
       if (response.stopReason !== 'tool_use') {
