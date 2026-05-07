@@ -5,7 +5,6 @@ import postgres from 'postgres';
 import { createDb, type DB } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
 import { QUEUE_NAMES } from './types';
-import { createGithubProseRunner, createGithubCodeRunner } from './runners';
 import { createGenericRunner } from './framework-bridge';
 import {
   createLinearSpec,
@@ -14,6 +13,8 @@ import {
   createNotionSpec,
   createGrainSpec,
   createSlackSpec,
+  createGithubSpec,
+  githubAppConfigFromEnv,
 } from '@holo/connectors';
 import { setSyncRunner } from './sync-runner-registry';
 import { reconcileOrphanedRuns } from './sync-runs-store';
@@ -64,8 +65,30 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       ),
     );
     setSyncRunner(QUEUE_NAMES.NOTION_SYNC, createGenericRunner(createNotionSpec(), deps));
-    setSyncRunner(QUEUE_NAMES.GITHUB_PROSE_SYNC, createGithubProseRunner(deps));
-    setSyncRunner(QUEUE_NAMES.GITHUB_CODE_SYNC, createGithubCodeRunner(deps));
+
+    // GitHub: one spec, two queue runners. The framework's resources filter
+    // sends prose-queue jobs to the `prose` resource and code-queue jobs to
+    // the `code` resource on the same createGithubSpec instance. The 'code'
+    // shape exposes codeInitial/codeIncremental (matching the existing
+    // dispatcher contract).
+    if (process.env.GITHUB_APP_ID && process.env.GITHUB_APP_PRIVATE_KEY_B64) {
+      const githubConfig = githubAppConfigFromEnv({
+        GITHUB_APP_ID: process.env.GITHUB_APP_ID,
+        GITHUB_APP_PRIVATE_KEY_B64: process.env.GITHUB_APP_PRIVATE_KEY_B64,
+      });
+      const githubSpec = createGithubSpec({
+        appId: githubConfig.appId,
+        privateKeyPem: githubConfig.privateKeyPem,
+      });
+      setSyncRunner(
+        QUEUE_NAMES.GITHUB_PROSE_SYNC,
+        createGenericRunner(githubSpec, deps, { resources: ['prose'] }),
+      );
+      setSyncRunner(
+        QUEUE_NAMES.GITHUB_CODE_SYNC,
+        createGenericRunner(githubSpec, deps, { resources: ['code'], shape: 'code' }),
+      );
+    }
     setSyncRunner(
       QUEUE_NAMES.GRAIN_SYNC,
       createGenericRunner(
@@ -96,7 +119,7 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       ),
     );
     this.logger.log(
-      'Registered real SyncRunners for github-prose, github-code (legacy) + slack, grain, pylon, hubspot, notion, linear (framework)',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code',
     );
 
     // Reap any 'running' rows the previous worker incarnation left behind

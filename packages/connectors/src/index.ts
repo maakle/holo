@@ -44,26 +44,11 @@ export type { NotionSpecOptions } from './notion/index';
 export { createGrainSpec } from './grain/index';
 export type { GrainSpecOptions } from './grain/index';
 
-// Underlying sync engines + API clients (used by the worker to bypass the
-// connector facade for github, where prose and code dispatch on different queues).
-export { runGithubProseSync } from './github/sync-prose';
-export type {
-  RunGithubProseSyncInput,
-  RunGithubProseSyncOutput,
-  GithubProseChunkPayload,
-  GithubProseEmbedEnqueueFn,
-} from './github/sync-prose';
-export { runGithubCodeSync, realGitShell } from './github/sync-code';
-export type {
-  RunGithubCodeSyncInput,
-  RunGithubCodeSyncOutput,
-  GithubCodeChunkPayload,
-  GithubCodeEmbedEnqueueFn,
-  GitShell,
-} from './github/sync-code';
-export { createGithubApiClient } from './github/api-client';
-export type { GithubApiClient } from './github/api-client';
+// GitHub (framework-native spec + retained helpers for the bot, gateway,
+// install/uninstall flow, and the webhook receiver). All re-exported via
+// github/index.ts so the public surface follows the canonical template.
 export {
+  createGithubSpec,
   loadGithubInstallationToken,
   listInstallationRepos,
   mintInstallationToken,
@@ -71,11 +56,27 @@ export {
   uninstallApp,
   githubAppConfigFromEnv,
   __clearGithubAppTokenCacheForTests,
-} from './github/auth';
-export type { GithubAppConfig } from './github/auth';
-export {
+  createGithubApiClient,
+  runGithubProseSync,
+  runGithubCodeSync,
+  realGitShell,
   verifyGithubWebhookSignature,
   isHandledEvent,
   GITHUB_WEBHOOK_EVENTS,
-} from './github/webhook';
-export type { GithubWebhookEvent, VerifyResult } from './github/webhook';
+} from './github/index';
+export type {
+  GithubSpecOptions,
+  GithubAppConfig,
+  GithubApiClient,
+  RunGithubProseSyncInput,
+  RunGithubProseSyncOutput,
+  GithubProseChunkPayload,
+  GithubProseEmbedEnqueueFn,
+  RunGithubCodeSyncInput,
+  RunGithubCodeSyncOutput,
+  GithubCodeChunkPayload,
+  GithubCodeEmbedEnqueueFn,
+  GitShell,
+  GithubWebhookEvent,
+  VerifyResult,
+} from './github/index';
