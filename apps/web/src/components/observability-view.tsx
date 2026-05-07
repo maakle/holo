@@ -386,7 +386,7 @@ function LogTable({
           borderColor: 'var(--border)',
           color: 'var(--text-subtle)',
           background: 'var(--bg)',
-          gridTemplateColumns: '180px 180px 1fr 80px 1fr',
+          gridTemplateColumns: '180px 220px 1fr 80px 1fr',
           columnGap: '16px',
         }}
       >
@@ -467,7 +467,7 @@ function StatusTag({
   const tone = hasError ? 'var(--error)' : 'var(--success)';
   return (
     <span
-      className="inline-flex max-w-full items-center truncate rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.04em]"
+      className="inline-flex max-w-full items-center truncate rounded-sm px-1.5 py-px font-mono text-[10px] font-medium uppercase leading-[14px] tracking-[0.04em]"
       title={label}
       style={{
         background: hasError
