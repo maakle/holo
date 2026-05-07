@@ -8,16 +8,13 @@
 import { describe, it, expect } from 'vitest';
 import { createGithubSpec } from '../src/github/index';
 
-// A real-looking but disposable PEM. Used only by spec construction; the
-// JWT signing path doesn't run in these tests.
-const TEST_PEM = `-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC6MEGV9uM2X3wL
-test-test-test-test-test-test-test-test-test-test-test-test-test
------END PRIVATE KEY-----`;
-
+// The spec construction path stores the privateKeyPem string but doesn't
+// parse it — JWT signing only happens when `auth.mintInstallationToken()`
+// fires, and these tests never call it. A non-PEM placeholder keeps the
+// fixture from looking like a real key to secret scanners.
 const opts = {
   appId: '12345',
-  privateKeyPem: TEST_PEM,
+  privateKeyPem: 'placeholder-not-parsed-by-this-suite',
 };
 
 describe('createGithubSpec', () => {
