@@ -8,6 +8,7 @@ export {
 } from './registry';
 
 export type {
+  AllowlistEntry,
   ConnectorSpec,
   ConnectorTokens,
   ResourceSpec,

@@ -18,7 +18,6 @@ import { schema, type DB } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
 import {
   createSlackConnector,
-  createNotionConnector,
   createGithubApiClient,
   createGrainConnector,
   resolveAllowlist,
@@ -102,7 +101,7 @@ async function resolveGithubRepos(args: {
 async function loadConnectorToken(
   db: DB,
   organizationId: string,
-  provider: 'slack' | 'notion' | 'grain',
+  provider: 'slack' | 'grain',
 ): Promise<string> {
   const rows = await db
     .select({ accessToken: schema.connectorCredentials.accessToken })
@@ -209,41 +208,8 @@ export function createSlackRunner(deps: RunnerDeps): SyncRunner {
   };
 }
 
-// ── Notion ───────────────────────────────────────────────────────────────────
-export function createNotionRunner(deps: RunnerDeps): SyncRunner {
-  const enqueueEmbed = makeEnqueueEmbed(deps.embedQueue);
-  const buildConnector = (): ReturnType<typeof createNotionConnector> =>
-    createNotionConnector({ db: deps.db, enqueueEmbed });
-
-  return {
-    async full(payload: SyncJobPayload, opts): Promise<SyncResult> {
-      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'notion');
-      const result = await buildConnector().fullSync(
-        { accessToken },
-        {
-          sourceId: payload.sourceId,
-          organizationId: payload.organizationId,
-          cursorScope: 'sync',
-          reportProgress: opts?.reportProgress,
-        },
-      );
-      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
-    },
-    async incremental(payload: SyncJobPayload, _cursor, opts): Promise<SyncResult> {
-      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'notion');
-      const result = await buildConnector().incrementalSync(
-        { accessToken },
-        {
-          sourceId: payload.sourceId,
-          organizationId: payload.organizationId,
-          cursorScope: 'sync',
-          reportProgress: opts?.reportProgress,
-        },
-      );
-      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
-    },
-  };
-}
+// Notion migrated to @holo/connector-framework — see runners.module.ts for
+// the registration via createGenericRunner(createNotionSpec(), deps).
 
 // ── GitHub prose ─────────────────────────────────────────────────────────────
 // Calls runGithubProseSync directly. The split between prose and code matches

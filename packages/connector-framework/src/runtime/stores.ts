@@ -1,4 +1,4 @@
-import type { ConnectorTokens } from '../types';
+import type { AllowlistEntry, ConnectorTokens } from '../types';
 
 /**
  * Persistence boundary between the framework and the host app. The framework
@@ -45,6 +45,17 @@ export interface RuntimeStores {
    * dedupe new chunks before enqueueing. Called once per sync.
    */
   loadExistingHashes(input: { organizationId: string }): Promise<Set<string>>;
+
+  /**
+   * Optional. Load the host's allowlist rows for (org, provider). Specs
+   * that need narrowing (Slack, GitHub, Notion) read this from
+   * `ctx.allowlist`. Hosts that don't expose an allowlist mechanism omit
+   * this and the runtime hands specs an empty array.
+   */
+  loadAllowlist?(input: {
+    organizationId: string;
+    providerId: string;
+  }): Promise<ReadonlyArray<AllowlistEntry>>;
 
   /**
    * Hand chunks off to the embed pipeline. Called by the runtime in batches.
