@@ -17,7 +17,7 @@ export const CONNECTOR_CATEGORIES: ConnectorCategory[] = [
 ];
 
 export interface ConnectorMeta {
-  id: 'github' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot';
+  id: 'github' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot' | 'linear';
   displayName: string;
   description: string;
   category: ConnectorCategoryId;
@@ -73,5 +73,13 @@ export const CONNECTORS: ConnectorMeta[] = [
     category: 'customer',
     implemented: true,
     flowType: 'apikey',
+  },
+  {
+    id: 'linear',
+    displayName: 'Linear',
+    description: 'Issues with title, description, status, priority, team, and labels.',
+    category: 'productivity',
+    implemented: true,
+    flowType: 'oauth',
   },
 ];

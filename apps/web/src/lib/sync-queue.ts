@@ -3,7 +3,7 @@ import { Queue } from 'bullmq';
 import { and, eq } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 
-type Provider = 'github' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot';
+type Provider = 'github' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot' | 'linear';
 
 const QUEUE_NAMES_BY_PROVIDER: Record<Provider, string[]> = {
   github: ['github-code-sync', 'github-prose-sync'],
@@ -12,6 +12,7 @@ const QUEUE_NAMES_BY_PROVIDER: Record<Provider, string[]> = {
   grain: ['grain-sync'],
   pylon: ['pylon-sync'],
   hubspot: ['hubspot-sync'],
+  linear: ['linear-sync'],
 };
 
 function parseRedisUrl(url: string): { host: string; port: number } {

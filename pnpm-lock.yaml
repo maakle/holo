@@ -132,6 +132,9 @@ importers:
       '@holo/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@holo/connector-framework':
+        specifier: workspace:*
+        version: link:../../packages/connector-framework
       '@holo/connectors':
         specifier: workspace:*
         version: link:../../packages/connectors
@@ -262,6 +265,9 @@ importers:
       '@holo/audit':
         specifier: workspace:*
         version: link:../../packages/audit
+      '@holo/connector-framework':
+        specifier: workspace:*
+        version: link:../../packages/connector-framework
       '@holo/connectors':
         specifier: workspace:*
         version: link:../../packages/connectors

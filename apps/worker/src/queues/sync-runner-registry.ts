@@ -28,6 +28,7 @@ const registry: Record<string, SyncRunner> = {
   'grain-sync': stubRunner('grain'),
   'pylon-sync': stubRunner('pylon'),
   'hubspot-sync': stubRunner('hubspot'),
+  'linear-sync': stubRunner('linear'),
 };
 
 export function getSyncRunner(queue: string): SyncRunner {

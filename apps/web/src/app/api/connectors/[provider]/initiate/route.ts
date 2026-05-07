@@ -5,6 +5,7 @@ import {
   shared,
   createSlackConnector,
   createGrainConnector,
+  createLinearSpec,
   type Connector,
 } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
@@ -88,11 +89,40 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
         clientId: env.GRAIN_CONNECTOR_CLIENT_ID,
         clientSecret: env.GRAIN_CONNECTOR_CLIENT_SECRET,
       });
+    } else if (provider === 'linear') {
+      // First framework-native connector — uses ConnectorSpec from
+      // @holo/connector-framework instead of the legacy Connector facade.
+      // The spec's auth strategy (oauth2) exposes the same buildAuthorizeUrl
+      // shape, so the rest of this route stays generic.
+      if (!env.LINEAR_CONNECTOR_CLIENT_ID || !env.LINEAR_CONNECTOR_CLIENT_SECRET) {
+        throw holoError({
+          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+          problem: 'Linear connector credentials are not configured',
+          fix: 'Set LINEAR_CONNECTOR_CLIENT_ID and LINEAR_CONNECTOR_CLIENT_SECRET in the environment.',
+        });
+      }
+      redirectUri = `${publicOrigin}/api/connectors/linear/callback`;
+      const spec = createLinearSpec({
+        clientId: env.LINEAR_CONNECTOR_CLIENT_ID,
+        clientSecret: env.LINEAR_CONNECTOR_CLIENT_SECRET,
+      });
+      const csrfNonce = shared.generateCsrfNonce();
+      const state = await shared.signState(
+        {
+          user_id: session.user.id,
+          organization_id: orgId,
+          csrf_nonce: csrfNonce,
+          provider,
+        },
+        env.BETTER_AUTH_SECRET,
+      );
+      const authorizeUrl = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
+      return NextResponse.json({ authorizeUrl });
     } else {
       throw holoError({
         code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: `${provider} connector does not use the OAuth initiate flow`,
-        fix: 'OAuth-redirect connectors: GitHub, Slack, Grain. API-key connectors (Notion, Pylon, HubSpot) use their own /connect endpoints.',
+        fix: 'OAuth-redirect connectors: GitHub, Slack, Grain, Linear. API-key connectors (Notion, Pylon, HubSpot) use their own /connect endpoints.',
       });
     }
 

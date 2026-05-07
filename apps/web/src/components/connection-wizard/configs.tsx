@@ -73,6 +73,21 @@ const grainConfig: ConnectorWizardConfig = {
   ],
 };
 
+const linearConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'install',
+      label: 'Authorize',
+      render: (ctx) =>
+        oauthInstallStep(ctx, {
+          installButtonLabel: 'Authorize Linear',
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 const hubspotConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
@@ -163,6 +178,7 @@ const REGISTRY: Record<ConnectorMeta['id'], ConnectorWizardConfig<any>> = {
   hubspot: hubspotConfig,
   notion: notionConfig,
   pylon: pylonConfig,
+  linear: linearConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -9,6 +9,7 @@ import { NotionSyncModule } from './queues/notion';
 import { GrainSyncModule } from './queues/grain';
 import { PylonSyncModule } from './queues/pylon';
 import { HubspotSyncModule } from './queues/hubspot';
+import { LinearSyncModule } from './queues/linear';
 import { EmbedModule } from './queues/embed';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 import { SyncRunnersModule } from './queues/runners.module';
@@ -54,6 +55,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     GrainSyncModule,
     PylonSyncModule,
     HubspotSyncModule,
+    LinearSyncModule,
     EmbedModule,
     SyncRunnersModule,
     SyncSchedulerModule,

@@ -15,6 +15,7 @@
     "@holo/audit": "workspace:*",
     "@holo/discovery": "workspace:*",
     "@holo/auth": "workspace:*",
+    "@holo/connector-framework": "workspace:*",
     "@holo/connectors": "workspace:*",
     "@holo/crypto": "workspace:*",
     "@holo/db": "workspace:*",

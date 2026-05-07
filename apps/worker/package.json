@@ -14,6 +14,7 @@
     "@anthropic-ai/sdk": "^0.92.0",
     "@holo/agent-tools": "workspace:*",
     "@holo/audit": "workspace:*",
+    "@holo/connector-framework": "workspace:*",
     "@holo/connectors": "workspace:*",
     "@holo/crypto": "workspace:*",
     "@holo/db": "workspace:*",
