@@ -27,6 +27,13 @@ export type SyncResult = {
   newCursor: Date | null;
   metadataPatch?: Record<string, unknown>;
   skipReason?: string;
+  /**
+   * Per-kind { new, deduped } counters from the framework runner. Optional
+   * because the source_deleted skip path bails before any chunks are
+   * considered, and we don't want to write a misleading empty breakdown
+   * for runs that didn't actually run.
+   */
+  breakdown?: Record<string, { new: number; deduped: number }>;
 };
 
 // Heartbeat callback. The processor wires this to a debounced DB write so

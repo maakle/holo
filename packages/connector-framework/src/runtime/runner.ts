@@ -12,6 +12,7 @@ import type {
 import type {
   ChunkRecord,
   RuntimeStores,
+  SyncBreakdown,
   SyncJobInput,
   SyncJobResult,
 } from './stores';
@@ -87,6 +88,20 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
   let artifactCount = 0;
   const cursorPatch: Record<string, unknown> = {};
   const emptyResources: string[] = [];
+  // Per-kind breakdown of what the upsert path did this run. Keyed by chunk
+  // kind (e.g. 'github-pr', 'linear-issue'). Mutated in the closure below;
+  // returned on the SyncJobResult so the worker can persist it on sync_runs.
+  const breakdown: SyncBreakdown = {};
+  const tallyNew = (kind: string): void => {
+    const slot = breakdown[kind] ?? { new: 0, deduped: 0 };
+    slot.new += 1;
+    breakdown[kind] = slot;
+  };
+  const tallyDeduped = (kind: string): void => {
+    const slot = breakdown[kind] ?? { new: 0, deduped: 0 };
+    slot.deduped += 1;
+    breakdown[kind] = slot;
+  };
 
   const resourceFilter = input.resources ? new Set(input.resources) : null;
 
@@ -120,8 +135,12 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
       signal: input.signal,
       async upsert(chunk: ChunkUpsert): Promise<void> {
         const hash = chunkHash(chunk.kind, chunk.content);
-        if (existingHashes.has(hash)) return;
+        if (existingHashes.has(hash)) {
+          tallyDeduped(chunk.kind);
+          return;
+        }
         existingHashes.add(hash);
+        tallyNew(chunk.kind);
         pending.push({
           externalId: chunk.externalId,
           kind: chunk.kind,
@@ -177,6 +196,7 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
     artifactCount,
     cursorPatch,
     emptyResources: emptyResources.length > 0 ? emptyResources : undefined,
+    breakdown,
   };
 }
 

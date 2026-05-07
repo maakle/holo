@@ -103,10 +103,20 @@ export interface SyncJobInput {
   sourceId: string;
 }
 
+/**
+ * Per-kind tally of what one sync run did. `new` is the chunk count newly
+ * inserted; `deduped` is the count dropped because the same content_hash
+ * already existed for the org (cross-sync rediscovery + intra-sync
+ * duplicates). Sum of `new` across kinds equals the run's `artifactCount`.
+ */
+export type SyncBreakdown = Record<string, { new: number; deduped: number }>;
+
 export interface SyncJobResult {
   artifactCount: number;
   /** Per-resource cursor patch, keyed by resource id. */
   cursorPatch: Record<string, unknown>;
   /** Resources that ran but had nothing new; reported for observability. */
   emptyResources?: ReadonlyArray<string>;
+  /** Per-kind { new, deduped } counters from the upsert path. */
+  breakdown: SyncBreakdown;
 }

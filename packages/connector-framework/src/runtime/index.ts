@@ -5,4 +5,5 @@ export type {
   RuntimeStores,
   SyncJobInput,
   SyncJobResult,
+  SyncBreakdown,
 } from './stores';

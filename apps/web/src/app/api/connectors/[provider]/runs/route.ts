@@ -34,6 +34,10 @@ type RunRow = {
   progressCurrent: number | null;
   progressTotal: number | null;
   progressMessage: string | null;
+  /** Per-kind { new, deduped } counts, populated by the framework runner
+   * on completion. Null on rows written before migration 0028 and on runs
+   * that bailed before reaching the upsert path (skip_reason set). */
+  breakdown: Record<string, { new: number; deduped: number }> | null;
 };
 
 const RESPONSE_LIMIT = 20;
@@ -100,6 +104,7 @@ export async function GET(
         finishedAt: schema.syncRuns.finishedAt,
         durationMs: schema.syncRuns.durationMs,
         artifactCount: schema.syncRuns.artifactCount,
+        breakdown: schema.syncRuns.breakdown,
         errorCode: schema.syncRuns.errorCode,
         errorProblem: schema.syncRuns.errorProblem,
         skipReason: schema.syncRuns.skipReason,
@@ -179,6 +184,7 @@ export async function GET(
           progressCurrent: r.progressCurrent ?? null,
           progressTotal: r.progressTotal ?? null,
           progressMessage: r.progressMessage ?? null,
+          breakdown: r.breakdown ?? null,
         };
         rowJobIds.set(row, r.jobId);
         return row;
@@ -233,6 +239,7 @@ export async function GET(
           progressCurrent: null,
           progressTotal: null,
           progressMessage: null,
+          breakdown: null,
         };
         if (existingIdx >= 0) {
           // Carry forward the live/progress fields that come from postgres —

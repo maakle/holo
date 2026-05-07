@@ -223,6 +223,15 @@ export const syncRuns = pgTable(
     finishedAt: timestamp('finished_at', { withTimezone: true }),
     durationMs: integer('duration_ms'),
     artifactCount: integer('artifact_count'),
+    /**
+     * Per-kind breakdown of what the run did. Shape:
+     *   { [kind]: { new: number; deduped: number } }
+     * `new` = chunks newly inserted (sum equals `artifactCount`).
+     * `deduped` = chunks dropped because their content_hash already existed
+     * for the org (cross-sync rediscovery + intra-sync duplicates).
+     * NULL on rows written before migration 0028.
+     */
+    breakdown: jsonb('breakdown').$type<Record<string, { new: number; deduped: number }>>(),
     errorCode: text('error_code'),
     errorProblem: text('error_problem'),
     errorCause: text('error_cause'),

@@ -279,6 +279,7 @@ export function createGenericRunner(
       // Keep the per-resource cursor map on the summary row's metadata so
       // operators can eyeball it without joining cursor rows.
       metadataPatch: result.cursorPatch,
+      breakdown: result.breakdown,
     };
   };
 

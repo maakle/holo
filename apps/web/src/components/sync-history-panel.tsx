@@ -21,7 +21,21 @@ type Run = {
   progressCurrent: number | null;
   progressTotal: number | null;
   progressMessage: string | null;
+  breakdown: Record<string, { new: number; deduped: number }> | null;
 };
+
+function totalsFromBreakdown(
+  breakdown: Run['breakdown'],
+): { newCount: number; dedupedCount: number } | null {
+  if (!breakdown) return null;
+  let newCount = 0;
+  let dedupedCount = 0;
+  for (const slot of Object.values(breakdown)) {
+    newCount += slot.new;
+    dedupedCount += slot.deduped;
+  }
+  return { newCount, dedupedCount };
+}
 
 function describeSkipReason(reason: string): string {
   if (reason === 'no_channels_selected') return 'no channels selected';
@@ -189,7 +203,21 @@ export function SyncHistoryPanel({ provider }: Props) {
           {runs.map((r) => {
             const rowKey = `${r.queue}:${r.id}`;
             const expanded = openRowId === rowKey;
-            const artifactsLabel = formatArtifacts(r.state, r.artifactCount, r.skipReason);
+            const breakdownTotals = totalsFromBreakdown(r.breakdown);
+            // When a breakdown exists, prefer the richer "+N new · M deduped"
+            // label over the legacy single-int "new chunks" line — both
+            // pull from the same data, but the breakdown also tells the user
+            // how much was already-indexed work the connector re-emitted.
+            const artifactsLabel =
+              breakdownTotals && r.state === 'completed'
+                ? breakdownTotals.newCount === 0 && breakdownTotals.dedupedCount === 0
+                  ? 'up to date'
+                  : `+${breakdownTotals.newCount.toLocaleString()} new${
+                      breakdownTotals.dedupedCount > 0
+                        ? ` · ${breakdownTotals.dedupedCount.toLocaleString()} deduped`
+                        : ''
+                    }`
+                : formatArtifacts(r.state, r.artifactCount, r.skipReason);
             // While running, surface the heartbeat in the collapsed header so
             // users see motion without expanding. Falls back to live chunk
             // counter when the connector hasn't reported a message yet.
@@ -272,6 +300,17 @@ export function SyncHistoryPanel({ provider }: Props) {
                               ? `${r.liveArtifactCount.toLocaleString()} so far (live)`
                               : '—'}
                       </dd>
+                      {breakdownTotals && breakdownTotals.dedupedCount > 0 ? (
+                        <>
+                          <dt className="text-text-muted">Deduped</dt>
+                          <dd className="text-text">
+                            {breakdownTotals.dedupedCount.toLocaleString()}
+                            <span className="ml-1 text-[11px] text-text-muted">
+                              (content already indexed for this org)
+                            </span>
+                          </dd>
+                        </>
+                      ) : null}
                       {r.state === 'active' &&
                       (r.progressMessage || r.progressCurrent !== null) ? (
                         <>
@@ -297,6 +336,45 @@ export function SyncHistoryPanel({ provider }: Props) {
                         </>
                       ) : null}
                     </dl>
+                    {r.breakdown && Object.keys(r.breakdown).length > 0 ? (
+                      <div className="mt-3">
+                        <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                          Breakdown
+                        </div>
+                        <table className="w-full [font-variant-numeric:tabular-nums]">
+                          <thead>
+                            <tr className="border-b border-border text-left">
+                              <th className="py-1.5 pr-3 text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                                Kind
+                              </th>
+                              <th className="py-1.5 pr-3 text-right text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                                New
+                              </th>
+                              <th className="py-1.5 text-right text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                                Deduped
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Object.entries(r.breakdown)
+                              .sort(([, a], [, b]) => b.new + b.deduped - (a.new + a.deduped))
+                              .map(([kind, slot]) => (
+                                <tr key={kind} className="border-b border-border last:border-b-0">
+                                  <td className="py-1.5 pr-3 font-mono text-[11px] text-text">
+                                    {kind}
+                                  </td>
+                                  <td className="py-1.5 pr-3 text-right text-[12px] text-text">
+                                    {slot.new.toLocaleString()}
+                                  </td>
+                                  <td className="py-1.5 text-right text-[12px] text-text-muted">
+                                    {slot.deduped.toLocaleString()}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
                     {r.state === 'failed' && r.failedReason ? (
                       <div className="mt-2.5 rounded-sm border border-error/30 bg-[color-mix(in_srgb,var(--error)_8%,transparent)] p-2 font-mono text-[11px] text-error">
                         <div>{r.failedReason}</div>
@@ -308,10 +386,13 @@ export function SyncHistoryPanel({ provider }: Props) {
                         </div>
                       </div>
                     ) : null}
-                    <div className="mt-2.5 text-[11px] text-text-muted">
-                      Per-file breakdown (indexed / skipped / deduped) currently
-                      lives only in worker logs.
-                    </div>
+                    {!r.breakdown && r.state === 'completed' ? (
+                      <div className="mt-2.5 text-[11px] text-text-muted">
+                        No per-kind breakdown for this run — runs from before
+                        the breakdown column was added (migration 0028) only
+                        recorded the totals above.
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </li>
