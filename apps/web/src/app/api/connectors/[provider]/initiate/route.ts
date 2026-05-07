@@ -3,10 +3,9 @@ import { headers } from 'next/headers';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import {
   shared,
-  createSlackConnector,
+  createSlackSpec,
   createGrainSpec,
   createLinearSpec,
-  type Connector,
 } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
@@ -60,9 +59,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
       return NextResponse.json({ authorizeUrl });
     }
 
-    let conn: Connector;
-    let redirectUri: string;
-
     if (provider === 'slack') {
       if (!env.SLACK_CONNECTOR_CLIENT_ID || !env.SLACK_CONNECTOR_CLIENT_SECRET) {
         throw holoError({
@@ -71,11 +67,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
           fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET in the environment.',
         });
       }
-      redirectUri = `${publicOrigin}/api/connectors/slack/callback`;
-      conn = createSlackConnector({
+      const redirectUri = `${publicOrigin}/api/connectors/slack/callback`;
+      const spec = createSlackSpec({
         clientId: env.SLACK_CONNECTOR_CLIENT_ID,
         clientSecret: env.SLACK_CONNECTOR_CLIENT_SECRET,
       });
+      const csrfNonce = shared.generateCsrfNonce();
+      const state = await shared.signState(
+        {
+          user_id: session.user.id,
+          organization_id: orgId,
+          csrf_nonce: csrfNonce,
+          provider,
+        },
+        env.BETTER_AUTH_SECRET,
+      );
+      const authorizeUrl = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
+      return NextResponse.json({ authorizeUrl });
     } else if (provider === 'grain') {
       if (!env.GRAIN_CONNECTOR_CLIENT_ID || !env.GRAIN_CONNECTOR_CLIENT_SECRET) {
         throw holoError({
@@ -84,7 +92,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
           fix: 'Set GRAIN_CONNECTOR_CLIENT_ID and GRAIN_CONNECTOR_CLIENT_SECRET in the environment.',
         });
       }
-      redirectUri = `${publicOrigin}/api/connectors/grain/callback`;
+      const redirectUri = `${publicOrigin}/api/connectors/grain/callback`;
       const spec = createGrainSpec({
         clientId: env.GRAIN_CONNECTOR_CLIENT_ID,
         clientSecret: env.GRAIN_CONNECTOR_CLIENT_SECRET,
@@ -113,7 +121,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
           fix: 'Set LINEAR_CONNECTOR_CLIENT_ID and LINEAR_CONNECTOR_CLIENT_SECRET in the environment.',
         });
       }
-      redirectUri = `${publicOrigin}/api/connectors/linear/callback`;
+      const redirectUri = `${publicOrigin}/api/connectors/linear/callback`;
       const spec = createLinearSpec({
         clientId: env.LINEAR_CONNECTOR_CLIENT_ID,
         clientSecret: env.LINEAR_CONNECTOR_CLIENT_SECRET,
@@ -137,22 +145,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
         fix: 'OAuth-redirect connectors: GitHub, Slack, Grain, Linear. API-key connectors (Notion, Pylon, HubSpot) use their own /connect endpoints.',
       });
     }
-
-    const csrfNonce = shared.generateCsrfNonce();
-    const state = await shared.signState(
-      {
-        user_id: session.user.id,
-        organization_id: orgId,
-        csrf_nonce: csrfNonce,
-        provider,
-      },
-      env.BETTER_AUTH_SECRET,
-    );
-
-    const authorizeUrl = conn.buildAuthorizeUrl({ redirectUri, state });
-    // No CSRF cookie — see comment above on the GitHub branch. Callback
-    // verifies the state JWT's user_id matches the current session.
-    return NextResponse.json({ authorizeUrl });
   } catch (e) {
     if (e instanceof HoloError) {
       const status =

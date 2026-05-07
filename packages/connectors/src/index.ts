@@ -6,32 +6,33 @@ export { chunkHash, dedupeAgainstDb } from './shared/content-hash';
 export type { DedupeAgainstDbInput } from './shared/content-hash';
 // GitHub uses GitHub App auth, not OAuth — there is no Connector facade.
 // Worker dispatches directly to runGithubProseSync / runGithubCodeSync below.
+// Framework-native specs (new shape — no legacy Connector facade).
 export {
-  createSlackConnector,
+  createSlackSpec,
   hasSlackBotScopes,
   SLACK_INGEST_SCOPES,
   SLACK_BOT_SCOPES,
 } from './slack/index';
-export type { SlackConnectorOptions } from './slack/index';
-export { createSlackUserApiClient } from './slack/user-client';
-export type { SlackUserApiClient } from './slack/user-client';
-export { createSlackApiClient } from './slack/api-client';
+export type { SlackSpecOptions } from './slack/index';
+export { createSlackApiClient, createSlackUserApiClient } from './slack/index';
+export type { SlackApiClient, SlackUserApiClient } from './slack/index';
 export {
   verifySlackSignature,
   SLACK_REPLAY_WINDOW_SECONDS,
-} from './slack/verify-signature';
+} from './slack/index';
 export type {
   VerifySlackInput,
-  VerifyResult as SlackVerifyResult,
+  SlackVerifyResult,
   SlackVerifyFailure,
-} from './slack/verify-signature';
+} from './slack/index';
 export type {
-  SlackApiClient,
   SlackBlock,
+  SlackChannel,
+  SlackMember,
+  SlackMessage,
   SlackPostMessageInput,
   SlackPostMessageResult,
-} from './slack/api-client';
-// Framework-native specs (new shape — no legacy Connector facade).
+} from './slack/index';
 export { createLinearSpec } from './linear/index';
 export type { LinearSpecOptions } from './linear/index';
 export { createPylonSpec } from './pylon/index';

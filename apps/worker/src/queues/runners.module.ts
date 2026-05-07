@@ -5,11 +5,7 @@ import postgres from 'postgres';
 import { createDb, type DB } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
 import { QUEUE_NAMES } from './types';
-import {
-  createSlackRunner,
-  createGithubProseRunner,
-  createGithubCodeRunner,
-} from './runners';
+import { createGithubProseRunner, createGithubCodeRunner } from './runners';
 import { createGenericRunner } from './framework-bridge';
 import {
   createLinearSpec,
@@ -17,6 +13,7 @@ import {
   createHubspotSpec,
   createNotionSpec,
   createGrainSpec,
+  createSlackSpec,
 } from '@holo/connectors';
 import { setSyncRunner } from './sync-runner-registry';
 import { reconcileOrphanedRuns } from './sync-runs-store';
@@ -53,7 +50,19 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     const deps = { db: getDb(), embedQueue: this.embedQueue };
-    setSyncRunner(QUEUE_NAMES.SLACK_SYNC, createSlackRunner(deps));
+    setSyncRunner(
+      QUEUE_NAMES.SLACK_SYNC,
+      createGenericRunner(
+        createSlackSpec({
+          // OAuth-only; the worker doesn't initiate OAuth, so empty defaults
+          // are fine — the spec only uses clientId/secret on authorize/exchange,
+          // not during sync.
+          clientId: process.env.SLACK_CONNECTOR_CLIENT_ID ?? '',
+          clientSecret: process.env.SLACK_CONNECTOR_CLIENT_SECRET ?? '',
+        }),
+        deps,
+      ),
+    );
     setSyncRunner(QUEUE_NAMES.NOTION_SYNC, createGenericRunner(createNotionSpec(), deps));
     setSyncRunner(QUEUE_NAMES.GITHUB_PROSE_SYNC, createGithubProseRunner(deps));
     setSyncRunner(QUEUE_NAMES.GITHUB_CODE_SYNC, createGithubCodeRunner(deps));
@@ -87,7 +96,7 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       ),
     );
     this.logger.log(
-      'Registered real SyncRunners for slack, github-prose, github-code (legacy) + grain, pylon, hubspot, notion, linear (framework)',
+      'Registered real SyncRunners for github-prose, github-code (legacy) + slack, grain, pylon, hubspot, notion, linear (framework)',
     );
 
     // Reap any 'running' rows the previous worker incarnation left behind

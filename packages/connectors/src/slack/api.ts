@@ -1,48 +1,35 @@
-export interface SlackMember {
-  id: string;
-  real_name: string;
-  is_bot: boolean;
-  name?: string;
-}
+/**
+ * Slack API client built on Slack's POST /api/<method> form-urlencoded
+ * surface. Owns its own rate-limit pacing and 429 retry budget — Slack's
+ * tier-3 endpoints (conversations.history/replies) require careful pacing
+ * that's hard to express through the framework's generic token bucket.
+ *
+ * This client is consumed by:
+ *   - the framework's Slack spec (for sync)
+ *   - the worker's Slack bot (for chatPostMessage / chatUpdate / etc)
+ *   - the gateway's slash-command and event-subscription routes (indirectly)
+ */
+import type {
+  SlackBlock,
+  SlackChannel,
+  SlackMember,
+  SlackMessage,
+  SlackPostMessageInput,
+  SlackPostMessageResult,
+} from './types';
 
-export interface SlackChannel {
-  id: string;
-  name: string;
-  is_private: boolean;
-  is_member: boolean;
-}
-
-export interface SlackMessage {
-  ts: string;
-  thread_ts?: string;
-  user?: string;
-  text?: string;
-  bot_id?: string;
-  reply_count?: number;
-}
-
-export interface SlackBlock {
-  type: string;
-  [key: string]: unknown;
-}
-
-export interface SlackPostMessageInput {
-  channel: string;
-  text: string;
-  thread_ts?: string;
-  blocks?: SlackBlock[];
-  unfurl_links?: boolean;
-  unfurl_media?: boolean;
-}
-
-export interface SlackPostMessageResult {
-  ok: boolean;
-  channel?: string;
-  ts?: string;
-  error?: string;
-}
+export type {
+  SlackBlock,
+  SlackChannel,
+  SlackMember,
+  SlackMessage,
+  SlackPostMessageInput,
+  SlackPostMessageResult,
+};
 
 export interface SlackApiClient {
+  /** GET-equivalent for `auth.test` — returns workspace identity for testConnection. */
+  authTest(): Promise<{ team_id: string; team: string; user_id?: string }>;
   usersList(): Promise<SlackMember[]>;
   /**
    * Channels the bot user is currently a member of (public + private).
@@ -193,6 +180,20 @@ export function createSlackApiClient(
   fetchImpl: typeof fetch = fetch,
 ): SlackApiClient {
   return {
+    async authTest() {
+      const res = await slackPost(token, 'auth.test', {}, fetchImpl);
+      if (!res['ok']) {
+        throw Object.assign(new Error(`auth.test error: ${res['error']}`), {
+          data: { error: res['error'] },
+        });
+      }
+      return {
+        team_id: (res['team_id'] as string) ?? '',
+        team: (res['team'] as string) ?? '',
+        user_id: res['user_id'] as string | undefined,
+      };
+    },
+
     async usersList() {
       const members: SlackMember[] = [];
       let cursor: string | undefined;
