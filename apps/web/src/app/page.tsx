@@ -80,9 +80,10 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
           for your company.
         </h1>
         <p className="mx-auto mt-6 max-w-[640px] text-balance text-[15px] leading-6 text-text-muted">
-          Connect your tools once. Holo unifies the data, learns your team&apos;s repeatable
-          procedures, and exposes them as callable tools over MCP and OpenAPI. Bring your own
-          agent — Claude, Cursor, ChatGPT, anything — and plug it into the same layer.
+          Connect your tools once. Holo continuously ingests everything your company knows —
+          code, docs, conversations, calls — and exposes it as one scope-aware context any
+          agent can call over MCP or OpenAPI. Bring your own — Claude, Cursor, ChatGPT,
+          anything — and plug into the loop.
           <span className="text-text"> Layer today. Agent OS tomorrow.</span>
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -176,9 +177,10 @@ function VisionBand() {
         <p className="caption text-text-subtle">Building toward</p>
         <p className="mt-4 text-balance font-display text-[22px] leading-snug tracking-tight text-text md:text-[26px]">
           The <span className="text-accent">AI operating system for companies</span> and the{' '}
-          <span className="text-accent">company brain</span> — the queryable context layer
-          underneath all your team&apos;s agent operations, and the procedural extraction
-          layer that turns scattered artifacts into invokable skills.
+          <span className="text-accent">company brain</span> — a self-updating context layer
+          underneath every agent your team runs, and the procedural extraction layer that
+          turns scattered artifacts into invokable skills. The substrate of an AI-native
+          company.
         </p>
         <p className="mx-auto mt-4 max-w-[560px] text-[12px] text-text-subtle">
           Two adjacent YC Requests for Startups. Holo is the open-source, self-hostable take.
@@ -197,8 +199,9 @@ function FinalCTA({ isAuthed }: { isAuthed: boolean }) {
           One brain. Every agent. Self-hostable.
         </h2>
         <p className="mx-auto mt-5 max-w-[560px] text-balance text-[15px] leading-6 text-text-muted">
-          If your team is already paying the per-agent integration tax, holo is the shared
-          context layer that makes it stop. Star the repo, run it locally, or sign in.
+          If you&apos;re already running multiple agents, holo is the shared, self-updating
+          context layer that makes them coherent. The substrate of an AI-native company.
+          Star the repo, run it locally, or sign in.
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
@@ -254,8 +257,8 @@ function SiteFooter() {
 const PILLARS = [
   {
     label: 'Context layer',
-    title: 'Connect once. Index everything.',
-    body: 'Slack, GitHub, Notion, Grain, Pylon, HubSpot — six connectors live, more on the way. Hybrid retrieval (pgvector + tsvector, RRF-fused) over a single ACL-aware index. One ingestion pipeline; every agent reads the same source of truth.',
+    title: 'Connect once. Index everything. Stay fresh.',
+    body: 'Slack, GitHub, Notion, Grain, Pylon, HubSpot — six connectors live, more on the way. A continuous sync loop keeps the ACL-aware index current as your company keeps working. Hybrid retrieval (pgvector + tsvector, RRF-fused) over one source of truth every agent reads.',
   },
   {
     label: 'Procedures',

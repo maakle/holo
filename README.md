@@ -43,7 +43,45 @@ Holo is the missing shared layer — the **queryable context layer** under all y
 
 ## Architecture
 
-Three apps. ~16 packages. AGPL-3.0.
+Three apps. 19 packages. AGPL-3.0.
+
+```mermaid
+flowchart LR
+    subgraph A["Agents (MCP or REST clients)"]
+      direction TB
+      A1["Claude · Cursor"]
+      A2["ChatGPT Actions"]
+      A3["Slack bot · custom"]
+    end
+
+    subgraph H["Holo"]
+      direction TB
+      GW["<b>apps/gateway</b> · Hono<br/>MCP /mcp · REST /v1<br/>OAuth 2.1 + PKCE · DCR"]
+      WEB["<b>apps/web</b> · Next.js 16<br/>dashboard · Better Auth<br/>OAuth callbacks · DCR UI"]
+      WK["<b>apps/worker</b> · NestJS + BullMQ<br/>ingest · chunk · embed · sync<br/>step() checkpoints"]
+      PG[("Postgres 16<br/>pgvector + tsvector + RRF<br/>ACL-aware index")]
+      RD[("Redis 7<br/>BullMQ queue")]
+    end
+
+    subgraph S["Sources"]
+      direction TB
+      S1["Slack"]
+      S2["GitHub"]
+      S3["Notion"]
+      S4["Grain"]
+      S5["Pylon"]
+      S6["HubSpot"]
+    end
+
+    A -->|"search · fetch · invoke"| GW
+    GW --> PG
+    GW --> RD
+    WEB --> PG
+    WEB -. "OAuth grant" .-> S
+    WK --> PG
+    WK --> RD
+    WK -->|"sync · webhook"| S
+```
 
 | Layer | Choice |
 |---|---|
