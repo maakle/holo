@@ -41,6 +41,44 @@ Holo is the missing shared layer — the **queryable context layer** under all y
 
 ---
 
+## What teams build on Holo
+
+Holo is a primitive, not a product. These are the four shapes the same layer takes in the first month of use — same backend, same audit trail, different consumers. The first three drive an agent over MCP; the fourth is plain REST with no agent in the loop.
+
+### 1. Codebase memory across every IDE *(engineering)*
+
+A Cursor or Claude Code agent answers *"why is this code the way it is?"* by searching across GitHub, Slack, and Notion, then drilling into the right PR diff, review thread, and RFC. New hires stop excavating; senior engineers stop re-explaining decisions made six months ago.
+
+```
+search("rate limiting auth flow") → get_pr(owner, repo, 1284) → get_thread(channel, ts) → answer with citations
+```
+
+### 2. Drafted support replies with the right sources attached *(customer support)*
+
+A Pylon or Zendesk webhook fires on a new ticket. Holo pulls the customer's history, the matching Mintlify docs page, and the closest past resolution, and posts a draft reply for the human to approve. Time-to-first-response drops; tone stays consistent across the team.
+
+```
+search(ticket.subject) → get_ticket(ticket_id) → get_doc(notion_id) → draft reply for approval
+```
+
+### 3. Every call starts with full context *(sales / CS)*
+
+Five minutes before a meeting with Acme, a calendar-triggered agent searches Grain transcripts, the HubSpot deal record, and any open Pylon issues, and posts a digest to the prep doc. Account owners walk in knowing exactly where things stand instead of opening four tabs in the parking lot.
+
+```
+search("Acme Corp") → get_call(recording_id) → get_ticket(ticket_id) → digest to prep doc
+```
+
+### 4. One search box across every system *(everyone else)*
+
+A dashboard search box, a Slack `/ask` command, or an internal Retool app calls the REST surface directly. Ops, design, PM, and revops get ranked results across all nine connectors with deep links back to the source — no agent required, no MCP client, no LLM in the path. The same retrieval primitive that powers the agents above is also the one humans hit when they just want to find something.
+
+```
+POST /v1/search { query, limit } → ranked chunks with snippet_url back to source
+```
+
+---
+
 ## Architecture
 
 Three apps. 19 packages. AGPL-3.0.
