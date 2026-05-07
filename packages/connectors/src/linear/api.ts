@@ -28,7 +28,7 @@ export const VIEWER_QUERY = /* GraphQL */ `
 `;
 
 export const ISSUES_QUERY = /* GraphQL */ `
-  query Issues($after: String, $since: DateTime) {
+  query Issues($after: String, $since: DateTimeOrDuration) {
     issues(
       first: 50
       after: $after
