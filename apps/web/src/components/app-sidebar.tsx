@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { OrgSwitcher, type OrgSummary } from '@/components/org-switcher';
 import { UserMenu } from '@/components/user-menu';
 import { HoloLogo } from '@/components/logo';
+import { SampleDataNavIndicator } from '@/components/sample-data-nav-indicator';
 
 type NavItem = {
   href: string;
@@ -61,11 +62,13 @@ export function AppSidebar({
   userName,
   orgs,
   activeOrgId,
+  sampleDataActive,
 }: {
   userEmail?: string | null;
   userName?: string | null;
   orgs: OrgSummary[];
   activeOrgId: string;
+  sampleDataActive: boolean;
 }) {
   const pathname = usePathname();
 
@@ -127,6 +130,8 @@ export function AppSidebar({
           </div>
         ))}
       </nav>
+
+      <SampleDataNavIndicator initialActive={sampleDataActive} />
 
       {/* User block */}
       {userEmail ? (

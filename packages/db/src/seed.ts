@@ -1,6 +1,7 @@
 import type { DB } from './client';
 import { member, organization, user } from './schema/auth';
 import { sql, eq, and } from 'drizzle-orm';
+import { ensureSampleData } from './sample-data';
 
 export const DEFAULT_ORG_SLUG = 'default';
 export const DEFAULT_USER_EMAIL = 'default@holo.local';
@@ -12,6 +13,7 @@ export async function seedDefaultOrganization(db: DB): Promise<{ id: string }> {
     .where(sql`${organization.slug} = ${DEFAULT_ORG_SLUG}`);
   if (existing[0]) {
     await ensureDefaultUser(db, existing[0].id);
+    await ensureSampleData(db, existing[0].id);
     return { id: existing[0].id };
   }
 
@@ -25,6 +27,7 @@ export async function seedDefaultOrganization(db: DB): Promise<{ id: string }> {
 
   const orgId = inserted[0]!.id;
   await ensureDefaultUser(db, orgId);
+  await ensureSampleData(db, orgId);
   return { id: orgId };
 }
 

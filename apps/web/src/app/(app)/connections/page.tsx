@@ -1,13 +1,14 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { eq, and } from 'drizzle-orm';
-import { schema } from '@holo/db';
+import { schema, getSampleDataStatus } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { CONNECTORS, CONNECTOR_CATEGORIES } from '@/lib/connector-registry';
 import { ConnectorRow } from '@/components/connector-row';
 import { SlackOnboardingTrigger } from '@/components/slack-onboarding-trigger';
 import { ConnectErrorBanner } from '@/components/connect-error-banner';
+import { SampleConnectorRow } from '@/components/sample-connector-row';
 
 export default async function ConnectionsPage({
   searchParams,
@@ -80,6 +81,8 @@ export default async function ConnectionsPage({
     }
   }
 
+  const sampleStatus = await getSampleDataStatus(db, orgId);
+
   const allowlistRows = await db
     .select({
       provider: schema.connectorAllowlists.provider,
@@ -127,6 +130,10 @@ export default async function ConnectionsPage({
       {sp.connect_error ? (
         <ConnectErrorBanner code={sp.connect_error} fix={sp.connect_fix} />
       ) : null}
+      <SampleConnectorRow
+        installed={sampleStatus.active}
+        artifactCount={sampleStatus.artifactCount}
+      />
       <SlackOnboardingTrigger
         slackConnected={Boolean(connected.get('slack'))}
         slackAllowlistEmpty={(allowlistByProvider.get('slack') ?? []).length === 0}

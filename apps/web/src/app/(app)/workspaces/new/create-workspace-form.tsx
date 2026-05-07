@@ -48,6 +48,13 @@ export function CreateWorkspaceForm() {
       if (newId) {
         await authClient.organization.setActive({ organizationId: newId });
       }
+      // Seed Star Wars sample data so the new workspace shows live data
+      // immediately. Best-effort — failure here shouldn't block onboarding.
+      try {
+        await fetch('/api/sample-data', { method: 'POST' });
+      } catch {
+        // ignore — workspace creation already succeeded
+      }
       toast.success(`Workspace "${trimmedName}" created.`);
       router.push('/dashboard');
       router.refresh();
