@@ -14,6 +14,7 @@
     "@holo/connectors": "workspace:*",
     "@holo/custom-tools": "workspace:*",
     "@holo/errors": "workspace:*",
+    "bullmq": "5.20.1",
     "commander": "^12.1.0",
     "cli-table3": "^0.6.5",
     "drizzle-orm": "0.45.2"
