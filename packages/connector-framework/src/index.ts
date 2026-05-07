@@ -21,7 +21,7 @@ export type {
 } from './types';
 
 // Auth strategies
-export { oauth2, apiKey, githubApp } from './auth';
+export { oauth2, apiKey, githubApp, none } from './auth';
 export type {
   AuthKind,
   AuthStrategy,

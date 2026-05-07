@@ -67,7 +67,9 @@ export function createHttpClient(input: CreateHttpClientInput): HttpClient {
       for (const [k, v] of Object.entries(opts.headers)) headers.set(k, v);
     }
     const { name, value } = input.auth.authHeader(input.tokens);
-    if (!headers.has(name)) headers.set(name, value);
+    // Empty name signals the `none` auth strategy — skip the header entirely
+    // for fully-public surfaces (Mintlify-hosted docs, sitemaps, …).
+    if (name && !headers.has(name)) headers.set(name, value);
 
     let body: string | URLSearchParams | undefined;
     if (opts?.body !== undefined) {

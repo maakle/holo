@@ -175,6 +175,17 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
       return new Set(rows.map((r) => r.contentHash));
     },
 
+    async loadSourceMetadata({ sourceId }): Promise<Record<string, unknown>> {
+      const rows = await deps.db
+        .select({ metadata: schema.sources.metadata })
+        .from(schema.sources)
+        .where(eq(schema.sources.id, sourceId))
+        .limit(1);
+      const meta = rows[0]?.metadata;
+      if (!meta || typeof meta !== 'object') return {};
+      return meta as Record<string, unknown>;
+    },
+
     async loadAllowlist({ organizationId, providerId }): Promise<ReadonlyArray<AllowlistEntry>> {
       const rows = await deps.db
         .select({

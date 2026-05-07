@@ -80,6 +80,9 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
   const allowlist = stores.loadAllowlist
     ? await stores.loadAllowlist({ organizationId, providerId: spec.id })
     : [];
+  const sourceMetadata = stores.loadSourceMetadata
+    ? await stores.loadSourceMetadata({ sourceId })
+    : {};
 
   let artifactCount = 0;
   const cursorPatch: Record<string, unknown> = {};
@@ -112,6 +115,7 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
       paginate,
       cursor,
       allowlist,
+      sourceMetadata,
       reportProgress: input.reportProgress,
       signal: input.signal,
       async upsert(chunk: ChunkUpsert): Promise<void> {

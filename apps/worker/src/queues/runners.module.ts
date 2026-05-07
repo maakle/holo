@@ -14,6 +14,7 @@ import {
   createGrainSpec,
   createSlackSpec,
   createGithubSpec,
+  createMintlifySpec,
   githubAppConfigFromEnv,
 } from '@holo/connectors';
 import { setSyncRunner } from './sync-runner-registry';
@@ -118,8 +119,15 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
         deps,
       ),
     );
+    // Mintlify is fully public — no env credentials required. The per-source
+    // base URL lives on `sources.metadata.baseUrl` and the framework's
+    // `ctx.sourceMetadata` surfaces it inside the spec.
+    setSyncRunner(
+      QUEUE_NAMES.MINTLIFY_SYNC,
+      createGenericRunner(createMintlifySpec(), deps),
+    );
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, mintlify',
     );
 
     // Reap any 'running' rows the previous worker incarnation left behind

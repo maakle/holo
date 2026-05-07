@@ -7,6 +7,7 @@ import { GrainSyncModule } from './grain';
 import { PylonSyncModule } from './pylon';
 import { HubspotSyncModule } from './hubspot';
 import { LinearSyncModule } from './linear';
+import { MintlifySyncModule } from './mintlify';
 import { SyncSchedulerService } from './sync-scheduler.service';
 
 @Module({
@@ -19,6 +20,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
     PylonSyncModule,
     HubspotSyncModule,
     LinearSyncModule,
+    MintlifySyncModule,
   ],
   providers: [SyncSchedulerService],
 })

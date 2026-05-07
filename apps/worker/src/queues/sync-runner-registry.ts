@@ -29,6 +29,7 @@ const registry: Record<string, SyncRunner> = {
   'pylon-sync': stubRunner('pylon'),
   'hubspot-sync': stubRunner('hubspot'),
   'linear-sync': stubRunner('linear'),
+  'mintlify-sync': stubRunner('mintlify'),
 };
 
 export function getSyncRunner(queue: string): SyncRunner {

@@ -45,6 +45,7 @@ export class SyncSchedulerService implements OnModuleInit {
     @InjectQueue(QUEUE_NAMES.PYLON_SYNC) private readonly pylon: Queue,
     @InjectQueue(QUEUE_NAMES.HUBSPOT_SYNC) private readonly hubspot: Queue,
     @InjectQueue(QUEUE_NAMES.LINEAR_SYNC) private readonly linear: Queue,
+    @InjectQueue(QUEUE_NAMES.MINTLIFY_SYNC) private readonly mintlify: Queue,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -100,6 +101,10 @@ export class SyncSchedulerService implements OnModuleInit {
     }
     if (s.provider === 'linear') {
       await this.linear.add('sync', payload, { repeat });
+      return;
+    }
+    if (s.provider === 'mintlify') {
+      await this.mintlify.add('sync', payload, { repeat });
       return;
     }
     this.logger.warn(`unknown provider '${s.provider}' for source ${s.id}; skipping schedule`);

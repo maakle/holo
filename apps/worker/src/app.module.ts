@@ -10,6 +10,7 @@ import { GrainSyncModule } from './queues/grain';
 import { PylonSyncModule } from './queues/pylon';
 import { HubspotSyncModule } from './queues/hubspot';
 import { LinearSyncModule } from './queues/linear';
+import { MintlifySyncModule } from './queues/mintlify';
 import { EmbedModule } from './queues/embed';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 import { SyncRunnersModule } from './queues/runners.module';
@@ -56,6 +57,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     PylonSyncModule,
     HubspotSyncModule,
     LinearSyncModule,
+    MintlifySyncModule,
     EmbedModule,
     SyncRunnersModule,
     SyncSchedulerModule,

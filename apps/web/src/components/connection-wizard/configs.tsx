@@ -167,6 +167,28 @@ const pylonConfig: ConnectorWizardConfig = {
   ],
 };
 
+const mintlifyConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'apikey',
+      label: 'Docs URL',
+      render: (ctx) =>
+        apiKeyStep(ctx, {
+          placeholder: 'https://docs.example.com',
+          helpText:
+            'Paste the root URL of any Mintlify-hosted docs site. Holo ingests pages via the auto-published /llms.txt index and pulls the OpenAPI reference if one is available.',
+          instructions: [
+            'Find the docs site root, e.g. https://docs.kombo.dev or https://docs.linear.app.',
+            'Paste it below — no API key needed (Mintlify docs are public).',
+            'Connect again later to add more docs sites; each one syncs independently.',
+          ],
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 // Registry holds heterogeneous configs (each connector has its own state
 // shape). Consumers don't introspect the state from the outside — they hand
 // the config to <ConnectionWizard> which threads the type through.
@@ -179,6 +201,7 @@ const REGISTRY: Record<ConnectorMeta['id'], ConnectorWizardConfig<any>> = {
   notion: notionConfig,
   pylon: pylonConfig,
   linear: linearConfig,
+  mintlify: mintlifyConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
