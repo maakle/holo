@@ -23,7 +23,9 @@ export type AuditEventType =
   | 'connector.stopped'
   | 'oauth.code_authorized'
   | 'workspace.deleted'
-  | 'workspace.updated';
+  | 'workspace.updated'
+  | 'sample_data.installed'
+  | 'sample_data.removed';
 
 export interface EmitAuditEventInput {
   db: DB;

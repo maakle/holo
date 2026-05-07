@@ -1,16 +1,26 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { and, eq, ne, sql } from 'drizzle-orm';
+import { schema, SAMPLE_PROVIDER } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 import { ConnectAgentPanel } from '@/components/connect-agent-panel';
+import {
+  ConnectAgentBanner,
+  type ConnectAgentBannerInitial,
+} from '@/components/connect-agent-banner';
 
 export default async function ConnectAgentPage() {
-  const { auth } = await getServerContext();
+  const { auth, db, defaultOrgId } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
+  const orgId = resolveActiveOrgId(session, defaultOrgId);
 
   const mcpBase = process.env['MCP_PUBLIC_URL']?.replace(/\/+$/, '')
     ?? 'http://localhost:8080';
   const mcpUrl = `${mcpBase}/mcp`;
+
+  const initial = await loadBannerInitial(db, orgId);
 
   return (
     <div className="space-y-8">
@@ -24,7 +34,59 @@ export default async function ConnectAgentPage() {
           client to authenticate and start retrieving context.
         </p>
       </header>
+      <ConnectAgentBanner initial={initial} />
       <ConnectAgentPanel mcpUrl={mcpUrl} />
     </div>
   );
+}
+
+async function loadBannerInitial(
+  db: Awaited<ReturnType<typeof getServerContext>>['db'],
+  orgId: string,
+): Promise<ConnectAgentBannerInitial> {
+  // "Real connector" = anything other than our synthetic sample provider:
+  // active connector_credentials OR a github_installations row.
+  const [credCount, ghCount, sampleSource, realChunkRow] = await Promise.all([
+    db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(schema.connectorCredentials)
+      .where(
+        and(
+          eq(schema.connectorCredentials.organizationId, orgId),
+          eq(schema.connectorCredentials.status, 'active'),
+        ),
+      ),
+    db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(schema.githubInstallations)
+      .where(eq(schema.githubInstallations.organizationId, orgId)),
+    db
+      .select({ id: schema.sources.id })
+      .from(schema.sources)
+      .where(
+        and(
+          eq(schema.sources.organizationId, orgId),
+          eq(schema.sources.provider, SAMPLE_PROVIDER),
+        ),
+      )
+      .limit(1),
+    db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(schema.chunks)
+      .where(
+        and(
+          eq(schema.chunks.organizationId, orgId),
+          ne(schema.chunks.provider, SAMPLE_PROVIDER),
+        ),
+      ),
+  ]);
+
+  const hasRealConnector =
+    (credCount[0]?.c ?? 0) > 0 || (ghCount[0]?.c ?? 0) > 0;
+
+  return {
+    hasRealConnector,
+    realChunksIndexed: realChunkRow[0]?.c ?? 0,
+    sampleActive: sampleSource.length > 0,
+  };
 }
