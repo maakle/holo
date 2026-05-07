@@ -4,10 +4,13 @@ import { toast } from 'sonner';
 
 interface Props {
   mcpUrl: string;
+  gatewayBase: string;
 }
 
-const CONFIG_TABS = ['Cursor', 'Claude', 'ChatGPT', 'Slack'] as const;
+const CONFIG_TABS = ['Claude', 'ChatGPT', 'Slack', 'OpenAPI', 'Custom MCP'] as const;
 type Tab = (typeof CONFIG_TABS)[number];
+
+const TEST_DISMISSED_KEY = 'holo:agent-test-dismissed';
 
 function mcpJsonConfig(mcpUrl: string, token: string): string {
   const t = token || '<YOUR_HOLO_TOKEN>';
@@ -22,14 +25,42 @@ function mcpJsonConfig(mcpUrl: string, token: string): string {
   );
 }
 
-export function ConnectAgentPanel({ mcpUrl }: Props) {
+export function ConnectAgentPanel({ mcpUrl, gatewayBase }: Props) {
   const [token, setToken] = useState('');
   const [tokenId, setTokenId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('Cursor');
+  const [activeTab, setActiveTab] = useState<Tab>('Claude');
   const [lastUsedAt, setLastUsedAt] = useState<string | null>(null);
+  const [testDismissed, setTestDismissed] = useState<boolean | null>(null);
+
+  // Read dismissed state once on mount.
+  useEffect(() => {
+    try {
+      setTestDismissed(localStorage.getItem(TEST_DISMISSED_KEY) === '1');
+    } catch {
+      setTestDismissed(false);
+    }
+  }, []);
+
+  function dismissTesting() {
+    try {
+      localStorage.setItem(TEST_DISMISSED_KEY, '1');
+    } catch {
+      // storage may be unavailable; in-memory dismissal is fine
+    }
+    setTestDismissed(true);
+  }
+
+  function reopenTesting() {
+    try {
+      localStorage.removeItem(TEST_DISMISSED_KEY);
+    } catch {
+      // best effort
+    }
+    setTestDismissed(false);
+  }
 
   async function generateToken() {
     setGenerating(true);
@@ -38,7 +69,7 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
       const res = await fetch('/api/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: 'agent' }),
+        body: JSON.stringify({ label: 'agent-test' }),
       });
       const data = (await res.json()) as { id?: string; token?: string; problem?: string };
       if (res.ok && data.token) {
@@ -86,96 +117,73 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
       .catch(() => {});
   }
 
-  const inputCls =
-    'rounded-sm border border-gray-300 bg-white px-3 py-1.5 text-sm font-mono dark:border-gray-700 dark:bg-gray-950';
-  const btnPrimary =
-    'rounded-md bg-[#3F47FF] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#3038e0] disabled:opacity-50 transition-colors';
-
   return (
-    <div className="space-y-6">
-      {/* MCP URL */}
-      <div className="space-y-1">
-        <p className="text-xs font-medium uppercase tracking-[0.04em] text-gray-500 dark:text-gray-400">
-          MCP server URL
-        </p>
-        <div className="flex items-center gap-2">
-          <input readOnly value={mcpUrl} className={`${inputCls} flex-1`} />
+    <div className="space-y-10">
+      {/* TESTING ----------------------------------------------------------- */}
+      {testDismissed === false && (
+        <TestingSection
+          mcpUrl={mcpUrl}
+          token={token}
+          tokenId={tokenId}
+          generating={generating}
+          genError={genError}
+          lastUsedAt={lastUsedAt}
+          copied={copied}
+          onCopy={copy}
+          onGenerate={generateToken}
+          onDismiss={dismissTesting}
+        />
+      )}
+
+      {testDismissed === true && (
+        <div className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2 text-[13px] text-text">
+              <span className="inline-flex h-2 w-2 rounded-full bg-success" />
+              Connection verified. Test panel hidden.
+            </div>
+            <p className="text-[12px] text-text-subtle">
+              Manage API keys in{' '}
+              <a href="/settings" className="text-accent hover:underline">
+                Settings → API keys
+              </a>
+              .
+            </p>
+          </div>
           <button
-            onClick={() => copy(mcpUrl, 'url')}
-            className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+            onClick={reopenTesting}
+            className="text-[12px] text-text-subtle transition-colors hover:text-text"
           >
-            {copied === 'url' ? 'Copied!' : 'Copy'}
+            Test again
           </button>
         </div>
-      </div>
+      )}
 
-      {/* Token */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <p className="text-xs font-medium uppercase tracking-[0.04em] text-gray-500 dark:text-gray-400">
-            API token
+      {/* CONNECT YOUR AGENT ------------------------------------------------ */}
+      <section className="space-y-3">
+        <div className="space-y-1">
+          <span className="caption">Connect your agent</span>
+          <h2 className="font-display text-h2 font-medium tracking-tight">
+            Wire up a client
+          </h2>
+          <p className="max-w-2xl text-[13px] leading-6 text-text-muted">
+            Pick your client below. Token-based clients use API keys from{' '}
+            <a href="/settings" className="text-accent hover:underline">
+              Settings → API keys
+            </a>
+            ; Claude can connect over OAuth without a token.
           </p>
-          {!token && (
-            <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded">
-              Required
-            </span>
-          )}
         </div>
-        {!token && (
-          <p className="text-[13px] leading-6 text-gray-600 dark:text-gray-400">
-            Generate a token first — the setup snippets below won&apos;t authenticate without one.
-          </p>
-        )}
-        {token ? (
-          <div className="rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3 space-y-2">
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              Save this token now — it won&apos;t be shown again.
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="text-xs font-mono flex-1 break-all">{token}</code>
-              <button
-                onClick={() => copy(token, 'token')}
-                className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 shrink-0 transition-colors"
-              >
-                {copied === 'token' ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            <button onClick={generateToken} disabled={generating} className={btnPrimary}>
-              {generating ? 'Generating…' : 'Generate API token'}
-            </button>
-            {genError && (
-              <p className="text-xs text-red-600 dark:text-red-400">{genError}</p>
-            )}
-          </div>
-        )}
-      </div>
 
-      {/* Verify */}
-      <VerifySection
-        mcpUrl={mcpUrl}
-        token={token}
-        copied={copied}
-        onCopy={copy}
-        lastUsedAt={lastUsedAt}
-      />
-
-      {/* Setup */}
-      <div className="space-y-3">
-        <p className="text-xs font-medium uppercase tracking-[0.04em] text-gray-500 dark:text-gray-400">
-          Setup
-        </p>
-        <div className="flex gap-1 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex gap-1 border-b border-border">
           {CONFIG_TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 -mb-px ${
+              className={`-mb-px border-b-2 px-3 py-1.5 text-xs font-medium transition-colors duration-micro ease-enter ${
                 activeTab === tab
-                  ? 'border-[#3F47FF] text-[#3F47FF]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-text-muted hover:text-text'
               }`}
             >
               {tab}
@@ -183,30 +191,25 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
           ))}
         </div>
 
-        {!token && activeTab !== 'Slack' && activeTab !== 'Claude' && (
-          <div className="rounded-md border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5 flex gap-3 items-start">
+        {activeTab !== 'Slack' && activeTab !== 'Claude' && !token && (
+          <div className="flex items-start gap-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5">
             <span
               aria-hidden
-              className="mt-[3px] inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white"
+              className="mt-[3px] inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-warning text-[10px] font-bold text-white"
             >
               !
             </span>
-            <div className="text-[13px] leading-6 text-amber-900 dark:text-amber-200">
-              <span className="font-medium">No token generated yet.</span> The snippet below
-              shows <InlineCode>&lt;YOUR_HOLO_TOKEN&gt;</InlineCode> as a placeholder — replace it
-              with a real token, or generate one above to have it filled in automatically.
+            <div className="text-[13px] leading-6 text-text">
+              Snippets below use <InlineCode>&lt;YOUR_HOLO_TOKEN&gt;</InlineCode> as a
+              placeholder. Generate a key in{' '}
+              <a href="/settings" className="text-accent hover:underline">
+                Settings → API keys
+              </a>{' '}
+              and paste it in.
             </div>
           </div>
         )}
 
-        {activeTab === 'Cursor' && (
-          <CursorSetup
-            mcpUrl={mcpUrl}
-            token={token}
-            copied={copied}
-            onCopy={copy}
-          />
-        )}
         {activeTab === 'Claude' && (
           <ClaudeSetup
             mcpUrl={mcpUrl}
@@ -219,13 +222,28 @@ export function ConnectAgentPanel({ mcpUrl }: Props) {
           <ChatGPTSetup mcpUrl={mcpUrl} token={token} />
         )}
         {activeTab === 'Slack' && <SlackSetup />}
-
-      </div>
+        {activeTab === 'OpenAPI' && (
+          <OpenApiSetup
+            gatewayBase={gatewayBase}
+            token={token}
+            copied={copied}
+            onCopy={copy}
+          />
+        )}
+        {activeTab === 'Custom MCP' && (
+          <CustomMcpSetup
+            mcpUrl={mcpUrl}
+            token={token}
+            copied={copied}
+            onCopy={copy}
+          />
+        )}
+      </section>
     </div>
   );
 }
 
-// --- Verify ----------------------------------------------------------------
+// --- Testing ---------------------------------------------------------------
 
 function curlVerify(mcpUrl: string, token: string): string {
   const t = token || '<YOUR_HOLO_TOKEN>';
@@ -238,54 +256,138 @@ function curlVerify(mcpUrl: string, token: string): string {
   ].join('\n');
 }
 
-function VerifySection({
+function TestingSection({
   mcpUrl,
   token,
+  tokenId,
+  generating,
+  genError,
+  lastUsedAt,
   copied,
   onCopy,
-  lastUsedAt,
+  onGenerate,
+  onDismiss,
 }: {
   mcpUrl: string;
   token: string;
+  tokenId: string | null;
+  generating: boolean;
+  genError: string | null;
+  lastUsedAt: string | null;
   copied: string | null;
   onCopy: (text: string, key: string) => void;
-  lastUsedAt: string | null;
+  onGenerate: () => void;
+  onDismiss: () => void;
 }) {
   const cmd = curlVerify(mcpUrl, token);
+  const verified = Boolean(tokenId && lastUsedAt);
 
   return (
-    <div className="space-y-3">
-      <p className="text-xs font-medium uppercase tracking-[0.04em] text-gray-500 dark:text-gray-400">
-        Verify
-      </p>
-      <p className="text-[13px] leading-6 text-gray-600 dark:text-gray-400">
-        Before wiring up a client, confirm the gateway accepts your token. Paste this into a
-        terminal — we&apos;ll detect the request live and confirm below. A{' '}
-        <InlineCode>200</InlineCode> response with <InlineCode>serverInfo</InlineCode> means
-        you&apos;re good; <InlineCode>401 HOLO_AUTH_NO_SESSION</InlineCode> means the token
-        wasn&apos;t accepted.
-      </p>
-      <Snippet
-        text={cmd}
-        copyKey="verify-curl"
-        copied={copied}
-        onCopy={onCopy}
-        language="curl"
-      />
-      {token && (
-        <VerifyStatus lastUsedAt={lastUsedAt} />
+    <section className="space-y-4">
+      <div className="space-y-1">
+        <span className="caption">Testing</span>
+        <h2 className="font-display text-h2 font-medium tracking-tight">
+          Test the gateway
+        </h2>
+        <p className="max-w-2xl text-[13px] leading-6 text-text-muted">
+          Generate a temporary key and hit the MCP endpoint with curl. We&apos;ll detect the
+          request live. The generated key is a real API key — manage it in{' '}
+          <a href="/settings" className="text-accent hover:underline">
+            Settings → API keys
+          </a>{' '}
+          afterwards.
+        </p>
+      </div>
+
+      <div className="space-y-1">
+        <p className="caption">MCP server URL</p>
+        <div className="flex items-center gap-2">
+          <input
+            readOnly
+            value={mcpUrl}
+            className="flex-1 rounded-sm border border-border bg-transparent px-3 py-1.5 font-mono text-[13px] text-text"
+          />
+          <button
+            onClick={() => onCopy(mcpUrl, 'url')}
+            className="text-[12px] text-text-subtle transition-colors hover:text-text"
+          >
+            {copied === 'url' ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      </div>
+
+      {!token ? (
+        <div className="space-y-1">
+          <button
+            onClick={onGenerate}
+            disabled={generating}
+            className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg transition-colors duration-micro ease-enter hover:bg-accent/90 disabled:opacity-50"
+          >
+            {generating ? 'Generating…' : 'Generate test API key'}
+          </button>
+          {genError && <p className="text-[12px] text-error">{genError}</p>}
+        </div>
+      ) : (
+        <div className="space-y-2 rounded-md border border-border bg-surface p-3">
+          <p className="text-[12px] text-warning">
+            Save this key now — it won&apos;t be shown again.
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 break-all font-mono text-[12px] text-text">
+              {token}
+            </code>
+            <button
+              onClick={() => onCopy(token, 'token')}
+              className="shrink-0 text-[12px] text-text-subtle transition-colors hover:text-text"
+            >
+              {copied === 'token' ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+        </div>
       )}
-    </div>
+
+      <div className="space-y-2">
+        <p className="caption">Verify with curl</p>
+        <p className="text-[13px] leading-6 text-text-muted">
+          A <InlineCode>200</InlineCode> response with{' '}
+          <InlineCode>serverInfo</InlineCode> means you&apos;re good;{' '}
+          <InlineCode>401 HOLO_AUTH_NO_SESSION</InlineCode> means the token wasn&apos;t
+          accepted.
+        </p>
+        <Snippet
+          text={cmd}
+          copyKey="verify-curl"
+          copied={copied}
+          onCopy={onCopy}
+          language="curl"
+        />
+        {tokenId && <VerifyStatus lastUsedAt={lastUsedAt} />}
+      </div>
+
+      {verified && (
+        <div className="flex items-center justify-between rounded-md border border-success/40 bg-success/10 px-3 py-2.5">
+          <div className="text-[13px] text-text">
+            Looks good — you&apos;re ready to wire up a client below.
+          </div>
+          <button
+            onClick={onDismiss}
+            className="rounded-md border border-border bg-surface px-2.5 py-1 text-[12px] text-text transition-colors hover:bg-surface-2"
+          >
+            Hide test panel
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 
 function VerifyStatus({ lastUsedAt }: { lastUsedAt: string | null }) {
   if (!lastUsedAt) {
     return (
-      <div className="flex items-center gap-2 text-[13px] text-gray-600 dark:text-gray-400">
+      <div className="flex items-center gap-2 text-[13px] text-text-muted">
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-warning/60" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-warning" />
         </span>
         Waiting for first request from your terminal…
       </div>
@@ -293,19 +395,19 @@ function VerifyStatus({ lastUsedAt }: { lastUsedAt: string | null }) {
   }
   const when = new Date(lastUsedAt).toLocaleTimeString();
   return (
-    <div className="flex items-center gap-2 text-[13px] text-emerald-600 dark:text-emerald-400">
-      <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-      ✓ Received request at {when}. Token works — go configure your client.
+    <div className="flex items-center gap-2 text-[13px] text-success">
+      <span className="inline-flex h-2 w-2 rounded-full bg-success" />
+      Received request at {when}. Token works.
     </div>
   );
 }
 
-// --- Tab content -----------------------------------------------------------
+// --- Shared bits -----------------------------------------------------------
 
 function Step({ n, children }: { n: number; children: ReactNode }) {
   return (
-    <li className="flex gap-3 text-[13px] leading-6 text-gray-700 dark:text-gray-300">
-      <span className="shrink-0 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 text-[11px] font-medium flex items-center justify-center mt-0.5 text-gray-600 dark:text-gray-400">
+    <li className="flex gap-3 text-[13px] leading-6 text-text">
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[11px] font-medium text-text-muted">
         {n}
       </span>
       <div className="flex-1 space-y-2">{children}</div>
@@ -327,18 +429,18 @@ function Snippet({
   language?: string;
 }) {
   return (
-    <div className="relative rounded-sm bg-[#0F0F11] border border-gray-800">
+    <div className="relative rounded-sm border border-border bg-code-bg">
       {language && (
-        <div className="absolute top-2 left-3 text-[10px] uppercase tracking-[0.06em] text-gray-500 font-mono">
+        <div className="absolute left-3 top-2 font-mono text-[10px] uppercase tracking-[0.06em] text-text-subtle">
           {language}
         </div>
       )}
-      <pre className={`p-4 ${language ? 'pt-7' : ''} text-xs font-mono text-gray-200 overflow-x-auto whitespace-pre-wrap`}>
+      <pre className={`overflow-x-auto whitespace-pre-wrap p-4 ${language ? 'pt-7' : ''} font-mono text-xs text-text`}>
         {text}
       </pre>
       <button
         onClick={() => onCopy(text, copyKey)}
-        className="absolute top-2 right-2 text-xs text-gray-400 hover:text-gray-200 bg-gray-800 hover:bg-gray-700 rounded px-2 py-1 transition-colors"
+        className="absolute right-2 top-2 rounded bg-surface-2 px-2 py-1 text-xs text-text-muted transition-colors hover:text-text"
       >
         {copied === copyKey ? 'Copied!' : 'Copy'}
       </button>
@@ -367,13 +469,15 @@ function CopyIcon() {
 
 function InlineCode({ children }: { children: ReactNode }) {
   return (
-    <code className="font-mono text-[12px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-800 dark:text-gray-200">
+    <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[12px] text-text">
       {children}
     </code>
   );
 }
 
-function CursorSetup({
+// --- Custom MCP (was Cursor) -----------------------------------------------
+
+function CustomMcpSetup({
   mcpUrl,
   token,
   copied,
@@ -386,33 +490,55 @@ function CursorSetup({
 }) {
   const config = mcpJsonConfig(mcpUrl, token);
   return (
-    <ol className="space-y-4 list-none">
-      <Step n={1}>
-        Open Cursor → <InlineCode>Settings</InlineCode> → <InlineCode>MCP</InlineCode>, or
-        edit <InlineCode>~/.cursor/mcp.json</InlineCode> directly.
-      </Step>
-      <Step n={2}>
-        Paste this server entry. If the file already has an <InlineCode>mcpServers</InlineCode>{' '}
-        block, merge the <InlineCode>holo</InlineCode> key into it.
-        <Snippet
-          text={config}
-          copyKey="cursor-config"
-          copied={copied}
-          onCopy={onCopy}
-          language="mcp.json"
-        />
-      </Step>
-      <Step n={3}>
-        Restart Cursor (or hit the refresh icon in the MCP settings panel). The{' '}
-        <InlineCode>holo</InlineCode> server should appear with a green dot.
-      </Step>
-      <Step n={4}>
-        Try it: ask Cursor &ldquo;use holo to find context for X.&rdquo; You&apos;ll see the
-        request show up under <InlineCode>Skills → Runs</InlineCode>.
-      </Step>
-    </ol>
+    <div className="space-y-4">
+      <p className="text-[13px] leading-6 text-text-muted">
+        Works with any MCP client that reads a standard{' '}
+        <InlineCode>mcp.json</InlineCode> — Cursor, Cline, Continue, Windsurf, custom hosts.
+      </p>
+      <ol className="list-none space-y-4">
+        <Step n={1}>
+          Open your client&apos;s MCP config. For example:
+          <ul className="ml-1 mt-1 space-y-1 text-[13px] leading-6">
+            <li>
+              <span className="text-text-subtle">Cursor:</span>{' '}
+              <InlineCode>~/.cursor/mcp.json</InlineCode>
+            </li>
+            <li>
+              <span className="text-text-subtle">Cline / Continue:</span> the extension&apos;s
+              MCP servers panel
+            </li>
+            <li>
+              <span className="text-text-subtle">Custom host:</span> wherever your runtime
+              loads MCP server entries
+            </li>
+          </ul>
+        </Step>
+        <Step n={2}>
+          Paste this server entry. If the file already has an{' '}
+          <InlineCode>mcpServers</InlineCode> block, merge the{' '}
+          <InlineCode>holo</InlineCode> key into it.
+          <Snippet
+            text={config}
+            copyKey="custom-mcp-config"
+            copied={copied}
+            onCopy={onCopy}
+            language="mcp.json"
+          />
+        </Step>
+        <Step n={3}>
+          Restart (or refresh) your client. The <InlineCode>holo</InlineCode> server should
+          appear with a healthy indicator.
+        </Step>
+        <Step n={4}>
+          Try it: ask your agent to &ldquo;use holo to find context for X.&rdquo; Requests
+          show up under <InlineCode>Observability → Runs</InlineCode>.
+        </Step>
+      </ol>
+    </div>
   );
 }
+
+// --- Claude ----------------------------------------------------------------
 
 function ClaudeSetup({
   mcpUrl,
@@ -429,29 +555,29 @@ function ClaudeSetup({
   const config = mcpJsonConfig(mcpUrl, token);
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-[13px] leading-6 text-gray-700 dark:text-gray-300">
+      <div className="rounded-md border border-border bg-surface px-3 py-2 text-[13px] leading-6 text-text">
         <span className="font-medium">Recommended.</span> Claude.ai web, mobile, and recent
         Desktop versions support remote MCP servers via the Custom Connector UI — no JSON
         editing, no bearer token, OAuth sign-in handled for you.
       </div>
-      <ol className="space-y-4 list-none">
+      <ol className="list-none space-y-4">
         <Step n={1}>
           In Claude, open <InlineCode>Settings → Connectors → Add custom connector</InlineCode>.
         </Step>
         <Step n={2}>
           Fill in:
-          <ul className="text-[13px] leading-6 space-y-1 ml-1 mt-1">
+          <ul className="ml-1 mt-1 space-y-1 text-[13px] leading-6">
             <li>
-              <span className="text-gray-500 dark:text-gray-400">Name:</span>{' '}
+              <span className="text-text-subtle">Name:</span>{' '}
               <InlineCode>holo</InlineCode>
             </li>
             <li>
-              <span className="text-gray-500 dark:text-gray-400">Remote MCP server URL:</span>{' '}
+              <span className="text-text-subtle">Remote MCP server URL:</span>{' '}
               <InlineCode>{mcpUrl}</InlineCode>
               <button
                 onClick={() => onCopy(mcpUrl, 'claude-mcp-url')}
                 aria-label="Copy MCP server URL"
-                className="ml-1.5 inline-flex items-center align-middle text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                className="ml-1.5 inline-flex items-center align-middle text-text-subtle transition-colors hover:text-text"
               >
                 {copied === 'claude-mcp-url' ? (
                   <span className="text-[11px]">Copied!</span>
@@ -461,7 +587,7 @@ function ClaudeSetup({
               </button>
             </li>
           </ul>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-text-subtle">
             Leave OAuth Client ID / Secret blank — holo registers Claude automatically via
             dynamic client registration.
           </p>
@@ -478,16 +604,16 @@ function ClaudeSetup({
 
       <button
         onClick={() => setShowManual((v) => !v)}
-        className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+        className="text-xs text-text-subtle transition-colors hover:text-text"
       >
         {showManual ? '− Hide' : '+ Show'} manual setup (older Claude Desktop, no Connectors UI)
       </button>
 
       {showManual && (
-        <ol className="space-y-4 list-none border-l border-gray-200 dark:border-gray-800 pl-4">
+        <ol className="list-none space-y-4 border-l border-border pl-4">
           <Step n={1}>
             Open <InlineCode>Claude → Settings → Developer → Edit Config</InlineCode>.
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-text-subtle">
               File location:{' '}
               <InlineCode>~/Library/Application Support/Claude/</InlineCode> (macOS) ·{' '}
               <InlineCode>%APPDATA%\Claude\</InlineCode> (Windows)
@@ -514,10 +640,12 @@ function ClaudeSetup({
   );
 }
 
+// --- ChatGPT ---------------------------------------------------------------
+
 function ChatGPTSetup({ mcpUrl, token }: { mcpUrl: string; token: string }) {
   const t = token || '<YOUR_HOLO_TOKEN>';
   return (
-    <ol className="space-y-4 list-none">
+    <ol className="list-none space-y-4">
       <Step n={1}>
         Requires ChatGPT Pro, Business, Enterprise, or Edu (Developer Mode for MCP is not
         available on Free/Plus today).
@@ -528,21 +656,21 @@ function ChatGPTSetup({ mcpUrl, token }: { mcpUrl: string; token: string }) {
       </Step>
       <Step n={3}>
         Open <InlineCode>Settings → Connectors → Create</InlineCode> and fill in:
-        <ul className="text-[13px] leading-6 space-y-1 ml-1 mt-1">
+        <ul className="ml-1 mt-1 space-y-1 text-[13px] leading-6">
           <li>
-            <span className="text-gray-500 dark:text-gray-400">Name:</span>{' '}
+            <span className="text-text-subtle">Name:</span>{' '}
             <InlineCode>holo</InlineCode>
           </li>
           <li>
-            <span className="text-gray-500 dark:text-gray-400">MCP server URL:</span>{' '}
+            <span className="text-text-subtle">MCP server URL:</span>{' '}
             <InlineCode>{mcpUrl}</InlineCode>
           </li>
           <li>
-            <span className="text-gray-500 dark:text-gray-400">Authentication:</span>{' '}
+            <span className="text-text-subtle">Authentication:</span>{' '}
             <InlineCode>Custom (Bearer)</InlineCode>
           </li>
           <li>
-            <span className="text-gray-500 dark:text-gray-400">Token:</span>{' '}
+            <span className="text-text-subtle">Token:</span>{' '}
             <InlineCode>{t}</InlineCode>
           </li>
         </ul>
@@ -552,18 +680,126 @@ function ChatGPTSetup({ mcpUrl, token }: { mcpUrl: string; token: string }) {
         from the <InlineCode>+</InlineCode> menu (or the &ldquo;Use connectors&rdquo; tool).
       </Step>
       <Step n={5}>
-        For custom GPTs / Actions (OpenAPI route), see the{' '}
-        <a
-          href="https://docs.holo.dev/connect/chatgpt-actions"
-          className="text-[#3F47FF] hover:underline"
-        >
-          OpenAPI guide
-        </a>
-        . Most users should use the MCP path above.
+        For custom GPTs / Actions over OpenAPI, see the OpenAPI tab. Most users should use the
+        MCP path above.
       </Step>
     </ol>
   );
 }
+
+// --- OpenAPI ---------------------------------------------------------------
+
+function OpenApiSetup({
+  gatewayBase,
+  token,
+  copied,
+  onCopy,
+}: {
+  gatewayBase: string;
+  token: string;
+  copied: string | null;
+  onCopy: (text: string, key: string) => void;
+}) {
+  const t = token || '<YOUR_HOLO_TOKEN>';
+  const specUrl = `${gatewayBase}/openapi.json`;
+  const docsUrl = `${gatewayBase}/docs`;
+
+  const searchCurl = [
+    `curl -s ${gatewayBase}/v1/search \\`,
+    `  -H "Authorization: Bearer ${t}" \\`,
+    `  -H "Content-Type: application/json" \\`,
+    `  -d '{"query":"onboarding flow","limit":5}'`,
+  ].join('\n');
+
+  const listSkillsCurl = [
+    `curl -s ${gatewayBase}/v1/skills \\`,
+    `  -H "Authorization: Bearer ${t}"`,
+  ].join('\n');
+
+  return (
+    <div className="space-y-4">
+      <p className="text-[13px] leading-6 text-text-muted">
+        Prefer plain HTTP? holo exposes a small REST surface alongside MCP — handy for custom
+        GPT Actions, n8n, scripts, or anything that doesn&apos;t speak MCP. Auth is Bearer
+        with the same API keys.
+      </p>
+
+      <ol className="list-none space-y-4">
+        <Step n={1}>
+          Grab the spec or open the live docs.
+          <ul className="ml-1 mt-1 space-y-1 text-[13px] leading-6">
+            <li>
+              <span className="text-text-subtle">OpenAPI 3.1 spec:</span>{' '}
+              <InlineCode>{specUrl}</InlineCode>
+              <button
+                onClick={() => onCopy(specUrl, 'openapi-spec-url')}
+                aria-label="Copy OpenAPI spec URL"
+                className="ml-1.5 inline-flex items-center align-middle text-text-subtle transition-colors hover:text-text"
+              >
+                {copied === 'openapi-spec-url' ? (
+                  <span className="text-[11px]">Copied!</span>
+                ) : (
+                  <CopyIcon />
+                )}
+              </button>
+            </li>
+            <li>
+              <span className="text-text-subtle">Interactive docs:</span>{' '}
+              <a
+                href={docsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent hover:underline"
+              >
+                {docsUrl}
+              </a>
+            </li>
+          </ul>
+        </Step>
+
+        <Step n={2}>
+          Authenticate every request with{' '}
+          <InlineCode>Authorization: Bearer &lt;key&gt;</InlineCode>. Generate one in{' '}
+          <a href="/settings" className="text-accent hover:underline">
+            Settings → API keys
+          </a>
+          .
+        </Step>
+
+        <Step n={3}>
+          Search across your indexed content:
+          <Snippet
+            text={searchCurl}
+            copyKey="openapi-search-curl"
+            copied={copied}
+            onCopy={onCopy}
+            language="curl"
+          />
+        </Step>
+
+        <Step n={4}>
+          List skills available to the authenticated user:
+          <Snippet
+            text={listSkillsCurl}
+            copyKey="openapi-skills-curl"
+            copied={copied}
+            onCopy={onCopy}
+            language="curl"
+          />
+        </Step>
+
+        <Step n={5}>
+          For custom GPT Actions, import{' '}
+          <InlineCode>{specUrl}</InlineCode> in the GPT builder and pick{' '}
+          <InlineCode>Bearer</InlineCode> as the auth type. Paste your holo API key when
+          prompted.
+        </Step>
+      </ol>
+    </div>
+  );
+}
+
+// --- Slack -----------------------------------------------------------------
 
 type SlackBotStatus = 'loading' | 'not_connected' | 'ingest_only' | 'bot_enabled' | 'error';
 
@@ -597,16 +833,14 @@ function SlackSetup() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 space-y-3">
+      <div className="space-y-3 rounded-md border border-border bg-surface p-4">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded">
+          <span className="rounded bg-warning/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em] text-warning">
             Beta
           </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            Talk to holo from Slack
-          </span>
+          <span className="text-xs text-text-subtle">Talk to holo from Slack</span>
         </div>
-        <p className="text-[13px] leading-6 text-gray-700 dark:text-gray-300">
+        <p className="text-[13px] leading-6 text-text">
           Mention <InlineCode>@holo</InlineCode> in any channel or DM, or run{' '}
           <InlineCode>/holo</InlineCode>, to retrieve context from your indexed sources. The
           bot uses the same Slack connection as your ingest sync.
@@ -614,18 +848,18 @@ function SlackSetup() {
       </div>
 
       {status === 'loading' && (
-        <p className="text-xs text-gray-400 dark:text-gray-500">Checking workspace…</p>
+        <p className="text-xs text-text-subtle">Checking workspace…</p>
       )}
 
       {status === 'not_connected' && (
         <div className="space-y-3">
-          <p className="text-[13px] leading-6 text-gray-700 dark:text-gray-300">
+          <p className="text-[13px] leading-6 text-text">
             You haven&apos;t connected Slack yet. Install the holo Slack app first — the bot
             and ingest sync share the same install.
           </p>
           <a
             href="/connections"
-            className="inline-flex items-center gap-2 rounded-md bg-[#4A154B] px-3 py-2 text-xs font-medium text-white hover:bg-[#611f63] transition-colors"
+            className="inline-flex items-center gap-2 rounded-md bg-[#4A154B] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#611f63]"
           >
             <SlackMark />
             Connect Slack →
@@ -636,9 +870,9 @@ function SlackSetup() {
       {status === 'ingest_only' && <SlackReauthCta />}
 
       {status === 'bot_enabled' && (
-        <ol className="space-y-4 list-none">
+        <ol className="list-none space-y-4">
           <Step n={1}>
-            <span className="text-emerald-600 dark:text-emerald-400">
+            <span className="text-success">
               ✓ <InlineCode>@holo</InlineCode> is active in your workspace.
             </span>
           </Step>
@@ -658,7 +892,7 @@ function SlackSetup() {
       )}
 
       {status === 'error' && (
-        <p className="text-xs text-red-600 dark:text-red-400">
+        <p className="text-xs text-error">
           Couldn&apos;t check Slack bot status. Refresh and try again.
         </p>
       )}
@@ -695,7 +929,7 @@ function SlackReauthCta() {
 
   return (
     <div className="space-y-3">
-      <p className="text-[13px] leading-6 text-gray-700 dark:text-gray-300">
+      <p className="text-[13px] leading-6 text-text">
         Your Slack workspace is connected for ingest, but the <InlineCode>@holo</InlineCode>{' '}
         bot needs additional scopes (mentions, DMs, <InlineCode>chat:write</InlineCode>, slash
         command). Re-authorize to enable the bot — Slack will prompt you to approve the new
@@ -704,12 +938,12 @@ function SlackReauthCta() {
       <button
         onClick={reauth}
         disabled={busy}
-        className="inline-flex items-center gap-2 rounded-md bg-[#4A154B] px-3 py-2 text-xs font-medium text-white hover:bg-[#611f63] disabled:opacity-50 transition-colors"
+        className="inline-flex items-center gap-2 rounded-md bg-[#4A154B] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#611f63] disabled:opacity-50"
       >
         <SlackMark />
         {busy ? 'Redirecting…' : 'Re-authorize for @holo bot'}
       </button>
-      {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
+      {err && <p className="text-xs text-error">{err}</p>}
     </div>
   );
 }

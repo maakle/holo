@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { ApiTokens } from './api-tokens';
 import { DangerZone } from './danger-zone';
 import { WorkspaceDetails } from './workspace-details';
 
@@ -63,6 +64,8 @@ export default async function SettingsPage() {
           isDefaultOrg={isDefaultOrg}
         />
       </section>
+
+      <ApiTokens />
 
       <DangerZone
         organizationId={org.id}
