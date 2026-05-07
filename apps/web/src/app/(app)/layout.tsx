@@ -26,16 +26,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const activeOrgId = resolveActiveOrgId(session);
 
   return (
-    <div className="flex min-h-screen bg-bg text-text">
+    <div className="flex h-screen bg-bg text-text">
       <AppSidebar
         userEmail={session.user.email}
         userName={session.user.name}
         orgs={memberOrgs}
         activeOrgId={activeOrgId}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppTopbar />
-        <main className="flex-1 px-6 py-8 lg:px-10 lg:py-10">
+        <main className="min-h-0 flex-1 overflow-y-auto px-6 py-8 lg:px-10 lg:py-10">
           <div className="mx-auto w-full max-w-[1280px]">{children}</div>
         </main>
       </div>
