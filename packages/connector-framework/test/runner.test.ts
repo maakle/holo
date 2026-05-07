@@ -171,6 +171,78 @@ describe('runConnectorSync', () => {
     });
     expect(result.artifactCount).toBe(0);
     expect(enqueued).toHaveLength(0);
+    // Dedup hits show up on the breakdown so the dashboard can surface
+    // "we already had this content" runs distinctly from "no new chunks".
+    expect(result.breakdown).toEqual({ k: { new: 0, deduped: 1 } });
+  });
+
+  it('tracks per-kind new and deduped counts on the breakdown', async () => {
+    // One page, four items: two of kind 'a' (one fresh, one repeat-of-itself),
+    // two of kind 'b' (both fresh, distinct content). The repeat-of-itself
+    // mirrors the real-world case where a connector emits the same chunk
+    // twice within a single sync (e.g. a comment quoted from another
+    // thread) — the second emission should count as a dedup, not a new.
+    const fetchImpl = (async () =>
+      jsonResponse({
+        items: [
+          { id: 'a1', kind: 'a', body: 'alpha' },
+          { id: 'a2', kind: 'a', body: 'alpha' }, // same content as a1 → dedup
+          { id: 'b1', kind: 'b', body: 'one' },
+          { id: 'b2', kind: 'b', body: 'two' },
+        ],
+        next: null,
+      })) as unknown as typeof fetch;
+
+    const spec = defineConnector({
+      id: 'demo',
+      displayName: 'Demo',
+      auth: apiKey(),
+      http: { baseUrl: 'https://x' },
+      async testConnection() {
+        return { externalId: 'x', name: 'X' };
+      },
+      resources: [
+        {
+          id: 'items',
+          cursorSchema: z.object({}).default({}),
+          async sync(ctx) {
+            for await (const page of ctx.paginate.cursor<
+              { items: Array<{ id: string; kind: string; body: string }>; next: string | null },
+              { id: string; kind: string; body: string }
+            >('/x', {
+              items: (p) => p.items,
+              nextCursor: (p) => p.next,
+            })) {
+              for (const item of page) {
+                await ctx.upsert({
+                  externalId: item.id,
+                  kind: item.kind,
+                  content: item.body,
+                  metadata: {},
+                  aclSubjects: [],
+                });
+              }
+            }
+            return {};
+          },
+        },
+      ],
+    });
+
+    const { stores, enqueued } = makeStores();
+    const result = await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+    expect(result.artifactCount).toBe(3);
+    expect(enqueued).toHaveLength(3);
+    expect(result.breakdown).toEqual({
+      a: { new: 1, deduped: 1 },
+      b: { new: 2, deduped: 0 },
+    });
   });
 
   it('rejects a spec with duplicate resource ids', () => {

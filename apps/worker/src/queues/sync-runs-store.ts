@@ -42,6 +42,7 @@ export async function startSyncRun(sql: Sql, args: StartRunArgs): Promise<void> 
       finished_at = NULL,
       duration_ms = NULL,
       artifact_count = NULL,
+      breakdown = NULL,
       error_code = NULL,
       error_problem = NULL,
       error_cause = NULL,
@@ -82,19 +83,33 @@ export interface FinishOkArgs {
   jobId: string;
   artifactCount: number;
   skipReason?: string | null;
+  /**
+   * Per-kind { new, deduped } breakdown from the framework runner. Stored
+   * as JSONB so the dashboard can render the Kombo-style table without
+   * widening the column set every time a connector adds a kind. Pass
+   * undefined when the run never reached the upsert path (e.g. source
+   * deleted, skip_reason set) — we leave the column NULL rather than
+   * persist a misleading empty object.
+   */
+  breakdown?: Record<string, { new: number; deduped: number }> | null;
 }
 
 export async function finishSyncRunOk(sql: Sql, args: FinishOkArgs): Promise<void> {
   // status filter: don't overwrite 'cancelled' if /stop got there first.
   // Cancellation is the user's decision and outranks a late "ok" report from
   // a worker that hadn't yet noticed its BullMQ job was removed.
+  // Mirror the JSONB-write pattern from sync-cursor-store / step.ts:
+  // serialize once, cast inline. Letting the postgres driver infer JSON
+  // type from a JS object risks accidental shape coercion.
+  const breakdownJson = args.breakdown ? JSON.stringify(args.breakdown) : null;
   await sql`
     UPDATE sync_runs
        SET status = 'ok',
            finished_at = now(),
            duration_ms = (EXTRACT(EPOCH FROM (now() - started_at)) * 1000)::int,
            artifact_count = ${args.artifactCount},
-           skip_reason = ${args.skipReason ?? null}
+           skip_reason = ${args.skipReason ?? null},
+           breakdown = ${breakdownJson}::jsonb
      WHERE queue_name = ${args.queueName}
        AND job_id = ${args.jobId}
        AND status = 'running'

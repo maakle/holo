@@ -175,6 +175,7 @@ const mintlifyConfig: ConnectorWizardConfig = {
       label: 'Docs URL',
       render: (ctx) =>
         apiKeyStep(ctx, {
+          kind: 'url',
           placeholder: 'https://docs.example.com',
           helpText:
             'Paste the root URL of any Mintlify-hosted docs site. Holo ingests pages via the auto-published /llms.txt index and pulls the OpenAPI reference if one is available.',
@@ -197,6 +198,7 @@ const zendeskConfig: ConnectorWizardConfig = {
       label: 'Help center URL',
       render: (ctx) =>
         apiKeyStep(ctx, {
+          kind: 'url',
           placeholder: 'https://help.example.com',
           helpText:
             'Paste the root URL of any public Zendesk help center. Holo ingests articles via Zendesk’s public Help Center API — no API token needed for public help centers.',

@@ -20,6 +20,8 @@ const FILE_BY_ID: Partial<Record<ConnectorMeta['id'], string>> = {
   pylon: '/connectors/usepylon.webp',
   hubspot: '/connectors/hubspot.webp',
   linear: '/connectors/linear.webp',
+  mintlify: '/connectors/mintlify.png',
+  zendesk: '/connectors/zendesk.png',
 };
 
 export function ConnectorLogo({ id, className }: Props) {

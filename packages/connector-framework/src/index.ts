@@ -81,4 +81,5 @@ export type {
   ChunkRecord,
   SyncJobInput,
   SyncJobResult,
+  SyncBreakdown,
 } from './runtime';

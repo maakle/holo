@@ -19,6 +19,11 @@ interface Args {
   instructions?: string[];
   /** Code-styled scope strings rendered for click-to-select copy. */
   scopes?: { required: string[]; optional?: string[] };
+  /**
+   * Input kind. 'secret' (default) masks input with a reveal toggle.
+   * 'url' shows the value in plain text and validates it as an http(s) URL.
+   */
+  kind?: 'secret' | 'url';
 }
 
 /**
@@ -44,8 +49,13 @@ function ApiKeyStep<TState>({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const isUrl = args.kind === 'url';
 
   async function save() {
+    if (isUrl && !isValidHttpUrl(token)) {
+      setError('Enter a valid URL starting with http:// or https://');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -123,28 +133,35 @@ function ApiKeyStep<TState>({
           ) : null}
           <div className="relative">
             <input
-              type={revealed ? 'text' : 'password'}
+              type={isUrl ? 'url' : revealed ? 'text' : 'password'}
+              inputMode={isUrl ? 'url' : undefined}
               value={token}
-              onChange={(e) => setToken(e.target.value)}
+              onChange={(e) => {
+                setToken(e.target.value);
+                if (error) setError(null);
+              }}
               placeholder={args.placeholder}
-              className="w-full rounded-md border border-border bg-bg py-2 pl-3 pr-9 text-[13px] text-text placeholder:text-text-subtle focus:outline-hidden focus:focus-ring"
+              className={`w-full rounded-md border border-border bg-bg py-2 pl-3 ${isUrl ? 'pr-3' : 'pr-9'} text-[13px] text-text placeholder:text-text-subtle focus:outline-hidden focus:focus-ring`}
               autoComplete="off"
+              spellCheck={isUrl ? false : undefined}
               disabled={busy}
             />
-            <button
-              type="button"
-              onClick={() => setRevealed((v) => !v)}
-              disabled={busy}
-              aria-label={revealed ? 'Hide token' : 'Show token'}
-              aria-pressed={revealed}
-              className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-text-subtle hover:text-text focus:outline-hidden focus:focus-ring disabled:opacity-50"
-            >
-              {revealed ? (
-                <EyeOff className="h-3.5 w-3.5" aria-hidden />
-              ) : (
-                <Eye className="h-3.5 w-3.5" aria-hidden />
-              )}
-            </button>
+            {isUrl ? null : (
+              <button
+                type="button"
+                onClick={() => setRevealed((v) => !v)}
+                disabled={busy}
+                aria-label={revealed ? 'Hide token' : 'Show token'}
+                aria-pressed={revealed}
+                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-text-subtle hover:text-text focus:outline-hidden focus:focus-ring disabled:opacity-50"
+              >
+                {revealed ? (
+                  <EyeOff className="h-3.5 w-3.5" aria-hidden />
+                ) : (
+                  <Eye className="h-3.5 w-3.5" aria-hidden />
+                )}
+              </button>
+            )}
           </div>
           {error ? <p className="text-[12px] text-error">{error}</p> : null}
         </div>
@@ -159,7 +176,11 @@ function ApiKeyStep<TState>({
             <Button variant="secondary" onClick={ctx.close} disabled={busy}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={save} disabled={busy || !token.trim()}>
+            <Button
+              variant="primary"
+              onClick={save}
+              disabled={busy || !token.trim() || (isUrl && !isValidHttpUrl(token))}
+            >
               {busy ? 'Connecting…' : 'Connect'}
             </Button>
           </>
@@ -167,6 +188,15 @@ function ApiKeyStep<TState>({
       </AlertDialogFooter>
     </>
   );
+}
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 function ScopeList({
