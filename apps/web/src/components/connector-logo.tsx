@@ -1,12 +1,18 @@
 import Image from 'next/image';
-import type { ConnectorMeta } from '@/lib/connector-registry';
+import { CONNECTORS, type ConnectorMeta } from '@/lib/connector-registry';
 
 interface Props {
   id: ConnectorMeta['id'];
   className?: string;
 }
 
-const FILE_BY_ID: Record<ConnectorMeta['id'], string> = {
+/**
+ * Brand assets per connector. Connectors without an asset (typically new
+ * additions awaiting a real webp drop-in) fall through to a text-initial
+ * rendering so the page still works without breaking the typecheck or the
+ * Image runtime.
+ */
+const FILE_BY_ID: Partial<Record<ConnectorMeta['id'], string>> = {
   github: '/connectors/github.webp',
   slack: '/connectors/slack.webp',
   notion: '/connectors/notion.webp',
@@ -18,14 +24,29 @@ const FILE_BY_ID: Record<ConnectorMeta['id'], string> = {
 
 export function ConnectorLogo({ id, className }: Props) {
   const src = FILE_BY_ID[id];
+  if (src) {
+    return (
+      <Image
+        src={src}
+        alt=""
+        width={40}
+        height={40}
+        className={className ?? 'h-5 w-5 object-contain'}
+        aria-hidden="true"
+      />
+    );
+  }
+  const meta = CONNECTORS.find((c) => c.id === id);
+  const initial = (meta?.displayName ?? id).charAt(0).toUpperCase();
   return (
-    <Image
-      src={src}
-      alt=""
-      width={40}
-      height={40}
-      className={className ?? 'h-5 w-5 object-contain'}
+    <span
+      className={
+        className ??
+        'flex h-5 w-5 items-center justify-center rounded-sm bg-surface-2 text-[10px] font-medium text-text-muted'
+      }
       aria-hidden="true"
-    />
+    >
+      {initial}
+    </span>
   );
 }

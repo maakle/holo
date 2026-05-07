@@ -11,3 +11,4 @@ export { apiKey } from './api-key';
 export type { ApiKeyConfig } from './api-key';
 export { githubApp } from './github-app';
 export type { GithubAppConfig, GithubAppStrategy } from './github-app';
+export { none } from './none';

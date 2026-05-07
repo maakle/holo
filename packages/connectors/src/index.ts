@@ -42,6 +42,19 @@ export { createNotionSpec } from './notion/index';
 export type { NotionSpecOptions } from './notion/index';
 export { createGrainSpec } from './grain/index';
 export type { GrainSpecOptions } from './grain/index';
+export {
+  createMintlifySpec,
+  fetchLlmsIndex,
+  parseLlmsIndex,
+  fetchPageMarkdown,
+  probeOpenApi,
+  normalizeBaseUrl,
+} from './mintlify/index';
+export type {
+  MintlifySpecOptions,
+  LlmsIndex,
+  LlmsIndexEntry,
+} from './mintlify/index';
 
 // GitHub (framework-native spec + retained helpers for the bot, gateway,
 // install/uninstall flow, and the webhook receiver). All re-exported via

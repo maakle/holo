@@ -7,6 +7,7 @@ export const QUEUE_NAMES = {
   PYLON_SYNC: 'pylon-sync',
   HUBSPOT_SYNC: 'hubspot-sync',
   LINEAR_SYNC: 'linear-sync',
+  MINTLIFY_SYNC: 'mintlify-sync',
   EMBED: 'embed',
 } as const;
 
@@ -21,6 +22,7 @@ export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   'pylon-sync': 2,
   'hubspot-sync': 2,
   'linear-sync': 2,
+  'mintlify-sync': 2,
   embed: 5,
 };
 

@@ -1,6 +1,6 @@
 import type { ConnectorTokens } from '../types';
 
-export type AuthKind = 'oauth2' | 'apiKey' | 'githubApp';
+export type AuthKind = 'oauth2' | 'apiKey' | 'githubApp' | 'none';
 
 export interface BuildAuthorizeUrlInput {
   redirectUri: string;

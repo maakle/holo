@@ -58,6 +58,17 @@ export interface RuntimeStores {
   }): Promise<ReadonlyArray<AllowlistEntry>>;
 
   /**
+   * Optional. Load the per-source `metadata` JSONB from the host's sources
+   * table. Specs that key per-source state on the source row itself
+   * (Mintlify: docs base URL; in the future: any multi-source spec) read
+   * this from `ctx.sourceMetadata`. Hosts return an empty object when
+   * no metadata is present.
+   */
+  loadSourceMetadata?(input: {
+    sourceId: string;
+  }): Promise<Record<string, unknown>>;
+
+  /**
    * Hand chunks off to the embed pipeline. Called by the runtime in batches.
    */
   enqueueChunks(input: {

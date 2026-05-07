@@ -72,6 +72,13 @@ export interface ResourceSyncContext<TCursor> {
    * that case so operators see a clear setup error.
    */
   readonly allowlist: ReadonlyArray<AllowlistEntry>;
+  /**
+   * The host's `sources.metadata` JSONB for this source. Specs that key
+   * per-source state on the source row itself (e.g. Mintlify stores its
+   * docs `baseUrl` here) read it via this field. Empty object when the
+   * host doesn't populate metadata or `loadSourceMetadata` isn't wired.
+   */
+  readonly sourceMetadata: Record<string, unknown>;
   upsert(chunk: ChunkUpsert): Promise<void>;
   flushCursor(cursor: TCursor): Promise<void>;
   reportProgress?: ReportProgressFn;
