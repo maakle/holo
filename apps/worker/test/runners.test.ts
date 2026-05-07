@@ -1,9 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  createSlackRunner,
-  createGithubProseRunner,
-  createGithubCodeRunner,
-} from '../src/queues/runners';
+import { createGithubProseRunner, createGithubCodeRunner } from '../src/queues/runners';
 
 // Minimal mocks of the worker's runtime deps. Runners are factories — the
 // methods they return only invoke their dependencies when called, so we can
@@ -25,21 +21,9 @@ function mockDb() {
 }
 
 describe('runner factories', () => {
-  it('createSlackRunner exposes full + incremental', () => {
-    const runner = createSlackRunner({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      db: mockDb() as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      embedQueue: mockEmbedQueue() as any,
-    });
-    expect(typeof runner.full).toBe('function');
-    expect(typeof runner.incremental).toBe('function');
-    expect(runner.codeInitial).toBeUndefined();
-  });
-
-  // Notion (alongside Pylon, HubSpot, Linear) moved to the framework via
-  // createGenericRunner + createNotionSpec. Coverage lives in the framework
-  // runtime tests + connectors/test/notion.test.ts.
+  // Slack, Notion, Pylon, HubSpot, Linear, Grain all moved to the framework
+  // via createGenericRunner + create<X>Spec (see runners.module.ts).
+  // Coverage lives in the framework runtime tests + connectors/test/<x>.test.ts.
 
   it('createGithubProseRunner exposes full + incremental (no code methods)', () => {
     const runner = createGithubProseRunner({
@@ -66,20 +50,4 @@ describe('runner factories', () => {
     expect(runner.incremental).toBeUndefined();
   });
 
-  // HubSpot's runner moved to the framework via createGenericRunner +
-  // createHubspotSpec (see runners.module.ts). Coverage for that path lives
-  // in @holo/connector-framework's runtime tests + @holo/connectors's
-  // hubspot spec tests.
-
-  it('slack runner.full throws HOLO_AUTH_NO_SESSION when no token is found', async () => {
-    const runner = createSlackRunner({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      db: mockDb() as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      embedQueue: mockEmbedQueue() as any,
-    });
-    await expect(
-      runner.full!({ sourceId: 'src-1', organizationId: 'org-1' }),
-    ).rejects.toMatchObject({ code: 'HOLO_AUTH_NO_SESSION' });
-  });
 });

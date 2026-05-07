@@ -12,12 +12,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { Logger } from '@nestjs/common';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { Queue } from 'bullmq';
 import { schema, type DB } from '@holo/db';
-import { holoError, ErrorCode } from '@holo/errors';
+import { ErrorCode } from '@holo/errors';
 import {
-  createSlackConnector,
   createGithubApiClient,
   resolveAllowlist,
   runGithubProseSync,
@@ -97,35 +96,6 @@ async function resolveGithubRepos(args: {
   }
 }
 
-async function loadConnectorToken(
-  db: DB,
-  organizationId: string,
-  provider: 'slack',
-): Promise<string> {
-  const rows = await db
-    .select({ accessToken: schema.connectorCredentials.accessToken })
-    .from(schema.connectorCredentials)
-    .where(
-      and(
-        eq(schema.connectorCredentials.organizationId, organizationId),
-        eq(schema.connectorCredentials.provider, provider),
-        eq(schema.connectorCredentials.status, 'active'),
-      ),
-    )
-    .orderBy(desc(schema.connectorCredentials.connectedAt))
-    .limit(1);
-
-  const token = rows[0]?.accessToken;
-  if (!token) {
-    throw holoError({
-      code: ErrorCode.HOLO_AUTH_NO_SESSION,
-      problem: `No active ${provider} credential for organization ${organizationId}`,
-      fix: `Connect ${provider} via the OAuth flow before scheduling syncs.`,
-    });
-  }
-  return token;
-}
-
 async function loadExistingHashes(db: DB, organizationId: string): Promise<Set<string>> {
   const rows = await db
     .select({ contentHash: schema.chunks.contentHash })
@@ -153,59 +123,9 @@ function workDirFor(root: string, repoFullName: string): string {
   return dir;
 }
 
-// ── Slack ────────────────────────────────────────────────────────────────────
-export function createSlackRunner(deps: RunnerDeps): SyncRunner {
-  const enqueueEmbed = makeEnqueueEmbed(deps.embedQueue);
-  const buildConnector = (): ReturnType<typeof createSlackConnector> =>
-    createSlackConnector({
-      // OAuth-only; the worker does not initiate OAuth, so empty strings are fine.
-      clientId: process.env.SLACK_CONNECTOR_CLIENT_ID ?? '',
-      clientSecret: process.env.SLACK_CONNECTOR_CLIENT_SECRET ?? '',
-      db: deps.db,
-      enqueueEmbed,
-    });
-
-  return {
-    async full(payload: SyncJobPayload, opts): Promise<SyncResult> {
-      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'slack');
-      const result = await buildConnector().fullSync(
-        { accessToken },
-        {
-          sourceId: payload.sourceId,
-          organizationId: payload.organizationId,
-          cursorScope: 'sync',
-          signal: opts?.signal,
-          reportProgress: opts?.reportProgress,
-        },
-      );
-      return {
-        artifactCount: result.artifactCount,
-        newCursor: result.newCursor,
-        metadataPatch: result.metadataPatch,
-        skipReason: result.skipReason,
-      };
-    },
-    async incremental(payload: SyncJobPayload, _cursor, opts): Promise<SyncResult> {
-      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'slack');
-      const result = await buildConnector().incrementalSync(
-        { accessToken },
-        {
-          sourceId: payload.sourceId,
-          organizationId: payload.organizationId,
-          cursorScope: 'sync',
-          signal: opts?.signal,
-          reportProgress: opts?.reportProgress,
-        },
-      );
-      return {
-        artifactCount: result.artifactCount,
-        newCursor: result.newCursor,
-        metadataPatch: result.metadataPatch,
-        skipReason: result.skipReason,
-      };
-    },
-  };
-}
+// All API-key + OAuth connectors (slack, notion, grain, pylon, hubspot, linear)
+// migrated to @holo/connector-framework — see runners.module.ts for
+// registration via createGenericRunner(create<X>Spec(...), deps).
 
 // Notion migrated to @holo/connector-framework — see runners.module.ts for
 // the registration via createGenericRunner(createNotionSpec(), deps).
