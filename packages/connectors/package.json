@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
     "./shared": "./src/shared/index.ts",
-    "./github": "./src/github/index.ts"
+    "./github": "./src/github/index.ts",
+    "./linear": "./src/linear/index.ts"
   },
   "scripts": {
     "lint": "eslint src",
@@ -18,11 +19,13 @@
   },
   "dependencies": {
     "@holo/chunker": "workspace:*",
+    "@holo/connector-framework": "workspace:*",
     "@holo/db": "workspace:*",
     "@holo/errors": "workspace:*",
     "drizzle-orm": "0.45.2",
     "jose": "5.9.6",
-    "minimatch": "^9.0.5"
+    "minimatch": "^9.0.5",
+    "zod": "4.4.2"
   },
   "devDependencies": {
     "msw": "2.4.9",
