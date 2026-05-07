@@ -3,7 +3,8 @@ import { headers } from 'next/headers';
 import { eq, and } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
-import { createNotionConnector } from '@holo/connectors';
+import { createNotionSpec } from '@holo/connectors';
+import { createHttpClient } from '@holo/connector-framework';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
@@ -31,9 +32,11 @@ export async function POST(req: Request) {
     }
     const token = body.token.trim();
 
-    // Validate token via testConnection
-    const connector = createNotionConnector();
-    const ident = await connector.testConnection({ accessToken: token });
+    // Validate the integration token via the framework spec's testConnection.
+    const spec = createNotionSpec();
+    const tokens = { accessToken: token };
+    const api = createHttpClient({ config: spec.http!, auth: spec.auth, tokens });
+    const ident = await spec.testConnection({ api, tokens });
 
     const orgId = resolveActiveOrgId(session, defaultOrgId);
     const userId = session.user.id;

@@ -31,8 +31,6 @@ export type {
   SlackPostMessageInput,
   SlackPostMessageResult,
 } from './slack/api-client';
-export { createNotionConnector } from './notion/index';
-export type { NotionConnectorOptions } from './notion/index';
 export { createGrainConnector } from './grain/index';
 export type { GrainConnectorOptions } from './grain/index';
 // Framework-native specs (new shape — no legacy Connector facade).
@@ -42,6 +40,8 @@ export { createPylonSpec } from './pylon/index';
 export type { PylonSpecOptions } from './pylon/index';
 export { createHubspotSpec } from './hubspot/index';
 export type { HubspotSpecOptions } from './hubspot/index';
+export { createNotionSpec } from './notion/index';
+export type { NotionSpecOptions } from './notion/index';
 
 // Underlying sync engines + API clients (used by the worker to bypass the
 // connector facade for github, where prose and code dispatch on different queues).

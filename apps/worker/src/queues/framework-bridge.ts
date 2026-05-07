@@ -20,6 +20,7 @@ import { schema, type DB } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
 import {
   runConnectorSync,
+  type AllowlistEntry,
   type ChunkRecord,
   type ConnectorSpec,
   type ConnectorTokens,
@@ -154,6 +155,26 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
         .from(schema.chunks)
         .where(eq(schema.chunks.organizationId, organizationId));
       return new Set(rows.map((r) => r.contentHash));
+    },
+
+    async loadAllowlist({ organizationId, providerId }): Promise<ReadonlyArray<AllowlistEntry>> {
+      const rows = await deps.db
+        .select({
+          pattern: schema.connectorAllowlists.pattern,
+          patternKind: schema.connectorAllowlists.patternKind,
+          decision: schema.connectorAllowlists.decision,
+        })
+        .from(schema.connectorAllowlists)
+        .where(
+          and(
+            eq(schema.connectorAllowlists.organizationId, organizationId),
+            eq(
+              schema.connectorAllowlists.provider,
+              providerId as 'github' | 'slack' | 'notion',
+            ),
+          ),
+        );
+      return rows;
     },
 
     async enqueueChunks({ organizationId, chunks }): Promise<void> {

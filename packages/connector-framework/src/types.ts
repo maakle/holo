@@ -45,6 +45,19 @@ export type ReportProgressFn = (input: {
   message?: string;
 }) => void;
 
+/**
+ * One row in the host's allowlist table for a given (org, provider).
+ * Decisions are 'include' / 'exclude'; pattern kinds are 'glob' / 'exact_id'.
+ * Specs that need narrowing (Slack channels, GitHub repos, Notion pages)
+ * read these from `ctx.allowlist` and decide policy themselves — the
+ * framework doesn't impose matching semantics.
+ */
+export interface AllowlistEntry {
+  pattern: string;
+  patternKind: 'glob' | 'exact_id';
+  decision: 'include' | 'exclude';
+}
+
 export interface ResourceSyncContext<TCursor> {
   readonly organizationId: string;
   readonly sourceId: string;
@@ -52,6 +65,13 @@ export interface ResourceSyncContext<TCursor> {
   readonly api: HttpClient;
   readonly paginate: Paginator;
   readonly cursor: TCursor;
+  /**
+   * Allowlist rows for this (organization, provider). Empty array if the
+   * host doesn't expose one or has no entries; specs that require an
+   * allowlist (e.g. Slack, Notion) should throw HOLO_ALLOWLIST_EMPTY in
+   * that case so operators see a clear setup error.
+   */
+  readonly allowlist: ReadonlyArray<AllowlistEntry>;
   upsert(chunk: ChunkUpsert): Promise<void>;
   flushCursor(cursor: TCursor): Promise<void>;
   reportProgress?: ReportProgressFn;

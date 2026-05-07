@@ -7,13 +7,17 @@ import { holoError, ErrorCode } from '@holo/errors';
 import { QUEUE_NAMES } from './types';
 import {
   createSlackRunner,
-  createNotionRunner,
   createGithubProseRunner,
   createGithubCodeRunner,
   createGrainRunner,
 } from './runners';
 import { createGenericRunner } from './framework-bridge';
-import { createLinearSpec, createPylonSpec, createHubspotSpec } from '@holo/connectors';
+import {
+  createLinearSpec,
+  createPylonSpec,
+  createHubspotSpec,
+  createNotionSpec,
+} from '@holo/connectors';
 import { setSyncRunner } from './sync-runner-registry';
 import { reconcileOrphanedRuns } from './sync-runs-store';
 import type { EmbedJobPayload } from './embed-insert';
@@ -50,7 +54,7 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
   async onApplicationBootstrap(): Promise<void> {
     const deps = { db: getDb(), embedQueue: this.embedQueue };
     setSyncRunner(QUEUE_NAMES.SLACK_SYNC, createSlackRunner(deps));
-    setSyncRunner(QUEUE_NAMES.NOTION_SYNC, createNotionRunner(deps));
+    setSyncRunner(QUEUE_NAMES.NOTION_SYNC, createGenericRunner(createNotionSpec(), deps));
     setSyncRunner(QUEUE_NAMES.GITHUB_PROSE_SYNC, createGithubProseRunner(deps));
     setSyncRunner(QUEUE_NAMES.GITHUB_CODE_SYNC, createGithubCodeRunner(deps));
     setSyncRunner(QUEUE_NAMES.GRAIN_SYNC, createGrainRunner(deps));
@@ -74,7 +78,7 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       ),
     );
     this.logger.log(
-      'Registered real SyncRunners for slack, notion, github-prose, github-code, grain (legacy) + pylon, hubspot, linear (framework)',
+      'Registered real SyncRunners for slack, github-prose, github-code, grain (legacy) + pylon, hubspot, notion, linear (framework)',
     );
 
     // Reap any 'running' rows the previous worker incarnation left behind

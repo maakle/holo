@@ -70,6 +70,9 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
   });
   const paginate = buildPaginator({ client: api });
   const existingHashes = await stores.loadExistingHashes({ organizationId });
+  const allowlist = stores.loadAllowlist
+    ? await stores.loadAllowlist({ organizationId, providerId: spec.id })
+    : [];
 
   let artifactCount = 0;
   const cursorPatch: Record<string, unknown> = {};
@@ -98,6 +101,7 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
       api,
       paginate,
       cursor,
+      allowlist,
       reportProgress: input.reportProgress,
       signal: input.signal,
       async upsert(chunk: ChunkUpsert): Promise<void> {

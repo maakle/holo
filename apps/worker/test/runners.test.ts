@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   createSlackRunner,
-  createNotionRunner,
   createGithubProseRunner,
   createGithubCodeRunner,
 } from '../src/queues/runners';
@@ -38,16 +37,9 @@ describe('runner factories', () => {
     expect(runner.codeInitial).toBeUndefined();
   });
 
-  it('createNotionRunner exposes full + incremental', () => {
-    const runner = createNotionRunner({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      db: mockDb() as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      embedQueue: mockEmbedQueue() as any,
-    });
-    expect(typeof runner.full).toBe('function');
-    expect(typeof runner.incremental).toBe('function');
-  });
+  // Notion (alongside Pylon, HubSpot, Linear) moved to the framework via
+  // createGenericRunner + createNotionSpec. Coverage lives in the framework
+  // runtime tests + connectors/test/notion.test.ts.
 
   it('createGithubProseRunner exposes full + incremental (no code methods)', () => {
     const runner = createGithubProseRunner({

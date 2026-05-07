@@ -42,6 +42,58 @@ function rowMatches(candidate: string, row: AllowlistRow): boolean {
   return minimatch(candidate, row.pattern);
 }
 
+/**
+ * Pure allowlist evaluator. Pulled out of resolveAllowlist so the framework's
+ * connector specs can match against rows surfaced via ctx.allowlist without
+ * needing a Drizzle handle. The legacy db-backed `resolveAllowlist` reuses
+ * this function.
+ */
+export function evaluateAllowlist(
+  rows: ReadonlyArray<{
+    pattern: string;
+    patternKind: 'glob' | 'exact_id';
+    decision: 'include' | 'exclude';
+  }>,
+  options: { provider: string; organizationId: string; candidates?: string[] },
+): AllowlistResult {
+  const include = rows.filter((r) => r.decision === 'include') as AllowlistRow[];
+  const exclude = rows.filter((r) => r.decision === 'exclude') as AllowlistRow[];
+
+  if (include.length === 0) {
+    throw holoError({
+      code: ErrorCode.HOLO_ALLOWLIST_EMPTY,
+      problem: `No 'include' allowlist entries for provider '${options.provider}'`,
+      cause: `provider=${options.provider} organizationId=${options.organizationId}`,
+      fix: `Add at least one entry: \`holo allowlist add ${options.provider} <pattern>\``,
+    });
+  }
+
+  function matches(candidate: string): boolean {
+    const included = include.some((row) => rowMatches(candidate, row));
+    if (!included) return false;
+    const excluded = exclude.some((row) => rowMatches(candidate, row));
+    return !excluded;
+  }
+
+  let resolved: string[];
+  if (options.candidates !== undefined) {
+    resolved = options.candidates.filter((c) => matches(c));
+  } else {
+    resolved = include.map((r) => r.pattern).filter((p) => matches(p));
+  }
+
+  if (resolved.length > 50) {
+    throw holoError({
+      code: ErrorCode.HOLO_ALLOWLIST_OVERSIZED,
+      problem: `Allowlist for provider '${options.provider}' resolves to ${resolved.length} entries (max 50)`,
+      cause: `provider=${options.provider} organizationId=${options.organizationId} resolved=${resolved.length}`,
+      fix: `Narrow your allowlist patterns or remove some entries so the resolved set is ≤50.`,
+    });
+  }
+
+  return { include, exclude, resolved, matches };
+}
+
 export async function resolveAllowlist(input: ResolveAllowlistInput): Promise<AllowlistResult> {
   const { db, organizationId, provider, candidates } = input;
 
@@ -60,43 +112,5 @@ export async function resolveAllowlist(input: ResolveAllowlistInput): Promise<Al
       ),
     );
 
-  const include = rows.filter((r) => r.decision === 'include') as AllowlistRow[];
-  const exclude = rows.filter((r) => r.decision === 'exclude') as AllowlistRow[];
-
-  if (include.length === 0) {
-    throw holoError({
-      code: ErrorCode.HOLO_ALLOWLIST_EMPTY,
-      problem: `No 'include' allowlist entries for provider '${provider}'`,
-      cause: `provider=${provider} organizationId=${organizationId}`,
-      fix: `Add at least one entry: \`holo allowlist add ${provider} <pattern>\``,
-    });
-  }
-
-  function matches(candidate: string): boolean {
-    const included = include.some((row) => rowMatches(candidate, row));
-    if (!included) return false;
-    const excluded = exclude.some((row) => rowMatches(candidate, row));
-    return !excluded;
-  }
-
-  // Build the resolved set
-  let resolved: string[];
-  if (candidates !== undefined) {
-    resolved = candidates.filter((c) => matches(c));
-  } else {
-    // Project include patterns themselves — filter out any that are fully
-    // blocked by an exclude row with an identical pattern/kind match.
-    resolved = include.map((r) => r.pattern).filter((p) => matches(p));
-  }
-
-  if (resolved.length > 50) {
-    throw holoError({
-      code: ErrorCode.HOLO_ALLOWLIST_OVERSIZED,
-      problem: `Allowlist for provider '${provider}' resolves to ${resolved.length} entries (max 50)`,
-      cause: `provider=${provider} organizationId=${organizationId} resolved=${resolved.length}`,
-      fix: `Narrow your allowlist patterns or remove some entries so the resolved set is ≤50.`,
-    });
-  }
-
-  return { include, exclude, resolved, matches };
+  return evaluateAllowlist(rows, { provider, organizationId, candidates });
 }
