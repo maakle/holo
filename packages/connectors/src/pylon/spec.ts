@@ -18,7 +18,7 @@ export interface PylonSpecOptions {
 const ticketsCursorSchema = z
   .object({
     /** ISO timestamp of the most-recent ticket we've ingested. */
-    latestUpdatedAt: z.string().optional(),
+    updatedAt: z.string().optional(),
   })
   .default({});
 
@@ -54,7 +54,7 @@ export function createPylonSpec(_opts: PylonSpecOptions = {}): ConnectorSpec {
         cursorSchema: ticketsCursorSchema,
         async sync(ctx: ResourceSyncContext<TicketsCursor>): Promise<TicketsCursor> {
           let cursor: string | undefined;
-          let highestUpdatedAt = ctx.cursor.latestUpdatedAt;
+          let highestUpdatedAt = ctx.cursor.updatedAt;
           let pageNum = 0;
 
           do {
@@ -68,7 +68,7 @@ export function createPylonSpec(_opts: PylonSpecOptions = {}): ConnectorSpec {
 
             const page = await searchIssues(ctx.api, {
               cursor,
-              updatedAfter: ctx.cursor.latestUpdatedAt,
+              updatedAfter: ctx.cursor.updatedAt,
             });
 
             for (const issue of page.data ?? []) {
@@ -85,7 +85,7 @@ export function createPylonSpec(_opts: PylonSpecOptions = {}): ConnectorSpec {
                 : undefined;
           } while (cursor);
 
-          return { latestUpdatedAt: highestUpdatedAt };
+          return { updatedAt: highestUpdatedAt };
         },
       },
     ],

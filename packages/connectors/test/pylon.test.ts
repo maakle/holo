@@ -185,11 +185,11 @@ describe('Pylon sync (full)', () => {
     expect(enqueued[0]!.sourceArtifactId).toBe('pylon-ticket:issue-1');
     // Cursor advances to the highest updated_at seen.
     expect(result.cursorPatch['tickets']).toEqual({
-      latestUpdatedAt: '2026-05-03T10:00:00Z',
+      updatedAt: '2026-05-03T10:00:00Z',
     });
     expect(savedCursors.at(-1)).toEqual({
       resourceId: 'tickets',
-      cursor: { latestUpdatedAt: '2026-05-03T10:00:00Z' },
+      cursor: { updatedAt: '2026-05-03T10:00:00Z' },
     });
 
     // Two /issues/search POSTs (page 1, page 2) + one /issues/<id>/messages
@@ -278,7 +278,7 @@ describe('Pylon sync (incremental)', () => {
     });
     const spec = createPylonSpec();
     const { stores } = makeStores({
-      cursors: { tickets: { latestUpdatedAt: '2026-05-04T00:00:00Z' } },
+      cursors: { tickets: { updatedAt: '2026-05-04T00:00:00Z' } },
     });
     await runConnectorSync({
       spec,
@@ -302,7 +302,7 @@ describe('Pylon sync (incremental)', () => {
     );
     const spec = createPylonSpec();
     const { stores, enqueued } = makeStores({
-      cursors: { tickets: { latestUpdatedAt: '2026-05-04T10:00:00Z' } },
+      cursors: { tickets: { updatedAt: '2026-05-04T10:00:00Z' } },
     });
     const result = await runConnectorSync({
       spec,
@@ -314,7 +314,7 @@ describe('Pylon sync (incremental)', () => {
     expect(result.artifactCount).toBe(0);
     expect(enqueued).toHaveLength(0);
     expect(result.cursorPatch['tickets']).toEqual({
-      latestUpdatedAt: '2026-05-04T10:00:00Z',
+      updatedAt: '2026-05-04T10:00:00Z',
     });
   });
 });

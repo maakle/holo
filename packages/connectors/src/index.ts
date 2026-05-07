@@ -1,4 +1,3 @@
-export * from './contract';
 export * as shared from './shared/index';
 export { resolveAllowlist } from './shared/allowlist';
 export type { ResolveAllowlistInput, AllowlistResult, AllowlistRow } from './shared/allowlist';

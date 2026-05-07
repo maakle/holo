@@ -75,7 +75,11 @@ export function createNotionSpec(_opts: NotionSpecOptions = {}): ConnectorSpec {
         return {
           externalId: me.id,
           name: me.workspace_name ?? me.name ?? me.id,
-          raw: me as unknown as Record<string, unknown>,
+          raw: {
+            id: me.id,
+            ...(me.name !== undefined && { name: me.name }),
+            ...(me.workspace_name !== undefined && { workspace_name: me.workspace_name }),
+          },
         };
       } catch (err) {
         if (isStatus(err, 401)) {
