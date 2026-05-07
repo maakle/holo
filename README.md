@@ -56,9 +56,9 @@ flowchart LR
 
     subgraph H["Holo"]
       direction TB
-      GW["<b>apps/gateway</b> · Hono<br/>MCP /mcp · REST /v1<br/>OAuth 2.1 + PKCE · DCR"]
-      WEB["<b>apps/web</b> · Next.js 16<br/>dashboard · Better Auth<br/>OAuth callbacks · DCR UI"]
-      WK["<b>apps/worker</b> · NestJS + BullMQ<br/>ingest · chunk · embed · sync<br/>step() checkpoints"]
+      GW["apps/gateway · Hono<br/>MCP /mcp · REST /v1<br/>OAuth 2.1 + PKCE · DCR"]
+      WEB["apps/web · Next.js 16<br/>dashboard · Better Auth<br/>OAuth callbacks · DCR UI"]
+      WK["apps/worker · NestJS + BullMQ<br/>ingest · chunk · embed · sync<br/>step() checkpoints"]
       PG[("Postgres 16<br/>pgvector + tsvector + RRF<br/>ACL-aware index")]
       RD[("Redis 7<br/>BullMQ queue")]
     end
@@ -73,14 +73,16 @@ flowchart LR
       S6["HubSpot"]
     end
 
-    A -->|"search · fetch · invoke"| GW
+    A1 -->|"search · fetch · invoke"| GW
+    A2 --> GW
+    A3 --> GW
     GW --> PG
     GW --> RD
     WEB --> PG
-    WEB -. "OAuth grant" .-> S
+    WEB -. "OAuth grant" .-> S3
     WK --> PG
     WK --> RD
-    WK -->|"sync · webhook"| S
+    WK -->|"sync · webhook"| S3
 ```
 
 | Layer | Choice |
