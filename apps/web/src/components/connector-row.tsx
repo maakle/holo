@@ -13,6 +13,7 @@ import { SyncStatusBadge } from '@/components/sync-status-badge';
 import { ConnectorManageSheet } from '@/components/connector-manage-sheet';
 import { ConnectionWizard } from '@/components/connection-wizard/connection-wizard';
 import { getWizardConfig } from '@/components/connection-wizard/configs';
+import { ConnectorLogo } from '@/components/connector-logo';
 
 interface AllowlistEntry {
   pattern: string;
@@ -113,6 +114,9 @@ export function ConnectorRow({
   return (
     <div className="flex flex-col gap-3 px-5 py-4 transition-colors duration-micro hover:bg-surface-2/40">
       <div className="flex items-start justify-between gap-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 text-text-muted">
+          <ConnectorLogo id={meta.id} className="h-5 w-5" />
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-[14px] font-medium text-text">{meta.displayName}</span>
