@@ -35,13 +35,13 @@ export { createNotionConnector } from './notion/index';
 export type { NotionConnectorOptions } from './notion/index';
 export { createGrainConnector } from './grain/index';
 export type { GrainConnectorOptions } from './grain/index';
-export { createPylonConnector } from './pylon/index';
-export type { PylonConnectorOptions } from './pylon/index';
 export { createHubspotConnector } from './hubspot/index';
 export type { HubspotConnectorOptions } from './hubspot/index';
 // Framework-native specs (new shape — no legacy Connector facade).
 export { createLinearSpec } from './linear/index';
 export type { LinearSpecOptions } from './linear/index';
+export { createPylonSpec } from './pylon/index';
+export type { PylonSpecOptions } from './pylon/index';
 export { runHubspotSync } from './hubspot/sync';
 export type {
   RunHubspotSyncInput,

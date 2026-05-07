@@ -205,7 +205,7 @@ describe('Linear sync (full)', () => {
     expect(chunk.kind).toBe('linear-issue');
     expect(chunk.provider).toBe('linear');
     expect(chunk.externalId).toBe('i1');
-    expect(chunk.sourceArtifactId).toBe('linear-linear-issue:i1');
+    expect(chunk.sourceArtifactId).toBe('linear-issue:i1');
     expect(chunk.content).toContain('[ENG-42] Fix login crash');
     expect(chunk.content).toContain('Status: Todo');
     expect(chunk.content).toContain('Priority: High');

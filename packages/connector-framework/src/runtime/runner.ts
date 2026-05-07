@@ -33,8 +33,14 @@ function chunkHash(kind: string, content: string): string {
   return createHash('sha256').update(`${kind}:${content}`).digest('hex');
 }
 
-function deriveSourceArtifactId(provider: string, kind: string, externalId: string): string {
-  return `${provider}-${kind}:${externalId}`;
+/**
+ * Synthetic source-artifact id. Connector kinds are already provider-prefixed
+ * by convention (e.g. 'slack-thread', 'notion-page', 'pylon-ticket'), so we
+ * use `${kind}:${externalId}` verbatim — this matches the legacy connectors'
+ * format and keeps existing `source_artifacts` rows valid across migrations.
+ */
+function deriveSourceArtifactId(_provider: string, kind: string, externalId: string): string {
+  return `${kind}:${externalId}`;
 }
 
 /**

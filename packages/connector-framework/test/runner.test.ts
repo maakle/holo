@@ -107,7 +107,7 @@ describe('runConnectorSync', () => {
 
     expect(result.artifactCount).toBe(3);
     expect(enqueued).toHaveLength(3);
-    expect(enqueued[0]!.sourceArtifactId).toBe('demo-demo-item:a');
+    expect(enqueued[0]!.sourceArtifactId).toBe('demo-item:a');
     expect(enqueued[0]!.provider).toBe('demo');
     expect(enqueued[0]!.organizationId).toBe('org-1');
     expect(savedCursors.at(-1)).toEqual({
