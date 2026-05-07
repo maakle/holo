@@ -9,7 +9,6 @@ import {
   createSlackRunner,
   createGithubProseRunner,
   createGithubCodeRunner,
-  createGrainRunner,
 } from './runners';
 import { createGenericRunner } from './framework-bridge';
 import {
@@ -17,6 +16,7 @@ import {
   createPylonSpec,
   createHubspotSpec,
   createNotionSpec,
+  createGrainSpec,
 } from '@holo/connectors';
 import { setSyncRunner } from './sync-runner-registry';
 import { reconcileOrphanedRuns } from './sync-runs-store';
@@ -57,7 +57,16 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     setSyncRunner(QUEUE_NAMES.NOTION_SYNC, createGenericRunner(createNotionSpec(), deps));
     setSyncRunner(QUEUE_NAMES.GITHUB_PROSE_SYNC, createGithubProseRunner(deps));
     setSyncRunner(QUEUE_NAMES.GITHUB_CODE_SYNC, createGithubCodeRunner(deps));
-    setSyncRunner(QUEUE_NAMES.GRAIN_SYNC, createGrainRunner(deps));
+    setSyncRunner(
+      QUEUE_NAMES.GRAIN_SYNC,
+      createGenericRunner(
+        createGrainSpec({
+          clientId: process.env.GRAIN_CONNECTOR_CLIENT_ID ?? '',
+          clientSecret: process.env.GRAIN_CONNECTOR_CLIENT_SECRET ?? '',
+        }),
+        deps,
+      ),
+    );
     setSyncRunner(QUEUE_NAMES.PYLON_SYNC, createGenericRunner(createPylonSpec(), deps));
     setSyncRunner(QUEUE_NAMES.HUBSPOT_SYNC, createGenericRunner(createHubspotSpec(), deps));
     // Linear is the first framework-native connector. createGenericRunner
@@ -78,7 +87,7 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       ),
     );
     this.logger.log(
-      'Registered real SyncRunners for slack, github-prose, github-code, grain (legacy) + pylon, hubspot, notion, linear (framework)',
+      'Registered real SyncRunners for slack, github-prose, github-code (legacy) + grain, pylon, hubspot, notion, linear (framework)',
     );
 
     // Reap any 'running' rows the previous worker incarnation left behind

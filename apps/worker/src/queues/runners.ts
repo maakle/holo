@@ -19,7 +19,6 @@ import { holoError, ErrorCode } from '@holo/errors';
 import {
   createSlackConnector,
   createGithubApiClient,
-  createGrainConnector,
   resolveAllowlist,
   runGithubProseSync,
   runGithubCodeSync,
@@ -101,7 +100,7 @@ async function resolveGithubRepos(args: {
 async function loadConnectorToken(
   db: DB,
   organizationId: string,
-  provider: 'slack' | 'grain',
+  provider: 'slack',
 ): Promise<string> {
   const rows = await db
     .select({ accessToken: schema.connectorCredentials.accessToken })
@@ -325,37 +324,5 @@ function pickRepresentativeSha(shas: Record<string, string>): string {
   return values[0] ?? '';
 }
 
-// ── Grain ────────────────────────────────────────────────────────────────────
-export function createGrainRunner(deps: RunnerDeps): SyncRunner {
-  const enqueueEmbed = makeEnqueueEmbed(deps.embedQueue);
-  const buildConnector = (): ReturnType<typeof createGrainConnector> =>
-    createGrainConnector({
-      clientId: process.env.GRAIN_CONNECTOR_CLIENT_ID ?? '',
-      clientSecret: process.env.GRAIN_CONNECTOR_CLIENT_SECRET ?? '',
-      db: deps.db,
-      enqueueEmbed,
-    });
-
-  return {
-    async full(payload: SyncJobPayload): Promise<SyncResult> {
-      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'grain');
-      const result = await buildConnector().fullSync(
-        { accessToken },
-        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
-      );
-      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
-    },
-    async incremental(payload: SyncJobPayload): Promise<SyncResult> {
-      const accessToken = await loadConnectorToken(deps.db, payload.organizationId, 'grain');
-      const result = await buildConnector().incrementalSync(
-        { accessToken },
-        { sourceId: payload.sourceId, organizationId: payload.organizationId, cursorScope: 'sync' },
-      );
-      return { artifactCount: result.artifactCount, newCursor: result.newCursor };
-    },
-  };
-}
-
-// Pylon and HubSpot migrated to @holo/connector-framework — see
-// runners.module.ts for registration via
-// createGenericRunner(createPylonSpec | createHubspotSpec, deps).
+// Pylon, HubSpot, Notion, Grain migrated to @holo/connector-framework —
+// see runners.module.ts for registration via createGenericRunner(createXSpec(...), deps).
