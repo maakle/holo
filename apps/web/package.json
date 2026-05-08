@@ -21,6 +21,7 @@
     "@holo/db": "workspace:*",
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",
+    "@holo/llm": "workspace:*",
     "@holo/oauth-provider": "workspace:*",
     "@holo/retrieval-core": "workspace:^",
     "@holo/skills": "workspace:^",
