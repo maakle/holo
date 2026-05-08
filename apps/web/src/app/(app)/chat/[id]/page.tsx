@@ -6,6 +6,7 @@ import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { ChatPanel, type ChatTurn } from '@/components/chat-panel';
+import { CHAT_MODEL_ID } from '@/lib/chat-model';
 
 interface ToolCallTrace {
   id: string;
@@ -70,6 +71,7 @@ export default async function ChatConversationPage({
   return (
     <ChatPanel
       hasAnthropicKey={hasAnthropicKey}
+      modelId={CHAT_MODEL_ID}
       conversationId={convRows[0].id}
       initialTurns={initialTurns}
     />

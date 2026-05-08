@@ -42,10 +42,12 @@ const SUGGESTIONS = [
 
 export function ChatPanel({
   hasAnthropicKey,
+  modelId,
   conversationId: initialConversationId = null,
   initialTurns = [],
 }: {
   hasAnthropicKey: boolean;
+  modelId: string;
   conversationId?: string | null;
   initialTurns?: ChatTurn[];
 }) {
@@ -177,15 +179,10 @@ export function ChatPanel({
     void send(input);
   }
 
-  function clearChat() {
-    router.push('/chat');
-    router.refresh();
-  }
-
   return (
     <div className="flex min-h-[480px] flex-1 flex-col rounded-md border border-border bg-surface">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+      <div className="flex items-center border-b border-border px-4 py-2.5">
         <div className="flex items-center gap-2 text-[13px] text-text">
           <span
             className={`inline-flex h-2 w-2 rounded-full ${
@@ -193,18 +190,16 @@ export function ChatPanel({
             }`}
             aria-hidden
           />
-          {hasAnthropicKey
-            ? 'Agent ready · Anthropic key detected'
-            : 'ANTHROPIC_API_KEY missing — set it to enable chat'}
+          {hasAnthropicKey ? (
+            <>
+              MCP connected
+              <span className="text-text-subtle">·</span>
+              <code className="font-mono text-[12px] text-text-muted">{modelId}</code>
+            </>
+          ) : (
+            'ANTHROPIC_API_KEY missing — set it to enable chat'
+          )}
         </div>
-        <button
-          type="button"
-          onClick={clearChat}
-          disabled={turns.length === 0 || busy}
-          className="text-[12px] text-text-subtle transition-colors duration-micro hover:text-text disabled:opacity-40"
-        >
-          New chat
-        </button>
       </div>
 
       {/* Messages */}

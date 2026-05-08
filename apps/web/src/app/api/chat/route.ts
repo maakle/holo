@@ -10,6 +10,7 @@ import { AnthropicLLMClient, type LLMMessage, type LLMTool } from '@holo/llm';
 import { getSubjectsForUser } from '@holo/user-subjects';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { CHAT_MODEL_ID } from '@/lib/chat-model';
 
 export const runtime = 'nodejs';
 // The agent loop can take longer than the default serverless slice; raise it
@@ -362,7 +363,7 @@ export async function POST(req: Request) {
       }
 
       const response = await client.complete({
-        model: 'claude-sonnet-4-6',
+        model: CHAT_MODEL_ID,
         maxTokens: 4096,
         system: SYSTEM_PROMPT,
         messages,
