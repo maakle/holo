@@ -70,7 +70,7 @@ export function SampleConnectorRow({ installed, artifactCount }: Props) {
   }
 
   return (
-    <section id="sample" className="flex flex-col gap-3 scroll-mt-6">
+    <section id="cat-sample" className="flex flex-col gap-3 scroll-mt-6">
       <span className="caption text-text-subtle">Sample data</span>
       <div className="overflow-hidden rounded-md border border-border bg-surface">
         <div className="flex flex-col gap-3 px-5 py-4">
