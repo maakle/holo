@@ -35,9 +35,7 @@ The cost compounds with every new agent. Cross-agent context is impossible becau
 
 Holo is the missing shared layer — the **queryable context layer** under all your team's agent operations and the **procedural extraction layer** that turns scattered artifacts into invokable skills. Two adjacent YC RFSs ([AI Operating System for Companies](https://www.ycombinator.com/rfs#ai-operating-system-for-companies), Diana Hu; [Company Brain](https://www.ycombinator.com/rfs#company-brain), Tom Blomfield) describe the bet. Holo is the open-source, self-hostable take.
 
-**Who runs Holo:** CTOs and lead engineers at 30–80-person tech companies maintaining 2+ custom agents in production. Buyer = builder = sufferer collapsed into one role.
-
-**Who consumes Holo:** every agent on their team. Claude in Cursor over the codebase. A custom Slack bot for support. ChatGPT Actions for an external partner. An internal copilot for customer success. None of them re-implement the retrieval layer; all of them inherit the same scopes, the same audit trail, and the same set of learned procedures.
+**Who consumes Holo:** every agent on a team. Claude in Cursor over the codebase. A custom Slack bot for support. ChatGPT Actions for an external partner. An internal copilot for customer success. None of them re-implement the retrieval layer; all of them inherit the same scopes, the same audit trail, and the same set of learned procedures.
 
 ---
 

@@ -18,9 +18,18 @@ const AGENTS = [
   { label: 'Your custom agent' },
 ] as const;
 
+const CAPABILITIES = [
+  'Security',
+  'Rate limits',
+  'Scoped access',
+  'Audit logging',
+  'Observability',
+  'Agent runtime',
+] as const;
+
 // Fixed-size canvas on desktop. Mobile gets a stacked fallback.
 const W = 960;
-const H = 540;
+const H = 560;
 const TOOL_X = 64; // right edge of each tool tile (line anchor)
 const TOOL_TILE = 44;
 const TOOL_GAP = 22;
@@ -28,7 +37,8 @@ const TOOL_BLOCK_H = TOOLS.length * TOOL_TILE + (TOOLS.length - 1) * TOOL_GAP;
 const TOOL_TOP = (H - TOOL_BLOCK_H) / 2;
 const HOLO_CX = W / 2;
 const HOLO_CY = H / 2;
-const HOLO_SIZE = 196;
+const HOLO_W = 280;
+const HOLO_H = 400;
 const AGENT_W = 240;
 const AGENT_X = W - AGENT_W; // left edge of agent panel
 const AGENT_CY = HOLO_CY;
@@ -74,12 +84,24 @@ export function ToolsAgentGraph() {
               ))}
             </div>
           </div>
-          <div className="rounded-md border border-border bg-surface p-5 text-center">
-            <div className="mx-auto h-10 w-10">
-              <Logo />
+          <div className="rounded-md border border-border bg-surface p-5">
+            <div className="text-center">
+              <div className="mx-auto h-10 w-10">
+                <Logo />
+              </div>
+              <p className="mt-3 font-display text-[16px] font-semibold tracking-tight">holo</p>
+              <p className="mt-1 text-[12px] text-text-subtle">context layer</p>
             </div>
-            <p className="mt-3 font-display text-[16px] font-semibold tracking-tight">holo</p>
-            <p className="mt-1 text-[12px] text-text-subtle">context layer</p>
+            <ul className="mt-4 grid grid-cols-2 gap-1.5">
+              {CAPABILITIES.map((c) => (
+                <li
+                  key={c}
+                  className="rounded-sm border border-border bg-surface-2 px-2 py-1.5 text-center text-[11px] leading-none text-text-muted"
+                >
+                  {c}
+                </li>
+              ))}
+            </ul>
           </div>
           <div className="rounded-md border border-border bg-surface p-5">
             <p className="caption text-text-subtle">Your agent</p>
@@ -102,8 +124,8 @@ export function ToolsAgentGraph() {
 }
 
 function DesktopGraph() {
-  const holoLeft = HOLO_CX - HOLO_SIZE / 2;
-  const holoRight = HOLO_CX + HOLO_SIZE / 2;
+  const holoLeft = HOLO_CX - HOLO_W / 2;
+  const holoRight = HOLO_CX + HOLO_W / 2;
 
   return (
     <div
@@ -121,7 +143,7 @@ function DesktopGraph() {
           {TOOLS.map((_, i) => {
             const y = toolCenterY(i);
             const targetY =
-              HOLO_CY + (i - (TOOLS.length - 1) / 2) * (HOLO_SIZE / (TOOLS.length + 1));
+              HOLO_CY + (i - (TOOLS.length - 1) / 2) * (HOLO_H / (TOOLS.length + 1));
             const c1x = TOOL_X + (holoLeft - TOOL_X) * 0.5;
             const c2x = TOOL_X + (holoLeft - TOOL_X) * 0.5;
             return (
@@ -182,21 +204,32 @@ function DesktopGraph() {
         <div
           className="absolute rounded-lg border border-border bg-surface"
           style={{
-            left: pctX(HOLO_CX - HOLO_SIZE / 2),
-            top: pctY(HOLO_CY - HOLO_SIZE / 2),
-            width: pctX(HOLO_SIZE),
-            height: pctY(HOLO_SIZE),
+            left: pctX(HOLO_CX - HOLO_W / 2),
+            top: pctY(HOLO_CY - HOLO_H / 2),
+            width: pctX(HOLO_W),
+            height: pctY(HOLO_H),
           }}
         >
           <CornerTicks />
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-            <div className="h-12 w-12">
+          <div className="absolute inset-0 flex flex-col items-center px-5 py-6">
+            <div className="h-10 w-10">
               <Logo />
             </div>
-            <span className="font-display text-[15px] font-semibold tracking-tight text-text">
+            <span className="mt-2 font-display text-[15px] font-semibold tracking-tight text-text">
               holo
             </span>
-            <span className="caption text-text-subtle">context layer</span>
+            <span className="caption mt-1 text-text-subtle">context layer</span>
+            <div className="my-4 h-px w-full bg-border" aria-hidden />
+            <ul className="grid w-full grid-cols-2 gap-1.5">
+              {CAPABILITIES.map((c) => (
+                <li
+                  key={c}
+                  className="rounded-sm border border-border bg-surface-2 px-2 py-1.5 text-center text-[11px] leading-none text-text-muted"
+                >
+                  {c}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
