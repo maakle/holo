@@ -18,6 +18,7 @@ export interface CreateAuthOpts {
     | 'GITHUB_LOGIN_CLIENT_SECRET'
     | 'EMAIL_PROVIDER'
     | 'RESEND_API_KEY'
+    | 'EMAIL_FROM'
   >;
   defaultOrganizationId: string;
 }
@@ -44,7 +45,7 @@ interface ResendEmail {
 }
 
 async function sendEmail(
-  env: Pick<Env, 'EMAIL_PROVIDER' | 'RESEND_API_KEY' | 'BETTER_AUTH_URL'>,
+  env: Pick<Env, 'EMAIL_PROVIDER' | 'RESEND_API_KEY' | 'EMAIL_FROM'>,
   tag: string,
   email: ResendEmail,
 ): Promise<void> {
@@ -54,7 +55,8 @@ async function sendEmail(
     );
     return;
   }
-  const fromHost = new URL(env.BETTER_AUTH_URL).host;
+  // parseEnv's refine guarantees EMAIL_FROM is set when EMAIL_PROVIDER=resend.
+  const from = env.EMAIL_FROM!;
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -62,7 +64,7 @@ async function sendEmail(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: `Holo <noreply@${fromHost}>`,
+      from,
       to: email.to,
       subject: email.subject,
       text: email.text,
@@ -73,13 +75,13 @@ async function sendEmail(
       code: ErrorCode.HOLO_INTERNAL,
       problem: `Resend API rejected ${tag} email (status ${res.status})`,
       cause: await res.text(),
-      fix: 'Verify RESEND_API_KEY is valid and the from-domain is verified in Resend.',
+      fix: `Verify RESEND_API_KEY is valid and EMAIL_FROM (${from}) is on a domain verified in Resend.`,
     });
   }
 }
 
 async function sendOtpEmail(
-  env: Pick<Env, 'EMAIL_PROVIDER' | 'RESEND_API_KEY' | 'BETTER_AUTH_URL'>,
+  env: Pick<Env, 'EMAIL_PROVIDER' | 'RESEND_API_KEY' | 'EMAIL_FROM'>,
   email: string,
   otp: string,
   type: string,
@@ -92,7 +94,7 @@ async function sendOtpEmail(
 }
 
 async function sendInvitationEmail(
-  env: Pick<Env, 'EMAIL_PROVIDER' | 'RESEND_API_KEY' | 'BETTER_AUTH_URL'>,
+  env: Pick<Env, 'EMAIL_PROVIDER' | 'RESEND_API_KEY' | 'EMAIL_FROM' | 'BETTER_AUTH_URL'>,
   args: {
     inviteeEmail: string;
     inviterName: string;

@@ -39,4 +39,36 @@ describe('parseEnv', () => {
       }),
     ).toThrow(HoloError);
   });
+
+  it('rejects EMAIL_PROVIDER=resend without RESEND_API_KEY and EMAIL_FROM', () => {
+    try {
+      parseEnv({ ...COMPLETE_ENV, EMAIL_PROVIDER: 'resend' });
+      throw new Error('expected parseEnv to throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(HoloError);
+      expect((e as HoloError).cause).toMatch(/RESEND_API_KEY and EMAIL_FROM/);
+    }
+    try {
+      parseEnv({
+        ...COMPLETE_ENV,
+        EMAIL_PROVIDER: 'resend',
+        RESEND_API_KEY: 're_xxx',
+      });
+      throw new Error('expected parseEnv to throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(HoloError);
+      expect((e as HoloError).cause).toMatch(/EMAIL_FROM/);
+    }
+  });
+
+  it('accepts EMAIL_PROVIDER=resend when RESEND_API_KEY and EMAIL_FROM are set', () => {
+    const env = parseEnv({
+      ...COMPLETE_ENV,
+      EMAIL_PROVIDER: 'resend',
+      RESEND_API_KEY: 're_xxx',
+      EMAIL_FROM: 'Holo <noreply@example.com>',
+    });
+    expect(env.EMAIL_PROVIDER).toBe('resend');
+    expect(env.EMAIL_FROM).toBe('Holo <noreply@example.com>');
+  });
 });

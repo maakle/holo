@@ -38,6 +38,16 @@ const EnvSchema = z.object({
   LINEAR_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().optional(),
+  /**
+   * RFC 5322 sender for outbound emails (e.g. invitations, OTPs).
+   * Examples: `"Holo <noreply@example.com>"` or just `"noreply@example.com"`.
+   * The local part / display name is up to you; the domain MUST be verified
+   * in Resend. Required when `EMAIL_PROVIDER=resend`. Earlier we derived this
+   * from `BETTER_AUTH_URL`, which silently broke in dev (localhost is not a
+   * verified domain) — failures got swallowed by better-auth's background
+   * task wrapper, so the invite endpoint returned 200 while no email shipped.
+   */
+  EMAIL_FROM: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   ANTHROPIC_API_KEY: z.string().optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -49,7 +59,16 @@ const EnvSchema = z.object({
    * retention job prunes them. Set to 0 to disable retention.
    */
   OBSERVABILITY_TTL_DAYS: z.coerce.number().int().min(0).default(30),
-});
+}).refine(
+  (env) =>
+    env.EMAIL_PROVIDER !== 'resend' ||
+    (!!env.RESEND_API_KEY && !!env.EMAIL_FROM),
+  {
+    message:
+      'EMAIL_PROVIDER=resend requires RESEND_API_KEY and EMAIL_FROM (e.g. "Holo <noreply@your-verified-domain.com>")',
+    path: ['EMAIL_PROVIDER'],
+  },
+);
 
 export type Env = z.infer<typeof EnvSchema>;
 
