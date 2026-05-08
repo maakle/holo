@@ -1,8 +1,18 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { authClient, signIn } from '@holo/auth/client';
 import { Button } from '@/components/ui/button';
+
+// Validate ?callbackURL=… to a same-origin relative path. Rejects absolute
+// URLs (open-redirect) and schemeless protocol-relative URLs ("//evil.com").
+function safeCallbackURL(raw: string | null): string {
+  if (!raw) return '/dashboard';
+  if (!raw.startsWith('/')) return '/dashboard';
+  if (raw.startsWith('//')) return '/dashboard';
+  return raw;
+}
 
 type Step = 'email' | 'otp';
 
@@ -10,6 +20,8 @@ const inputClass =
   'h-10 w-full rounded-md border border-border bg-transparent px-3 text-[13px] text-text outline-hidden placeholder:text-text-subtle focus:border-transparent focus:outline-solid focus:outline-2 focus:outline-accent disabled:opacity-50';
 
 export function SignInForm() {
+  const searchParams = useSearchParams();
+  const callbackURL = safeCallbackURL(searchParams.get('callbackURL'));
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -21,7 +33,7 @@ export function SignInForm() {
     setBusy(true);
     setError(null);
     try {
-      const res = await signIn.social({ provider: 'github', callbackURL: '/dashboard' });
+      const res = await signIn.social({ provider: 'github', callbackURL });
       if (res && 'error' in res && res.error) {
         setError(res.error.message ?? 'Sign-in failed.');
       }
@@ -74,7 +86,7 @@ export function SignInForm() {
         setError(res.error.message ?? 'Invalid or expired code.');
         return;
       }
-      window.location.href = '/dashboard';
+      window.location.href = callbackURL;
     } catch (e) {
       setError((e as Error).message);
     } finally {

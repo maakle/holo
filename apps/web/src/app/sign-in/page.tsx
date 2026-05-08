@@ -1,6 +1,12 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { SignInForm } from '@/components/sign-in-form';
 import { HoloLogo } from '@/components/logo';
+
+// SignInForm reads ?callbackURL via useSearchParams, which opts the page
+// out of static prerendering. Suspense lets the static shell render and
+// streams the form once the URL is available.
+export const dynamic = 'force-dynamic';
 
 export default function SignInPage() {
   return (
@@ -21,7 +27,9 @@ export default function SignInPage() {
               Open-source MCP context layer. Self-hostable, AGPL-3.0.
             </p>
           </div>
-          <SignInForm />
+          <Suspense fallback={null}>
+            <SignInForm />
+          </Suspense>
         </div>
       </div>
     </main>
