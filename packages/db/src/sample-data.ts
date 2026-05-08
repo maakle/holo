@@ -152,6 +152,16 @@ export async function ensureSampleData(
     .limit(1);
 
   if (existing[0]) {
+    // Backfill ACL on chunks installed before aclSubjects was set here. Empty
+    // acl_subjects fails the array-overlap filter in retrieval-core/search,
+    // making the sample invisible to the agent.
+    await db.execute(sql`
+      UPDATE chunks
+      SET acl_subjects = ARRAY[${'org:' + organizationId}]::text[]
+      WHERE organization_id = ${organizationId}
+        AND provider = ${SAMPLE_PROVIDER}
+        AND (acl_subjects IS NULL OR cardinality(acl_subjects) = 0)
+    `);
     return { created: false, artifactCount: SAMPLE_ARTIFACTS.length };
   }
 
@@ -189,6 +199,10 @@ export async function ensureSampleData(
       kind: a.kind,
       content,
       contentHash: contentHash(organizationId, a.externalId, content),
+      // Match the org-scoped ACL real chunkers use so the agent's search tool
+      // (which filters chunks via `acl_subjects && userSubjects`) can reach
+      // sample rows. Without this they default to '{}' and never match.
+      aclSubjects: [`org:${organizationId}`],
       metadata: { sample: true, title: a.title },
     });
   }
