@@ -13,3 +13,8 @@ export const cancelInvitationSchema = z.object({
   invitationId: z.string().min(1),
 });
 export type CancelInvitationInput = z.infer<typeof cancelInvitationSchema>;
+
+export const removeMemberSchema = z.object({
+  memberId: z.string().min(1),
+});
+export type RemoveMemberInput = z.infer<typeof removeMemberSchema>;

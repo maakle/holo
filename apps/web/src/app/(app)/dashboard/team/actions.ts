@@ -6,7 +6,7 @@ import { holoError, ErrorCode } from '@holo/errors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
-import { inviteMemberSchema, cancelInvitationSchema } from './schemas';
+import { inviteMemberSchema, cancelInvitationSchema, removeMemberSchema } from './schemas';
 
 export async function inviteMember(formData: FormData): Promise<{
   ok: boolean;
@@ -91,4 +91,53 @@ export async function cancelInvitation(formData: FormData): Promise<void> {
     // Silently swallow — revalidate will show whether it stuck.
   }
   revalidatePath('/dashboard/team');
+}
+
+export async function removeMember(formData: FormData): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  const parsed = removeMemberSchema.safeParse({
+    memberId: formData.get('memberId'),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: 'Invalid member id.' };
+  }
+
+  const { auth, db } = await getServerContext();
+  const reqHeaders = await headers();
+  const session = await auth.api.getSession({ headers: reqHeaders });
+  if (!session) {
+    throw holoError({
+      code: ErrorCode.HOLO_AUTH_NO_SESSION,
+      problem: 'must be signed in',
+      fix: 'Sign in and try again.',
+    });
+  }
+
+  const orgId = resolveActiveOrgId(session);
+
+  try {
+    await auth.api.removeMember({
+      body: { memberIdOrEmail: parsed.data.memberId, organizationId: orgId },
+      headers: reqHeaders,
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'Could not remove member.',
+    };
+  }
+
+  emitAuditEvent({
+    db,
+    organizationId: orgId,
+    userId: session.user.id,
+    eventType: 'member.removed',
+    resourceType: 'member',
+    resourceId: parsed.data.memberId,
+  });
+
+  revalidatePath('/dashboard/team');
+  return { ok: true };
 }

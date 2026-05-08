@@ -6,6 +6,7 @@ import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { Badge } from '@/components/ui/badge';
 import { InviteForm } from './invite-form';
+import { RemoveMemberButton } from './remove-member-button';
 import { cancelInvitation } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -80,7 +81,8 @@ export default async function TeamPage() {
               <tr>
                 <Th>Member</Th>
                 <Th>Role</Th>
-                <Th className="text-right">Joined</Th>
+                <Th>Joined</Th>
+                {canManage ? <Th className="text-right">Action</Th> : null}
               </tr>
             </thead>
             <tbody>
@@ -103,9 +105,21 @@ export default async function TeamPage() {
                         <span className="ml-2 text-text-subtle">· you</span>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3 text-right text-text-muted">
+                    <td className="px-4 py-3 text-text-muted">
                       {new Date(m.joinedAt).toISOString().slice(0, 10)}
                     </td>
+                    {canManage ? (
+                      <td className="px-4 py-3 text-right">
+                        {isSelf ? (
+                          <span className="text-text-subtle">—</span>
+                        ) : (
+                          <RemoveMemberButton
+                            memberId={m.memberId}
+                            memberLabel={m.name ?? m.email}
+                          />
+                        )}
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })}

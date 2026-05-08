@@ -15,6 +15,7 @@ export type AuditEventType =
   | 'skill.synthesized'
   | 'member.invited'
   | 'member.invitation_cancelled'
+  | 'member.removed'
   | 'custom_tool.invoked'
   | 'user_subjects.refreshed'
   | 'connector.connected'
