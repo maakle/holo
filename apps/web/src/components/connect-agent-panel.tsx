@@ -5,12 +5,17 @@ import { toast } from 'sonner';
 interface Props {
   mcpUrl: string;
   gatewayBase: string;
+  orgId: string;
 }
 
 const CONFIG_TABS = ['Claude', 'ChatGPT', 'Slack', 'OpenAPI', 'Custom MCP'] as const;
 type Tab = (typeof CONFIG_TABS)[number];
 
-const TEST_DISMISSED_KEY = 'holo:agent-test-dismissed';
+// Scope the dismissal per workspace so a fresh workspace doesn't inherit a
+// "verified" panel from another workspace on the same browser.
+function testDismissedKey(orgId: string): string {
+  return `holo:agent-test-dismissed:${orgId}`;
+}
 
 function mcpJsonConfig(mcpUrl: string, token: string): string {
   const t = token || '<YOUR_HOLO_TOKEN>';
@@ -25,7 +30,8 @@ function mcpJsonConfig(mcpUrl: string, token: string): string {
   );
 }
 
-export function ConnectAgentPanel({ mcpUrl, gatewayBase }: Props) {
+export function ConnectAgentPanel({ mcpUrl, gatewayBase, orgId }: Props) {
+  const dismissedKey = testDismissedKey(orgId);
   const [token, setToken] = useState('');
   const [tokenId, setTokenId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -35,18 +41,18 @@ export function ConnectAgentPanel({ mcpUrl, gatewayBase }: Props) {
   const [lastUsedAt, setLastUsedAt] = useState<string | null>(null);
   const [testDismissed, setTestDismissed] = useState<boolean | null>(null);
 
-  // Read dismissed state once on mount.
+  // Read dismissed state once on mount, re-read when the workspace changes.
   useEffect(() => {
     try {
-      setTestDismissed(localStorage.getItem(TEST_DISMISSED_KEY) === '1');
+      setTestDismissed(localStorage.getItem(dismissedKey) === '1');
     } catch {
       setTestDismissed(false);
     }
-  }, []);
+  }, [dismissedKey]);
 
   function dismissTesting() {
     try {
-      localStorage.setItem(TEST_DISMISSED_KEY, '1');
+      localStorage.setItem(dismissedKey, '1');
     } catch {
       // storage may be unavailable; in-memory dismissal is fine
     }
@@ -55,7 +61,7 @@ export function ConnectAgentPanel({ mcpUrl, gatewayBase }: Props) {
 
   function reopenTesting() {
     try {
-      localStorage.removeItem(TEST_DISMISSED_KEY);
+      localStorage.removeItem(dismissedKey);
     } catch {
       // best effort
     }

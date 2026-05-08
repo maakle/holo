@@ -91,7 +91,7 @@ export function ChatHistoryRail({
                   }}
                   disabled={deletingId === c.id}
                   aria-label={`Delete conversation: ${c.title}`}
-                  className="absolute right-1 top-1.5 hidden rounded-sm px-1.5 py-0.5 text-[12px] text-text-subtle hover:bg-bg hover:text-text group-hover:inline-flex disabled:opacity-50"
+                  className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-sm px-1.5 py-0.5 text-[12px] leading-none text-text-subtle hover:bg-bg hover:text-text group-hover:inline-flex disabled:opacity-50"
                 >
                   ×
                 </button>

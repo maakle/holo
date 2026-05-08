@@ -35,7 +35,7 @@ export default async function ConnectAgentPage() {
         </p>
       </header>
       <ConnectAgentBanner initial={initial} />
-      <ConnectAgentPanel mcpUrl={mcpUrl} gatewayBase={gatewayBase} />
+      <ConnectAgentPanel mcpUrl={mcpUrl} gatewayBase={gatewayBase} orgId={orgId} />
     </div>
   );
 }
