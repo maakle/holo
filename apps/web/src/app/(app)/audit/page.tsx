@@ -7,11 +7,11 @@ import { schema } from '@holo/db';
 import { AuditLogTable } from '@/components/audit-log-table';
 
 export default async function AuditPage() {
-  const { auth, db, defaultOrgId } = await getServerContext();
+  const { auth, db} = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
-  const orgId = resolveActiveOrgId(session, defaultOrgId);
+  const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/sign-in');
 
   const events = await db

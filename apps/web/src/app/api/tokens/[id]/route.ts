@@ -5,13 +5,14 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session)
       throw holoError({
@@ -20,7 +21,7 @@ export async function DELETE(
         fix: 'Sign in.',
       });
     const { id } = await params;
-    const orgId = defaultOrgId;
+    const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
 
     const [updated] = await db

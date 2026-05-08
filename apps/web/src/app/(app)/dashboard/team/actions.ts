@@ -21,7 +21,7 @@ export async function inviteMember(formData: FormData): Promise<{
   }
   const { email, role } = parsed.data;
 
-  const { auth, db, defaultOrgId } = await getServerContext();
+  const { auth, db} = await getServerContext();
   const reqHeaders = await headers();
   const session = await auth.api.getSession({ headers: reqHeaders });
   if (!session) {
@@ -32,9 +32,11 @@ export async function inviteMember(formData: FormData): Promise<{
     });
   }
 
+  const orgId = resolveActiveOrgId(session);
+
   try {
     await auth.api.createInvitation({
-      body: { email, role },
+      body: { email, role, organizationId: orgId },
       headers: reqHeaders,
     });
   } catch (err) {
@@ -47,7 +49,6 @@ export async function inviteMember(formData: FormData): Promise<{
     };
   }
 
-  const orgId = resolveActiveOrgId(session, defaultOrgId);
   emitAuditEvent({
     db,
     organizationId: orgId,
@@ -67,7 +68,7 @@ export async function cancelInvitation(formData: FormData): Promise<void> {
   });
   if (!parsed.success) return;
 
-  const { auth, db, defaultOrgId } = await getServerContext();
+  const { auth, db} = await getServerContext();
   const reqHeaders = await headers();
   const session = await auth.api.getSession({ headers: reqHeaders });
 
@@ -77,10 +78,9 @@ export async function cancelInvitation(formData: FormData): Promise<void> {
       headers: reqHeaders,
     });
     if (session) {
-      const orgId = resolveActiveOrgId(session, defaultOrgId);
       emitAuditEvent({
         db,
-        organizationId: orgId,
+        organizationId: resolveActiveOrgId(session),
         userId: session.user.id,
         eventType: 'member.invitation_cancelled',
         resourceType: 'invitation',

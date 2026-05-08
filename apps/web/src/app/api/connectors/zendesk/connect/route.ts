@@ -26,7 +26,7 @@ import { enqueueInitialSync } from '@/lib/sync-queue';
  */
 export async function POST(req: Request) {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db} = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const orgId = resolveActiveOrgId(session, defaultOrgId);
+    const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
 
     // Singleton connector_credentials row per (org, user). Public surface

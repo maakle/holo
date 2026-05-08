@@ -11,7 +11,7 @@ import { cancelInvitation } from './actions';
 export const dynamic = 'force-dynamic';
 
 export default async function TeamPage() {
-  const { auth, db, defaultOrgId } = await getServerContext();
+  const { auth, db} = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in?callbackURL=/dashboard/team');
 
@@ -19,7 +19,7 @@ export default async function TeamPage() {
     id: string;
     email: string;
   };
-  const orgId = resolveActiveOrgId(session, defaultOrgId);
+  const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/dashboard');
 
   const members = await db

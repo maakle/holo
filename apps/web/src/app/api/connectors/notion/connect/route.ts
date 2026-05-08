@@ -12,7 +12,7 @@ import { enqueueInitialSync } from '@/lib/sync-queue';
 
 export async function POST(req: Request) {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db} = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     const api = createHttpClient({ config: spec.http!, auth: spec.auth, tokens });
     const ident = await spec.testConnection({ api, tokens });
 
-    const orgId = resolveActiveOrgId(session, defaultOrgId);
+    const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
 
     // Upsert connector_credentials

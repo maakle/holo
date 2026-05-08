@@ -17,11 +17,11 @@ function formatUtc(date: Date): string {
 
 export default async function ReplayPage({ params }: ReplayPageProps) {
   const { id } = await params;
-  const { auth, db, defaultOrgId } = await getServerContext();
+  const { auth, db} = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
-  const orgId = resolveActiveOrgId(session, defaultOrgId);
+  const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/sign-in');
 
   const [invocation] = await db

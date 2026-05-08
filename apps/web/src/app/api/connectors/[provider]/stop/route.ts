@@ -28,7 +28,7 @@ export async function POST(
       });
     }
     const provider: Provider = rawProvider;
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db} = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -37,7 +37,7 @@ export async function POST(
         fix: 'Sign in first.',
       });
     }
-    const orgId = resolveActiveOrgId(session, defaultOrgId);
+    const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
 
     const sourceRows = await db
