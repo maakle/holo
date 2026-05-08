@@ -204,6 +204,9 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
         // A user can belong to many orgs but defaults to a single home org
         // until they create or are invited to additional ones.
         allowUserToCreateOrganization: true,
+        // 7 days (default is 48h); covers a normal work week so invites
+        // sent on Friday still work the following Friday.
+        invitationExpiresIn: 60 * 60 * 24 * 7,
         async sendInvitationEmail(data) {
           await sendInvitationEmail(env, {
             inviteeEmail: data.email,
