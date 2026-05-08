@@ -110,6 +110,7 @@ export const invitation = pgTable(
     inviterId: uuid('inviter_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     orgEmailIdx: index('invitation_org_email_idx').on(t.organizationId, t.email),
