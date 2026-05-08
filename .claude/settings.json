@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter @holo/db --filter @holo/audit --filter @holo/errors typecheck)",
+      "Bash(pnpm --filter web test)",
+      "Bash(git push *)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
