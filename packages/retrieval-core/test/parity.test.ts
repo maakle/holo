@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { sql } from 'drizzle-orm';
 import { createDb, type DB } from '@holo/db';
 import { createOpenAiEmbedder } from '@holo/embedder';
-import { search } from '../src/search.js';
+import { search } from '../src/search';
 
 /**
  * Parity smoke test — the v0.0 dogfood gate.

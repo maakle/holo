@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSkill, serializeSkill, fingerprintSkill } from '../format.js';
+import { parseSkill, serializeSkill, fingerprintSkill } from '../format';
 
 const SAMPLE_SKILL = `---
 name: handle-refund-request

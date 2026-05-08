@@ -2,9 +2,9 @@ export {
   listTools,
   type ToolContext,
   type ToolDefinition,
-} from './registry.js';
+} from './registry';
 
-export { runSearchTool } from './tools/search.js';
-export { runListSkillsTool } from './tools/list-skills.js';
-export { runGetSkillTool } from './tools/get-skill.js';
-export { executeSkillInputSchema } from './tools/execute-skill.js';
+export { runSearchTool } from './tools/search';
+export { runListSkillsTool } from './tools/list-skills';
+export { runGetSkillTool } from './tools/get-skill';
+export { executeSkillInputSchema } from './tools/execute-skill';

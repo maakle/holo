@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { redactSensitive } from '../src/redact.js';
+import { redactSensitive } from '../src/redact';
 
 describe('redactSensitive', () => {
   it('redacts sensitive object keys regardless of casing', () => {

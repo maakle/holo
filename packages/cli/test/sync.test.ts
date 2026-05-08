@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runSync, isSyncProvider, SYNC_PROVIDERS } from '../src/commands/sync-run.js';
+import { runSync, isSyncProvider, SYNC_PROVIDERS } from '../src/commands/sync-run';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 

@@ -1,7 +1,7 @@
 // packages/discovery/src/__tests__/cluster.test.ts
 import { describe, it, expect } from 'vitest';
-import { clusterArtifacts } from '../cluster.js';
-import { DEFAULT_CLUSTER_OPTIONS, type ArtifactInput } from '../types.js';
+import { clusterArtifacts } from '../cluster';
+import { DEFAULT_CLUSTER_OPTIONS, type ArtifactInput } from '../types';
 
 const baseEmbedding = (i: number) => {
   const v = new Array(1024).fill(0);

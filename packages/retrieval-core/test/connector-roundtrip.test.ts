@@ -7,7 +7,7 @@ import {
   type GithubApiClient,
   type GithubProseChunkPayload,
 } from '@holo/connectors';
-import { search } from '../src/search.js';
+import { search } from '../src/search';
 
 /**
  * Connector-roundtrip integration test (Phase 12.2).

@@ -1,5 +1,5 @@
-import type { Chunk, ChunkContext, Chunker } from './contract.js';
-import { recursiveSplit } from './recursive-split.js';
+import type { Chunk, ChunkContext, Chunker } from './contract';
+import { recursiveSplit } from './recursive-split';
 
 export interface MintlifyPageInput {
   /** Site root (e.g. `https://docs.kombo.dev`). */

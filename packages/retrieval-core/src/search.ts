@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { DB } from '@holo/db';
-import { embedQuery, embedQueryWith, type EmbeddingModel } from './query-router.js';
+import { embedQuery, embedQueryWith, type EmbeddingModel } from './query-router';
 
 export interface SearchInput {
   db: DB;

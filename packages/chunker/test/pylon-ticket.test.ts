@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { pylonTicketChunker, type PylonTicketInput } from '../src/pylon-ticket.js';
-import type { ChunkContext } from '../src/contract.js';
+import { pylonTicketChunker, type PylonTicketInput } from '../src/pylon-ticket';
+import type { ChunkContext } from '../src/contract';
 
 const ctx: ChunkContext = {
   organizationId: 'org-1',

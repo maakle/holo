@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { slackThreadChunker, type SlackThreadInput } from '../src/slack-thread.js';
-import type { ChunkContext } from '../src/contract.js';
+import { slackThreadChunker, type SlackThreadInput } from '../src/slack-thread';
+import type { ChunkContext } from '../src/contract';
 
 const ctx: ChunkContext = {
   organizationId: 'org-1',

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { runCommand } from '../src/spawn-runner.js';
+import { runCommand } from '../src/spawn-runner';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ECHO = resolve(here, 'fixtures/echo-tool.sh');

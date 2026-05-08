@@ -1,7 +1,7 @@
 import type { DB } from '@holo/db';
 import { emitAuditEvent } from '@holo/audit';
-import { replaceSubjectsForUser } from './repository.js';
-import { resolveSlackSubjects, type SlackChannelLister } from './slack-resolver.js';
+import { replaceSubjectsForUser } from './repository';
+import { resolveSlackSubjects, type SlackChannelLister } from './slack-resolver';
 
 export interface RunSlackSyncInput {
   db: DB;

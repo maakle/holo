@@ -1,6 +1,6 @@
-import type { Chunker, Chunk, ChunkContext } from './contract.js';
-import { recursiveSplit } from './recursive-split.js';
-import { astChunk } from './tree-sitter/index.js';
+import type { Chunker, Chunk, ChunkContext } from './contract';
+import { recursiveSplit } from './recursive-split';
+import { astChunk } from './tree-sitter/index';
 
 export interface GithubCodeInput {
   repoFullName: string;

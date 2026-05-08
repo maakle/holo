@@ -1,7 +1,7 @@
 // packages/discovery/src/__tests__/propose.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { LLMClient, LLMResponse } from '@holo/llm';
-import { proposeProcedureName } from '../propose.js';
+import { proposeProcedureName } from '../propose';
 
 const complete = vi.fn<(...args: unknown[]) => Promise<LLMResponse>>();
 const fakeClient: LLMClient = { complete };

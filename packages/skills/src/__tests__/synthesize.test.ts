@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { synthesizeSkill } from '../synthesize.js';
+import { synthesizeSkill } from '../synthesize';
 
 describe('synthesizeSkill', () => {
   it('throws HOLO_INVALID_INPUT when fewer than 2 artifacts provided', async () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { githubCodeChunker } from '../src/github-code.js';
-import { createRegistry } from '../src/tree-sitter/registry.js';
-import type { ChunkContext } from '../src/contract.js';
+import { githubCodeChunker } from '../src/github-code';
+import { createRegistry } from '../src/tree-sitter/registry';
+import type { ChunkContext } from '../src/contract';
 
 const baseCtx = {
   organizationId: 'org-1',

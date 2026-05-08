@@ -6,7 +6,7 @@ import type {
   LLMRequest,
   LLMResponse,
   LLMStopReason,
-} from './index.js';
+} from './index';
 
 type AnthropicContentParam =
   | { type: 'text'; text: string }

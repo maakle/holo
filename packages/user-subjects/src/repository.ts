@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
-import type { ReplaceSubjectsInput } from './types.js';
+import type { ReplaceSubjectsInput } from './types';
 
 export async function getSubjectsForUser(db: DB, userId: string): Promise<string[]> {
   const rows = await db

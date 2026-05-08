@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import postgres from 'postgres';
 import { createDb } from '@holo/db';
-import { mintAuthCode, consumeAuthCode } from '../src/codes.js';
-import { computeS256Challenge } from '../src/pkce.js';
+import { mintAuthCode, consumeAuthCode } from '../src/codes';
+import { computeS256Challenge } from '../src/pkce';
 
 const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';
 let sql: ReturnType<typeof postgres>;

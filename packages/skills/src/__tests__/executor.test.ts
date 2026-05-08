@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { runSkillStep } from '../executor.js';
+import { runSkillStep } from '../executor';
 
 describe('runSkillStep', () => {
   it('extracts first action step from a skill body', () => {

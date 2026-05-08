@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import type { RunResult } from './types.js';
+import type { RunResult } from './types';
 
 export interface RunCommandInput {
   command: string;

@@ -1,15 +1,15 @@
 import { z, type ZodType } from 'zod';
 import type { DB } from '@holo/db';
 import { listCustomTools, buildCustomToolDefinition } from '@holo/custom-tools';
-import { searchInputSchema, runSearchTool } from './tools/search.js';
-import { getPrInputSchema, runGetPrTool } from './tools/get-pr.js';
-import { getThreadInputSchema, runGetThreadTool } from './tools/get-thread.js';
-import { getDocInputSchema, runGetDocTool } from './tools/get-doc.js';
-import { getCallInputSchema, runGetCallTool } from './tools/get-call.js';
-import { getTicketInputSchema, runGetTicketTool } from './tools/get-ticket.js';
-import { listSkillsInputSchema, runListSkillsTool } from './tools/list-skills.js';
-import { getSkillInputSchema, runGetSkillTool } from './tools/get-skill.js';
-import { executeSkillInputSchema, runExecuteSkillTool } from './tools/execute-skill.js';
+import { searchInputSchema, runSearchTool } from './tools/search';
+import { getPrInputSchema, runGetPrTool } from './tools/get-pr';
+import { getThreadInputSchema, runGetThreadTool } from './tools/get-thread';
+import { getDocInputSchema, runGetDocTool } from './tools/get-doc';
+import { getCallInputSchema, runGetCallTool } from './tools/get-call';
+import { getTicketInputSchema, runGetTicketTool } from './tools/get-ticket';
+import { listSkillsInputSchema, runListSkillsTool } from './tools/list-skills';
+import { getSkillInputSchema, runGetSkillTool } from './tools/get-skill';
+import { executeSkillInputSchema, runExecuteSkillTool } from './tools/execute-skill';
 
 export interface ToolContext {
   db: DB;

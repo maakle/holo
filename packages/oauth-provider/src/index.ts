@@ -2,20 +2,20 @@ export type {
   CodeChallengeMethod,
   AuthCodeRecord,
   AccessTokenRecord,
-} from './types.js';
+} from './types';
 
-export { verifyPkce, computeS256Challenge } from './pkce.js';
+export { verifyPkce, computeS256Challenge } from './pkce';
 
-export { mintAuthCode, consumeAuthCode } from './codes.js';
+export { mintAuthCode, consumeAuthCode } from './codes';
 export type {
   MintAuthCodeInput,
   ConsumeAuthCodeInput,
   ConsumeAuthCodeResult,
-} from './codes.js';
+} from './codes';
 
-export { mintAccessToken, validateAccessToken, revokeAccessToken } from './tokens.js';
+export { mintAccessToken, validateAccessToken, revokeAccessToken } from './tokens';
 export type {
   MintAccessTokenInput,
   MintedAccessToken,
   ValidatedToken,
-} from './tokens.js';
+} from './tokens';

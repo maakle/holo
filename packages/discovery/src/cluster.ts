@@ -1,5 +1,5 @@
 // packages/discovery/src/cluster.ts
-import type { ArtifactInput, ClusterOptions, Episode } from './types.js';
+import type { ArtifactInput, ClusterOptions, Episode } from './types';
 
 function cosine(a: number[], b: number[]): number {
   let dot = 0;

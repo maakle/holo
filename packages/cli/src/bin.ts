@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { initCommand } from './commands/init.js';
-import { doctorCommand } from './commands/doctor.js';
-import { buildProgram } from './main.js';
+import { initCommand } from './commands/init';
+import { doctorCommand } from './commands/doctor';
+import { buildProgram } from './main';
 
 const [, , command, ...args] = process.argv;
 

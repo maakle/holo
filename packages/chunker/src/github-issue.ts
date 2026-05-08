@@ -1,4 +1,4 @@
-import type { Chunker, Chunk, ChunkContext } from './contract.js';
+import type { Chunker, Chunk, ChunkContext } from './contract';
 
 export interface GithubIssueInput {
   issueNumber: number;

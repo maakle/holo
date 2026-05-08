@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
-import { resolveDeps } from '../deps.js';
-import { runSync, SYNC_PROVIDERS } from './sync-run.js';
+import { resolveDeps } from '../deps';
+import { runSync, SYNC_PROVIDERS } from './sync-run';
 
 export function registerSyncCommand(program: Command): void {
   program

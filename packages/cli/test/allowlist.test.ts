@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { sql } from 'drizzle-orm';
-import { runAllowlistAdd } from '../src/commands/allowlist-add.js';
-import { runAllowlistRemove } from '../src/commands/allowlist-remove.js';
-import { renderListGithub } from '../src/commands/allowlist-list-github.js';
+import { runAllowlistAdd } from '../src/commands/allowlist-add';
+import { runAllowlistRemove } from '../src/commands/allowlist-remove';
+import { renderListGithub } from '../src/commands/allowlist-list-github';
 import { createDb, type DB } from '@holo/db';
 
 const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';

@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseSkill } from '../format.js';
-import type { SkillDoc } from '../types.js';
+import { parseSkill } from '../format';
+import type { SkillDoc } from '../types';
 
 // CommonJS consumers (e.g. apps/worker, which uses `module: "CommonJS"` for
 // NestJS decorators) typecheck this file's source through pnpm's workspace

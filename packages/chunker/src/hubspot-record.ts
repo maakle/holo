@@ -1,4 +1,4 @@
-import type { Chunker, Chunk, ChunkContext } from './contract.js';
+import type { Chunker, Chunk, ChunkContext } from './contract';
 
 export type HubspotRecordType = 'contact' | 'deal' | 'company';
 export type HubspotEngagementType = 'note' | 'call' | 'email' | 'meeting' | 'task';

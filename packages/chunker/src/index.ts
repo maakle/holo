@@ -1,30 +1,30 @@
-export type { Chunker, Chunk, ChunkContext, TreeSitterRegistry } from './contract.js';
-export { recursiveSplit } from './recursive-split.js';
-export { createRegistry, astChunk } from './tree-sitter/index.js';
-export type { AstChunk } from './tree-sitter/index.js';
-export { githubPrChunker, type GithubPrInput } from './github-pr.js';
-export { githubIssueChunker, type GithubIssueInput } from './github-issue.js';
-export { githubDocChunker, type GithubDocInput } from './github-doc.js';
-export { githubCodeChunker, type GithubCodeInput } from './github-code.js';
-export { slackThreadChunker, type SlackThreadInput } from './slack-thread.js';
-export { notionPageChunker, type NotionPageInput } from './notion-page.js';
-export { grainCallChunker, type GrainCallInput, type GrainSpeakerTurn } from './grain-call.js';
-export { pylonTicketChunker, type PylonTicketInput, type PylonMessage } from './pylon-ticket.js';
+export type { Chunker, Chunk, ChunkContext, TreeSitterRegistry } from './contract';
+export { recursiveSplit } from './recursive-split';
+export { createRegistry, astChunk } from './tree-sitter/index';
+export type { AstChunk } from './tree-sitter/index';
+export { githubPrChunker, type GithubPrInput } from './github-pr';
+export { githubIssueChunker, type GithubIssueInput } from './github-issue';
+export { githubDocChunker, type GithubDocInput } from './github-doc';
+export { githubCodeChunker, type GithubCodeInput } from './github-code';
+export { slackThreadChunker, type SlackThreadInput } from './slack-thread';
+export { notionPageChunker, type NotionPageInput } from './notion-page';
+export { grainCallChunker, type GrainCallInput, type GrainSpeakerTurn } from './grain-call';
+export { pylonTicketChunker, type PylonTicketInput, type PylonMessage } from './pylon-ticket';
 export {
   hubspotRecordChunker,
   type HubspotRecordInput,
   type HubspotEngagement,
   type HubspotEngagementType,
   type HubspotRecordType,
-} from './hubspot-record.js';
-export { mintlifyPageChunker, type MintlifyPageInput } from './mintlify-page.js';
+} from './hubspot-record';
+export { mintlifyPageChunker, type MintlifyPageInput } from './mintlify-page';
 export {
   openapiEndpointChunker,
   type OpenApiEndpointInput,
   type OpenApiDocument,
-} from './openapi-endpoint.js';
+} from './openapi-endpoint';
 export {
   zendeskArticleChunker,
   stripHtmlToText,
   type ZendeskArticleInput,
-} from './zendesk-article.js';
+} from './zendesk-article';

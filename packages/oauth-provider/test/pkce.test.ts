@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { verifyPkce, computeS256Challenge } from '../src/pkce.js';
+import { verifyPkce, computeS256Challenge } from '../src/pkce';
 
 // Known-good vector from RFC 7636 §4
 // verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'

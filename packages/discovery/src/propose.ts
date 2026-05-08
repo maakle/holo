@@ -1,7 +1,7 @@
 // packages/discovery/src/propose.ts
 import { AnthropicLLMClient, type LLMClient } from '@holo/llm';
 import { holoError, ErrorCode } from '@holo/errors';
-import type { Proposal } from './types.js';
+import type { Proposal } from './types';
 
 export interface ProposeInput {
   apiKey: string;

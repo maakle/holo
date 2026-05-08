@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSlackSubjects, type SlackChannelLister } from '../src/slack-resolver.js';
+import { resolveSlackSubjects, type SlackChannelLister } from '../src/slack-resolver';
 
 function fakeClient(
   pages: Array<{ channels: Array<{ id: string }>; nextCursor?: string }>,

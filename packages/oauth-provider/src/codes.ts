@@ -3,8 +3,8 @@ import { eq } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
-import { verifyPkce } from './pkce.js';
-import type { CodeChallengeMethod } from './types.js';
+import { verifyPkce } from './pkce';
+import type { CodeChallengeMethod } from './types';
 
 const CODE_TTL_MS = 60_000;
 

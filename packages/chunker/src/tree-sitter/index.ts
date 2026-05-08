@@ -1,9 +1,9 @@
 import type { SyntaxNode } from 'tree-sitter';
-import { recursiveSplit } from '../recursive-split.js';
+import { recursiveSplit } from '../recursive-split';
 
 export type { SyntaxNode } from 'tree-sitter';
-export { createRegistry } from './registry.js';
-export type { TreeSitterRegistry } from './registry.js';
+export { createRegistry } from './registry';
+export type { TreeSitterRegistry } from './registry';
 
 export interface AstChunk {
   content: string;
