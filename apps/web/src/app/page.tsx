@@ -22,6 +22,7 @@ export default async function Home() {
       <ConnectorsStrip />
       <ToolsAgentGraph />
       <PillarsBand />
+      <UseCasesBand />
       <CodeShowcase />
       <ObservabilityBand />
       <VisionBand />
@@ -295,6 +296,67 @@ function PillarsBand() {
                 {p.title}
               </h3>
               <p className="mt-3 text-[14px] leading-6 text-text-muted">{p.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Use cases band ────────────────────────────────────────────────────────
+const USE_CASES = [
+  {
+    label: 'Engineering',
+    title: 'Codebase memory across every IDE.',
+    body: 'A Cursor or Claude Code agent answers "why is this code the way it is?" by searching across GitHub, Slack, and Notion, then drilling into the right PR diff, review thread, and RFC. New hires stop excavating; senior engineers stop re-explaining decisions.',
+    trace: 'search → get_pr → get_thread → answer',
+  },
+  {
+    label: 'Customer support',
+    title: 'Drafted replies with the right sources attached.',
+    body: 'A Pylon or Zendesk webhook fires on a new ticket. Holo pulls the customer’s history, the matching docs page, and the closest past resolution, and posts a draft reply for the human to approve. Time-to-first-response drops; tone stays consistent.',
+    trace: 'search → get_ticket → get_doc → draft',
+  },
+  {
+    label: 'Sales / CS',
+    title: 'Every call starts with full context.',
+    body: 'Five minutes before a meeting with Acme, a calendar-triggered agent searches Grain transcripts, the HubSpot deal, and any open Pylon issues, and posts a digest to the prep doc. Account owners walk in knowing exactly where things stand.',
+    trace: 'search → get_call → get_ticket → digest',
+  },
+  {
+    label: 'Everyone else',
+    title: 'One search box across every system.',
+    body: 'A dashboard search box or a Slack /ask command hits the REST surface directly. Ops, design, PM, and revops get ranked results across all nine connectors with deep links back to the source — no agent, no MCP client, no LLM in the path.',
+    trace: 'POST /v1/search → ranked chunks',
+  },
+] as const;
+
+function UseCasesBand() {
+  return (
+    <section className="border-b border-border">
+      <div className="mx-auto max-w-[1280px] px-6 py-20">
+        <div className="mx-auto max-w-[760px] text-center">
+          <p className="caption text-text-subtle">What teams build</p>
+          <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
+            Four shapes the same layer takes.
+          </h2>
+          <p className="mx-auto mt-4 max-w-[600px] text-balance text-[15px] leading-6 text-text-muted">
+            Holo is a primitive, not a product. These are the agents teams ship on top of it
+            in the first month — same backend, same audit trail, different consumers. The
+            first three drive an agent over MCP; the fourth is plain REST with no agent in
+            the loop.
+          </p>
+        </div>
+        <div className="mt-12 grid gap-6 sm:grid-cols-2">
+          {USE_CASES.map((u) => (
+            <div key={u.label} className="rounded-lg border border-border bg-surface p-6">
+              <p className="caption text-text-subtle">{u.label}</p>
+              <h3 className="mt-3 font-display text-[18px] font-semibold leading-snug tracking-tight text-text">
+                {u.title}
+              </h3>
+              <p className="mt-3 text-[14px] leading-6 text-text-muted">{u.body}</p>
+              <p className="mt-4 font-mono text-[12px] text-text-subtle">{u.trace}</p>
             </div>
           ))}
         </div>
