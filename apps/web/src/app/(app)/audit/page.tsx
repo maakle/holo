@@ -25,7 +25,7 @@ export default async function AuditPage({
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
   const offset = (page - 1) * PAGE_SIZE;
 
-  const [events, [{ total }]] = await Promise.all([
+  const [events, totalRows] = await Promise.all([
     db
       .select()
       .from(schema.auditEvents)
@@ -39,6 +39,7 @@ export default async function AuditPage({
       .where(eq(schema.auditEvents.organizationId, orgId)),
   ]);
 
+  const total = totalRows[0]?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
