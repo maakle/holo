@@ -23,7 +23,7 @@ When v0.2 ships, we'll offer hosted holo for teams that want the product without
 | Tier | Target | Likely price | What you get |
 |------|--------|-----|--------------|
 | **Free** | Solo devs, evaluation | $0 | 1 connector, 1 agent, 1 GB ingestion, community Slack |
-| **Team** | 30–80-person companies (the wedge ICP) | **~$20–50 / agent / month** OR **~$200–500 / org / month flat** | Unlimited connectors, unlimited agents, ingestion up to ~50 GB, email support, SOC 2 (when ready) |
+| **Team** | Teams running 2+ custom agents in production | **~$20–50 / agent / month** OR **~$200–500 / org / month flat** | Unlimited connectors, unlimited agents, ingestion up to ~50 GB, email support, SOC 2 (when ready) |
 | **Enterprise** | Larger orgs with compliance asks | Custom | SSO, custom data-residency region, audit log export, dedicated support, SLA |
 
 **Why "per-agent" or "per-org flat" instead of per-seat:**
