@@ -100,7 +100,7 @@ async function listAllChannels(token: string): Promise<SlackChannel[]> {
 
 export async function GET() {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db} = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -109,7 +109,7 @@ export async function GET() {
         fix: 'Sign in first.',
       });
     }
-    const orgId = resolveActiveOrgId(session, defaultOrgId);
+    const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
 
     const token = await loadAccessToken(db, orgId, userId);
@@ -187,7 +187,7 @@ export async function GET() {
 
 export async function PUT(req: Request) {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db} = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -196,7 +196,7 @@ export async function PUT(req: Request) {
         fix: 'Sign in first.',
       });
     }
-    const orgId = resolveActiveOrgId(session, defaultOrgId);
+    const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
 
     const body = (await req.json().catch(() => ({}))) as {

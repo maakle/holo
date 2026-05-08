@@ -219,7 +219,7 @@ const TOOLS: LocalTool[] = [
 
 export async function POST(req: Request) {
   try {
-    const { auth, db, defaultOrgId, env } = await getServerContext();
+    const { auth, db, env } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -245,7 +245,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const orgId = resolveActiveOrgId(session, defaultOrgId);
+    const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
     const extraSubjects = await getSubjectsForUser(db, userId);
     const ctx: ToolCtx = {

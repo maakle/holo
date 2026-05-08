@@ -24,7 +24,7 @@ export default async function ChatConversationPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { auth, db, defaultOrgId, env } = await getServerContext();
+  const { auth, db, env } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
@@ -32,7 +32,7 @@ export default async function ChatConversationPage({
   const idResult = idSchema.safeParse(id);
   if (!idResult.success) notFound();
 
-  const orgId = resolveActiveOrgId(session, defaultOrgId);
+  const orgId = resolveActiveOrgId(session);
   const convRows = await db
     .select({ id: schema.chatConversations.id })
     .from(schema.chatConversations)

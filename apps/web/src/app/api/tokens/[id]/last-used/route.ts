@@ -4,13 +4,14 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session)
       throw holoError({
@@ -19,6 +20,7 @@ export async function GET(
         fix: 'Sign in.',
       });
     const { id } = await params;
+    const orgId = resolveActiveOrgId(session);
 
     const [row] = await db
       .select({ lastUsedAt: schema.apiTokens.lastUsedAt })
@@ -26,7 +28,7 @@ export async function GET(
       .where(
         and(
           eq(schema.apiTokens.id, id),
-          eq(schema.apiTokens.organizationId, defaultOrgId),
+          eq(schema.apiTokens.organizationId, orgId),
           eq(schema.apiTokens.userId, session.user.id),
           isNull(schema.apiTokens.revokedAt),
         ),

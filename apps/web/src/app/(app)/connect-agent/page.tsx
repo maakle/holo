@@ -11,10 +11,10 @@ import {
 } from '@/components/connect-agent-banner';
 
 export default async function ConnectAgentPage() {
-  const { auth, db, defaultOrgId } = await getServerContext();
+  const { auth, db} = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
-  const orgId = resolveActiveOrgId(session, defaultOrgId);
+  const orgId = resolveActiveOrgId(session);
 
   const gatewayBase = process.env['MCP_PUBLIC_URL']?.replace(/\/+$/, '')
     ?? 'http://localhost:8080';

@@ -9,7 +9,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AppTopbar } from '@/components/app-topbar';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const { auth, db, defaultOrgId } = await getServerContext();
+  const { auth, db} = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
@@ -23,7 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     .innerJoin(schema.organization, eq(schema.member.organizationId, schema.organization.id))
     .where(eq(schema.member.userId, session.user.id));
 
-  const activeOrgId = resolveActiveOrgId(session, defaultOrgId);
+  const activeOrgId = resolveActiveOrgId(session);
 
   const sampleSourceRows = await db
     .select({ id: schema.sources.id })

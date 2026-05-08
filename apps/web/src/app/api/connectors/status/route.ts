@@ -38,7 +38,7 @@ function emptyStatus(): ConnectorSyncStatus {
 
 export async function GET() {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db} = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -47,7 +47,7 @@ export async function GET() {
         fix: 'Sign in first.',
       });
     }
-    const orgId = resolveActiveOrgId(session, defaultOrgId);
+    const orgId = resolveActiveOrgId(session);
 
     const statuses = Object.fromEntries(
       PROVIDERS.map((p) => [p, emptyStatus()]),

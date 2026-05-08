@@ -16,7 +16,7 @@ export default async function SettingsPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in?callbackURL=/settings');
 
-  const orgId = resolveActiveOrgId(session, defaultOrgId);
+  const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/dashboard');
 
   const [org] = await db

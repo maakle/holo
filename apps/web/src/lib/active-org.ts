@@ -1,4 +1,5 @@
 import 'server-only';
+import { holoError, ErrorCode } from '@holo/errors';
 
 type SessionLike = {
   user: { id: string } & Record<string, unknown>;
@@ -13,18 +14,25 @@ type SessionLike = {
  * The user's `organizationId` field is the *home* org assigned at signup and
  * never changes — using it for data queries breaks workspace switching.
  *
- * `fallback` is **required**: pass `defaultOrgId` from getServerContext().
- * A previous version made it optional and defaulted to `''` if everything
- * was missing, which silently routed reads against the empty string while
- * writes hit the seeded default org — the dashboard then showed "Not
- * connected" forever after a successful connect. Keeping `fallback`
- * required catches the drift at compile time.
+ * Strict by design: throws `HOLO_AUTH_NO_ACTIVE_ORG` if neither
+ * `session.activeOrganizationId` nor `user.organizationId` is set. A previous
+ * version accepted a `defaultOrgId` fallback, which silently routed
+ * workspace-scoped writes (invitations, audit events, connector tokens) to
+ * the seeded `default` org for any user whose session drifted — wrong-tenant
+ * data leakage waiting to happen once Holo is multi-tenant. The session
+ * `create.before` hook in @holo/auth populates `activeOrganizationId` from
+ * the user's home org, so this should always succeed for valid sessions.
  */
-export function resolveActiveOrgId(
-  session: SessionLike,
-  fallback: string,
-): string {
+export function resolveActiveOrgId(session: SessionLike): string {
   const sessionRow = session.session as { activeOrganizationId?: string | null };
   const homeOrgId = (session.user as { organizationId?: string }).organizationId;
-  return sessionRow.activeOrganizationId ?? homeOrgId ?? fallback;
+  const orgId = sessionRow.activeOrganizationId ?? homeOrgId;
+  if (!orgId) {
+    throw holoError({
+      code: ErrorCode.HOLO_AUTH_NO_ACTIVE_ORG,
+      problem: 'no active workspace on session',
+      fix: 'Sign out and back in, or switch to a workspace.',
+    });
+  }
+  return orgId;
 }

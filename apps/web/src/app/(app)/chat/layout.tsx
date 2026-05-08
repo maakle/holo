@@ -8,11 +8,11 @@ import { resolveActiveOrgId } from '@/lib/active-org';
 import { ChatHistoryRail } from '@/components/chat-history-rail';
 
 export default async function ChatLayout({ children }: { children: ReactNode }) {
-  const { auth, db, defaultOrgId } = await getServerContext();
+  const { auth, db} = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
-  const orgId = resolveActiveOrgId(session, defaultOrgId);
+  const orgId = resolveActiveOrgId(session);
   const conversationRows = await db
     .select({
       id: schema.chatConversations.id,

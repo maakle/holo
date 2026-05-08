@@ -77,7 +77,7 @@ export async function GET(
       });
     }
     const provider: Provider = rawProvider;
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db} = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -86,7 +86,7 @@ export async function GET(
         fix: 'Sign in first.',
       });
     }
-    const orgId = resolveActiveOrgId(session, defaultOrgId);
+    const orgId = resolveActiveOrgId(session);
 
     // Historic rows (completed / failed / stalled / running) come from
     // Postgres, which survives Redis flushes. Live state (active / waiting /

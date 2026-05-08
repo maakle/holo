@@ -17,7 +17,7 @@ const createBodySchema = z
 
 export async function GET() {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db} = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -26,7 +26,7 @@ export async function GET() {
         fix: 'Sign in.',
       });
     }
-    const orgId = resolveActiveOrgId(session, defaultOrgId);
+    const orgId = resolveActiveOrgId(session);
     const rows = await db
       .select({
         id: schema.chatConversations.id,
@@ -51,7 +51,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db} = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
         fix: 'Send { title?: string } or empty body.',
       });
     }
-    const orgId = resolveActiveOrgId(session, defaultOrgId);
+    const orgId = resolveActiveOrgId(session);
     const [row] = await db
       .insert(schema.chatConversations)
       .values({

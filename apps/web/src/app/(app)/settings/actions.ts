@@ -72,7 +72,7 @@ export async function updateWorkspace(
     });
   }
   const userId = session.user.id;
-  const activeOrgId = resolveActiveOrgId(session, defaultOrgId);
+  const activeOrgId = resolveActiveOrgId(session);
   if (organizationId !== activeOrgId) {
     return { ok: false, field, error: 'Workspace mismatch. Refresh and try again.' };
   }
@@ -142,7 +142,7 @@ export async function updateOrgPreferences(input: {
   }
   const { organizationId, hideSampleData } = parsed.data;
 
-  const { auth, db, defaultOrgId } = await getServerContext();
+  const { auth, db } = await getServerContext();
   const reqHeaders = await headers();
   const session = await auth.api.getSession({ headers: reqHeaders });
   if (!session) {
@@ -153,7 +153,7 @@ export async function updateOrgPreferences(input: {
     });
   }
   const userId = session.user.id;
-  const activeOrgId = resolveActiveOrgId(session, defaultOrgId);
+  const activeOrgId = resolveActiveOrgId(session);
   if (organizationId !== activeOrgId) {
     return { ok: false, error: 'Workspace mismatch. Refresh and try again.' };
   }
@@ -226,7 +226,7 @@ export async function deleteWorkspace(
     });
   }
   const userId = session.user.id;
-  const activeOrgId = resolveActiveOrgId(session, defaultOrgId);
+  const activeOrgId = resolveActiveOrgId(session);
   if (organizationId !== activeOrgId) {
     return { ok: false, error: 'Workspace mismatch. Refresh and try again.' };
   }

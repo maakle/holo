@@ -6,10 +6,11 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
 
 export async function GET() {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session)
       throw holoError({
@@ -17,7 +18,7 @@ export async function GET() {
         problem: 'must be signed in',
         fix: 'Sign in.',
       });
-    const orgId = defaultOrgId;
+    const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
 
     const tokens = await db
@@ -58,7 +59,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { auth, db, defaultOrgId } = await getServerContext();
+    const { auth, db } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session)
       throw holoError({
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
         problem: 'must be signed in',
         fix: 'Sign in.',
       });
-    const orgId = defaultOrgId;
+    const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
 
     const body = (await req.json().catch(() => ({}))) as { label?: string };

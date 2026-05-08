@@ -20,7 +20,7 @@ async function requireSession() {
       fix: 'Sign in first.',
     });
   }
-  return { ...ctx, session, orgId: resolveActiveOrgId(session, ctx.defaultOrgId) };
+  return { ...ctx, session, orgId: resolveActiveOrgId(session) };
 }
 
 export async function GET() {

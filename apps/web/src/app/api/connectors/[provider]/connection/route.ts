@@ -29,7 +29,7 @@ export async function DELETE(
     }
     const provider: Provider = rawProvider;
 
-    const { auth, db, env, defaultOrgId } = await getServerContext();
+    const { auth, db, env} = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -38,7 +38,7 @@ export async function DELETE(
         fix: 'Sign in first.',
       });
     }
-    const orgId = resolveActiveOrgId(session, defaultOrgId);
+    const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
 
     // GitHub uses an org-level App installation. Disconnect order matters:
