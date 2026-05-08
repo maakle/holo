@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { emailOTP, organization } from 'better-auth/plugins';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import type { Env } from '@holo/env';
@@ -153,25 +153,45 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
       },
     },
     databaseHooks: {
-      // Auto-enroll new users in their home org. The `user.organizationId`
-      // additionalField defaults the home org at insert; here we mirror that
-      // into the `member` table so the org plugin sees them as a member.
+      // Auto-enroll new users in their home org so the org plugin sees them
+      // as a member. Two important rules:
+      //   1. Skip if there's a pending invitation for this email — better-auth's
+      //      acceptInvitation handler will create the member row with the
+      //      invited role. Pre-creating here would fire the unique constraint
+      //      on (organization_id, user_id), abort acceptInvitation mid-flight,
+      //      and leave the user with the wrong role plus a stale "pending" row.
+      //   2. New users default to 'member', not 'owner'. The seed creates the
+      //      default org's owner explicitly (Default User); subsequent direct
+      //      signups should not silently inherit owner privileges.
       user: {
         create: {
           after: async (createdUser) => {
-            const orgId =
-              (createdUser as unknown as { organizationId?: string }).organizationId ??
-              defaultOrganizationId;
+            const u = createdUser as { id: string; email: string; organizationId?: string };
+            const orgId = u.organizationId ?? defaultOrganizationId;
+
+            const pendingInvite = await db
+              .select({ id: schema.invitation.id })
+              .from(schema.invitation)
+              .where(
+                and(
+                  eq(schema.invitation.email, u.email.toLowerCase()),
+                  eq(schema.invitation.status, 'pending'),
+                ),
+              )
+              .limit(1);
+            if (pendingInvite[0]) return;
+
             const existing = await db
               .select({ id: schema.member.id })
               .from(schema.member)
-              .where(eq(schema.member.userId, createdUser.id))
+              .where(eq(schema.member.userId, u.id))
               .limit(1);
             if (existing[0]) return;
+
             await db.insert(schema.member).values({
               organizationId: orgId,
-              userId: createdUser.id,
-              role: 'owner',
+              userId: u.id,
+              role: 'member',
             });
           },
         },
