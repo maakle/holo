@@ -34,7 +34,7 @@ export function InviteForm() {
       action={formAction}
       className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-end"
     >
-      <label className="flex-1 space-y-1.5">
+      <label className="flex flex-1 flex-col gap-1.5">
         <span className="caption text-text-subtle">Email</span>
         <input
           name="email"
@@ -45,9 +45,14 @@ export function InviteForm() {
           className={`${inputClass} w-full`}
         />
       </label>
-      <label className="space-y-1.5">
+      <label className="flex flex-col gap-1.5">
         <span className="caption text-text-subtle">Role</span>
-        <select name="role" defaultValue="member" disabled={pending} className={inputClass}>
+        <select
+          name="role"
+          defaultValue="member"
+          disabled={pending}
+          className={`${inputClass} pr-8`}
+        >
           <option value="member">Member</option>
           <option value="admin">Admin</option>
         </select>
