@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react';
 import { toast } from 'sonner';
-import { Mail } from 'lucide-react';
+import { ChevronDown, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { inviteMember } from './actions';
 
@@ -47,15 +47,21 @@ export function InviteForm() {
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="caption text-text-subtle">Role</span>
-        <select
-          name="role"
-          defaultValue="member"
-          disabled={pending}
-          className={`${inputClass} pr-8`}
-        >
-          <option value="member">Member</option>
-          <option value="admin">Admin</option>
-        </select>
+        <div className="relative">
+          <select
+            name="role"
+            defaultValue="member"
+            disabled={pending}
+            className={`${inputClass} w-full appearance-none pr-8`}
+          >
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted"
+            aria-hidden
+          />
+        </div>
       </label>
       <Button type="submit" variant="primary" disabled={pending} className="sm:self-end">
         <Mail className="h-3.5 w-3.5" />
