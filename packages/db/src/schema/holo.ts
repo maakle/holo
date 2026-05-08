@@ -722,3 +722,47 @@ export const procedureProposalDecisions = pgTable(
     ),
   }),
 );
+
+export const chatConversations = pgTable(
+  'chat_conversations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    title: text('title').notNull().default('New chat'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgUserUpdatedIdx: index('chat_conversations_org_user_updated_idx').on(
+      t.organizationId,
+      t.userId,
+      t.updatedAt,
+    ),
+  }),
+);
+
+export const chatMessages = pgTable(
+  'chat_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => chatConversations.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: ['user', 'assistant'] }).notNull(),
+    text: text('text').notNull(),
+    toolCalls: jsonb('tool_calls'),
+    modelCalls: integer('model_calls'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    conversationCreatedIdx: index('chat_messages_conversation_created_idx').on(
+      t.conversationId,
+      t.createdAt,
+    ),
+  }),
+);

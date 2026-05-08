@@ -23,6 +23,7 @@ const turnSchema = z.object({
 
 const bodySchema = z.object({
   messages: z.array(turnSchema).min(1),
+  conversationId: z.string().uuid().optional(),
 });
 
 interface ToolCallTrace {
@@ -252,6 +253,74 @@ export async function POST(req: Request) {
       userSubjects: [`org:${orgId}`, `user:${userId}`, ...extraSubjects],
     };
 
+    let conversationId: string | null = null;
+    if (parsed.data.conversationId) {
+      const ownedRows = await db
+        .select({
+          id: schema.chatConversations.id,
+          title: schema.chatConversations.title,
+        })
+        .from(schema.chatConversations)
+        .where(
+          and(
+            eq(schema.chatConversations.id, parsed.data.conversationId),
+            eq(schema.chatConversations.organizationId, orgId),
+            eq(schema.chatConversations.userId, userId),
+          ),
+        )
+        .limit(1);
+      const owned = ownedRows[0];
+      if (!owned) {
+        return NextResponse.json(
+          { code: 'HOLO_NOT_FOUND', problem: 'conversation not found' },
+          { status: 404 },
+        );
+      }
+      conversationId = owned.id;
+      let lastUserMessage: { role: 'user' | 'assistant'; text: string } | undefined;
+      for (let i = parsed.data.messages.length - 1; i >= 0; i--) {
+        const m = parsed.data.messages[i]!;
+        if (m.role === 'user') {
+          lastUserMessage = m;
+          break;
+        }
+      }
+      if (lastUserMessage) {
+        await db.insert(schema.chatMessages).values({
+          conversationId,
+          role: 'user',
+          text: lastUserMessage.text,
+        });
+        const titleUpdate: { title?: string; updatedAt: Date } = { updatedAt: new Date() };
+        if (owned.title === 'New chat') {
+          titleUpdate.title = lastUserMessage.text.slice(0, 80).trim() || 'New chat';
+        }
+        await db
+          .update(schema.chatConversations)
+          .set(titleUpdate)
+          .where(eq(schema.chatConversations.id, conversationId));
+      }
+    }
+
+    async function persistAssistant(args: {
+      text: string;
+      toolCalls: ToolCallTrace[];
+      modelCalls: number;
+    }) {
+      if (!conversationId) return;
+      await db.insert(schema.chatMessages).values({
+        conversationId,
+        role: 'assistant',
+        text: args.text,
+        toolCalls: args.toolCalls,
+        modelCalls: args.modelCalls,
+      });
+      await db
+        .update(schema.chatConversations)
+        .set({ updatedAt: new Date() })
+        .where(eq(schema.chatConversations.id, conversationId));
+    }
+
     const toolByName = new Map<string, LocalTool>(TOOLS.map((t) => [t.name, t]));
     const llmTools: LLMTool[] = TOOLS.map((t) => ({
       name: t.name,
@@ -275,6 +344,11 @@ export async function POST(req: Request) {
 
     while (true) {
       if (Date.now() - startedAt > wallClockMs) {
+        await persistAssistant({
+          text: `[error] agent exceeded wall clock budget (${wallClockMs}ms)`,
+          toolCalls: traces,
+          modelCalls,
+        });
         return NextResponse.json(
           {
             answer: '',
@@ -304,6 +378,7 @@ export async function POST(req: Request) {
           .map((b) => b.text)
           .join('\n')
           .trim();
+        await persistAssistant({ text, toolCalls: traces, modelCalls });
         return NextResponse.json({
           answer: text,
           toolCalls: traces,
@@ -320,6 +395,11 @@ export async function POST(req: Request) {
       for (const use of toolUses) {
         toolCallCount += 1;
         if (toolCallCount > maxToolCalls) {
+          await persistAssistant({
+            text: `[error] agent exceeded max tool calls (${maxToolCalls})`,
+            toolCalls: traces,
+            modelCalls,
+          });
           return NextResponse.json(
             {
               answer: '',

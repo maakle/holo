@@ -85,7 +85,7 @@ function ToggleRow({
           }`}
         >
           <span
-            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-text shadow-sm transition-transform duration-micro ${
+            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-accent-fg shadow-sm transition-transform duration-micro ${
               value ? 'translate-x-[18px]' : 'translate-x-[2px]'
             }`}
           />

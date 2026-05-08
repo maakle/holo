@@ -38,7 +38,7 @@ const TOOL_TOP = (H - TOOL_BLOCK_H) / 2;
 const HOLO_CX = W / 2;
 const HOLO_CY = H / 2;
 const HOLO_W = 280;
-const HOLO_H = 400;
+const HOLO_H = 280;
 const AGENT_W = 240;
 const AGENT_X = W - AGENT_W; // left edge of agent panel
 const AGENT_CY = HOLO_CY;
@@ -50,7 +50,7 @@ function toolCenterY(index: number) {
 export function ToolsAgentGraph() {
   return (
     <section className="border-b border-border">
-      <div className="mx-auto max-w-[1280px] px-6 py-20">
+      <div className="mx-auto max-w-[1280px] px-6 py-14">
         <div className="mx-auto max-w-[760px] text-center">
           <p className="caption text-text-subtle">How it fits together</p>
           <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
@@ -64,7 +64,7 @@ export function ToolsAgentGraph() {
         </div>
 
         {/* Desktop graph */}
-        <div className="mt-16 hidden md:flex md:justify-center">
+        <div className="mt-10 hidden md:flex md:justify-center">
           <DesktopGraph />
         </div>
 

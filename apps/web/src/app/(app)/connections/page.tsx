@@ -91,7 +91,7 @@ export default async function ConnectionsPage({
   }
 
   const sampleStatus = hideSampleData
-    ? { active: false, artifactCount: 0 }
+    ? { active: false, artifactCount: 0, installedAt: null, kindBreakdown: [] }
     : await getSampleDataStatus(db, orgId);
 
   const allowlistRows = await db
@@ -177,6 +177,8 @@ export default async function ConnectionsPage({
             <SampleConnectorRow
               installed={sampleStatus.active}
               artifactCount={sampleStatus.artifactCount}
+              installedAt={sampleStatus.installedAt}
+              kindBreakdown={sampleStatus.kindBreakdown}
             />
           ) : null}
           {CONNECTOR_CATEGORIES.map((cat) => {

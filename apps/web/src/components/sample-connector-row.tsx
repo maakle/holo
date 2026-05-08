@@ -5,32 +5,30 @@ import { useRouter } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { SampleManageSheet } from '@/components/sample-manage-sheet';
 
 interface Props {
   installed: boolean;
   artifactCount: number;
+  installedAt: string | null;
+  kindBreakdown: Array<{ kind: string; count: number }>;
 }
 
 /**
  * Sits at the top of the connections list. Always visible — every workspace
- * either has the sample dataset (with a Remove button) or can install it
- * with a single click.
+ * either has the sample dataset (with a Manage button that opens the same
+ * sidebar slider real connectors use) or can install it with a single click.
  */
-export function SampleConnectorRow({ installed, artifactCount }: Props) {
+export function SampleConnectorRow({
+  installed,
+  artifactCount,
+  installedAt,
+  kindBreakdown,
+}: Props) {
   const router = useRouter();
-  const [busy, setBusy] = useState<'install' | 'remove' | null>(null);
+  const [busy, setBusy] = useState<'install' | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [showManage, setShowManage] = useState(false);
 
   async function install() {
     setBusy('install');
@@ -42,25 +40,6 @@ export function SampleConnectorRow({ installed, artifactCount }: Props) {
         setError(data.problem ?? 'Could not install sample data.');
         return;
       }
-      router.refresh();
-    } catch {
-      setError('Network error.');
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function confirmRemove() {
-    setBusy('remove');
-    setError(null);
-    try {
-      const res = await fetch('/api/sample-data', { method: 'DELETE' });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { problem?: string };
-        setError(data.problem ?? 'Could not remove sample data.');
-        return;
-      }
-      setConfirmOpen(false);
       router.refresh();
     } catch {
       setError('Network error.');
@@ -105,10 +84,9 @@ export function SampleConnectorRow({ installed, artifactCount }: Props) {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setConfirmOpen(true)}
-                  disabled={busy !== null}
+                  onClick={() => setShowManage(true)}
                 >
-                  Remove
+                  Manage
                 </Button>
               ) : (
                 <Button
@@ -125,30 +103,15 @@ export function SampleConnectorRow({ installed, artifactCount }: Props) {
         </div>
       </div>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove sample data?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently deletes the Star Wars sample artifacts and their
-              indexed chunks for this workspace. Real connector data is not
-              affected.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy === 'remove'}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void confirmRemove();
-              }}
-              disabled={busy === 'remove'}
-            >
-              {busy === 'remove' ? 'Removing…' : 'Remove sample data'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {installed ? (
+        <SampleManageSheet
+          open={showManage}
+          onOpenChange={setShowManage}
+          artifactCount={artifactCount}
+          installedAt={installedAt}
+          kindBreakdown={kindBreakdown}
+        />
+      ) : null}
     </section>
   );
 }

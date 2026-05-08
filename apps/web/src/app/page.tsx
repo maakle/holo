@@ -19,7 +19,6 @@ export default async function Home() {
     <div className="relative min-h-screen overflow-hidden">
       <SiteHeader isAuthed={isAuthed} />
       <Hero isAuthed={isAuthed} />
-      <ConnectorsStrip />
       <ToolsAgentGraph />
       <PillarsBand />
       <UseCasesBand />
@@ -118,28 +117,6 @@ function BackdropGrid() {
       className="pointer-events-none absolute inset-0 bg-[linear-gradient(var(--border)_1px,transparent_1px),linear-gradient(90deg,var(--border)_1px,transparent_1px)] bg-size-[48px_48px] opacity-30 mask-[radial-gradient(ellipse_at_center,black_30%,transparent_70%)]"
       aria-hidden
     />
-  );
-}
-
-// ── Connectors strip ──────────────────────────────────────────────────────
-const CONNECTOR_ITEMS = [
-  { label: 'Slack', live: true },
-  { label: 'GitHub', live: true },
-  { label: 'Notion', live: true },
-  { label: 'Grain', live: true },
-  { label: 'Pylon', live: true },
-  { label: 'HubSpot', live: true },
-] as const;
-
-function ConnectorsStrip() {
-  return (
-    <section className="border-b border-border">
-      <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-center gap-x-10 gap-y-3 px-6 py-10 font-mono text-[13px] text-text-muted">
-        {CONNECTOR_ITEMS.map((c) => (
-          <span key={c.label}>{c.label.toLowerCase()}</span>
-        ))}
-      </div>
-    </section>
   );
 }
 

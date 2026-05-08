@@ -210,6 +210,13 @@ export interface SampleDataStatus {
   active: boolean;
   artifactCount: number;
   installedAt: string | null;
+  /**
+   * Per-kind artifact counts (e.g. { doc: 3, message: 3, issue: 3 }). Empty
+   * when the sample isn't installed. Powers the breakdown rendered in the
+   * Manage sidebar — the same surface real connectors use for their content
+   * snapshot.
+   */
+  kindBreakdown: Array<{ kind: string; count: number }>;
 }
 
 export async function getSampleDataStatus(
@@ -235,11 +242,26 @@ export async function getSampleDataStatus(
     .limit(1);
 
   const row = rows[0];
-  if (!row) return { active: false, artifactCount: 0, installedAt: null };
+  if (!row) {
+    return { active: false, artifactCount: 0, installedAt: null, kindBreakdown: [] };
+  }
+
+  const breakdownRows = await db
+    .select({
+      kind: sourceArtifacts.kind,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(sourceArtifacts)
+    .where(eq(sourceArtifacts.sourceId, row.id))
+    .groupBy(sourceArtifacts.kind);
+
   return {
     active: true,
     artifactCount: row.count ?? 0,
     installedAt: row.createdAt.toISOString(),
+    kindBreakdown: breakdownRows
+      .map((r) => ({ kind: r.kind, count: r.count }))
+      .sort((a, b) => b.count - a.count),
   };
 }
 
