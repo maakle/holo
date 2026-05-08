@@ -93,6 +93,20 @@ export const member = pgTable(
   }),
 );
 
+// Holo-native shareable invite link. Exactly one row per organization (PK on
+// organization_id). Anyone signed in who hits /join/<token> joins as 'member'.
+// Regenerate = UPDATE token (old token instantly invalid). Revoke = DELETE.
+export const orgInviteLink = pgTable('org_invite_link', {
+  organizationId: uuid('organization_id')
+    .primaryKey()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Better Auth `organization` plugin: pending email invitations to join an org.
 export const invitation = pgTable(
   'invitation',

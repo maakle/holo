@@ -6,13 +6,14 @@ import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { Badge } from '@/components/ui/badge';
 import { InviteForm } from './invite-form';
+import { InviteLinkCard } from './invite-link-card';
 import { RemoveMemberButton } from './remove-member-button';
 import { RevokeInviteButton } from './revoke-invite-button';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TeamPage() {
-  const { auth, db} = await getServerContext();
+  const { auth, db, env } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in?callbackURL=/dashboard/team');
 
@@ -62,6 +63,20 @@ export default async function TeamPage() {
     )
     .orderBy(asc(schema.invitation.expiresAt));
 
+  let inviteLinkUrl: string | null = null;
+  if (canManage) {
+    const linkRows = await db
+      .select({ token: schema.orgInviteLink.token })
+      .from(schema.orgInviteLink)
+      .where(eq(schema.orgInviteLink.organizationId, orgId))
+      .limit(1);
+    const token = linkRows[0]?.token;
+    if (token) {
+      const base = env.BETTER_AUTH_URL.replace(/\/+$/, '');
+      inviteLinkUrl = `${base}/join/${token}`;
+    }
+  }
+
   return (
     <div className="max-w-3xl space-y-10">
       <header className="flex flex-col gap-2">
@@ -76,6 +91,7 @@ export default async function TeamPage() {
       </header>
 
       {canManage && <InviteForm />}
+      {canManage && <InviteLinkCard initialUrl={inviteLinkUrl} />}
 
       <section className="space-y-3">
         <h2 className="text-[15px] font-medium">

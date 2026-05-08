@@ -34,3 +34,8 @@ export const updateOrgPreferencesSchema = z.object({
   hideSampleData: z.boolean(),
 });
 export type UpdateOrgPreferencesInput = z.infer<typeof updateOrgPreferencesSchema>;
+
+export const leaveWorkspaceSchema = z.object({
+  organizationId: z.string().uuid({ message: 'Invalid workspace id.' }),
+});
+export type LeaveWorkspaceInput = z.infer<typeof leaveWorkspaceSchema>;

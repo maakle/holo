@@ -6,6 +6,7 @@ import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { ApiTokens } from './api-tokens';
 import { DangerZone } from './danger-zone';
+import { LeaveWorkspace } from './leave-workspace';
 import { Preferences } from './preferences';
 import { WorkspaceDetails } from './workspace-details';
 
@@ -81,6 +82,19 @@ export default async function SettingsPage() {
       </section>
 
       <ApiTokens />
+
+      <LeaveWorkspace
+        organizationId={org.id}
+        organizationName={org.name}
+        canLeave={!!me && me.role !== 'owner'}
+        reason={
+          !me
+            ? 'You are not a member of this workspace.'
+            : me.role === 'owner'
+              ? 'Owners can’t leave their own workspace. Transfer ownership or delete it instead.'
+              : undefined
+        }
+      />
 
       <DangerZone
         organizationId={org.id}

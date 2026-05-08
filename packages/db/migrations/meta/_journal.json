@@ -225,6 +225,13 @@
       "when": 1778832000000,
       "tag": "0031_invitation_created_at",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1778918400000,
+      "tag": "0032_org_invite_link",
+      "breakpoints": true
     }
   ]
 }
