@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { MoreHorizontal, UserMinus } from 'lucide-react';
+import { MoreHorizontal, MailX } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,14 +19,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { removeMember } from './actions';
+import { cancelInvitation } from './actions';
 
-export function RemoveMemberButton({
-  memberId,
-  memberLabel,
+export function RevokeInviteButton({
+  invitationId,
+  inviteeEmail,
 }: {
-  memberId: string;
-  memberLabel: string;
+  invitationId: string;
+  inviteeEmail: string;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -37,7 +37,7 @@ export function RemoveMemberButton({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            aria-label={`Open actions for ${memberLabel}`}
+            aria-label={`Open actions for invitation to ${inviteeEmail}`}
             className="inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-50"
             disabled={pending}
           >
@@ -52,8 +52,8 @@ export function RemoveMemberButton({
               setConfirmOpen(true);
             }}
           >
-            <UserMinus className="h-3.5 w-3.5" />
-            Remove from workspace
+            <MailX className="h-3.5 w-3.5" />
+            Revoke invitation
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -61,9 +61,9 @@ export function RemoveMemberButton({
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {memberLabel}?</AlertDialogTitle>
+            <AlertDialogTitle>Revoke invitation to {inviteeEmail}?</AlertDialogTitle>
             <AlertDialogDescription>
-              They&apos;ll lose access to this workspace immediately. You can re-invite them later.
+              The accept link will stop working. You can send a new invite anytime.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -75,18 +75,14 @@ export function RemoveMemberButton({
                 e.preventDefault();
                 startTransition(async () => {
                   const fd = new FormData();
-                  fd.append('memberId', memberId);
-                  const result = await removeMember(fd);
-                  if (result.ok) {
-                    toast.success(`Removed ${memberLabel}`);
-                    setConfirmOpen(false);
-                  } else if (result.error) {
-                    toast.error(result.error);
-                  }
+                  fd.append('invitationId', invitationId);
+                  await cancelInvitation(fd);
+                  toast.success(`Revoked invitation to ${inviteeEmail}`);
+                  setConfirmOpen(false);
                 });
               }}
             >
-              {pending ? 'Removing…' : 'Remove'}
+              {pending ? 'Revoking…' : 'Revoke'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

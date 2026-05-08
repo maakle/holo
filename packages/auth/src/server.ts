@@ -6,6 +6,7 @@ import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import type { Env } from '@holo/env';
 import { holoError, ErrorCode } from '@holo/errors';
+import { renderInvitationEmail, renderOtpEmail } from './email-templates.js';
 
 export interface CreateAuthOpts {
   db: DB;
@@ -42,6 +43,7 @@ interface ResendEmail {
   to: string;
   subject: string;
   text: string;
+  html?: string;
 }
 
 async function sendEmail(
@@ -68,6 +70,7 @@ async function sendEmail(
       to: email.to,
       subject: email.subject,
       text: email.text,
+      ...(email.html ? { html: email.html } : {}),
     }),
   });
   if (!res.ok) {
@@ -86,10 +89,12 @@ async function sendOtpEmail(
   otp: string,
   type: string,
 ): Promise<void> {
+  const rendered = renderOtpEmail({ otp });
   await sendEmail(env, type, {
     to: email,
-    subject: `Your sign-in code: ${otp}`,
-    text: `Your verification code is ${otp}. It expires in 5 minutes.`,
+    subject: rendered.subject,
+    text: rendered.text,
+    html: rendered.html,
   });
 }
 
@@ -103,13 +108,16 @@ async function sendInvitationEmail(
   },
 ): Promise<void> {
   const acceptUrl = `${env.BETTER_AUTH_URL}/accept-invite?id=${encodeURIComponent(args.invitationId)}`;
+  const rendered = renderInvitationEmail({
+    inviterName: args.inviterName,
+    organizationName: args.organizationName,
+    acceptUrl,
+  });
   await sendEmail(env, 'invitation', {
     to: args.inviteeEmail,
-    subject: `${args.inviterName} invited you to ${args.organizationName} on Holo`,
-    text:
-      `${args.inviterName} invited you to join the "${args.organizationName}" workspace on Holo.\n\n` +
-      `Accept the invite:\n${acceptUrl}\n\n` +
-      `If you didn't expect this, you can safely ignore this email.`,
+    subject: rendered.subject,
+    text: rendered.text,
+    html: rendered.html,
   });
 }
 

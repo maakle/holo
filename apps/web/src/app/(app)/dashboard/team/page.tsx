@@ -7,7 +7,7 @@ import { resolveActiveOrgId } from '@/lib/active-org';
 import { Badge } from '@/components/ui/badge';
 import { InviteForm } from './invite-form';
 import { RemoveMemberButton } from './remove-member-button';
-import { cancelInvitation } from './actions';
+import { RevokeInviteButton } from './revoke-invite-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -152,15 +152,7 @@ export default async function TeamPage() {
                       {new Date(inv.expiresAt).toISOString().slice(0, 10)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <form action={cancelInvitation}>
-                        <input type="hidden" name="invitationId" value={inv.id} />
-                        <button
-                          type="submit"
-                          className="text-[13px] text-text-muted hover:text-error"
-                        >
-                          Revoke
-                        </button>
-                      </form>
+                      <RevokeInviteButton invitationId={inv.id} inviteeEmail={inv.email} />
                     </td>
                   </tr>
                 ))}
