@@ -14,7 +14,7 @@ export function OrgSwitcher({
   activeOrgId,
 }: {
   orgs: OrgSummary[];
-  activeOrgId: string;
+  activeOrgId: string | null;
 }) {
   const router = useRouter();
   const [orgs, setOrgs] = useState(initialOrgs);
@@ -23,9 +23,10 @@ export function OrgSwitcher({
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
 
-  const active = orgs.find((o) => o.id === activeOrgId) ?? orgs[0];
-  const display = active?.name ?? 'holo';
-  const initial = display.charAt(0).toLowerCase();
+  const active = activeOrgId ? orgs.find((o) => o.id === activeOrgId) ?? null : null;
+  const hasOrgs = orgs.length > 0;
+  const display = active?.name ?? (hasOrgs ? 'Select workspace' : 'No workspace');
+  const initial = active?.name.charAt(0).toLowerCase() ?? '·';
 
   useEffect(() => {
     if (!open) return;
@@ -109,6 +110,11 @@ export function OrgSwitcher({
           className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-bg p-1 shadow-lg"
         >
           <div className="caption px-2 pb-1 pt-1.5 text-text-subtle">Workspaces</div>
+          {!hasOrgs ? (
+            <div className="px-2 py-2 text-[12px] text-text-subtle">
+              You&apos;re not a member of any workspace yet.
+            </div>
+          ) : null}
           <ul className="space-y-0.5">
             {orgs.map((org) => {
               const isActive = org.id === activeOrgId;

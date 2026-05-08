@@ -69,7 +69,7 @@ export function AppSidebar({
   userEmail?: string | null;
   userName?: string | null;
   orgs: OrgSummary[];
-  activeOrgId: string;
+  activeOrgId: string | null;
   sampleDataActive: boolean;
 }) {
   const pathname = usePathname();

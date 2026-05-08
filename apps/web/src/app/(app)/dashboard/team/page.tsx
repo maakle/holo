@@ -38,7 +38,13 @@ export default async function TeamPage() {
     .orderBy(asc(schema.member.createdAt));
 
   const myRow = members.find((m) => m.userId === sessionUser.id);
-  const canManage = myRow?.role === 'owner' || myRow?.role === 'admin';
+  // Defense in depth: if the current user isn't actually a member of the
+  // resolved active org (e.g. their session is stale because they were
+  // removed elsewhere), don't render someone else's workspace data. The
+  // (app) layout normally reconciles this, but this guard keeps the team
+  // page honest if the layout ever misses an edge case.
+  if (!myRow) redirect('/workspaces/new');
+  const canManage = myRow.role === 'owner' || myRow.role === 'admin';
 
   const pending = await db
     .select({
