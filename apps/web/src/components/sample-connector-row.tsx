@@ -6,6 +6,7 @@ import { Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SampleManageSheet } from '@/components/sample-manage-sheet';
+import { notifySampleDataChanged } from '@/lib/sample-data-events';
 
 interface Props {
   installed: boolean;
@@ -40,6 +41,7 @@ export function SampleConnectorRow({
         setError(data.problem ?? 'Could not install sample data.');
         return;
       }
+      notifySampleDataChanged(true);
       router.refresh();
     } catch {
       setError('Network error.');

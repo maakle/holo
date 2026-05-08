@@ -21,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { notifySampleDataChanged } from '@/lib/sample-data-events';
 
 interface Props {
   open: boolean;
@@ -83,6 +84,7 @@ export function SampleManageSheet({
         setError(data.problem ?? 'Could not remove sample data.');
         return;
       }
+      notifySampleDataChanged(false);
       setConfirmOpen(false);
       onOpenChange(false);
       router.refresh();

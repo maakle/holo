@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
+import { onSampleDataChanged } from '@/lib/sample-data-events';
 
 interface Props {
   initialActive: boolean;
@@ -11,34 +12,15 @@ interface Props {
 /**
  * Pinned just below the workspace nav. Visible whenever sample data is
  * installed for the active workspace, so it's always obvious that retrieval
- * results may include synthetic content. Polls in the background so the
- * indicator disappears as soon as the user removes the sample dataset from
- * the connections page.
+ * results may include synthetic content. Initial state comes from the server
+ * on every page load; install/remove actions in the same tab emit an event
+ * that flips this indicator instantly.
  */
 export function SampleDataNavIndicator({ initialActive }: Props) {
   const [active, setActive] = useState(initialActive);
 
   useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    async function tick() {
-      try {
-        const res = await fetch('/api/sample-data', { cache: 'no-store' });
-        if (!cancelled && res.ok) {
-          const data = (await res.json()) as { active?: boolean };
-          setActive(Boolean(data.active));
-        }
-      } catch {
-        // ignore — try again later
-      }
-      if (!cancelled) timer = setTimeout(tick, 30_000);
-    }
-    timer = setTimeout(tick, 10_000);
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
+    return onSampleDataChanged(setActive);
   }, []);
 
   if (!active) return null;

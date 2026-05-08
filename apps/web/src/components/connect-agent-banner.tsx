@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Sparkles, Database } from 'lucide-react';
 import { useAllConnectorsStatus } from '@/lib/connectors-status-store';
+import { notifySampleDataChanged } from '@/lib/sample-data-events';
 
 export type ConnectAgentBannerInitial = {
   /** Real (non-sample) connector currently active for the org. */
@@ -61,6 +62,7 @@ export function ConnectAgentBanner({ initial }: Props) {
         setInstallError(data.problem ?? 'Could not install sample data.');
         return;
       }
+      notifySampleDataChanged(true);
       router.refresh();
     } catch {
       setInstallError('Network error.');
