@@ -11,7 +11,7 @@ vi.mock('@/lib/server-context', () => ({
   ),
 }));
 
-import { inviteMember } from './actions';
+import { inviteMember, joinViaInviteLink } from './actions';
 
 function fd(entries: Record<string, string>): FormData {
   const f = new FormData();
@@ -29,5 +29,19 @@ describe('inviteMember', () => {
   it('returns an error for an unknown role', async () => {
     const result = await inviteMember(fd({ email: 'a@b.io', role: 'superuser' }));
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('joinViaInviteLink', () => {
+  it('rejects a token that is too short before reaching server context', async () => {
+    const result = await joinViaInviteLink('too-short');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('invalid_token');
+  });
+
+  it('rejects an empty token', async () => {
+    const result = await joinViaInviteLink('');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('invalid_token');
   });
 });
