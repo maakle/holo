@@ -91,7 +91,7 @@ export default async function TeamPage() {
                 return (
                   <tr key={m.memberId} className="border-t border-border">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-text">{m.name ?? m.email}</div>
+                      <div className="font-medium text-text">{m.name || m.email}</div>
                       <div className="text-text-subtle">{m.email}</div>
                     </td>
                     <td className="px-4 py-3">
@@ -115,7 +115,7 @@ export default async function TeamPage() {
                         ) : (
                           <RemoveMemberButton
                             memberId={m.memberId}
-                            memberLabel={m.name ?? m.email}
+                            memberLabel={m.name || m.email}
                           />
                         )}
                       </td>
