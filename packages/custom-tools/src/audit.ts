@@ -1,6 +1,6 @@
 import type { DB } from '@holo/db';
 import { emitAuditEvent } from '@holo/audit';
-import type { RunResult, CustomToolRow } from './types.js';
+import type { RunResult, CustomToolRow } from './types';
 
 export interface EmitInvocationInput {
   db: DB;

@@ -6,7 +6,7 @@ import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import type { Env } from '@holo/env';
 import { holoError, ErrorCode } from '@holo/errors';
-import { renderInvitationEmail, renderOtpEmail } from './email-templates.js';
+import { renderInvitationEmail, renderOtpEmail } from './email-templates';
 
 export interface CreateAuthOpts {
   db: DB;

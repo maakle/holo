@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import type { CodeChallengeMethod } from './types.js';
+import type { CodeChallengeMethod } from './types';
 
 // RFC 7636: code_verifier ALPHA / DIGIT / "-" / "." / "_" / "~", length 43–128.
 const VERIFIER_RE = /^[A-Za-z0-9\-._~]{43,128}$/;

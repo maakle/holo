@@ -40,6 +40,7 @@ const nextConfig = {
     '@holo/env',
     '@holo/errors',
   ],
+  turbopack: {},
   webpack: (config, { isServer }) => {
     // Workspace packages use .js extensions in ESM imports (TS convention).
     // Webpack needs to resolve .js → .ts at build time.

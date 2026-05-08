@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { githubIssueChunker, type GithubIssueInput } from '../src/github-issue.js';
-import type { ChunkContext } from '../src/contract.js';
+import { githubIssueChunker, type GithubIssueInput } from '../src/github-issue';
+import type { ChunkContext } from '../src/contract';
 
 const ctx: ChunkContext = {
   organizationId: 'org-1',

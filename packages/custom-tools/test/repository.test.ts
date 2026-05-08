@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createCustomTool } from '../src/repository.js';
+import { createCustomTool } from '../src/repository';
 
 describe('createCustomTool name validation', () => {
   // We never reach the DB — the name check throws first, so a stub `db` is fine.

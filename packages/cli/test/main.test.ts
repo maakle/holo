@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildProgram } from '../src/main.js';
+import { buildProgram } from '../src/main';
 
 describe('holo CLI', () => {
   it('builds a program with name "holo"', () => {

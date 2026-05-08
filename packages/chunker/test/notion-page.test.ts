@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { notionPageChunker, type NotionPageInput } from '../src/notion-page.js';
-import type { ChunkContext } from '../src/contract.js';
+import { notionPageChunker, type NotionPageInput } from '../src/notion-page';
+import type { ChunkContext } from '../src/contract';
 
 const ctx: ChunkContext = {
   organizationId: 'org-1',

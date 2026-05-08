@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { grainCallChunker, type GrainCallInput } from '../src/grain-call.js';
-import type { ChunkContext } from '../src/contract.js';
+import { grainCallChunker, type GrainCallInput } from '../src/grain-call';
+import type { ChunkContext } from '../src/contract';
 
 const ctx: ChunkContext = {
   organizationId: 'org-1',

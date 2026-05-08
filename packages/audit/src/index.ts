@@ -1,9 +1,9 @@
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import type { AgentEventKind } from '@holo/db';
-import { redactSensitive } from './redact.js';
+import { redactSensitive } from './redact';
 
-export { redactSensitive } from './redact.js';
+export { redactSensitive } from './redact';
 
 export type AuditEventType =
   | 'skill_run.started'

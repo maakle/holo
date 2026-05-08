@@ -1,8 +1,8 @@
 // packages/discovery/src/__tests__/discover.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import { runDiscovery, type DiscoveryDb, type DiscoveryInput } from '../discover.js';
-import type { ProposeInput } from '../propose.js';
-import type { ArtifactInput, Proposal } from '../types.js';
+import { runDiscovery, type DiscoveryDb, type DiscoveryInput } from '../discover';
+import type { ProposeInput } from '../propose';
+import type { ArtifactInput, Proposal } from '../types';
 
 // ---------------------------------------------------------------------------
 // Helpers

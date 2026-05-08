@@ -1,9 +1,9 @@
 import type { Command } from 'commander';
-import { runToolRegister } from './tool-register.js';
-import { runToolList } from './tool-list.js';
-import { runToolShow } from './tool-show.js';
-import { runToolUnregister } from './tool-unregister.js';
-import { resolveDeps } from '../deps.js';
+import { runToolRegister } from './tool-register';
+import { runToolList } from './tool-list';
+import { runToolShow } from './tool-show';
+import { runToolUnregister } from './tool-unregister';
+import { resolveDeps } from '../deps';
 
 export function registerToolCommand(program: Command): void {
   const tool = program.command('tool').description('manage custom MCP tools (CLI-as-tool)');

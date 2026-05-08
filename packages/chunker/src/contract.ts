@@ -1,4 +1,4 @@
-import type { TreeSitterRegistry } from './tree-sitter/registry.js';
+import type { TreeSitterRegistry } from './tree-sitter/registry';
 
 export type { TreeSitterRegistry };
 

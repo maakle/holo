@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { expandArgs } from '../src/expand-args.js';
+import { expandArgs } from '../src/expand-args';
 
 describe('expandArgs', () => {
   it('substitutes a single placeholder', () => {

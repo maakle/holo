@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
-import { runConnectSlack } from './connect-slack.js';
-import { resolveDeps } from '../deps.js';
+import { runConnectSlack } from './connect-slack';
+import { resolveDeps } from '../deps';
 
 export function registerConnectCommand(program: Command): void {
   const connect = program

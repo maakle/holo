@@ -1,5 +1,5 @@
-export { search } from './search.js';
-export type { SearchInput, SearchResult } from './search.js';
+export { search } from './search';
+export type { SearchInput, SearchResult } from './search';
 export {
   embedQuery,
   embedQueryWith,
@@ -8,6 +8,6 @@ export {
   _resetEmbedders,
   type EmbeddingModel,
   type EmbedQueryResult,
-} from './query-router.js';
-export { getArtifact } from './get-artifact.js';
-export type { GetArtifactInput, GetArtifactResult, ChunkRow } from './get-artifact.js';
+} from './query-router';
+export { getArtifact } from './get-artifact';
+export type { GetArtifactInput, GetArtifactResult, ChunkRow } from './get-artifact';

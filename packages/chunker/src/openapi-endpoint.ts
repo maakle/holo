@@ -1,4 +1,4 @@
-import type { Chunk, ChunkContext, Chunker } from './contract.js';
+import type { Chunk, ChunkContext, Chunker } from './contract';
 
 /**
  * One chunk per (path, method) on an OpenAPI 3.x document. Keeping each

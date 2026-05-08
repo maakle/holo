@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import postgres from 'postgres';
 import { createDb } from '@holo/db';
-import { mintAccessToken, validateAccessToken, revokeAccessToken } from '../src/tokens.js';
+import { mintAccessToken, validateAccessToken, revokeAccessToken } from '../src/tokens';
 
 const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';
 let sql: ReturnType<typeof postgres>;

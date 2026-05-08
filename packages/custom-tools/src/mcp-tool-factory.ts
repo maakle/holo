@@ -1,9 +1,9 @@
 import type { DB } from '@holo/db';
-import type { CustomToolRow } from './types.js';
-import { expandArgs } from './expand-args.js';
-import { validateInput } from './validate-input.js';
-import { runCommand } from './spawn-runner.js';
-import { emitCustomToolInvocation } from './audit.js';
+import type { CustomToolRow } from './types';
+import { expandArgs } from './expand-args';
+import { validateInput } from './validate-input';
+import { runCommand } from './spawn-runner';
+import { emitCustomToolInvocation } from './audit';
 
 export interface CustomToolDefinition {
   name: string;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateInput } from '../src/validate-input.js';
+import { validateInput } from '../src/validate-input';
 
 const schema = {
   type: 'object',

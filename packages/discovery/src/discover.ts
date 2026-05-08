@@ -1,7 +1,7 @@
 // packages/discovery/src/discover.ts
-import { clusterArtifacts } from './cluster.js';
-import { proposeProcedureName, type ProposeInput } from './propose.js';
-import { DEFAULT_CLUSTER_OPTIONS, type ArtifactInput, type Episode, type Proposal } from './types.js';
+import { clusterArtifacts } from './cluster';
+import { proposeProcedureName, type ProposeInput } from './propose';
+import { DEFAULT_CLUSTER_OPTIONS, type ArtifactInput, type Episode, type Proposal } from './types';
 
 // ---------------------------------------------------------------------------
 // DiscoveryDb adapter — callers supply a concrete implementation

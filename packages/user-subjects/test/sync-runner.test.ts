@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import postgres from 'postgres';
 import { createDb } from '@holo/db';
-import { runSlackSubjectsSync } from '../src/sync-runner.js';
-import type { SlackChannelLister } from '../src/slack-resolver.js';
+import { runSlackSubjectsSync } from '../src/sync-runner';
+import type { SlackChannelLister } from '../src/slack-resolver';
 
 const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';
 let sql: ReturnType<typeof postgres>;

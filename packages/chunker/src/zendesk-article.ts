@@ -1,5 +1,5 @@
-import type { Chunk, ChunkContext, Chunker } from './contract.js';
-import { recursiveSplit } from './recursive-split.js';
+import type { Chunk, ChunkContext, Chunker } from './contract';
+import { recursiveSplit } from './recursive-split';
 
 export interface ZendeskArticleInput {
   /** Help-center base URL (e.g. `https://help.kombo.dev`). */

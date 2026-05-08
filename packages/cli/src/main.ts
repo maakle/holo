@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { registerAllowlistCommand } from './commands/allowlist.js';
-import { registerConnectCommand } from './commands/connect.js';
-import { registerSyncCommand } from './commands/sync.js';
-import { registerToolCommand } from './commands/tool.js';
+import { registerAllowlistCommand } from './commands/allowlist';
+import { registerConnectCommand } from './commands/connect';
+import { registerSyncCommand } from './commands/sync';
+import { registerToolCommand } from './commands/tool';
 
 export function buildProgram(): Command {
   const program = new Command();

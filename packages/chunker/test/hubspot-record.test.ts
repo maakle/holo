@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   hubspotRecordChunker,
   type HubspotRecordInput,
-} from '../src/hubspot-record.js';
-import type { ChunkContext } from '../src/contract.js';
+} from '../src/hubspot-record';
+import type { ChunkContext } from '../src/contract';
 
 const ctx: ChunkContext = {
   organizationId: 'org-1',

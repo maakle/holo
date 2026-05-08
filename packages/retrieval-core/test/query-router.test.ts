@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { looksLikeCode } from '../src/query-router.js';
+import { looksLikeCode } from '../src/query-router';
 
 describe('looksLikeCode', () => {
   it('matches code keywords', () => {

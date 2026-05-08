@@ -1,5 +1,5 @@
-import type { Chunker, Chunk, ChunkContext } from './contract.js';
-import { recursiveSplit } from './recursive-split.js';
+import type { Chunker, Chunk, ChunkContext } from './contract';
+import { recursiveSplit } from './recursive-split';
 
 export interface GithubDocInput {
   repoFullName: string;

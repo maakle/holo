@@ -1,8 +1,8 @@
 import type { Command } from 'commander';
-import { runAllowlistAdd } from './allowlist-add.js';
-import { runAllowlistRemove } from './allowlist-remove.js';
-import { renderListGithub } from './allowlist-list-github.js';
-import { resolveDeps } from '../deps.js';
+import { runAllowlistAdd } from './allowlist-add';
+import { runAllowlistRemove } from './allowlist-remove';
+import { renderListGithub } from './allowlist-list-github';
+import { resolveDeps } from '../deps';
 
 export function registerAllowlistCommand(program: Command): void {
   const allowlist = program

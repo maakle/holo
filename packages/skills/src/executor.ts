@@ -1,6 +1,6 @@
 import { AnthropicLLMClient, type LLMClient } from '@holo/llm';
 import { holoError, ErrorCode } from '@holo/errors';
-import type { SkillDoc } from './types.js';
+import type { SkillDoc } from './types';
 
 export interface SkillStepResult {
   stepIndex: number;

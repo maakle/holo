@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clusterInvocations } from '../auto-extract.js';
+import { clusterInvocations } from '../auto-extract';
 
 describe('clusterInvocations', () => {
   it('groups by tool name and counts', () => {

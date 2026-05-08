@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { sql } from 'drizzle-orm';
 import { createDb, type DB } from '@holo/db';
-import { getArtifact } from '../src/get-artifact.js';
+import { getArtifact } from '../src/get-artifact';
 
 const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';
 let db: DB;

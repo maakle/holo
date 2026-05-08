@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
-import type { CustomToolRow } from './types.js';
+import type { CustomToolRow } from './types';
 
 // keep in sync with apps/gateway/src/tools/index.ts
 const BUILTIN_TOOL_NAMES = new Set([

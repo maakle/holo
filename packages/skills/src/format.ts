@@ -1,7 +1,7 @@
 import matter from 'gray-matter';
 import { createHash } from 'node:crypto';
 import { holoError, ErrorCode } from '@holo/errors';
-import type { SkillDoc, SkillFrontmatter } from './types.js';
+import type { SkillDoc, SkillFrontmatter } from './types';
 
 export function parseSkill(content: string): SkillDoc {
   const { data, content: body } = matter(content);

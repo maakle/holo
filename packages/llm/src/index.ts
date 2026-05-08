@@ -52,4 +52,4 @@ export interface LLMClient {
   complete(req: LLMRequest): Promise<LLMResponse>;
 }
 
-export { AnthropicLLMClient } from './anthropic.js';
+export { AnthropicLLMClient } from './anthropic';

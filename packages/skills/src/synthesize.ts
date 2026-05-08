@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { holoError, ErrorCode } from '@holo/errors';
-import { parseSkill } from './format.js';
-import type { SkillDoc } from './types.js';
+import { parseSkill } from './format';
+import type { SkillDoc } from './types';
 
 export interface LabeledArtifact {
   artifactId: string;

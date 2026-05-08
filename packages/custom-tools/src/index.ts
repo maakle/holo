@@ -1,16 +1,16 @@
-export type { CustomToolRow, ExpandedInvocation, RunResult } from './types.js';
-export { expandArgs } from './expand-args.js';
-export { validateInput } from './validate-input.js';
-export { runCommand } from './spawn-runner.js';
-export type { RunCommandInput } from './spawn-runner.js';
+export type { CustomToolRow, ExpandedInvocation, RunResult } from './types';
+export { expandArgs } from './expand-args';
+export { validateInput } from './validate-input';
+export { runCommand } from './spawn-runner';
+export type { RunCommandInput } from './spawn-runner';
 export {
   listCustomTools,
   getCustomToolByName,
   createCustomTool,
   deleteCustomToolByName,
-} from './repository.js';
-export type { CreateCustomToolInput } from './repository.js';
-export { emitCustomToolInvocation } from './audit.js';
-export type { EmitInvocationInput } from './audit.js';
-export { buildCustomToolDefinition } from './mcp-tool-factory.js';
-export type { CustomToolDefinition } from './mcp-tool-factory.js';
+} from './repository';
+export type { CreateCustomToolInput } from './repository';
+export { emitCustomToolInvocation } from './audit';
+export type { EmitInvocationInput } from './audit';
+export { buildCustomToolDefinition } from './mcp-tool-factory';
+export type { CustomToolDefinition } from './mcp-tool-factory';

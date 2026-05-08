@@ -35,7 +35,7 @@ afterEach(() => {
 describe('initCommand', () => {
   it('generates a .env with secret-shaped values when none exists', async () => {
     // Re-import after mocks are in place so the module picks them up.
-    const { initCommand } = await import('../src/commands/init.js');
+    const { initCommand } = await import('../src/commands/init');
     await initCommand([]);
 
     const envPath = join(tmpDir, '.env');
@@ -66,7 +66,7 @@ describe('initCommand', () => {
   });
 
   it('generates a different secret on each run (high entropy)', async () => {
-    const { initCommand } = await import('../src/commands/init.js');
+    const { initCommand } = await import('../src/commands/init');
 
     await initCommand([]);
     const first = readFileSync(join(tmpDir, '.env'), 'utf8');
@@ -88,7 +88,7 @@ describe('initCommand', () => {
     const { writeFileSync } = await import('node:fs');
     writeFileSync(join(tmpDir, 'docker-compose.yml'), 'services: {}\n', 'utf8');
 
-    const { initCommand } = await import('../src/commands/init.js');
+    const { initCommand } = await import('../src/commands/init');
     await initCommand([]);
 
     const combined = logs.join('\n');

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { rougeL, meanRougeL } from '../eval.js';
-import { loadGoldenSet } from '../golden/index.js';
+import { rougeL, meanRougeL } from '../eval';
+import { loadGoldenSet } from '../golden/index';
 
 describe('rougeL', () => {
   it('returns 1.0 for identical strings', () => {
