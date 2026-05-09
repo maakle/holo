@@ -7,6 +7,10 @@ export { githubIssueChunker, type GithubIssueInput } from './github-issue';
 export { githubDocChunker, type GithubDocInput } from './github-doc';
 export { githubCodeChunker, type GithubCodeInput } from './github-code';
 export { slackThreadChunker, type SlackThreadInput } from './slack-thread';
+export {
+  googleChatThreadChunker,
+  type GoogleChatThreadInput,
+} from './google-chat-thread';
 export { notionPageChunker, type NotionPageInput } from './notion-page';
 export { grainCallChunker, type GrainCallInput, type GrainSpeakerTurn } from './grain-call';
 export { pylonTicketChunker, type PylonTicketInput, type PylonMessage } from './pylon-ticket';

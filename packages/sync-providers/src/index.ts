@@ -23,6 +23,7 @@ export const SYNC_PROVIDERS = [
   'zendesk',
   'googledrive',
   'airtable',
+  'google-chat',
 ] as const;
 
 export type SyncProvider = (typeof SYNC_PROVIDERS)[number];
@@ -53,6 +54,7 @@ export const QUEUE_NAMES_BY_PROVIDER = {
   zendesk: ['zendesk-sync'],
   googledrive: ['googledrive-sync'],
   airtable: ['airtable-sync'],
+  'google-chat': ['google-chat-sync'],
 } as const satisfies Record<SyncProvider, readonly string[]>;
 
 export type SyncQueueName =
