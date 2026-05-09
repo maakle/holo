@@ -1,5 +1,5 @@
 // packages/discovery/src/propose.ts
-import { AnthropicLLMClient, type LLMClient } from '@holo/llm';
+import { AnthropicLLMClient, resolveAnthropicUtilityModel, type LLMClient } from '@holo/llm';
 import { holoError, ErrorCode } from '@holo/errors';
 import type { Proposal } from './types';
 
@@ -32,7 +32,7 @@ export async function proposeProcedureName(input: ProposeInput): Promise<Proposa
   let response;
   try {
     response = await client.complete({
-      model: 'claude-haiku-4-5-20251001',
+      model: resolveAnthropicUtilityModel(),
       maxTokens: 400,
       system: SYSTEM,
       messages: [{ role: 'user', content: userBlock }],

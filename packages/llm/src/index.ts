@@ -53,3 +53,7 @@ export interface LLMClient {
 }
 
 export { AnthropicLLMClient } from './anthropic';
+export {
+  resolveAnthropicAgentModel,
+  resolveAnthropicUtilityModel,
+} from './anthropic-models';

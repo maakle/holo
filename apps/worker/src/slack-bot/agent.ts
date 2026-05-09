@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { DB } from '@holo/db';
 import type { ToolDefinition } from '@holo/agent-tools';
+import { resolveAnthropicAgentModel } from '@holo/llm';
 
 export interface Source {
   provider: string;
@@ -198,7 +199,7 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
       );
     }
     const modelStart = now();
-    const model = 'claude-sonnet-4-6';
+    const model = resolveAnthropicAgentModel();
     const response = (await deps.client.messages.create({
       model,
       max_tokens: 4096,

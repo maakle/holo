@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { holoError, ErrorCode } from '@holo/errors';
+import { resolveAnthropicUtilityModel } from '@holo/llm';
 
 const REDACTION_SYSTEM =
   'You are a skill redaction system. Remove all company-specific names, internal URLs, Slack channel names, project codenames, and any PII from this skill document. Preserve the procedure and structure. Return only the redacted markdown document.';
@@ -13,7 +14,7 @@ export async function redactSkill(content: string, apiKey: string): Promise<stri
     content.length > MAX_INPUT_CHARS ? content.slice(0, MAX_INPUT_CHARS) + '\n[... truncated ...]' : content;
 
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: resolveAnthropicUtilityModel(),
     max_tokens: 4096,
     system: REDACTION_SYSTEM,
     messages: [{ role: 'user', content: truncated }],

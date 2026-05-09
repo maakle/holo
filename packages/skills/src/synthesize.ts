@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { holoError, ErrorCode } from '@holo/errors';
+import { resolveAnthropicUtilityModel } from '@holo/llm';
 import { parseSkill } from './format';
 import type { SkillDoc } from './types';
 
@@ -77,7 +78,7 @@ ${artifactBlocks}
 Extract the reusable procedure template for "${input.skillSlug}".`;
 
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: resolveAnthropicUtilityModel(),
     max_tokens: 1500,
     system: SYNTHESIS_SYSTEM,
     messages: [{ role: 'user', content: userMessage }],

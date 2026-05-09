@@ -1,4 +1,4 @@
-import { AnthropicLLMClient, type LLMClient } from '@holo/llm';
+import { AnthropicLLMClient, resolveAnthropicUtilityModel, type LLMClient } from '@holo/llm';
 import { holoError, ErrorCode } from '@holo/errors';
 import type { SkillDoc } from './types';
 
@@ -78,7 +78,7 @@ For each step I give you, explain concisely (1-3 sentences) what you would do fo
     let response;
     try {
       response = await client.complete({
-        model: 'claude-haiku-4-5-20251001',
+        model: resolveAnthropicUtilityModel(),
         maxTokens: 512,
         system: systemPrompt,
         messages: [{ role: 'user', content: `Execute: ${stepResult.stepText}` }],
@@ -115,7 +115,7 @@ For each step I give you, explain concisely (1-3 sentences) what you would do fo
   let summary: string;
   try {
     const summaryResponse = await client.complete({
-      model: 'claude-haiku-4-5-20251001',
+      model: resolveAnthropicUtilityModel(),
       maxTokens: 256,
       messages: [
         {
