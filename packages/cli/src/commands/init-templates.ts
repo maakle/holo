@@ -4,13 +4,16 @@
  * to ship adjacent .yml/.txt files; the bundler/tsc output stays self-
  * contained.
  *
- * If `docker-compose.yml` here drifts from the repo root file, that is OK
- * for now — `holo init` is the OSS-quickstart entry point, not the dev
- * compose used inside this monorepo. The repo-root file builds images
- * from local source; the version below is identical today (so an in-repo
- * `holo init` matches the dev workflow). When GHCR images publish on tag
- * we'll fork this template to use `image:` instead of `build:`.
+ * The compose template below pulls pre-built images from GHCR rather than
+ * building from local source — `holo init` is meant to work in an empty
+ * directory without a clone of the repo. The repo-root `docker-compose.yml`
+ * still uses `build: context: .` for in-monorepo dev. Image tag tracks the
+ * CLI's own version so a `npx @holo/cli@0.3.0 init` pins the matching
+ * server images.
  */
+
+const IMAGE_REPO = 'ghcr.io/maakle';
+const IMAGE_TAG = 'latest';
 
 export const DOCKER_COMPOSE_TEMPLATE = `services:
   postgres:
@@ -43,9 +46,7 @@ export const DOCKER_COMPOSE_TEMPLATE = `services:
       retries: 10
 
   migrate:
-    build:
-      context: .
-      dockerfile: apps/worker/Dockerfile
+    image: ${IMAGE_REPO}/holo-worker:${IMAGE_TAG}
     command: ["pnpm", "-F", "@holo/db", "migrate"]
     environment:
       DATABASE_URL: postgresql://\${POSTGRES_USER:-holo}:\${POSTGRES_PASSWORD}@postgres:5432/\${POSTGRES_DB:-holo}
@@ -53,9 +54,7 @@ export const DOCKER_COMPOSE_TEMPLATE = `services:
       postgres: { condition: service_healthy }
 
   worker:
-    build:
-      context: .
-      dockerfile: apps/worker/Dockerfile
+    image: ${IMAGE_REPO}/holo-worker:${IMAGE_TAG}
     environment: &app_env
       DATABASE_URL: postgresql://\${POSTGRES_USER:-holo}:\${POSTGRES_PASSWORD}@postgres:5432/\${POSTGRES_DB:-holo}
       REDIS_URL: redis://redis:6379
@@ -77,9 +76,7 @@ export const DOCKER_COMPOSE_TEMPLATE = `services:
       redis: { condition: service_healthy }
 
   gateway:
-    build:
-      context: .
-      dockerfile: apps/gateway/Dockerfile
+    image: ${IMAGE_REPO}/holo-gateway:${IMAGE_TAG}
     environment: *app_env
     ports:
       - "8080:8080"
@@ -87,9 +84,7 @@ export const DOCKER_COMPOSE_TEMPLATE = `services:
       migrate: { condition: service_completed_successfully }
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
+    image: ${IMAGE_REPO}/holo-web:${IMAGE_TAG}
     environment: *app_env
     ports:
       - "3000:3000"
