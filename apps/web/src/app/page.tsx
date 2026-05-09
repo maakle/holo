@@ -82,10 +82,11 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
           for your company.
         </h1>
         <p className="mx-auto mt-6 max-w-[640px] text-balance text-[15px] leading-6 text-text-muted">
-          Connect your tools once. Holo continuously ingests everything your company knows —
-          code, docs, conversations, calls — and exposes it as one scope-aware context any
-          agent can call over MCP or OpenAPI. Bring your own — Claude, Cursor, ChatGPT,
-          anything — and plug into the loop.
+          Built for the sales and support teams already drowning in &ldquo;can our product do
+          this?&rdquo; questions. Holo connects your tools once, continuously ingests everything
+          your company knows — code, docs, conversations, calls — and exposes it as one
+          scope-aware context any agent can call over MCP or OpenAPI. Bring your own — Claude,
+          Cursor, ChatGPT, anything — and plug into the loop.
           <span className="text-text"> Layer today. Agent OS tomorrow.</span>
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -140,7 +141,7 @@ function CodeShowcase() {
           title="search.ts"
           lang="ts"
           code={`const { content } = await mcp.callTool('holo', 'search', {
-  q: 'how do we onboard a new ATS partner?',
+  q: 'does our product support SSO? which customers asked for it?',
   topK: 5,
 });`}
         />
@@ -282,7 +283,21 @@ function PillarsBand() {
 }
 
 // ── Use cases band ────────────────────────────────────────────────────────
+// Order matters: sales enablement and customer support are the wedge. Security
+// and the cross-team search box are real, but secondary.
 const USE_CASES = [
+  {
+    label: 'Sales enablement',
+    title: 'Answer "can our product do this?" in seconds, not days.',
+    body: 'Account executives and solutions engineers paste the question straight into Slack or their agent of choice. Holo answers from the source code itself — the only ground truth that does not rot — alongside Linear tickets, prior calls, and the deal record in Salesforce or HubSpot. Every answer cites where it came from, so reps can forward it to the prospect with confidence.',
+    trace: 'search → get_repo → get_ticket → get_deal → draft',
+  },
+  {
+    label: 'Customer support',
+    title: 'Drafted replies with the right sources attached.',
+    body: 'A Zendesk, Pylon, or Aircall webhook fires on a new ticket or call. Holo pulls the customer’s history, the matching docs page, the closest past resolution, and any open engineering work — and posts a draft reply for the human to approve. Time-to-first-response drops; tone stays consistent; nothing gets answered from a stale doc.',
+    trace: 'search → get_ticket → get_doc → get_issue → draft',
+  },
   {
     label: 'Security & compliance',
     title: 'Security questionnaires answered with citations.',
@@ -290,21 +305,9 @@ const USE_CASES = [
     trace: 'search → get_doc → get_file → draft',
   },
   {
-    label: 'Customer support',
-    title: 'Drafted replies with the right sources attached.',
-    body: 'A Pylon or Zendesk webhook fires on a new ticket. Holo pulls the customer’s history, the matching docs page, and the closest past resolution, and posts a draft reply for the human to approve. Time-to-first-response drops; tone stays consistent.',
-    trace: 'search → get_ticket → get_doc → draft',
-  },
-  {
-    label: 'Sales / CS',
-    title: 'Every call starts with full context.',
-    body: 'Five minutes before a meeting with Acme, a calendar-triggered agent searches Grain transcripts, the HubSpot deal, and any open Pylon issues, and posts a digest to the prep doc. Account owners walk in knowing exactly where things stand.',
-    trace: 'search → get_call → get_ticket → digest',
-  },
-  {
     label: 'Everyone else',
     title: 'One search box across every system.',
-    body: 'A dashboard search box or a Slack /ask command hits the REST surface directly. Ops, design, PM, and revops get ranked results across all nine connectors with deep links back to the source — no agent, no MCP client, no LLM in the path.',
+    body: 'A dashboard search box or a Slack /ask command hits the REST surface directly. Ops, design, PM, and revops get ranked results across every connector with deep links back to the source — no agent, no MCP client, no LLM in the path.',
     trace: 'POST /v1/search → ranked chunks',
   },
 ] as const;
@@ -316,13 +319,13 @@ function UseCasesBand() {
         <div className="mx-auto max-w-[760px] text-center">
           <p className="caption text-text-subtle">What teams build</p>
           <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
-            Four shapes the same layer takes.
+            Start with sales and support. Extend from there.
           </h2>
           <p className="mx-auto mt-4 max-w-[600px] text-balance text-[15px] leading-6 text-text-muted">
-            Holo is a primitive, not a product. These are the agents teams ship on top of it
-            in the first month — same backend, same audit trail, different consumers. The
-            first three drive an agent over MCP; the fourth is plain REST with no agent in
-            the loop.
+            Holo is a primitive, not a product. The wedge is the team already paying for the
+            problem in lost deals and slow tickets — sales enablement and customer support.
+            Once the layer is in, security reviews and a company-wide search box come for
+            free. Same backend, same audit trail, different consumers.
           </p>
         </div>
         <div className="mt-12 grid gap-6 sm:grid-cols-2">
