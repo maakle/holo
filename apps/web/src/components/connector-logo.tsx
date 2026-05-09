@@ -22,6 +22,7 @@ const FILE_BY_ID: Partial<Record<ConnectorMeta['id'], string>> = {
   linear: '/connectors/linear.webp',
   mintlify: '/connectors/mintlify.png',
   zendesk: '/connectors/zendesk.png',
+  googledrive: '/connectors/googledrive.webp',
 };
 
 export function ConnectorLogo({ id, className }: Props) {
