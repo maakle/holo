@@ -30,5 +30,12 @@ export function curlVerify(mcpUrl: string, token: string): string {
 
 export type CopyHandler = (text: string, key: string) => void;
 
-export const CONFIG_TABS = ['Claude', 'ChatGPT', 'Slack', 'OpenAPI', 'Custom MCP'] as const;
+export const CONFIG_TABS = [
+  'Claude',
+  'ChatGPT',
+  'Gemini',
+  'Slack',
+  'OpenAPI',
+  'Custom MCP',
+] as const;
 export type Tab = (typeof CONFIG_TABS)[number];
