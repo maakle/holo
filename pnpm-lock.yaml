@@ -301,6 +301,9 @@ importers:
       '@holo/errors':
         specifier: workspace:*
         version: link:../../packages/errors
+      '@holo/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
       '@holo/retrieval-core':
         specifier: workspace:*
         version: link:../../packages/retrieval-core

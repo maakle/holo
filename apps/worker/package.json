@@ -21,6 +21,7 @@
     "@holo/embedder": "workspace:*",
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",
+    "@holo/llm": "workspace:*",
     "@holo/retrieval-core": "workspace:*",
     "@holo/sync-providers": "workspace:*",
     "@holo/user-subjects": "workspace:*",

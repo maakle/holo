@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { holoError, ErrorCode } from '@holo/errors';
+import { resolveAnthropicUtilityModel } from '@holo/llm';
 
 export interface InvocationRecord {
   toolName: string;
@@ -84,7 +85,7 @@ Output exactly ${maxProposals} skills separated by ---SKILL_SEPARATOR---. No oth
   let response: Anthropic.Message;
   try {
     response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: resolveAnthropicUtilityModel(),
       max_tokens: 3000,
       messages: [{ role: 'user', content: prompt }],
     });
