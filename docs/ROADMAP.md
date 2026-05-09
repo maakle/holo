@@ -14,6 +14,87 @@ Every milestone below advances one of three pillars. Each pillar must be visibly
 
 If a milestone slips, cut scope inside a pillar. Do not drop a pillar.
 
+---
+
+## Status snapshot — 2026-05-09
+
+This section is hand-maintained alongside CHANGELOG.md. The per-week checkboxes below in v0.0 and v0.1 are the *original plan*; this snapshot is the source of truth for what has actually shipped.
+
+### v0.0 — Internal context layer · **complete**
+
+Built and live at the founder's company. The three internal agents (support-question, interview-prep, customer-success) are running on holo's MCP endpoint.
+
+- Monorepo: `apps/web` (Next.js), `apps/mcp` (Hono — MCP JSON-RPC + REST/OpenAPI; renamed from `apps/gateway`), `apps/worker` (BullMQ).
+- `packages/db` with Drizzle, pgvector + GIN/HNSW indexes, migrations.
+- `packages/retrieval-core` shared between MCP and REST. ESLint boundary rule enforced.
+- `packages/errors` with `HoloError` + `local/no-bare-throw-error` ESLint rule.
+- `packages/chunker`, `packages/embedder`, `packages/llm`, `packages/connector-framework`, `packages/sync-providers`, `packages/crypto`, `packages/audit`, `packages/env`.
+- `docker-compose.yml` boots Postgres + pgvector + Redis + apps. CI runs lint + typecheck + tests on every PR.
+- Better Auth single-user mode → multi-tenant `organization` plugin (workspace creation, invite links, member roles, leave workspace, branded HTML emails).
+- Connections page (one row per connector, OAuth flow, last-sync, disconnect).
+- `connector_cursors` + per-provider sync cadence in `packages/connectors/src/sync-intervals.ts`.
+- Ingestion-time allowlist enforcement (`connector_allowlists` table + per-connector gating tests).
+- **9 connectors live (v0.0 spec called for 6):** Slack, GitHub, Notion, Grain, Pylon, HubSpot, plus Linear, Mintlify Docs, Zendesk Help Center.
+- MCP tool surface: `search`, `get_thread`, `get_pr`, `get_doc`, `get_call`, `get_ticket`.
+- Hybrid search (pgvector + tsvector fused with RRF in a single SQL CTE).
+- Audit log table + interceptor; paginated audit-log UI.
+- Internal observability: per-tool latency, sync throughput charts, invocation charts, sample-data discoverability.
+
+### v0.1 — Public release · **in progress**
+
+Skill synthesis foundation and OS surface partially shipped. Public release not cut.
+
+**Shipped:**
+- `packages/skills` — types, synthesizer, eval harness, executor, redactor, golden set, tests.
+- REST + OpenAPI surface generated from `@hono/zod-openapi` schemas; mirrors MCP tool surface; Scalar reference at `/docs`.
+- Static API-token auth (`api_token` table) for v0.1 BYO-agent reach.
+- "Connect your agent" panel in `apps/web` with pre-formatted config blobs (Cursor, Claude Desktop, Cline, curl, Python, TypeScript) and one-click copy.
+- Dashboard charts: agent invocations, sync throughput, sample-data state, dynamic range selection.
+- ESLint hardened (`no-explicit-any` promoted to error, `withActiveOrg` wrapper, strict `resolveActiveOrgId`).
+- Test coverage (per `TODOS.md` item 1): allowlist enforcement, per-connector ingestion + retrieval, hybrid-search parity, `HoloError` golden-set — all ✅. Connections-page OAuth E2E 🟡 partial; "Connect your agent" snapshot tests ⏸ deferred.
+
+**Still to ship before v0.1.0 tag:**
+- [ ] OAuth 2.1 with PKCE on the MCP server (static client; *shipped early in v0.3 — see below*).
+- [ ] BYO-agent reach demo end-to-end with a ChatGPT Action and a Gemini function call hitting the same holo instance.
+- [ ] Skill marketplace stub (CP1): `/skills` registry, two-stage publish with redaction diff, AGPL-3.0 contribution license, takedown email + rate limit.
+- [ ] Agent observability dashboard + read-only replay diff (CP2).
+- [ ] `npx holo init` (CP3 + DX D44/D48): macOS + Linux quickstart, GitHub-only at install, ≤30s TTFUQ target, opt-in TTHW telemetry.
+- [ ] GHCR Docker image auto-published on tag.
+- [ ] GitHub Discussions enabled (DX D47) — `Q&A` / `Feature requests` / `Show & tell` / `Connectors`.
+- [ ] Show HN draft + demo recording.
+- [ ] First 3+ external CTOs onboarded with ≥1 running >2 weeks.
+- [ ] Skill quality kill-switch: 3-of-5-usable criterion against the golden set (decides whether v0.1 ships skills or context-layer-only).
+
+### v0.2 — Self-host polish + free-form skills · **partial**
+
+Some v0.2 items shipped early on `claude/holo-v0.3-*` branches; others still open.
+
+**Shipped (mostly on v0.3 branches per `CHANGELOG.md`):**
+- Real OAuth 2.1 + PKCE provider (`@holo/oauth-provider`), replacing the v0.2 single-tenant DCR/authorize/token stubs.
+- Per-user OAuth ACL fan-out — **Slack only**. `slack_user_credentials`, `user_subjects_cache`, `@holo/user-subjects`, 30-min worker cron, MCP `userSubjects` fan-out.
+- CLI-as-tool registration (`packages/cli` commands: `tool register/list/show/unregister`). See `docs/superpowers/specs/2026-05-01-cli-as-tool-registration-design.md`.
+
+**Still open:**
+- [ ] Per-user OAuth fan-out for Notion, GitHub, Grain, Pylon (each its own follow-up slice).
+- [ ] MCP authorization granularity proxy — per-skill `toolAllowlist` enforcement at the proxy layer (`TODOS.md` item 6).
+- [ ] GitHub Actions ingestion mode — `maakle/holo-sync@v1` wrapping the worker code-path (`TODOS.md` item 7).
+- [ ] Free-form unsupervised skill extraction (variant a), gated on broader golden-set coverage.
+- [ ] Replay live-execution with per-tool effect classification (`TODOS.md` item 5).
+- [ ] Windows support for `npx holo init`.
+- [ ] Railway + Coolify one-click templates.
+- [ ] Managed cloud beta.
+- [ ] Audit log surface for self-hosters (currently table-only, no UI for non-founder ops).
+- [ ] `execute_skill` MCP tool (skill execution as workflow runs, not just read).
+- [ ] DCR endpoint + consent UI for self-registering MCP clients.
+- [ ] Webhook-accelerated incremental sync (gated on a v0.1 user hitting freshness pain).
+- [ ] Productize agent templates (CP4) — `packages/agent-templates/` + `holo use-template` (`TODOS.md` item 4).
+- [ ] Refresh tokens (currently 24h plain bearer; clients re-authorize on expiry).
+- [ ] Token-level scope enforcement beyond presence.
+- [ ] Slack subjects TTL admin UI (currently hardcoded 30 min).
+- [ ] `mcp-remote`-style proxy for clients without native OAuth.
+
+---
+
 ## Guiding principles
 
 - **Multi-agent dogfood first.** v0.0 must successfully migrate the founder's two existing custom agents (a Slack-triggered Cursor support-question agent and a Notion-based interview-prep agent) off their bespoke context fetchers onto holo's MCP endpoint. If it can't do that, the wedge isn't real.
@@ -166,12 +247,49 @@ Picked from observed v0.1 user need rather than pre-committed.
 - [ ] Webhook-accelerated incremental sync (only if a v0.1 user hits a freshness pain that breaks an agent)
 - [ ] Productize agent templates (CP4 deferred from /plan-ceo-review — once 3+ external CTOs ask for them)
 
+## Next connections to build
+
+Existing connectors (9): **Slack, GitHub, Notion, Grain, Pylon, HubSpot, Linear, Mintlify Docs, Zendesk Help Center.**
+
+Below is the candidate list of the next 15 connectors, in rough priority order. Priority is set by (a) coverage gaps in the founder's company workflow, (b) repeated asks from cold-DMs and v0.1 onboarding conversations, and (c) what unblocks the largest segment of external CTOs at lowest engineering cost. Order is not commitment — pick from the top of the list as users request, and skip any whose API constraints make incremental sync unworkable (same week-1 verification rule as Grain/Pylon).
+
+Each row sketches the canonical resources to ingest, the auth model, and the v0.0-style ACL story.
+
+1. **Google Drive** — Docs, Sheets, Slides, plain files in shared drives. OAuth (Google). ACL fan-out via per-user Drive scopes; closes the "where my company actually keeps its docs" gap that Notion alone misses.
+2. **Google Calendar** — events, attendees, descriptions, recurrence. OAuth. Lets agents reason about meeting context (who attended, what was on the agenda) and pairs naturally with Grain/Fathom.
+3. **Gmail** — threads in user-allowlisted labels (e.g., `customer/*`, `support/*`). OAuth, per-user. High-value for customer-success agents; high-risk surface, so allowlist-by-label is mandatory.
+4. **Atlassian Confluence** — spaces, pages, attachments. OAuth. The enterprise wiki for the half of buyers not on Notion. Same chunking shape as Notion.
+5. **Atlassian Jira** — issues, comments, sprints, epics. OAuth. Pairs with Confluence; many incoming buyers run Jira even when they're on Slack + GitHub.
+6. **Salesforce** — accounts, opportunities, contacts, activity timeline. OAuth. The CRM half of buyers use instead of HubSpot. Already flagged in "Beyond v0.2".
+7. **Intercom** — conversations, contacts, articles. OAuth. Common alternative to Pylon/Zendesk for product-led companies.
+8. **Microsoft Teams** — channels, chats, meeting transcripts. Microsoft Graph OAuth. Required for any enterprise buyer not on Slack.
+9. **Microsoft 365 / SharePoint + OneDrive** — Office docs, SharePoint sites. Graph OAuth. Pairs with Teams; together they cover the Microsoft-first buyer.
+10. **Outlook / Exchange Online** — mail in allowlisted folders. Graph OAuth. Same shape as Gmail; needed for the same buyers as Teams.
+11. **GitLab** — projects, MRs, issues, wikis. OAuth or PAT. Code-host parity for buyers not on GitHub. Reuses most of the GitHub connector's chunking.
+12. **Asana** — projects, tasks, comments. OAuth. PM-tool parity for teams not on Linear/Jira.
+13. **Sentry** — issues, events, releases. OAuth. Lets incident-response agents pull recent error context without hand-rolled fetchers.
+14. **PagerDuty** — incidents, services, on-call schedules. OAuth. Same incident-response use case as Sentry; pairs naturally.
+15. **Fathom** — meeting recordings + transcripts. OAuth. Already flagged in "Beyond v0.2"; second meeting source after Grain so non-Grain buyers aren't blocked. Fireflies should follow on the same code-path (per-speaker turns + meeting-level summary chunk, mirrors the Grain shape).
+
+**Connector implementation checklist** (every new connector must hit these — same gates as the existing 9):
+
+- [ ] OAuth/API-key flow at `/api/connectors/<provider>/callback` or `/connect/<provider>`, encrypted via `HOLO_TOKEN_ENCRYPTION_KEY`.
+- [ ] Provider added to `SYNC_PROVIDERS` in `packages/sync-providers` (web + CLI mirror).
+- [ ] Per-provider sync cadence in `packages/connectors/src/sync-intervals.ts`.
+- [ ] `connector_cursors` row + incremental-sync logic; no nightly full re-pulls.
+- [ ] Allowlist enforcement at ingestion time (channels / repos / spaces / labels — provider-appropriate).
+- [ ] Connector test in `packages/connectors/test/<provider>.test.ts` covering allowlist gating + retrieval round-trip.
+- [ ] Connector setup guide in `docs/connectors/<provider>.md` linked from `docs/connectors/README.md`.
+- [ ] At least one MCP tool surfaced (`get_<resource>`) where the resource shape is non-obvious from `search`.
+
+---
+
 ## Beyond v0.2
 
 Picked from observed user need:
 
 - **Drift detection** (the original v0.6 idea) — declare sprint goals / OKRs / PRDs, compare against actual artifacts, flag drift. Year-3 conversation, not on the near-term roadmap. Belongs in [`VISION.md`](./VISION.md) as long-run direction.
-- **Long-tail connectors** — Linear, Google Workspace, Fathom, Fireflies, Salesforce, BambooHR. Added as v0.1 users ask.
+- **Further long-tail connectors** beyond the 15 above — Fireflies, BambooHR, Greenhouse, Ashby, Stripe, Figma, Discord, Front, Help Scout, Freshdesk, Bitbucket, Datadog, Productboard, Coda, Airtable, GitBook, ReadMe, Loom, Zoom, Otter.ai. Added as v0.1+ users ask.
 - **Reranker on by default** if dogfooding shows latency is acceptable
 - **Action tools in MCP** — write, not just read; agents can post to Slack, comment on PRs, create Linear issues
 - **Agent marketplace** — pre-built skills shared across companies (community-contributed `handle_pagerduty_incident`, etc.)
