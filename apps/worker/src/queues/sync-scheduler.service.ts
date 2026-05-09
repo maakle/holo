@@ -42,7 +42,7 @@ export function __setSchedulerSqlForTests(sql: Sql | null): void {
  * sync. GitHub fans out to two queues (code + prose) on the same cadence;
  * everything else is one queue per provider.
  */
-type SyncQueueName = Exclude<QueueName, 'embed'>;
+type SyncQueueName = Exclude<QueueName, 'embed' | 'embed-backfill'>;
 type QueueMap = Record<SyncProvider, ReadonlyArray<SyncQueueName>>;
 
 @Injectable()
@@ -50,7 +50,7 @@ export class SyncSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(SyncSchedulerService.name);
 
   private readonly queueMap: QueueMap;
-  private readonly queuesByName: Record<Exclude<QueueName, 'embed'>, Queue>;
+  private readonly queuesByName: Record<SyncQueueName, Queue>;
 
   constructor(
     @InjectQueue(QUEUE_NAMES.GITHUB_CODE_SYNC) ghCode: Queue,
