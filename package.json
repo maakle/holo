@@ -16,6 +16,7 @@
     "db:migrate": "pnpm -F @holo/db migrate",
     "db:generate": "pnpm -F @holo/db generate",
     "db:studio": "pnpm -F @holo/db studio",
+    "db:check": "pnpm -F @holo/db check",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
