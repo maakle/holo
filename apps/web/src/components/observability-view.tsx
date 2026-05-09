@@ -27,7 +27,7 @@ interface Props {
   status: string | undefined;
   query: string;
   availableKinds: readonly string[];
-  stats: { total: number; errors: number };
+  stats: { total: number; errors: number; replays: number; replayViewers: number };
 }
 
 const KIND_LABELS: Record<string, string> = {
@@ -120,7 +120,7 @@ function FilterRail({
   kind: string | undefined;
   status: string | undefined;
   availableKinds: readonly string[];
-  stats: { total: number; errors: number };
+  stats: { total: number; errors: number; replays: number; replayViewers: number };
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -294,7 +294,7 @@ function Toolbar({
   stats,
 }: {
   query: string;
-  stats: { total: number; errors: number };
+  stats: { total: number; errors: number; replays: number; replayViewers: number };
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -333,6 +333,14 @@ function Toolbar({
       </h1>
       <span className="text-[12px]" style={{ color: 'var(--text-subtle)' }}>
         {stats.total.toLocaleString()} events · {stats.errors.toLocaleString()} errors
+        {stats.replayViewers > 0 ? (
+          <>
+            {' · '}
+            <span title={`${stats.replays.toLocaleString()} replays opened in total`}>
+              {stats.replayViewers.toLocaleString()} replay viewer{stats.replayViewers === 1 ? '' : 's'}
+            </span>
+          </>
+        ) : null}
       </span>
 
       <div className="ml-4 flex min-w-0 flex-1 items-center">

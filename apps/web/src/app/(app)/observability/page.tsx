@@ -81,9 +81,20 @@ export default async function ObservabilityPage({
     .where(and(eq(schema.mcpInvocations.organizationId, orgId)))
     .then((r) => r[0]);
 
+  const replayRow = await db
+    .select({
+      replays: sql<number>`count(*)::int`.as('replays'),
+      replayViewers: sql<number>`count(distinct ${schema.replayViews.userId})::int`.as('replay_viewers'),
+    })
+    .from(schema.replayViews)
+    .where(eq(schema.replayViews.organizationId, orgId))
+    .then((r) => r[0]);
+
   const stats = {
     total: statsRow?.total ?? 0,
     errors: statsRow?.errors ?? 0,
+    replays: replayRow?.replays ?? 0,
+    replayViewers: replayRow?.replayViewers ?? 0,
   };
 
   return (
