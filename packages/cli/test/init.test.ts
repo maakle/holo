@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -18,8 +18,8 @@ const logs: string[] = [];
 /**
  * Build a stub prompt that returns each scripted answer in order. The init
  * flow asks (in order): ANTHROPIC_API_KEY, github client id, github client
- * secret, telemetry opt-in. If `.env` already exists, an extra overwrite
- * confirm is asked first — pass that as the leading entry.
+ * secret. If `.env` already exists, an extra overwrite confirm is asked
+ * first — pass that as the leading entry.
  */
 function scriptedPrompt(answers: string[]) {
   let i = 0;
@@ -52,8 +52,7 @@ describe('initCommand', () => {
   it('generates a .env with secret-shaped values when none exists', async () => {
     const { initCommand } = await import('../src/commands/init');
     await initCommand([], {
-      prompt: scriptedPrompt(['', '', '', '']), // skip anthropic + gh + gh-secret + telemetry default
-      skipInstallStateWrite: true,
+      prompt: scriptedPrompt(['', '', '']),
     });
 
     const env = readFileSync(join(tmpDir, '.env'), 'utf8');
@@ -78,8 +77,7 @@ describe('initCommand', () => {
     const GH_ID = 'PLACEHOLDER-GH-CLIENT-A';
     const GH_AUTH = 'PLACEHOLDER-GH-CLIENT-B';
     await initCommand([], {
-      prompt: scriptedPrompt([ANTHROPIC, GH_ID, GH_AUTH, 'n']),
-      skipInstallStateWrite: true,
+      prompt: scriptedPrompt([ANTHROPIC, GH_ID, GH_AUTH]),
     });
 
     const env = readFileSync(join(tmpDir, '.env'), 'utf8');
@@ -88,49 +86,15 @@ describe('initCommand', () => {
     expect(env).toMatch(new RegExp(`^GITHUB_LOGIN_CLIENT_SECRET=${GH_AUTH}$`, 'm'));
   });
 
-  it('writes TTHW telemetry env vars (install id, started_at, opt-in)', async () => {
-    const { initCommand } = await import('../src/commands/init');
-    const before = Date.now();
-    await initCommand([], {
-      prompt: scriptedPrompt(['', '', '', 'y']),
-      skipInstallStateWrite: true,
-    });
-    const after = Date.now();
-
-    const env = readFileSync(join(tmpDir, '.env'), 'utf8');
-    expect(env).toMatch(
-      /^HOLO_TELEMETRY_INSTALL_ID=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/m,
-    );
-    expect(env).toMatch(/^HOLO_TELEMETRY_OPT_IN=true$/m);
-
-    const startedAtMatch = env.match(/^HOLO_TELEMETRY_STARTED_AT=(\d+)$/m);
-    expect(startedAtMatch).toBeTruthy();
-    const startedAt = Number(startedAtMatch![1]);
-    expect(startedAt).toBeGreaterThanOrEqual(before);
-    expect(startedAt).toBeLessThanOrEqual(after);
-  });
-
-  it('respects telemetry opt-out', async () => {
-    const { initCommand } = await import('../src/commands/init');
-    await initCommand([], {
-      prompt: scriptedPrompt(['', '', '', 'n']),
-      skipInstallStateWrite: true,
-    });
-    const env = readFileSync(join(tmpDir, '.env'), 'utf8');
-    expect(env).toMatch(/^HOLO_TELEMETRY_OPT_IN=false$/m);
-  });
-
   it('writes a docker-compose.yml when one does not exist', async () => {
     const { initCommand } = await import('../src/commands/init');
     await initCommand([], {
-      prompt: scriptedPrompt(['', '', '', '']),
-      skipInstallStateWrite: true,
+      prompt: scriptedPrompt(['', '', '']),
     });
 
     const compose = readFileSync(join(tmpDir, 'docker-compose.yml'), 'utf8');
     expect(compose).toContain('pgvector/pgvector:pg16');
     expect(compose).toContain('redis:7-alpine');
-    expect(compose).toContain('HOLO_TELEMETRY_OPT_IN');
 
     const combined = logs.join('\n');
     expect(combined).toContain('Generated docker-compose.yml');
@@ -141,8 +105,7 @@ describe('initCommand', () => {
 
     const { initCommand } = await import('../src/commands/init');
     await initCommand([], {
-      prompt: scriptedPrompt(['', '', '', '']),
-      skipInstallStateWrite: true,
+      prompt: scriptedPrompt(['', '', '']),
     });
 
     const compose = readFileSync(join(tmpDir, 'docker-compose.yml'), 'utf8');
@@ -151,30 +114,5 @@ describe('initCommand', () => {
     const combined = logs.join('\n');
     expect(combined).toContain('docker-compose.yml found');
     expect(combined).not.toContain('Generated docker-compose.yml');
-  });
-
-  it('generates a different installId on each run', async () => {
-    const { initCommand } = await import('../src/commands/init');
-
-    await initCommand([], {
-      prompt: scriptedPrompt(['', '', '', '']),
-      skipInstallStateWrite: true,
-    });
-    const first = readFileSync(join(tmpDir, '.env'), 'utf8');
-
-    rmSync(join(tmpDir, '.env'));
-    rmSync(join(tmpDir, 'docker-compose.yml'));
-
-    await initCommand([], {
-      prompt: scriptedPrompt(['', '', '', '']),
-      skipInstallStateWrite: true,
-    });
-    const second = readFileSync(join(tmpDir, '.env'), 'utf8');
-
-    const id1 = first.match(/^HOLO_TELEMETRY_INSTALL_ID=(.+)$/m)?.[1];
-    const id2 = second.match(/^HOLO_TELEMETRY_INSTALL_ID=(.+)$/m)?.[1];
-    expect(id1).toBeTruthy();
-    expect(id2).toBeTruthy();
-    expect(id1).not.toBe(id2);
   });
 });

@@ -59,26 +59,6 @@ const EnvSchema = z.object({
    * retention job prunes them. Set to 0 to disable retention.
    */
   OBSERVABILITY_TTL_DAYS: z.coerce.number().int().min(0).default(30),
-  /**
-   * TTHW (time-to-hello-world) telemetry. Populated by `npx holo init` and
-   * read by the gateway to report install→first-search timing aggregates on
-   * the public docs page. Anonymous install ID + timestamps only.
-   *   - HOLO_TELEMETRY_INSTALL_ID: random UUID v4
-   *   - HOLO_TELEMETRY_STARTED_AT: epoch ms when `holo init` started
-   *   - HOLO_TELEMETRY_OPT_IN: 'true' to send, anything else (incl. unset) to skip
-   */
-  HOLO_TELEMETRY_INSTALL_ID: z.string().uuid().optional(),
-  HOLO_TELEMETRY_STARTED_AT: z.coerce.number().int().nonnegative().optional(),
-  HOLO_TELEMETRY_OPT_IN: z
-    .string()
-    .optional()
-    .transform((v) => v === 'true'),
-  /**
-   * Endpoint the gateway POSTs the TTHW completion event to on first
-   * successful MCP search. Defaults to a no-op when unset — telemetry is
-   * silently dropped instead of failing the search.
-   */
-  HOLO_TELEMETRY_ENDPOINT: z.url().optional(),
 }).refine(
   (env) =>
     env.EMAIL_PROVIDER !== 'resend' ||

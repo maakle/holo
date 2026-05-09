@@ -24,7 +24,6 @@ Tracked work that isn't in scope for the current milestone but shouldn't be forg
 | Skill marketplace publish (CP1) — redaction golden-set + takedown E2E | ❌ **blocked** | No skill marketplace shipped. |
 | Observability dashboard (CP2) — replay diff snapshot + metric correctness | ❌ **blocked** | Replay diff feature not implemented. |
 | `npx holo init` (CP3 + DX D44) — clean-container integration test | ❌ **blocked** | No `holo init` command in `packages/cli` yet. |
-| TTHW telemetry (DX D48) — install→first-search timing + privacy assertion | ❌ **blocked** | No telemetry surface implemented. |
 
 **Pros:** Catches the allowlist regression that would cause an incident on day 1 of v0.1; per-connector tests catch ingestion drift when source APIs change; skill eval harness prevents silent quality regression on prompt iteration.
 
@@ -32,7 +31,7 @@ Tracked work that isn't in scope for the current milestone but shouldn't be forg
 
 **Context:** During /plan-eng-review on 2026-04-29, founder accepted v0.0-untested as a calculated risk for internal-only build. The non-optional gate for v0.1 was logged then. If this TODO is skipped, the v0.1 launch is at meaningful incident risk.
 
-**Depends on / blocked by:** Five remaining items are blocked on features (skill synthesizer, skill marketplace, observability replay, `holo init`, TTHW telemetry) that have not shipped. They become test-able as those features land.
+**Depends on / blocked by:** Four remaining items are blocked on features (skill synthesizer, skill marketplace, observability replay, `holo init`) that have not shipped. They become test-able as those features land.
 
 ---
 

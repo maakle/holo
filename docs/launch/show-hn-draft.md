@@ -49,7 +49,7 @@ Alternates if the above feels off:
 > npx @holo/cli@latest init   # ~30 seconds to first MCP search
 > ```
 >
-> The init flow scaffolds `.env` with safe defaults, drops a docker-compose.yml that pulls pre-built images from GHCR, and prompts for one Anthropic key + GitHub OAuth credentials. Opt-in TTHW telemetry (anonymous install ID + timestamps only) so we can publish honest p50/p95 install times — current p50 internally is around 45 seconds.
+> The init flow scaffolds `.env` with safe defaults, drops a docker-compose.yml that pulls pre-built images from GHCR, and prompts for one Anthropic key + GitHub OAuth credentials.
 >
 > **What I want from this post:**
 >
@@ -70,7 +70,7 @@ Alternates if the above feels off:
 
 Target: under 180 seconds, no narration audio, just on-screen captions and clean keystrokes.
 
-1. **0:00–0:20 — `npx @holo/cli@latest init`** in an empty directory. Show the prompts: Anthropic key, GitHub OAuth, telemetry opt-in. Show the generated `.env` and `docker-compose.yml`.
+1. **0:00–0:20 — `npx @holo/cli@latest init`** in an empty directory. Show the prompts: Anthropic key, GitHub OAuth. Show the generated `.env` and `docker-compose.yml`.
 2. **0:20–0:40 — `docker compose up -d`** + open `http://localhost:3000`. Sign in with GitHub. Connect Slack and one GitHub repo on the Connections page.
 3. **0:40–1:30 — Watch a sync land.** Connections page shows the first sync running, then "✓ N documents." Switch to the dashboard charts (sync throughput + agent invocations) so they're populated.
 4. **1:30–2:10 — Wire up an agent.** Open the "Connect your agent" page, copy the Claude Desktop config blob, paste it into Claude Desktop. Run `search` from Claude Desktop — return chunks from the just-indexed Slack channel.
