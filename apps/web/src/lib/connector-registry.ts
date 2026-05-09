@@ -19,6 +19,7 @@ export const CONNECTOR_CATEGORIES: ConnectorCategory[] = [
 export interface ConnectorMeta {
   id:
     | 'github'
+    | 'gitlab'
     | 'slack'
     | 'notion'
     | 'grain'
@@ -41,6 +42,14 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'github',
     displayName: 'GitHub',
     description: 'Code, pull requests, issues, and markdown docs.',
+    category: 'source-control',
+    implemented: true,
+    flowType: 'oauth',
+  },
+  {
+    id: 'gitlab',
+    displayName: 'GitLab',
+    description: 'Code, merge requests, issues, and markdown docs.',
     category: 'source-control',
     implemented: true,
     flowType: 'oauth',

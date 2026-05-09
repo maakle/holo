@@ -12,10 +12,11 @@ function notImplemented(method: string): never {
 }
 
 // Decides which sync entrypoint to call based on the cursor and queue.
-// - github-code-sync: branches on metadata.last_indexed_sha (per Part 5 plan).
+// - github-code-sync / gitlab-code-sync: branches on metadata.last_indexed_sha
+//   (per Part 5 plan). Both VCS code queues share the same shape.
 // - everything else: branches on cursor presence.
 export function decideSyncMode(args: { queue: QueueName; cursor: SyncCursor }): SyncMode {
-  if (args.queue === 'github-code-sync') {
+  if (args.queue === 'github-code-sync' || args.queue === 'gitlab-code-sync') {
     const sha = args.cursor.metadata['last_indexed_sha'];
     return typeof sha === 'string' && sha.length > 0 ? 'code-incremental' : 'code-initial';
   }

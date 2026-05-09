@@ -56,6 +56,8 @@ function getDb(): DB {
 function providerForQueue(queue: QueueName): string {
   if (queue === 'github-code-sync') return 'github-code';
   if (queue === 'github-prose-sync') return 'github-prose';
+  if (queue === 'gitlab-code-sync') return 'gitlab-code';
+  if (queue === 'gitlab-prose-sync') return 'gitlab-prose';
   return queue.replace(/-sync$/, '');
 }
 

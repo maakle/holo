@@ -17,6 +17,7 @@ export interface StartRunArgs {
 // github has two queues (code+prose) that both belong to the same provider.
 function providerForQueue(queue: QueueName): string {
   if (queue === 'github-code-sync' || queue === 'github-prose-sync') return 'github';
+  if (queue === 'gitlab-code-sync' || queue === 'gitlab-prose-sync') return 'gitlab';
   // 'slack-sync' → 'slack', etc.
   return queue.replace(/-sync$/, '');
 }

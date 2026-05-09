@@ -4,6 +4,8 @@ import { LoggerModule } from 'nestjs-pino';
 import { HeartbeatModule } from './heartbeat/heartbeat.module';
 import { GithubCodeSyncModule } from './queues/github-code';
 import { GithubProseSyncModule } from './queues/github-prose';
+import { GitlabCodeSyncModule } from './queues/gitlab-code';
+import { GitlabProseSyncModule } from './queues/gitlab-prose';
 import { SlackSyncModule } from './queues/slack';
 import { NotionSyncModule } from './queues/notion';
 import { GrainSyncModule } from './queues/grain';
@@ -55,6 +57,8 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     ObservabilityModule,
     GithubCodeSyncModule,
     GithubProseSyncModule,
+    GitlabCodeSyncModule,
+    GitlabProseSyncModule,
     SlackSyncModule,
     NotionSyncModule,
     GrainSyncModule,

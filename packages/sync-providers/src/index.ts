@@ -12,6 +12,7 @@
 // See CONTRIBUTING.md § "Adding a connector" for the full registration list.
 export const SYNC_PROVIDERS = [
   'github',
+  'gitlab',
   'slack',
   'notion',
   'grain',
@@ -41,6 +42,7 @@ export const SYNC_PROVIDERS_FIX_HINT = `Use one of: ${SYNC_PROVIDERS.join(', ')}
 // type-assert that QUEUE_NAMES covers exactly this set.
 export const QUEUE_NAMES_BY_PROVIDER = {
   github: ['github-code-sync', 'github-prose-sync'],
+  gitlab: ['gitlab-code-sync', 'gitlab-prose-sync'],
   slack: ['slack-sync'],
   notion: ['notion-sync'],
   grain: ['grain-sync'],

@@ -58,6 +58,21 @@ const githubConfig: ConnectorWizardConfig = {
   ],
 };
 
+const gitlabConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'install',
+      label: 'Authorize',
+      render: (ctx) =>
+        oauthInstallStep(ctx, {
+          installButtonLabel: 'Authorize GitLab',
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 const grainConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
@@ -266,6 +281,7 @@ const zendeskConfig: ConnectorWizardConfig = {
 const REGISTRY: Record<ConnectorMeta['id'], ConnectorWizardConfig<any>> = {
   slack: slackConfig,
   github: githubConfig,
+  gitlab: gitlabConfig,
   grain: grainConfig,
   hubspot: hubspotConfig,
   notion: notionConfig,

@@ -23,6 +23,8 @@ const stubRunner = (label: string): SyncRunner => {
 const registry: Record<string, SyncRunner> = {
   'github-code-sync': stubRunner('github-code'),
   'github-prose-sync': stubRunner('github-prose'),
+  'gitlab-code-sync': stubRunner('gitlab-code'),
+  'gitlab-prose-sync': stubRunner('gitlab-prose'),
   'slack-sync': stubRunner('slack'),
   'notion-sync': stubRunner('notion'),
   'grain-sync': stubRunner('grain'),

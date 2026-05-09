@@ -50,6 +50,32 @@ export type {
   DriveFilesPage,
   SharedDrive,
 } from './googledrive/index';
+export {
+  createGitlabSpec,
+  createGitlabApiClient,
+  listAccessibleProjects as listGitlabAccessibleProjects,
+  runGitlabProseSync,
+  runGitlabCodeSync,
+} from './gitlab/index';
+export type {
+  GitlabSpecOptions,
+  GitlabApiClient,
+  GitlabUser,
+  GitlabProject,
+  GitlabMergeRequest,
+  GitlabIssue,
+  GitlabNote,
+  GitlabRepoTreeEntry,
+  GitlabBranch,
+  RunGitlabProseSyncInput,
+  RunGitlabProseSyncOutput,
+  GitlabProseChunkPayload,
+  GitlabProseEmbedEnqueueFn,
+  RunGitlabCodeSyncInput,
+  RunGitlabCodeSyncOutput,
+  GitlabCodeChunkPayload,
+  GitlabCodeEmbedEnqueueFn,
+} from './gitlab/index';
 export { createPylonSpec } from './pylon/index';
 export type { PylonSpecOptions } from './pylon/index';
 export { createHubspotSpec } from './hubspot/index';

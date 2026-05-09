@@ -23,6 +23,7 @@ export const SYNC_INTERVAL_MS_BY_PROVIDER: Record<SyncProvider, number> = {
   hubspot: 6 * HOUR_MS,
   pylon: 6 * HOUR_MS,
   github: 6 * HOUR_MS,
+  gitlab: 6 * HOUR_MS,
   grain: 12 * HOUR_MS,
   notion: 24 * HOUR_MS,
   mintlify: 24 * HOUR_MS,

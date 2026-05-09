@@ -3,6 +3,8 @@ import { QUEUE_NAMES_BY_PROVIDER, type SyncProvider } from '@holo/sync-providers
 export const QUEUE_NAMES = {
   GITHUB_CODE_SYNC: 'github-code-sync',
   GITHUB_PROSE_SYNC: 'github-prose-sync',
+  GITLAB_CODE_SYNC: 'gitlab-code-sync',
+  GITLAB_PROSE_SYNC: 'gitlab-prose-sync',
   SLACK_SYNC: 'slack-sync',
   NOTION_SYNC: 'notion-sync',
   GRAIN_SYNC: 'grain-sync',
@@ -42,6 +44,8 @@ void _workerSubsetOfRegistry;
 export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   'github-code-sync': 1,
   'github-prose-sync': 3,
+  'gitlab-code-sync': 1,
+  'gitlab-prose-sync': 3,
   'slack-sync': 3,
   'notion-sync': 2,
   'grain-sync': 2,

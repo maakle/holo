@@ -55,6 +55,8 @@ export class SyncSchedulerService implements OnModuleInit {
   constructor(
     @InjectQueue(QUEUE_NAMES.GITHUB_CODE_SYNC) ghCode: Queue,
     @InjectQueue(QUEUE_NAMES.GITHUB_PROSE_SYNC) ghProse: Queue,
+    @InjectQueue(QUEUE_NAMES.GITLAB_CODE_SYNC) glCode: Queue,
+    @InjectQueue(QUEUE_NAMES.GITLAB_PROSE_SYNC) glProse: Queue,
     @InjectQueue(QUEUE_NAMES.SLACK_SYNC) slack: Queue,
     @InjectQueue(QUEUE_NAMES.NOTION_SYNC) notion: Queue,
     @InjectQueue(QUEUE_NAMES.GRAIN_SYNC) grain: Queue,
@@ -68,6 +70,7 @@ export class SyncSchedulerService implements OnModuleInit {
   ) {
     this.queueMap = {
       github: [QUEUE_NAMES.GITHUB_CODE_SYNC, QUEUE_NAMES.GITHUB_PROSE_SYNC],
+      gitlab: [QUEUE_NAMES.GITLAB_CODE_SYNC, QUEUE_NAMES.GITLAB_PROSE_SYNC],
       slack: [QUEUE_NAMES.SLACK_SYNC],
       notion: [QUEUE_NAMES.NOTION_SYNC],
       grain: [QUEUE_NAMES.GRAIN_SYNC],
@@ -82,6 +85,8 @@ export class SyncSchedulerService implements OnModuleInit {
     this.queuesByName = {
       [QUEUE_NAMES.GITHUB_CODE_SYNC]: ghCode,
       [QUEUE_NAMES.GITHUB_PROSE_SYNC]: ghProse,
+      [QUEUE_NAMES.GITLAB_CODE_SYNC]: glCode,
+      [QUEUE_NAMES.GITLAB_PROSE_SYNC]: glProse,
       [QUEUE_NAMES.SLACK_SYNC]: slack,
       [QUEUE_NAMES.NOTION_SYNC]: notion,
       [QUEUE_NAMES.GRAIN_SYNC]: grain,
