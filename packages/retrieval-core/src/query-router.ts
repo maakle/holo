@@ -1,6 +1,7 @@
 import {
   createOpenAiEmbedder,
   createVoyageEmbedder,
+  resolveOpenAiModel,
   type Embedder,
 } from '@holo/embedder';
 import { holoError, ErrorCode } from '@holo/errors';
@@ -70,5 +71,11 @@ export async function embedQueryWith(
 }
 
 export async function embedQuery(q: string): Promise<EmbedQueryResult> {
-  return embedQueryWith(q, looksLikeCode(q) ? 'voyage-code-3' : 'openai-3-small');
+  // Match the query model to whatever the worker is currently writing
+  // (`OPENAI_EMBEDDING_MODEL`). search.ts filters chunks by their
+  // stored model tag, so a mismatch makes the corpus invisible.
+  return embedQueryWith(
+    q,
+    looksLikeCode(q) ? 'voyage-code-3' : resolveOpenAiModel().tag,
+  );
 }

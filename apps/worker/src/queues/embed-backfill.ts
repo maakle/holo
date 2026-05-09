@@ -8,6 +8,7 @@ import { BullModule, InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job, Queue } from 'bullmq';
 import postgres, { type Sql } from 'postgres';
 import { holoError, ErrorCode } from '@holo/errors';
+import { OPENAI_MODELS, resolveOpenAiModel } from '@holo/embedder';
 import { QUEUE_NAMES, QUEUE_CONCURRENCY } from './types';
 import {
   runEmbedBackfillJob,
@@ -15,10 +16,11 @@ import {
   type BackfillResult,
 } from './embed-backfill-runner';
 import {
-  countLegacyChunks,
+  countChunksMatchingModel,
   createBackfillStore,
-  selectNextLegacyBatch,
+  selectNextBatchForBackfill,
 } from './embed-backfill-store';
+import type { EmbeddingModel } from './embed-insert';
 import type { EmbedderClient } from './embed-runner';
 
 /**
@@ -28,11 +30,11 @@ import type { EmbedderClient } from './embed-runner';
 const BACKFILL_BATCH_SIZE = 100;
 
 /**
- * Per-deploy ceiling on how many legacy chunks the boot scanner will
- * enqueue in one go. A safety brake: if there's a regression in the
- * processor (or OpenAI is down), an operator can ship a fix without
- * paying for millions of re-embeds first. Once backfill is healthy,
- * raise via `HOLO_EMBED_BACKFILL_CAP` or just re-deploy multiple times.
+ * Per-deploy ceiling on how many chunks the boot scanner will enqueue
+ * in one go. A safety brake: if there's a regression in the processor
+ * (or OpenAI is down), an operator can ship a fix without paying for
+ * millions of re-embeds first. Once backfill is healthy, raise via
+ * `HOLO_EMBED_BACKFILL_CAP` or just re-deploy multiple times.
  */
 const DEFAULT_BACKFILL_CAP_PER_BOOT = 100_000;
 
@@ -75,6 +77,30 @@ export function __setBackfillEmbedderForTests(embedder: EmbedderClient | null): 
   cachedEmbedder = embedder;
 }
 
+/**
+ * Determine which (sourceModel, targetModel) pair the backfill should
+ * migrate. Target = the operator's currently-selected OpenAI tier
+ * (`OPENAI_EMBEDDING_MODEL`). Source = whichever OpenAI tag isn't the
+ * target — that's what the scanner sweeps and rewrites. Code chunks
+ * (Voyage) are intentionally excluded; they keep their original
+ * tagging across migrations.
+ */
+function resolveBackfillModels(): { sourceModel: EmbeddingModel; targetModel: EmbeddingModel } {
+  const targetModel: EmbeddingModel = resolveOpenAiModel().tag;
+  const otherOpenAiTags: EmbeddingModel[] = Object.values(OPENAI_MODELS)
+    .map((m) => m.tag)
+    .filter((tag) => tag !== targetModel);
+  const sourceModel = otherOpenAiTags[0];
+  if (!sourceModel) {
+    throw holoError({
+      code: ErrorCode.HOLO_INTERNAL,
+      problem: 'No OpenAI model tag is available as a backfill source',
+      fix: 'Add at least two entries to OPENAI_MODELS so the resolver has a peer to migrate from.',
+    });
+  }
+  return { sourceModel, targetModel };
+}
+
 @Processor(QUEUE_NAMES.EMBED_BACKFILL, {
   concurrency: QUEUE_CONCURRENCY['embed-backfill'],
 })
@@ -88,7 +114,8 @@ export class EmbedBackfillProcessor extends WorkerHost {
       store: createBackfillStore(getSql()),
     });
     this.logger.log(
-      `embed-backfill job ${job.id} scanned=${result.scanned} rewritten=${result.rewritten} skipped=${result.skipped}`,
+      `embed-backfill job ${job.id} ${job.data.sourceModel}→${job.data.targetModel} `
+        + `scanned=${result.scanned} rewritten=${result.rewritten} skipped=${result.skipped}`,
     );
     return result;
   }
@@ -113,27 +140,35 @@ export class EmbedBackfillBootstrap implements OnApplicationBootstrap {
       || DEFAULT_BACKFILL_CAP_PER_BOOT;
     try {
       const sql = getSql();
-      const total = await countLegacyChunks(sql);
+      const { sourceModel, targetModel } = resolveBackfillModels();
+      const total = await countChunksMatchingModel(sql, sourceModel);
       if (total === 0) {
-        this.logger.log('embed-backfill: no legacy chunks remain — done');
+        this.logger.log(
+          `embed-backfill: no chunks tagged ${sourceModel} remain — done`,
+        );
         return;
       }
       this.logger.log(
-        `embed-backfill: ${total} legacy chunk(s) remain; enqueuing up to ${cap} this boot`,
+        `embed-backfill: ${total} chunk(s) on ${sourceModel} remain; `
+          + `migrating to ${targetModel}; enqueuing up to ${cap} this boot`,
       );
 
       // Walk the table in newest-first order, enqueuing batches of
-      // BACKFILL_BATCH_SIZE until cap. The processor itself filters by
+      // BACKFILL_BATCH_SIZE until cap. The processor filters by
       // embedding_model again, so re-enqueueing the same chunk across
       // restarts is safe (it just no-ops the second time).
       let enqueued = 0;
       let lastBatchHadIds = true;
       // Track ids enqueued THIS boot so we don't re-enqueue the same id
-      // twice (the SELECT keeps returning the same newest rows until the
-      // processor has actually flipped them off `-large`).
+      // twice (the SELECT keeps returning the same newest rows until
+      // the processor has actually flipped them off `sourceModel`).
       const seen = new Set<string>();
       while (enqueued < cap && lastBatchHadIds) {
-        const ids = await selectNextLegacyBatch(sql, BACKFILL_BATCH_SIZE);
+        const ids = await selectNextBatchForBackfill(
+          sql,
+          sourceModel,
+          BACKFILL_BATCH_SIZE,
+        );
         const fresh = ids.filter((id) => !seen.has(id));
         if (fresh.length === 0) {
           lastBatchHadIds = false;
@@ -142,7 +177,7 @@ export class EmbedBackfillBootstrap implements OnApplicationBootstrap {
         for (const id of fresh) seen.add(id);
         await this.queue.add(
           'backfill',
-          { chunkIds: fresh },
+          { chunkIds: fresh, sourceModel, targetModel },
           { removeOnComplete: 100, removeOnFail: 100 },
         );
         enqueued += fresh.length;

@@ -1,18 +1,25 @@
 import OpenAI from 'openai';
 import type { Embedder } from './contract';
+import { resolveOpenAiModel } from './openai-models';
 import { chunkArray } from './shared/chunk-array';
 import { withBackoff } from './shared/backoff';
 
 export interface CreateOpenAiEmbedderOptions {
   apiKey: string;
+  /**
+   * Override the model that would otherwise come from
+   * `OPENAI_EMBEDDING_MODEL`. Useful for tests, A/B workers, or
+   * eval harnesses; production should rely on the env var.
+   */
+  model?: 'text-embedding-3-small' | 'text-embedding-3-large';
   /** Optional sleep injection for tests. */
   sleep?: (ms: number) => Promise<void>;
 }
 
-// text-embedding-3-small accepts up to 8192 tokens per input. Token density
-// varies wildly: prose is ~4 chars/token, but code with single-char tokens
-// (braces, operators, identifiers) can hit ~1.5 chars/token. We pick 12000
-// (≈ 1.5 chars/token × 8192 tokens) to stay safe for the densest code.
+// Both supported OpenAI models accept up to 8192 tokens per input. Token
+// density varies wildly: prose is ~4 chars/token, but code with single-char
+// tokens (braces, operators, identifiers) can hit ~1.5 chars/token. We pick
+// 12000 (≈ 1.5 chars/token × 8192 tokens) to stay safe for the densest code.
 // Slightly less accurate embeddings on long files beat batch-killing 400s.
 const OPENAI_EMBED_MAX_CHARS = 12000;
 
@@ -25,9 +32,15 @@ function truncateForOpenAi(text: string): string {
 export function createOpenAiEmbedder(opts: CreateOpenAiEmbedderOptions): Embedder {
   // maxRetries: 0 disables the SDK's built-in retry; withBackoff handles our own.
   const client = new OpenAI({ apiKey: opts.apiKey, maxRetries: 0 });
+  // Resolve once at construction. Every embedder instance corresponds to a
+  // single API model — flipping the env mid-run requires a worker restart,
+  // matching the existing operational model for embedder config.
+  const resolved = opts.model
+    ? { api: opts.model, tag: opts.model === 'text-embedding-3-large' ? 'openai-3-large' as const : 'openai-3-small' as const, dimensions: 1024 as const }
+    : resolveOpenAiModel();
   return {
-    model: 'openai-3-small',
-    dimensions: 1024,
+    model: resolved.tag,
+    dimensions: resolved.dimensions,
     async embed(texts: string[]): Promise<number[][]> {
       if (texts.length === 0) return [];
       // Truncate any input that would exceed the 8192-token limit. Without
@@ -42,9 +55,9 @@ export function createOpenAiEmbedder(opts: CreateOpenAiEmbedderOptions): Embedde
         const res = await withBackoff(
           () =>
             client.embeddings.create({
-              model: 'text-embedding-3-small',
+              model: resolved.api,
               input: batch,
-              dimensions: 1024,
+              dimensions: resolved.dimensions,
               encoding_format: 'float',
             }),
           { upstream: 'openai', sleep: opts.sleep },
