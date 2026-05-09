@@ -2,50 +2,16 @@ import 'server-only';
 import { Queue } from 'bullmq';
 import { and, eq } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
+import {
+  QUEUE_NAMES_BY_PROVIDER,
+  SYNC_PROVIDERS,
+  SYNC_PROVIDERS_FIX_HINT,
+  isSyncProvider,
+  type SyncProvider,
+} from '@holo/sync-providers';
 
-// Single source of truth for which providers can be synced from the dashboard.
-// Every API route under apps/web/src/app/api/connectors/[provider]/ validates
-// against SYNC_PROVIDERS — adding a new connector means adding an entry to
-// QUEUE_NAMES_BY_PROVIDER below. The route validators pick it up automatically.
-//
-// Other places that enumerate providers (e.g. /api/connectors/status) MUST
-// import SYNC_PROVIDERS instead of restating the list. A duplicated array
-// drifts and silently drops new connectors out of the bulk-status poll —
-// symptom: the connection wizard's first-sync step flashes "Sync finished —
-// no new content" while the worker is happily indexing, and the dashboard's
-// "Connect → Manage" flip + sync badges never update.
-// See CONTRIBUTING.md § "Adding a connector" for the full registration list.
-export const SYNC_PROVIDERS = [
-  'github',
-  'slack',
-  'notion',
-  'grain',
-  'pylon',
-  'hubspot',
-  'linear',
-  'mintlify',
-  'zendesk',
-] as const;
-export type Provider = (typeof SYNC_PROVIDERS)[number];
-
-export function isSyncProvider(value: string): value is Provider {
-  return (SYNC_PROVIDERS as readonly string[]).includes(value);
-}
-
-/** Human-readable list for HoloError fix strings. */
-export const SYNC_PROVIDERS_FIX_HINT = `Use one of: ${SYNC_PROVIDERS.join(', ')}.`;
-
-const QUEUE_NAMES_BY_PROVIDER: Record<Provider, string[]> = {
-  github: ['github-code-sync', 'github-prose-sync'],
-  slack: ['slack-sync'],
-  notion: ['notion-sync'],
-  grain: ['grain-sync'],
-  pylon: ['pylon-sync'],
-  hubspot: ['hubspot-sync'],
-  linear: ['linear-sync'],
-  mintlify: ['mintlify-sync'],
-  zendesk: ['zendesk-sync'],
-};
+export { SYNC_PROVIDERS, SYNC_PROVIDERS_FIX_HINT, isSyncProvider };
+export type Provider = SyncProvider;
 
 function parseRedisUrl(url: string): { host: string; port: number } {
   const u = new URL(url);
