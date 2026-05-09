@@ -36,6 +36,8 @@ const EnvSchema = z.object({
   SLACK_CONNECTOR_SIGNING_SECRET: z.string().optional(),
   LINEAR_CONNECTOR_CLIENT_ID: z.string().optional(),
   LINEAR_CONNECTOR_CLIENT_SECRET: z.string().optional(),
+  GOOGLEDRIVE_CONNECTOR_CLIENT_ID: z.string().optional(),
+  GOOGLEDRIVE_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().optional(),
   /**

@@ -12,6 +12,7 @@ import { HubspotSyncModule } from './queues/hubspot';
 import { LinearSyncModule } from './queues/linear';
 import { MintlifySyncModule } from './queues/mintlify';
 import { ZendeskSyncModule } from './queues/zendesk';
+import { GoogleDriveSyncModule } from './queues/googledrive';
 import { EmbedModule } from './queues/embed';
 import { EmbedBackfillModule } from './queues/embed-backfill';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
@@ -61,6 +62,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     LinearSyncModule,
     MintlifySyncModule,
     ZendeskSyncModule,
+    GoogleDriveSyncModule,
     EmbedModule,
     EmbedBackfillModule,
     SyncRunnersModule,

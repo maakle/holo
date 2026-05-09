@@ -81,6 +81,21 @@ const grainConfig: ConnectorWizardConfig = {
   ],
 };
 
+const googleDriveConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'install',
+      label: 'Authorize',
+      render: (ctx) =>
+        oauthInstallStep(ctx, {
+          installButtonLabel: 'Authorize Google Drive',
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 const linearConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
@@ -235,6 +250,7 @@ const REGISTRY: Record<ConnectorMeta['id'], ConnectorWizardConfig<any>> = {
   linear: linearConfig,
   mintlify: mintlifyConfig,
   zendesk: zendeskConfig,
+  googledrive: googleDriveConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

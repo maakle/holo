@@ -26,7 +26,8 @@ export interface ConnectorMeta {
     | 'hubspot'
     | 'linear'
     | 'mintlify'
-    | 'zendesk';
+    | 'zendesk'
+    | 'googledrive';
   displayName: string;
   description: string;
   category: ConnectorCategoryId;
@@ -106,5 +107,14 @@ export const CONNECTORS: ConnectorMeta[] = [
     category: 'customer',
     implemented: true,
     flowType: 'apikey',
+  },
+  {
+    id: 'googledrive',
+    displayName: 'Google Drive',
+    description:
+      'Google Docs, Sheets, Slides, and uploaded text/markdown files across My Drive and Shared Drives.',
+    category: 'productivity',
+    implemented: true,
+    flowType: 'oauth',
   },
 ];

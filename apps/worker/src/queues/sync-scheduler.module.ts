@@ -9,6 +9,7 @@ import { HubspotSyncModule } from './hubspot';
 import { LinearSyncModule } from './linear';
 import { MintlifySyncModule } from './mintlify';
 import { ZendeskSyncModule } from './zendesk';
+import { GoogleDriveSyncModule } from './googledrive';
 import { SyncSchedulerService } from './sync-scheduler.service';
 
 @Module({
@@ -23,6 +24,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
     LinearSyncModule,
     MintlifySyncModule,
     ZendeskSyncModule,
+    GoogleDriveSyncModule,
   ],
   providers: [SyncSchedulerService],
 })

@@ -16,6 +16,7 @@ import {
   createGithubSpec,
   createMintlifySpec,
   createZendeskSpec,
+  createGoogleDriveSpec,
   githubAppConfigFromEnv,
 } from '@holo/connectors';
 import { setSyncRunner } from './sync-runner-registry';
@@ -124,8 +125,21 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       QUEUE_NAMES.ZENDESK_SYNC,
       createGenericRunner(createZendeskSpec(), deps),
     );
+    // Google Drive uses standard OAuth2 with refresh tokens. Same shape as
+    // Linear/Slack: register the runner regardless of env presence so the
+    // queue exists; jobs fail loudly if creds are missing.
+    setSyncRunner(
+      QUEUE_NAMES.GOOGLEDRIVE_SYNC,
+      createGenericRunner(
+        createGoogleDriveSpec({
+          clientId: process.env.GOOGLEDRIVE_CONNECTOR_CLIENT_ID ?? '',
+          clientSecret: process.env.GOOGLEDRIVE_CONNECTOR_CLIENT_SECRET ?? '',
+        }),
+        deps,
+      ),
+    );
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, mintlify, zendesk',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, mintlify, zendesk, googledrive',
     );
 
     // Reap any 'running' rows the previous worker incarnation left behind

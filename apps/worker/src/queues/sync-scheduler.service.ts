@@ -63,6 +63,7 @@ export class SyncSchedulerService implements OnModuleInit {
     @InjectQueue(QUEUE_NAMES.LINEAR_SYNC) linear: Queue,
     @InjectQueue(QUEUE_NAMES.MINTLIFY_SYNC) mintlify: Queue,
     @InjectQueue(QUEUE_NAMES.ZENDESK_SYNC) zendesk: Queue,
+    @InjectQueue(QUEUE_NAMES.GOOGLEDRIVE_SYNC) googledrive: Queue,
   ) {
     this.queueMap = {
       github: [QUEUE_NAMES.GITHUB_CODE_SYNC, QUEUE_NAMES.GITHUB_PROSE_SYNC],
@@ -74,6 +75,7 @@ export class SyncSchedulerService implements OnModuleInit {
       linear: [QUEUE_NAMES.LINEAR_SYNC],
       mintlify: [QUEUE_NAMES.MINTLIFY_SYNC],
       zendesk: [QUEUE_NAMES.ZENDESK_SYNC],
+      googledrive: [QUEUE_NAMES.GOOGLEDRIVE_SYNC],
     };
     this.queuesByName = {
       [QUEUE_NAMES.GITHUB_CODE_SYNC]: ghCode,
@@ -86,6 +88,7 @@ export class SyncSchedulerService implements OnModuleInit {
       [QUEUE_NAMES.LINEAR_SYNC]: linear,
       [QUEUE_NAMES.MINTLIFY_SYNC]: mintlify,
       [QUEUE_NAMES.ZENDESK_SYNC]: zendesk,
+      [QUEUE_NAMES.GOOGLEDRIVE_SYNC]: googledrive,
     };
   }
 

@@ -31,6 +31,7 @@ const registry: Record<string, SyncRunner> = {
   'linear-sync': stubRunner('linear'),
   'mintlify-sync': stubRunner('mintlify'),
   'zendesk-sync': stubRunner('zendesk'),
+  'googledrive-sync': stubRunner('googledrive'),
 };
 
 export function getSyncRunner(queue: string): SyncRunner {
