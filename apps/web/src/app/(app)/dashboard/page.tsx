@@ -8,6 +8,7 @@ import { resolveActiveOrgId } from '@/lib/active-org';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatsSection, StatsSkeleton } from './_components/stats-section';
 import { RecentInvocations, RecentInvocationsSkeleton } from './_components/recent-invocations';
+import { ChartsSection, ChartsSkeleton } from './_components/charts-section';
 
 export default async function DashboardPage() {
   const { auth} = await getServerContext();
@@ -29,6 +30,10 @@ export default async function DashboardPage() {
 
       <Suspense fallback={<StatsSkeleton />}>
         <StatsSection orgId={orgId} />
+      </Suspense>
+
+      <Suspense fallback={<ChartsSkeleton />}>
+        <ChartsSection orgId={orgId} />
       </Suspense>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
