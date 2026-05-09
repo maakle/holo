@@ -61,17 +61,18 @@ The most common contribution path. Shape:
 
 **ACL extraction is non-negotiable.** Every connector must populate `acl_subjects text[]` on each document with the source's native permissions. If you can't figure out a source's permission model, ask in the issue before starting.
 
-**Register the provider in three places.** All three must list the new provider id and its queue name(s); the dashboard validates against `SYNC_PROVIDERS` before it will let users sync, view history, or disconnect.
+**Register the provider in two places.** [`packages/sync-providers`](./packages/sync-providers/src/index.ts) is the single source of truth — the Drizzle schema enum, the dashboard's bulk-status poll, the CLI sync command, and the worker's queue topology all derive from it.
 
 | File | What to add |
 |---|---|
-| [`apps/web/src/lib/sync-queue.ts`](./apps/web/src/lib/sync-queue.ts) | New entry in `SYNC_PROVIDERS` and `QUEUE_NAMES_BY_PROVIDER`. This is the source of truth — every API route under `apps/web/src/app/api/connectors/[provider]/` validates against it. |
+| [`packages/sync-providers/src/index.ts`](./packages/sync-providers/src/index.ts) | New entry in `SYNC_PROVIDERS` and `QUEUE_NAMES_BY_PROVIDER`. The schema enum, dashboard routes, CLI, and worker all import from here. |
 | [`apps/web/src/lib/connector-registry.ts`](./apps/web/src/lib/connector-registry.ts) | New entry in `CONNECTORS` (display name, category, flow type) so the connector renders on the connections page. |
-| [`packages/cli/src/commands/sync-run.ts`](./packages/cli/src/commands/sync-run.ts) | New entry in `SYNC_PROVIDERS` and `QUEUE_NAMES_BY_PROVIDER` so `holo sync <provider>` works. The CLI lives in its own package and can't import from `apps/web`, so the list is mirrored manually — keep them in sync. |
+
+You will also need to add a `@Processor` for each new queue under [`apps/worker/src/queues/`](./apps/worker/src/queues/) and an entry in `QUEUE_NAMES` / `QUEUE_CONCURRENCY` in [`apps/worker/src/queues/types.ts`](./apps/worker/src/queues/types.ts). The worker has a compile-time assertion that `QUEUE_NAMES` covers exactly the registry's queue set — TS will fail the build if you add to one without the other.
 
 If you forget step 8, the connector will OAuth and ingest fine in the worker, but the dashboard will show `Use one of: …` instead of sync history — and "Sync now" / "Disconnect" will fail with the same error.
 
-**Don't hardcode another provider list.** The bulk-status poll at [`apps/web/src/app/api/connectors/status/route.ts`](./apps/web/src/app/api/connectors/status/route.ts) used to keep its own hardcoded `PROVIDERS` array; new connectors silently dropped out of the response. Symptom: the connection wizard's first-sync step flashed "Sync finished — no new content" while the worker was actively indexing, and the dashboard's "Connect → Manage" flip + sync badges never updated. The route now derives from `SYNC_PROVIDERS` — keep it that way. If you add another place that needs to enumerate providers, **import `SYNC_PROVIDERS` rather than restating the list.** Every duplicate list is a future "no new content" bug.
+**Don't hardcode another provider list.** The bulk-status poll at [`apps/web/src/app/api/connectors/status/route.ts`](./apps/web/src/app/api/connectors/status/route.ts) used to keep its own hardcoded `PROVIDERS` array; new connectors silently dropped out of the response. Symptom: the connection wizard's first-sync step flashed "Sync finished — no new content" while the worker was actively indexing, and the dashboard's "Connect → Manage" flip + sync badges never updated. Always **import `SYNC_PROVIDERS` from `@holo/sync-providers`** rather than restating the list — every duplicate list is a future "no new content" bug.
 
 ## Adding a skill (v0.5+)
 

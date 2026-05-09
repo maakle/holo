@@ -1,3 +1,5 @@
+import { QUEUE_NAMES_BY_PROVIDER, type SyncProvider } from '@holo/sync-providers';
+
 export const QUEUE_NAMES = {
   GITHUB_CODE_SYNC: 'github-code-sync',
   GITHUB_PROSE_SYNC: 'github-prose-sync',
@@ -13,6 +15,22 @@ export const QUEUE_NAMES = {
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
+
+// Compile-time guard: every queue named in @holo/sync-providers must also
+// appear in QUEUE_NAMES (except 'embed', which has no provider). Adding a
+// connector to the registry without wiring a @Processor here is a TS error,
+// not a silent runtime drop into a queue no worker is listening on.
+type RegistrySyncQueueName =
+  (typeof QUEUE_NAMES_BY_PROVIDER)[SyncProvider][number];
+type WorkerSyncQueueName = Exclude<QueueName, 'embed'>;
+type _RegistrySubsetOfWorker =
+  RegistrySyncQueueName extends WorkerSyncQueueName ? true : never;
+type _WorkerSubsetOfRegistry =
+  WorkerSyncQueueName extends RegistrySyncQueueName ? true : never;
+const _registrySubsetOfWorker: _RegistrySubsetOfWorker = true;
+const _workerSubsetOfRegistry: _WorkerSubsetOfRegistry = true;
+void _registrySubsetOfWorker;
+void _workerSubsetOfRegistry;
 
 export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   'github-code-sync': 1,

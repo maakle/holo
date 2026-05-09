@@ -22,6 +22,7 @@
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",
     "@holo/retrieval-core": "workspace:*",
+    "@holo/sync-providers": "workspace:*",
     "@holo/user-subjects": "workspace:*",
     "@nestjs/bullmq": "10.2.3",
     "@nestjs/common": "10.4.15",

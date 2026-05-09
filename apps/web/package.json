@@ -25,6 +25,7 @@
     "@holo/oauth-provider": "workspace:*",
     "@holo/retrieval-core": "workspace:^",
     "@holo/skills": "workspace:^",
+    "@holo/sync-providers": "workspace:*",
     "@holo/user-subjects": "workspace:*",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",

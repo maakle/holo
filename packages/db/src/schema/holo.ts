@@ -13,6 +13,7 @@ import {
   bigint,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import { SYNC_PROVIDERS } from '@holo/sync-providers';
 import { encryptedText } from './encrypted-text';
 import { user, organization } from './auth';
 
@@ -32,9 +33,7 @@ export const connectorCredentials = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => user.id),
-    provider: text('provider', {
-      enum: ['github', 'slack', 'notion', 'grain', 'pylon', 'hubspot', 'linear', 'mintlify', 'zendesk'],
-    }).notNull(),
+    provider: text('provider', { enum: SYNC_PROVIDERS }).notNull(),
     accessToken: encryptedText('access_token'),
     refreshToken: encryptedText('refresh_token'),
     scope: text('scope'),

@@ -3,39 +3,15 @@ import { Queue } from 'bullmq';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
+import {
+  QUEUE_NAMES_BY_PROVIDER,
+  SYNC_PROVIDERS,
+  isSyncProvider,
+  type SyncProvider,
+} from '@holo/sync-providers';
 
-export const SYNC_PROVIDERS = [
-  'github',
-  'slack',
-  'notion',
-  'grain',
-  'pylon',
-  'hubspot',
-  'linear',
-  'mintlify',
-  'zendesk',
-] as const;
-export type SyncProvider = (typeof SYNC_PROVIDERS)[number];
-
-// Queue names per provider — mirrors apps/worker/src/queues/types.ts and
-// apps/web/src/lib/sync-queue.ts. Kept in sync manually because the CLI lives
-// in its own workspace package and can't import either; diverging would
-// silently route jobs into limbo.
-const QUEUE_NAMES_BY_PROVIDER: Record<SyncProvider, string[]> = {
-  github: ['github-code-sync', 'github-prose-sync'],
-  slack: ['slack-sync'],
-  notion: ['notion-sync'],
-  grain: ['grain-sync'],
-  pylon: ['pylon-sync'],
-  hubspot: ['hubspot-sync'],
-  linear: ['linear-sync'],
-  mintlify: ['mintlify-sync'],
-  zendesk: ['zendesk-sync'],
-};
-
-export function isSyncProvider(value: string): value is SyncProvider {
-  return (SYNC_PROVIDERS as readonly string[]).includes(value);
-}
+export { SYNC_PROVIDERS, isSyncProvider };
+export type { SyncProvider };
 
 function parseRedisUrl(url: string): { host: string; port: number } {
   const u = new URL(url);
@@ -133,5 +109,5 @@ export async function runSync(input: RunSyncInput): Promise<RunSyncOutput> {
     }
   }
 
-  return { provider, sources, queueNames, jobsEnqueued };
+  return { provider, sources, queueNames: [...queueNames], jobsEnqueued };
 }
