@@ -19,6 +19,14 @@ interface Props {
 export function SampleDataNavIndicator({ initialActive }: Props) {
   const [active, setActive] = useState(initialActive);
 
+  // Re-sync when SSR sends a new value — e.g. after an org switch triggers
+  // router.refresh(), the layout re-renders with the new workspace's sample
+  // state. Without this, the indicator keeps showing the prior org's value
+  // until a hard reload.
+  useEffect(() => {
+    setActive(initialActive);
+  }, [initialActive]);
+
   useEffect(() => {
     return onSampleDataChanged(setActive);
   }, []);
