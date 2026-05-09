@@ -4,7 +4,7 @@ export type { TreeSitterRegistry };
 
 export interface Chunker<TInput> {
   readonly kind: string;
-  readonly embeddingModel: 'openai-3-large' | 'voyage-code-3';
+  readonly embeddingModel: 'openai-3-small' | 'voyage-code-3';
   chunk(input: TInput, ctx: ChunkContext): Promise<Chunk[]>;
 }
 

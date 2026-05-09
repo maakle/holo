@@ -36,7 +36,7 @@ function formatDate(d: Date): string {
 
 export const pylonTicketChunker: Chunker<PylonTicketInput> = {
   kind: 'pylon-ticket',
-  embeddingModel: 'openai-3-large',
+  embeddingModel: 'openai-3-small',
 
   async chunk(input: PylonTicketInput, ctx: ChunkContext): Promise<Chunk[]> {
     const parentExternalId = `pylon-ticket:${input.ticketId}`;

@@ -10,7 +10,7 @@ export interface GithubIssueInput {
 
 export const githubIssueChunker: Chunker<GithubIssueInput> = {
   kind: 'github-issue',
-  embeddingModel: 'openai-3-large',
+  embeddingModel: 'openai-3-small',
   async chunk(input: GithubIssueInput, ctx: ChunkContext): Promise<Chunk[]> {
     const parentExternalId = `issue:${input.repoFullName}#${input.issueNumber}`;
     const aclSubjects = [`org:${ctx.organizationId}`];

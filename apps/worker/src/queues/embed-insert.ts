@@ -3,7 +3,7 @@ import { holoError, ErrorCode } from '@holo/errors';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sql = any;
 
-export type EmbeddingModel = 'openai-3-large' | 'voyage-code-3';
+export type EmbeddingModel = 'openai-3-small' | 'voyage-code-3';
 
 export type ChunkInsertPayload = {
   // Routing fields used by the embedder (kind drives prose vs code).

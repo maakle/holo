@@ -232,6 +232,13 @@
       "when": 1778918400000,
       "tag": "0032_org_invite_link",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1779004800000,
+      "tag": "0033_chunks_embedding_model_default_small",
+      "breakpoints": true
     }
   ]
 }

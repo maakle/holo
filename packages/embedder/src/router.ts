@@ -1,4 +1,4 @@
-import type { Embedder, EmbedderRegistry } from './contract';
+import type { Embedder, EmbedderRegistry, EmbeddingModelWrite } from './contract';
 
 // Minimal chunk shape used by the router. Will be replaced by `@holo/chunker`'s
 // type once Task 3.1 lands. Intentionally narrow — the router only needs
@@ -20,7 +20,7 @@ export function getEmbedderForChunkKind(
 export interface EmbeddedChunk<C extends RouterChunk = RouterChunk> {
   chunk: C;
   embedding: number[];
-  embeddingModel: 'openai-3-large' | 'voyage-code-3';
+  embeddingModel: EmbeddingModelWrite;
 }
 
 export async function embedChunks<C extends RouterChunk>(

@@ -77,7 +77,7 @@ export function stripHtmlToText(html: string): string {
 
 export const zendeskArticleChunker: Chunker<ZendeskArticleInput> = {
   kind: 'zendesk-article',
-  embeddingModel: 'openai-3-large',
+  embeddingModel: 'openai-3-small',
   async chunk(input: ZendeskArticleInput, ctx: ChunkContext): Promise<Chunk[]> {
     const text = stripHtmlToText(input.bodyHtml);
     if (text.length === 0) return [];

@@ -72,7 +72,7 @@ beforeAll(async () => {
     )
     VALUES (
       ${orgId}, ${artifactAId}, 'text', ${CHUNK_A_MARKER}, ${`hash-a-${SEED}`},
-      'openai-3-large',
+      'openai-3-small',
       ARRAY[${CHANNEL_SUBJECT}]::text[],
       'slack', ${sourceId}
     )
@@ -88,7 +88,7 @@ beforeAll(async () => {
     )
     VALUES (
       ${orgId}, ${artifactBId}, 'text', ${CHUNK_B_MARKER}, ${`hash-b-${SEED}`},
-      'openai-3-large',
+      'openai-3-small',
       ARRAY[${`org:${orgId}`}]::text[],
       'slack', ${sourceId}
     )

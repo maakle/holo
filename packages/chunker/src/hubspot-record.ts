@@ -50,7 +50,7 @@ function formatProps(props: HubspotRecordInput['properties']): string[] {
  */
 export const hubspotRecordChunker: Chunker<HubspotRecordInput> = {
   kind: 'hubspot-record',
-  embeddingModel: 'openai-3-large',
+  embeddingModel: 'openai-3-small',
 
   async chunk(input: HubspotRecordInput, ctx: ChunkContext): Promise<Chunk[]> {
     const parentExternalId = `hubspot-${input.recordType}:${input.recordId}`;

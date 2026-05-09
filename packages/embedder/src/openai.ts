@@ -9,7 +9,7 @@ export interface CreateOpenAiEmbedderOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
-// text-embedding-3-large accepts up to 8192 tokens per input. Token density
+// text-embedding-3-small accepts up to 8192 tokens per input. Token density
 // varies wildly: prose is ~4 chars/token, but code with single-char tokens
 // (braces, operators, identifiers) can hit ~1.5 chars/token. We pick 12000
 // (≈ 1.5 chars/token × 8192 tokens) to stay safe for the densest code.
@@ -26,7 +26,7 @@ export function createOpenAiEmbedder(opts: CreateOpenAiEmbedderOptions): Embedde
   // maxRetries: 0 disables the SDK's built-in retry; withBackoff handles our own.
   const client = new OpenAI({ apiKey: opts.apiKey, maxRetries: 0 });
   return {
-    model: 'openai-3-large',
+    model: 'openai-3-small',
     dimensions: 1024,
     async embed(texts: string[]): Promise<number[][]> {
       if (texts.length === 0) return [];
@@ -42,7 +42,7 @@ export function createOpenAiEmbedder(opts: CreateOpenAiEmbedderOptions): Embedde
         const res = await withBackoff(
           () =>
             client.embeddings.create({
-              model: 'text-embedding-3-large',
+              model: 'text-embedding-3-small',
               input: batch,
               dimensions: 1024,
               encoding_format: 'float',

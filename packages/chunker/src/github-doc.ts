@@ -9,7 +9,7 @@ export interface GithubDocInput {
 
 export const githubDocChunker: Chunker<GithubDocInput> = {
   kind: 'github-doc',
-  embeddingModel: 'openai-3-large',
+  embeddingModel: 'openai-3-small',
   async chunk(input: GithubDocInput, ctx: ChunkContext): Promise<Chunk[]> {
     if (input.content.length === 0) return [];
 

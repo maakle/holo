@@ -49,7 +49,7 @@ const TRANSCRIPT_CHUNK_CHARS = 6000;
 
 export const grainCallChunker: Chunker<GrainCallInput> = {
   kind: 'grain-call',
-  embeddingModel: 'openai-3-large',
+  embeddingModel: 'openai-3-small',
 
   async chunk(input: GrainCallInput, ctx: ChunkContext): Promise<Chunk[]> {
     const parentExternalId = `grain-call:${input.recordingId}`;

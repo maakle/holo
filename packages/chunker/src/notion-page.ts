@@ -15,7 +15,7 @@ const TRUNCATION_MARKER = '\n[truncated]';
 
 export const notionPageChunker: Chunker<NotionPageInput> = {
   kind: 'notion-page',
-  embeddingModel: 'openai-3-large',
+  embeddingModel: 'openai-3-small',
   async chunk(input: NotionPageInput, ctx: ChunkContext): Promise<Chunk[]> {
     const parentExternalId = `notion-page:${input.pageId}`;
     const aclSubjects = [

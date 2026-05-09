@@ -61,7 +61,7 @@ const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
 export const openapiEndpointChunker: Chunker<OpenApiEndpointInput> = {
   kind: 'openapi-endpoint',
-  embeddingModel: 'openai-3-large',
+  embeddingModel: 'openai-3-small',
   async chunk(input: OpenApiEndpointInput, ctx: ChunkContext): Promise<Chunk[]> {
     const out: Chunk[] = [];
     const aclSubjects = [`org:${ctx.organizationId}`];

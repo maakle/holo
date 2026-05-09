@@ -23,7 +23,7 @@ export interface EmbedderClient {
 // everything else to openai. Kept local so the worker doesn't have a
 // build-time dep on @holo/embedder.
 export function modelForChunkKind(kind: string): EmbeddingModel {
-  return kind === 'github-code' ? 'voyage-code-3' : 'openai-3-large';
+  return kind === 'github-code' ? 'voyage-code-3' : 'openai-3-small';
 }
 
 export type RunEmbedJobArgs = {
@@ -44,7 +44,7 @@ export async function runEmbedJob(args: RunEmbedJobArgs): Promise<EmbedJobResult
   const groups = groupByModel(args.payload.chunks);
   const all: EmbeddedChunkRow[] = [];
   const perModel: Record<EmbeddingModel, number> = {
-    'openai-3-large': 0,
+    'openai-3-small': 0,
     'voyage-code-3': 0,
   };
 
@@ -84,7 +84,7 @@ export async function runEmbedJob(args: RunEmbedJobArgs): Promise<EmbedJobResult
 
 function groupByModel(chunks: ChunkInsertPayload[]): Map<EmbeddingModel, ChunkInsertPayload[]> {
   const groups = new Map<EmbeddingModel, ChunkInsertPayload[]>([
-    ['openai-3-large', []],
+    ['openai-3-small', []],
     ['voyage-code-3', []],
   ]);
   for (const c of chunks) {
