@@ -13,6 +13,7 @@ import { LinearSyncModule } from './queues/linear';
 import { MintlifySyncModule } from './queues/mintlify';
 import { ZendeskSyncModule } from './queues/zendesk';
 import { EmbedModule } from './queues/embed';
+import { EmbedBackfillModule } from './queues/embed-backfill';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 import { SyncRunnersModule } from './queues/runners.module';
 import { SlackSubjectsModule } from './slack-subjects/slack-subjects.module';
@@ -61,6 +62,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     MintlifySyncModule,
     ZendeskSyncModule,
     EmbedModule,
+    EmbedBackfillModule,
     SyncRunnersModule,
     SyncSchedulerModule,
   ],
