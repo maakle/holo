@@ -284,10 +284,10 @@ function PillarsBand() {
 // ── Use cases band ────────────────────────────────────────────────────────
 const USE_CASES = [
   {
-    label: 'Engineering',
-    title: 'Codebase memory across every IDE.',
-    body: 'A Cursor or Claude Code agent answers "why is this code the way it is?" by searching across GitHub, Slack, and Notion, then drilling into the right PR diff, review thread, and RFC. New hires stop excavating; senior engineers stop re-explaining decisions.',
-    trace: 'search → get_pr → get_thread → answer',
+    label: 'Security & compliance',
+    title: 'Security questionnaires answered with citations.',
+    body: 'A founder or security lead pastes a customer questionnaire into a chat agent. Holo pulls prior answers from Notion, the architecture docs, and the actual repo for evidence, then drafts responses with a link back to every source. The week-long scramble before each enterprise deal turns into a one-pass review.',
+    trace: 'search → get_doc → get_file → draft',
   },
   {
     label: 'Customer support',

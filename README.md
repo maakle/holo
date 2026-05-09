@@ -43,12 +43,12 @@ Holo is the missing shared layer — the **queryable context layer** under all y
 
 Holo is a primitive, not a product. These are the four shapes the same layer takes in the first month of use — same backend, same audit trail, different consumers. The first three drive an agent over MCP; the fourth is plain REST with no agent in the loop.
 
-### 1. Codebase memory across every IDE *(engineering)*
+### 1. Security questionnaires answered with citations *(security & compliance)*
 
-A Cursor or Claude Code agent answers *"why is this code the way it is?"* by searching across GitHub, Slack, and Notion, then drilling into the right PR diff, review thread, and RFC. New hires stop excavating; senior engineers stop re-explaining decisions made six months ago.
+A founder or security lead pastes a customer's questionnaire into a chat agent. Holo pulls prior answers from Notion, the architecture docs, and the actual repo for evidence, then drafts responses with a link back to every source. The week-long scramble before each enterprise deal turns into a one-pass review.
 
 ```
-search("rate limiting auth flow") → get_pr(owner, repo, 1284) → get_thread(channel, ts) → answer with citations
+search("data retention policy") → get_doc(notion_id) → get_file(owner, repo, path) → draft answers with citations
 ```
 
 ### 2. Drafted support replies with the right sources attached *(customer support)*
