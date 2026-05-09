@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
     "./shared": "./src/shared/index.ts",
+    "./sync-intervals": "./src/sync-intervals.ts",
     "./github": "./src/github/index.ts",
     "./linear": "./src/linear/index.ts"
   },

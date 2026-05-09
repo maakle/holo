@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { SYNC_INTERVAL_MS_BY_PROVIDER } from '@holo/connectors';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '@holo/connectors/sync-intervals';
 import { useConnectorStatus } from '@/lib/connectors-status-store';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
