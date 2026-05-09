@@ -38,6 +38,18 @@ export type {
 } from './slack/index';
 export { createLinearSpec } from './linear/index';
 export type { LinearSpecOptions } from './linear/index';
+export {
+  createGoogleDriveSpec,
+  GOOGLEDRIVE_FILE_KIND,
+  buildIncrementalListQuery as buildGoogleDriveListQuery,
+} from './googledrive/index';
+export type {
+  GoogleDriveSpecOptions,
+  DriveAbout,
+  DriveFile,
+  DriveFilesPage,
+  SharedDrive,
+} from './googledrive/index';
 export { createPylonSpec } from './pylon/index';
 export type { PylonSpecOptions } from './pylon/index';
 export { createHubspotSpec } from './hubspot/index';

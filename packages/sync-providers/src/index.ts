@@ -20,6 +20,7 @@ export const SYNC_PROVIDERS = [
   'linear',
   'mintlify',
   'zendesk',
+  'googledrive',
 ] as const;
 
 export type SyncProvider = (typeof SYNC_PROVIDERS)[number];
@@ -47,6 +48,7 @@ export const QUEUE_NAMES_BY_PROVIDER = {
   linear: ['linear-sync'],
   mintlify: ['mintlify-sync'],
   zendesk: ['zendesk-sync'],
+  googledrive: ['googledrive-sync'],
 } as const satisfies Record<SyncProvider, readonly string[]>;
 
 export type SyncQueueName =

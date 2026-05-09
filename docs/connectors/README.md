@@ -13,6 +13,7 @@ Per-connector setup guides for developers running Holo locally or configuring a 
 | Linear | OAuth | _todo_ |
 | Mintlify Docs | API key (none for public sites) | _todo_ |
 | Zendesk Help Center | API key (none for public help centers) | _todo_ |
+| Google Drive | OAuth | [googledrive.md](./googledrive.md) |
 
 ## Conventions
 

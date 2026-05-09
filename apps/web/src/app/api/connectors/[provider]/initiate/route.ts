@@ -5,6 +5,7 @@ import {
   shared,
   createSlackSpec,
   createLinearSpec,
+  createGoogleDriveSpec,
 } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
@@ -111,11 +112,39 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
       );
       const authorizeUrl = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
       return NextResponse.json({ authorizeUrl });
+    } else if (provider === 'googledrive') {
+      if (
+        !env.GOOGLEDRIVE_CONNECTOR_CLIENT_ID ||
+        !env.GOOGLEDRIVE_CONNECTOR_CLIENT_SECRET
+      ) {
+        throw holoError({
+          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+          problem: 'Google Drive connector credentials are not configured',
+          fix: 'Set GOOGLEDRIVE_CONNECTOR_CLIENT_ID and GOOGLEDRIVE_CONNECTOR_CLIENT_SECRET in the environment.',
+        });
+      }
+      const redirectUri = `${publicOrigin}/api/connectors/googledrive/callback`;
+      const spec = createGoogleDriveSpec({
+        clientId: env.GOOGLEDRIVE_CONNECTOR_CLIENT_ID,
+        clientSecret: env.GOOGLEDRIVE_CONNECTOR_CLIENT_SECRET,
+      });
+      const csrfNonce = shared.generateCsrfNonce();
+      const state = await shared.signState(
+        {
+          user_id: session.user.id,
+          organization_id: orgId,
+          csrf_nonce: csrfNonce,
+          provider,
+        },
+        env.BETTER_AUTH_SECRET,
+      );
+      const authorizeUrl = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
+      return NextResponse.json({ authorizeUrl });
     } else {
       throw holoError({
         code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: `${provider} connector does not use the OAuth initiate flow`,
-        fix: 'OAuth-redirect connectors: GitHub, Slack, Linear. API-key connectors (Notion, Pylon, HubSpot, Grain) use their own /connect endpoints.',
+        fix: 'OAuth-redirect connectors: GitHub, Slack, Linear, Google Drive. API-key connectors (Notion, Pylon, HubSpot, Grain) use their own /connect endpoints.',
       });
     }
   } catch (e) {
