@@ -1,11 +1,8 @@
-import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import { and, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
-import { holoError, ErrorCode, HoloError } from '@holo/errors';
+import { holoError, ErrorCode } from '@holo/errors';
 import { emitAuditEvent } from '@holo/audit';
-import { getServerContext } from '@/lib/server-context';
-import { resolveActiveOrgId } from '@/lib/active-org';
+import { withActiveOrg } from '@/lib/with-active-org';
 import {
   enqueueResync,
   isSyncProvider,
@@ -13,34 +10,19 @@ import {
   type Provider,
 } from '@/lib/sync-queue';
 
-export async function POST(
-  _req: Request,
-  { params }: { params: Promise<{ provider: string }> },
-) {
-  try {
-    const { provider: rawProvider } = await params;
-    if (!isSyncProvider(rawProvider)) {
+export const POST = withActiveOrg<{ provider: string }>(
+  async ({ ctx, session, orgId, params }) => {
+    if (!isSyncProvider(params.provider)) {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
-        problem: `unknown provider '${rawProvider}'`,
+        problem: `unknown provider '${params.provider}'`,
         fix: SYNC_PROVIDERS_FIX_HINT,
       });
     }
-    const provider: Provider = rawProvider;
-
-    const { auth, db} = await getServerContext();
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      throw holoError({
-        code: ErrorCode.HOLO_AUTH_NO_SESSION,
-        problem: 'must be signed in',
-        fix: 'Sign in first.',
-      });
-    }
-    const orgId = resolveActiveOrgId(session);
+    const provider: Provider = params.provider;
     const userId = session.user.id;
 
-    const sourceRows = await db
+    const sourceRows = await ctx.db
       .select({ id: schema.sources.id })
       .from(schema.sources)
       .where(
@@ -65,7 +47,7 @@ export async function POST(
     }
 
     emitAuditEvent({
-      db,
+      db: ctx.db,
       organizationId: orgId,
       userId,
       eventType: 'connector.resync_triggered',
@@ -74,16 +56,6 @@ export async function POST(
       meta: { provider, sources: sourceRows.length, queues: enqueued },
     });
 
-    return NextResponse.json({
-      ok: true,
-      sources: sourceRows.length,
-      queues: enqueued,
-    });
-  } catch (e) {
-    if (e instanceof HoloError) {
-      return NextResponse.json({ problem: e.problem, fix: e.fix }, { status: 400 });
-    }
-    console.error(e);
-    return NextResponse.json({ problem: 'internal error' }, { status: 500 });
-  }
-}
+    return { ok: true, sources: sourceRows.length, queues: enqueued };
+  },
+);

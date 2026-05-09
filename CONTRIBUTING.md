@@ -35,7 +35,8 @@ pnpm dev
 - **Zod for all input validation.** Schemas live in `packages/contracts`.
 - **No new dependencies without justification.** Open an issue first.
 - **Defensive DDL.** All migrations use `IF NOT EXISTS` / `IF EXISTS`. Drizzle `push` is banned in CI.
-- **No `any`.** If you really need it, leave a comment explaining why.
+- **No `any`.** ESLint enforces `@typescript-eslint/no-explicit-any: error`. If a third-party type literally requires it (Hono generics, dynamic `import()`'s default-export reshape), add `// eslint-disable-next-line @typescript-eslint/no-explicit-any` with a one-line comment explaining why.
+- **Org-scoped routes use `withActiveOrg`.** New API routes under `apps/web/src/app/api/` should `export const GET = withActiveOrg(async ({ ctx, orgId, params }) => …)` instead of hand-rolling session lookup + `resolveActiveOrgId` + try/catch. The wrapper makes "no orgId" structurally impossible and centralizes `HoloError → status` mapping.
 
 ## Commit and PR style
 

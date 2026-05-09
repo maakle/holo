@@ -1,10 +1,6 @@
-import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { schema } from '@holo/db';
-import { holoError, ErrorCode, HoloError } from '@holo/errors';
-import { getServerContext } from '@/lib/server-context';
-import { resolveActiveOrgId } from '@/lib/active-org';
+import { withActiveOrg } from '@/lib/with-active-org';
 import { activeQueueNames, getQueueByName, SYNC_PROVIDERS } from '@/lib/sync-queue';
 
 // Drive from sync-queue's source-of-truth list so adding a connector there
@@ -36,20 +32,9 @@ function emptyStatus(): ConnectorSyncStatus {
   };
 }
 
-export async function GET() {
-  try {
-    const { auth, db} = await getServerContext();
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      throw holoError({
-        code: ErrorCode.HOLO_AUTH_NO_SESSION,
-        problem: 'must be signed in',
-        fix: 'Sign in first.',
-      });
-    }
-    const orgId = resolveActiveOrgId(session);
-
-    const statuses = Object.fromEntries(
+export const GET = withActiveOrg(async ({ ctx, orgId }) => {
+  const { db } = ctx;
+  const statuses = Object.fromEntries(
       PROVIDERS.map((p) => [p, emptyStatus()]),
     ) as Record<Provider, ConnectorSyncStatus>;
 
@@ -59,7 +44,7 @@ export async function GET() {
       .where(eq(schema.sources.organizationId, orgId));
 
     if (sourceRows.length === 0) {
-      return NextResponse.json({ statuses } satisfies BulkStatusResponse);
+      return { statuses } satisfies BulkStatusResponse;
     }
 
     const sourceIdToProvider = new Map<string, Provider>();
@@ -178,12 +163,5 @@ export async function GET() {
       if (p in statuses) statuses[p].chunksIndexed = row.c;
     }
 
-    return NextResponse.json({ statuses } satisfies BulkStatusResponse);
-  } catch (e) {
-    if (e instanceof HoloError) {
-      return NextResponse.json({ problem: e.problem, fix: e.fix }, { status: 400 });
-    }
-    console.error(e);
-    return NextResponse.json({ problem: 'internal error' }, { status: 500 });
-  }
-}
+    return { statuses } satisfies BulkStatusResponse;
+});

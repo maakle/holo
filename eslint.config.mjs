@@ -36,7 +36,12 @@ export default tseslint.config(
     },
     rules: {
       'no-console': 'off',
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // Promoted from warn to error: the codebase already disables on each
+      // explicit `any` (Hono <any,any,any>, tree-sitter dynamic loaders,
+      // generic registry maps), so error-level only blocks NEW unguarded
+      // anys. Add an `// eslint-disable-next-line @typescript-eslint/no-explicit-any`
+      // with a one-line comment explaining the escape hatch when truly needed.
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': [
         'warn',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
@@ -46,15 +51,18 @@ export default tseslint.config(
   },
 
   // packages/errors itself defines the error infrastructure; bare throws allowed there.
-  // Test files (root tests/**, plus per-package and per-app test dirs) use bare
-  // throws for fixture guards ("seed missing — bail loudly"); the rule's intent
-  // is to catch production throws, not test-internal sentinels.
+  // Test files (root tests/**, per-package and per-app test dirs, plus colocated
+  // *.test.ts inside src/) use bare throws for fixture guards ("seed missing —
+  // bail loudly") and to simulate handler failures; the rule's intent is to
+  // catch production throws, not test-internal sentinels.
   {
     files: [
       'packages/errors/**/*.ts',
       'tests/**/*.ts',
       'packages/*/test/**/*.ts',
       'apps/*/test/**/*.ts',
+      '**/*.test.ts',
+      '**/*.test.tsx',
     ],
     rules: { 'local/no-bare-throw-error': 'off' },
   },
