@@ -14,6 +14,7 @@ interface Props {
  */
 const FILE_BY_ID: Partial<Record<ConnectorMeta['id'], string>> = {
   github: '/connectors/github.webp',
+  gitlab: '/connectors/gitlab.webp',
   slack: '/connectors/slack.webp',
   notion: '/connectors/notion.webp',
   grain: '/connectors/grain.webp',
