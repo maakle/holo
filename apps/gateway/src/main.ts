@@ -2,10 +2,11 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { initCrypto } from '@holo/crypto';
 import { parseEnv } from '@holo/env';
-import { createDb, schema } from '@holo/db';
+import { createDb } from '@holo/db';
 import { HoloError } from '@holo/errors';
 import { getSubjectsForUser } from '@holo/user-subjects';
 import { createSessionMiddleware, type McpSessionVars } from './middleware/session.js';
+import { resolveActiveToolAllowlist } from './middleware/allowlist.js';
 import { mountMcp } from './mcp/transport.js';
 import { apiReference } from '@scalar/hono-api-reference';
 import { createRestRouter, openApiConfig } from './rest/router.js';
@@ -137,24 +138,11 @@ async function main() {
         });
       }
 
-      // Optional: if caller passes x-active-skill-slug header, load that skill's toolAllowlist
-      let activeToolAllowlist: string[] = [];
-      const activeSkillSlug = c.req.header('x-active-skill-slug');
-      if (activeSkillSlug) {
-        const { eq, and } = await import('drizzle-orm');
-        const skillRows = await db
-          .select({ toolAllowlist: schema.skills.toolAllowlist })
-          .from(schema.skills)
-          .where(
-            and(
-              eq(schema.skills.organizationId, user.organizationId),
-              eq(schema.skills.slug, activeSkillSlug),
-              eq(schema.skills.status, 'active'),
-            ),
-          )
-          .limit(1);
-        activeToolAllowlist = skillRows[0]?.toolAllowlist ?? [];
-      }
+      const activeToolAllowlist = await resolveActiveToolAllowlist(
+        db,
+        user.organizationId,
+        c.req.header('x-active-skill-slug'),
+      );
 
       const extraSubjects = await getSubjectsForUser(db, user.userId);
       const sessionId = c.req.header('mcp-session-id');

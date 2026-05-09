@@ -9,7 +9,9 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import type { DB } from '@holo/db';
 import { getSubjectsForUser } from '@holo/user-subjects';
+import { holoError, ErrorCode } from '@holo/errors';
 import type { McpSessionVars } from '../middleware/session.js';
+import { checkToolAllowed, resolveActiveToolAllowlist } from '../middleware/allowlist.js';
 import {
   runListSkillsTool,
   runGetSkillTool,
@@ -160,6 +162,23 @@ export function createRestRouter(db: DB) {
   router.openapi(searchRoute, async (c) => {
     const user = c.get('user');
     const { query, limit } = c.req.valid('json');
+
+    // Match the MCP transport's per-skill toolAllowlist enforcement: if the
+    // caller has activated a skill via `x-active-skill-slug`, the REST
+    // surface honors the same gate — search is only callable when the active
+    // skill's allowlist is empty (allow-all default) or includes 'search'.
+    const activeToolAllowlist = await resolveActiveToolAllowlist(
+      db,
+      user.organizationId,
+      c.req.header('x-active-skill-slug'),
+    );
+    if (!checkToolAllowed('search', activeToolAllowlist)) {
+      throw holoError({
+        code: ErrorCode.HOLO_ALLOWLIST_EMPTY,
+        problem: "Tool 'search' not in active skill allowlist",
+        fix: "Add 'search' to the active skill's toolAllowlist, or activate a different skill.",
+      });
+    }
 
     const extraSubjects = await getSubjectsForUser(db, user.userId);
     const result = await runSearchTool(
