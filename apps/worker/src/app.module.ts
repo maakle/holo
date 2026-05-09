@@ -13,6 +13,7 @@ import { LinearSyncModule } from './queues/linear';
 import { MintlifySyncModule } from './queues/mintlify';
 import { ZendeskSyncModule } from './queues/zendesk';
 import { GoogleDriveSyncModule } from './queues/googledrive';
+import { AirtableSyncModule } from './queues/airtable';
 import { EmbedModule } from './queues/embed';
 import { EmbedBackfillModule } from './queues/embed-backfill';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
@@ -63,6 +64,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     MintlifySyncModule,
     ZendeskSyncModule,
     GoogleDriveSyncModule,
+    AirtableSyncModule,
     EmbedModule,
     EmbedBackfillModule,
     SyncRunnersModule,

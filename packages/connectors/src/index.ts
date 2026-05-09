@@ -56,6 +56,15 @@ export { createHubspotSpec } from './hubspot/index';
 export type { HubspotSpecOptions } from './hubspot/index';
 export { createNotionSpec } from './notion/index';
 export type { NotionSpecOptions } from './notion/index';
+export { createAirtableSpec } from './airtable/index';
+export type {
+  AirtableSpecOptions,
+  AirtableBase,
+  AirtableField,
+  AirtableRecord,
+  AirtableTable,
+  AirtableUserMe,
+} from './airtable/index';
 export { createGrainSpec } from './grain/index';
 export type { GrainSpecOptions } from './grain/index';
 export {
