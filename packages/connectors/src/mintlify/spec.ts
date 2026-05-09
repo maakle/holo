@@ -8,6 +8,7 @@ import {
   type TestConnectionContext,
   type TestConnectionResult,
 } from '@holo/connector-framework';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '../sync-intervals';
 import {
   fetchLlmsIndex,
   fetchPageMarkdown,
@@ -76,6 +77,8 @@ export function createMintlifySpec(opts: MintlifySpecOptions = {}): ConnectorSpe
   return defineConnector({
     id: 'mintlify',
     displayName: 'Mintlify Docs',
+
+    sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.mintlify },
 
     auth: none(),
 

@@ -3,7 +3,12 @@ import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import postgres, { type Sql } from 'postgres';
 import { holoError, ErrorCode } from '@holo/errors';
-import { QUEUE_NAMES, SYNC_REPEAT_EVERY_MS, type SyncJobPayload } from './types';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '@holo/connectors';
+import {
+  isSyncProvider,
+  type SyncProvider,
+} from '@holo/sync-providers';
+import { QUEUE_NAMES, type QueueName, type SyncJobPayload } from './types';
 
 type SourceRow = {
   id: string;
@@ -32,22 +37,57 @@ export function __setSchedulerSqlForTests(sql: Sql | null): void {
   cachedSql = sql;
 }
 
+/**
+ * Per-provider mapping from provider id → BullMQ queue(s) that drive its
+ * sync. GitHub fans out to two queues (code + prose) on the same cadence;
+ * everything else is one queue per provider.
+ */
+type SyncQueueName = Exclude<QueueName, 'embed'>;
+type QueueMap = Record<SyncProvider, ReadonlyArray<SyncQueueName>>;
+
 @Injectable()
 export class SyncSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(SyncSchedulerService.name);
 
+  private readonly queueMap: QueueMap;
+  private readonly queuesByName: Record<Exclude<QueueName, 'embed'>, Queue>;
+
   constructor(
-    @InjectQueue(QUEUE_NAMES.GITHUB_CODE_SYNC) private readonly ghCode: Queue,
-    @InjectQueue(QUEUE_NAMES.GITHUB_PROSE_SYNC) private readonly ghProse: Queue,
-    @InjectQueue(QUEUE_NAMES.SLACK_SYNC) private readonly slack: Queue,
-    @InjectQueue(QUEUE_NAMES.NOTION_SYNC) private readonly notion: Queue,
-    @InjectQueue(QUEUE_NAMES.GRAIN_SYNC) private readonly grain: Queue,
-    @InjectQueue(QUEUE_NAMES.PYLON_SYNC) private readonly pylon: Queue,
-    @InjectQueue(QUEUE_NAMES.HUBSPOT_SYNC) private readonly hubspot: Queue,
-    @InjectQueue(QUEUE_NAMES.LINEAR_SYNC) private readonly linear: Queue,
-    @InjectQueue(QUEUE_NAMES.MINTLIFY_SYNC) private readonly mintlify: Queue,
-    @InjectQueue(QUEUE_NAMES.ZENDESK_SYNC) private readonly zendesk: Queue,
-  ) {}
+    @InjectQueue(QUEUE_NAMES.GITHUB_CODE_SYNC) ghCode: Queue,
+    @InjectQueue(QUEUE_NAMES.GITHUB_PROSE_SYNC) ghProse: Queue,
+    @InjectQueue(QUEUE_NAMES.SLACK_SYNC) slack: Queue,
+    @InjectQueue(QUEUE_NAMES.NOTION_SYNC) notion: Queue,
+    @InjectQueue(QUEUE_NAMES.GRAIN_SYNC) grain: Queue,
+    @InjectQueue(QUEUE_NAMES.PYLON_SYNC) pylon: Queue,
+    @InjectQueue(QUEUE_NAMES.HUBSPOT_SYNC) hubspot: Queue,
+    @InjectQueue(QUEUE_NAMES.LINEAR_SYNC) linear: Queue,
+    @InjectQueue(QUEUE_NAMES.MINTLIFY_SYNC) mintlify: Queue,
+    @InjectQueue(QUEUE_NAMES.ZENDESK_SYNC) zendesk: Queue,
+  ) {
+    this.queueMap = {
+      github: [QUEUE_NAMES.GITHUB_CODE_SYNC, QUEUE_NAMES.GITHUB_PROSE_SYNC],
+      slack: [QUEUE_NAMES.SLACK_SYNC],
+      notion: [QUEUE_NAMES.NOTION_SYNC],
+      grain: [QUEUE_NAMES.GRAIN_SYNC],
+      pylon: [QUEUE_NAMES.PYLON_SYNC],
+      hubspot: [QUEUE_NAMES.HUBSPOT_SYNC],
+      linear: [QUEUE_NAMES.LINEAR_SYNC],
+      mintlify: [QUEUE_NAMES.MINTLIFY_SYNC],
+      zendesk: [QUEUE_NAMES.ZENDESK_SYNC],
+    };
+    this.queuesByName = {
+      [QUEUE_NAMES.GITHUB_CODE_SYNC]: ghCode,
+      [QUEUE_NAMES.GITHUB_PROSE_SYNC]: ghProse,
+      [QUEUE_NAMES.SLACK_SYNC]: slack,
+      [QUEUE_NAMES.NOTION_SYNC]: notion,
+      [QUEUE_NAMES.GRAIN_SYNC]: grain,
+      [QUEUE_NAMES.PYLON_SYNC]: pylon,
+      [QUEUE_NAMES.HUBSPOT_SYNC]: hubspot,
+      [QUEUE_NAMES.LINEAR_SYNC]: linear,
+      [QUEUE_NAMES.MINTLIFY_SYNC]: mintlify,
+      [QUEUE_NAMES.ZENDESK_SYNC]: zendesk,
+    };
+  }
 
   async onModuleInit(): Promise<void> {
     if (process.env.HOLO_SKIP_SYNC_SCHEDULER === '1') {
@@ -56,6 +96,11 @@ export class SyncSchedulerService implements OnModuleInit {
     }
     try {
       const sources = await this.loadSources();
+      // Reconcile first: drop repeats whose `every` no longer matches the
+      // spec's cadence. Without this, BullMQ keeps the old schedule alive
+      // alongside the new one when intervals change between deploys, and
+      // sources end up firing twice per cycle until the old key ages out.
+      await this.reconcileRepeats(sources);
       for (const s of sources) {
         await this.scheduleSource(s);
       }
@@ -71,47 +116,63 @@ export class SyncSchedulerService implements OnModuleInit {
   }
 
   private async scheduleSource(s: SourceRow): Promise<void> {
+    if (!isSyncProvider(s.provider)) {
+      this.logger.warn(`unknown provider '${s.provider}' for source ${s.id}; skipping schedule`);
+      return;
+    }
+    const intervalMs = SYNC_INTERVAL_MS_BY_PROVIDER[s.provider];
     const payload: SyncJobPayload = { sourceId: s.id, organizationId: s.organization_id };
-    const repeat = { every: SYNC_REPEAT_EVERY_MS };
+    const repeat = { every: intervalMs };
+    for (const queueName of this.queueMap[s.provider]) {
+      await this.queuesByName[queueName].add('sync', payload, { repeat });
+    }
+  }
 
-    if (s.provider === 'github') {
-      // github sources drive both code and prose queues.
-      await this.ghCode.add('sync', payload, { repeat });
-      await this.ghProse.add('sync', payload, { repeat });
-      return;
+  /**
+   * Drops repeatable schedulers whose `every` doesn't match the current
+   * spec cadence. BullMQ keys repeats by (name, cron/every, jobId), so a
+   * cadence change creates a *new* key alongside the old one rather than
+   * replacing it; we have to clear the old explicitly.
+   */
+  private async reconcileRepeats(sources: SourceRow[]): Promise<void> {
+    const expectedByQueue = new Map<SyncQueueName, Set<number>>();
+    for (const s of sources) {
+      if (!isSyncProvider(s.provider)) continue;
+      const intervalMs = SYNC_INTERVAL_MS_BY_PROVIDER[s.provider];
+      for (const queueName of this.queueMap[s.provider]) {
+        let set = expectedByQueue.get(queueName);
+        if (!set) {
+          set = new Set();
+          expectedByQueue.set(queueName, set);
+        }
+        set.add(intervalMs);
+      }
     }
-    if (s.provider === 'slack') {
-      await this.slack.add('sync', payload, { repeat });
-      return;
+    for (const [queueName, queue] of Object.entries(this.queuesByName) as Array<
+      [SyncQueueName, Queue]
+    >) {
+      let cleared = 0;
+      try {
+        const repeats = await queue.getRepeatableJobs(0, -1, true);
+        const expected = expectedByQueue.get(queueName) ?? new Set<number>();
+        for (const r of repeats) {
+          const every = typeof r.every === 'string' ? Number(r.every) : r.every;
+          if (typeof every !== 'number' || !Number.isFinite(every)) continue;
+          if (expected.has(every)) continue;
+          await queue.removeRepeatableByKey(r.key);
+          cleared += 1;
+        }
+      } catch (err) {
+        this.logger.warn(
+          `repeat reconcile failed for ${queueName}: ${(err as Error).message}`,
+        );
+        continue;
+      }
+      if (cleared > 0) {
+        this.logger.log(
+          `cleared ${cleared} stale repeat(s) on ${queueName} (intervals no longer match spec)`,
+        );
+      }
     }
-    if (s.provider === 'notion') {
-      await this.notion.add('sync', payload, { repeat });
-      return;
-    }
-    if (s.provider === 'grain') {
-      await this.grain.add('sync', payload, { repeat });
-      return;
-    }
-    if (s.provider === 'pylon') {
-      await this.pylon.add('sync', payload, { repeat });
-      return;
-    }
-    if (s.provider === 'hubspot') {
-      await this.hubspot.add('sync', payload, { repeat });
-      return;
-    }
-    if (s.provider === 'linear') {
-      await this.linear.add('sync', payload, { repeat });
-      return;
-    }
-    if (s.provider === 'mintlify') {
-      await this.mintlify.add('sync', payload, { repeat });
-      return;
-    }
-    if (s.provider === 'zendesk') {
-      await this.zendesk.add('sync', payload, { repeat });
-      return;
-    }
-    this.logger.warn(`unknown provider '${s.provider}' for source ${s.id}; skipping schedule`);
   }
 }

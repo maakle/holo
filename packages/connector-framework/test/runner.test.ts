@@ -63,6 +63,7 @@ describe('runConnectorSync', () => {
     const spec = defineConnector({
       id: 'demo',
       displayName: 'Demo',
+      sync: { intervalMs: 60_000 },
       auth: apiKey(),
       http: { baseUrl: 'https://api.demo.com' },
       async testConnection() {
@@ -124,6 +125,7 @@ describe('runConnectorSync', () => {
     const spec = defineConnector({
       id: 'demo',
       displayName: 'Demo',
+      sync: { intervalMs: 60_000 },
       auth: apiKey(),
       http: { baseUrl: 'https://x' },
       async testConnection() {
@@ -196,6 +198,7 @@ describe('runConnectorSync', () => {
     const spec = defineConnector({
       id: 'demo',
       displayName: 'Demo',
+      sync: { intervalMs: 60_000 },
       auth: apiKey(),
       http: { baseUrl: 'https://x' },
       async testConnection() {
@@ -250,6 +253,7 @@ describe('runConnectorSync', () => {
       defineConnector({
         id: 'demo',
         displayName: 'Demo',
+        sync: { intervalMs: 60_000 },
         auth: apiKey(),
         async testConnection() {
           return { externalId: '', name: '' };
@@ -287,6 +291,7 @@ describe('runConnectorSync', () => {
     const spec = defineConnector({
       id: 'demo',
       displayName: 'Demo',
+      sync: { intervalMs: 60_000 },
       auth: apiKey(),
       http: { baseUrl: 'https://x' },
       async testConnection() {

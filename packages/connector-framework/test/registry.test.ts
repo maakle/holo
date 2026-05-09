@@ -12,6 +12,7 @@ import {
 const a = defineConnector({
   id: 'a',
   displayName: 'A',
+  sync: { intervalMs: 60_000 },
   auth: apiKey(),
   async testConnection() {
     return { externalId: '', name: '' };

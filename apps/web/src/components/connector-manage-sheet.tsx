@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '@holo/connectors';
 import { useConnectorStatus } from '@/lib/connectors-status-store';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,15 @@ function formatRelative(iso: string): string {
   const day = Math.floor(hr / 24);
   if (day < 30) return `${day}d ago`;
   return new Date(iso).toLocaleDateString();
+}
+
+function formatInterval(ms: number): string {
+  const hours = Math.round(ms / (60 * 60 * 1000));
+  if (hours >= 24 && hours % 24 === 0) {
+    const days = hours / 24;
+    return days === 1 ? 'day' : `${days} days`;
+  }
+  return hours === 1 ? 'hour' : `${hours} hours`;
 }
 
 export function ConnectorManageSheet({
@@ -232,6 +242,9 @@ export function ConnectorManageSheet({
                 }`
               : 'Never synced'}
           </SheetDescription>
+          <p className="text-[12px] text-text-muted">
+            Syncs automatically every {formatInterval(SYNC_INTERVAL_MS_BY_PROVIDER[meta.id])}
+          </p>
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">

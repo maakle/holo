@@ -22,6 +22,7 @@
     "@holo/connector-framework": "workspace:*",
     "@holo/db": "workspace:*",
     "@holo/errors": "workspace:*",
+    "@holo/sync-providers": "workspace:*",
     "drizzle-orm": "0.45.2",
     "jose": "5.9.6",
     "minimatch": "^9.0.5",

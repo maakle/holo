@@ -545,6 +545,9 @@ importers:
       '@holo/errors':
         specifier: workspace:*
         version: link:../errors
+      '@holo/sync-providers':
+        specifier: workspace:*
+        version: link:../sync-providers
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(kysely@0.28.17)(postgres@3.4.9)

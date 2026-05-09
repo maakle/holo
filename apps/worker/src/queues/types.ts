@@ -46,9 +46,6 @@ export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   embed: 5,
 };
 
-// 6 hours, per BullMQ topology table.
-export const SYNC_REPEAT_EVERY_MS = 6 * 60 * 60 * 1000;
-
 export type SyncJobPayload = {
   sourceId: string;
   organizationId: string;

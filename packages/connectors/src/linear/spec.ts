@@ -7,6 +7,7 @@ import {
   type TestConnectionContext,
   type TestConnectionResult,
 } from '@holo/connector-framework';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '../sync-intervals';
 import { ISSUES_QUERY, VIEWER_QUERY, graphql } from './api';
 import { processIssue } from './chunking';
 import type { LinearIssuesResponse, LinearViewerResponse } from './types';
@@ -31,6 +32,8 @@ export function createLinearSpec(opts: LinearSpecOptions): ConnectorSpec {
   return defineConnector({
     id: 'linear',
     displayName: 'Linear',
+
+    sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.linear },
 
     auth: oauth2({
       clientId: opts.clientId,

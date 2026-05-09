@@ -111,6 +111,20 @@ export interface UiSpec {
   }>;
 }
 
+/**
+ * Scheduling policy for a connector. Lives on the spec so cadence is owned
+ * by the integration (alongside auth, resources, UI category) rather than
+ * the worker. The web app reads `intervalMs` to display "Syncs every N
+ * hours" in the manage sheet; the worker reads it to drive BullMQ repeat.
+ *
+ * Defaults are centralised in `SYNC_INTERVAL_MS_BY_PROVIDER` (in
+ * `@holo/connectors`) so the single source of truth is one map keyed by
+ * provider id, and the spec object exposes the same value.
+ */
+export interface ConnectorSyncSpec {
+  readonly intervalMs: number;
+}
+
 export interface ConnectorSpec {
   readonly id: string;
   readonly displayName: string;
@@ -121,6 +135,8 @@ export interface ConnectorSpec {
   testConnection(ctx: TestConnectionContext): Promise<TestConnectionResult>;
 
   readonly resources: ReadonlyArray<ResourceSpec<unknown>>;
+
+  readonly sync: ConnectorSyncSpec;
 
   readonly webhooks?: WebhookSpec;
   readonly ui?: UiSpec;

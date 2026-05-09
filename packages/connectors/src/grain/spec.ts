@@ -7,6 +7,7 @@ import {
   type TestConnectionContext,
   type TestConnectionResult,
 } from '@holo/connector-framework';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '../sync-intervals';
 import { listRecordings } from './api';
 import { processRecording } from './chunking';
 
@@ -28,6 +29,8 @@ export function createGrainSpec(_opts: GrainSpecOptions = {}): ConnectorSpec {
   return defineConnector({
     id: 'grain',
     displayName: 'Grain',
+
+    sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.grain },
 
     // Workspace Access Tokens see every recording in the Grain workspace;
     // Personal Access Tokens are scoped to the issuing user. The wire format

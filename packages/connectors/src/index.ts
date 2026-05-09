@@ -1,4 +1,8 @@
 export * as shared from './shared/index';
+export {
+  SYNC_INTERVAL_MS_BY_PROVIDER,
+  getSyncIntervalMs,
+} from './sync-intervals';
 export { resolveAllowlist } from './shared/allowlist';
 export type { ResolveAllowlistInput, AllowlistResult, AllowlistRow } from './shared/allowlist';
 export { chunkHash, dedupeAgainstDb } from './shared/content-hash';
