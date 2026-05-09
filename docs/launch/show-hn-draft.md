@@ -9,7 +9,7 @@ Working draft of the Show HN post for the v0.1.0 launch. Tweak the numbers and l
 - [ ] `npx @holo/cli@0.3.0 init` works first-try in an empty directory on macOS + Linux.
 - [ ] At least 2 external CTOs have run holo against their own data for >2 weeks (per the v0.1 wedge-validation gate). Ideally one quotable testimonial.
 - [ ] Demo recording (≤3 min) uploaded to YouTube unlisted; URL substituted into the body.
-- [ ] GitHub Discussions are open and the founder has time to triage daily for the first week.
+- [ ] GitHub Discussions are open and the maintainer has time to triage daily for the first week.
 - [ ] Skill-quality kill-switch decision made: the body claims "labeled-template skills" only if the 3-of-5-usable golden-set check passed.
 
 ---
@@ -29,7 +29,7 @@ Alternates if the above feels off:
 
 ## Body (the OP comment)
 
-> Hi HN — I'm Mathias. For the last six months I've been the founder & CTO of a 30-person dev-tools company, and I kept watching us implement the same context fetcher three times: once for our Slack-triggered support-question agent, once for an interview-prep agent, once for a customer-success draft-reply agent. Each one had its own bespoke retriever over Slack threads, GitHub PRs, Notion pages, Grain calls, Pylon tickets, HubSpot deals. They drifted. They had different ACL stories. None of them could actually answer "what was the resolution on the EGYM ticket Mark closed last week" without a separate fetch.
+> Hi HN — I'm Mathias. For the last six months I've been Head of Engineering at a 60-person YC dev-tools company, and I kept watching us implement the same context fetcher three times: once for our Slack-triggered support-question agent, once for an interview-prep agent, once for a customer-success draft-reply agent. Each one had its own bespoke retriever over Slack threads, GitHub PRs, Notion pages, Grain calls, Pylon tickets, HubSpot deals. They drifted. They had different ACL stories. None of them could actually answer "what was the resolution on the EGYM ticket Mark closed last week" without a separate fetch.
 >
 > Holo is the tier I wanted. Connect Slack / GitHub / Notion / Grain / Pylon / HubSpot / Linear / Mintlify / Zendesk once. Holo ingests with cursor-based incremental sync (no nightly full re-pulls), chunks per-source-type, embeds, and indexes them in a single Postgres + pgvector + tsvector store. Hybrid retrieval (RRF fusion) over a single ACL-aware index. Then a small MCP tool surface (`search`, `get_thread`, `get_pr`, `get_doc`, `get_call`, `get_ticket`) and a parallel REST/OpenAPI endpoint serve every agent on the team — Claude, Cursor, ChatGPT, Gemini, your own. Same chunks, same ACL, same audit log.
 >
@@ -99,7 +99,7 @@ No voiceover. End frame: repo URL + GitHub Discussions URL.
 > Skills *format* is the same — Anthropic's frontmatter + procedure + example tools. Holo just lives one tier down: it's the place every agent fetches context *into* the skills format from, plus the surface where you (eventually) browse and import community skills. Onyx-of-procedures, not a competitor to Anthropic's spec.
 
 **"You shipped this fast. Are you sure about all the assumptions?"**
-> No, that's why v0.1 doesn't go public until 2+ external CTOs confirm the multi-agent context-duplication pain over their own week-long usage. The roadmap reframe in 2026-04 (`docs/decisions/0004-...`) was an explicit reaction to "we don't actually know if this matters outside the founder's company yet." Cold-DM responders gating Show HN is the test.
+> No, that's why v0.1 doesn't go public until 2+ external CTOs confirm the multi-agent context-duplication pain over their own week-long usage. The roadmap reframe in 2026-04 (`docs/decisions/0004-...`) was an explicit reaction to "we don't actually know if this matters outside my own company yet." Cold-DM responders gating Show HN is the test.
 
 ---
 
@@ -112,5 +112,5 @@ No voiceover. End frame: repo URL + GitHub Discussions URL.
 - [ ] First paragraph names a specific, concrete pain.
 - [ ] Repo README's quickstart works first-try on a fresh macOS install — re-verify the morning of posting.
 - [ ] GitHub Discussions are open and have visible categories.
-- [ ] Founder is at a keyboard for the next ~6 hours after posting.
+- [ ] Maintainer is at a keyboard for the next ~6 hours after posting.
 - [ ] Issue tracker is empty or close to it (no `Q4 P0 BUG` flags).
