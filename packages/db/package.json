@@ -16,7 +16,8 @@
     "test": "vitest run",
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/migrate.ts",
-    "studio": "drizzle-kit studio"
+    "studio": "drizzle-kit studio",
+    "check": "tsx scripts/check-migrations.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

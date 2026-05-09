@@ -32,6 +32,9 @@ jobs:
         with: { node-version: 20, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      # Drizzle migration meta guardrail: catches non-monotonic journals,
+      # missing snapshots, journal/SQL mismatches. Free fast check, no DB.
+      - run: pnpm -F @holo/db check
 
   typecheck:
     runs-on: ubuntu-latest
