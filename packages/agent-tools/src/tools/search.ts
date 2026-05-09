@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { DB } from '@holo/db';
 import { search, type SearchResult } from '@holo/retrieval-core';
+import { maybeReportTthw, readTthwEnv } from '../tthw';
 
 export const searchInputSchema = z.object({
   q: z.string().min(1),
@@ -12,6 +13,11 @@ export interface SearchToolContext {
   db: DB;
   organizationId: string;
   userSubjects: string[];
+  /**
+   * Optional override for `process.env`. Tests inject a controlled object;
+   * the gateway leaves this undefined so the real env is read.
+   */
+  envOverride?: Record<string, string | undefined>;
 }
 
 function deriveSnippetUrl(result: SearchResult): string | undefined {
@@ -74,6 +80,15 @@ export async function runSearchTool(
     topK: input.top_k,
     provider: input.provider,
     userSubjects: ctx.userSubjects,
+  });
+
+  // CP3 follow-up: fire the TTHW first-search reporter. No-op when telemetry
+  // env vars are absent or opt-in is false. Awaited (cheap when no-op) so
+  // tests can observe the side effect, but the underlying POST is fire-and-
+  // forget inside maybeReportTthw.
+  await maybeReportTthw({
+    db: ctx.db,
+    env: readTthwEnv(ctx.envOverride ?? process.env),
   });
 
   return {

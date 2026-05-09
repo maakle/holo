@@ -10,7 +10,8 @@
   },
   "scripts": {
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@holo/custom-tools": "workspace:*",
@@ -22,6 +23,7 @@
     "zod": "4.4.2"
   },
   "devDependencies": {
-    "typescript": "5.6.3"
+    "typescript": "5.6.3",
+    "vitest": "^2.1.3"
   }
 }

@@ -794,3 +794,31 @@ export const chatMessages = pgTable(
     ),
   }),
 );
+
+/**
+ * One row per holo install, recording the time-to-hello-world (TTHW) telemetry
+ * envelope. The CLI's `holo init` writes the install ID and start timestamp
+ * into env vars (see HOLO_TELEMETRY_*). The gateway records this row on the
+ * first successful MCP `search` call IFF telemetry is opted in. The unique
+ * `install_id` PK + ON CONFLICT DO NOTHING is the "fire once" gate — the
+ * second search through the same gateway is a no-op.
+ *
+ * `report_status` reflects the fire-and-forget POST to HOLO_TELEMETRY_ENDPOINT:
+ *   - 'pending' — row inserted, POST not attempted yet (transient state)
+ *   - 'sent'    — POST returned 2xx
+ *   - 'failed'  — POST errored or returned non-2xx (we never retry; the row
+ *                 stays as a record of the install regardless)
+ *   - 'noop'    — endpoint not configured; row recorded locally only
+ */
+export const tthwReports = pgTable(
+  'tthw_reports',
+  {
+    installId: text('install_id').primaryKey(),
+    startedAtMs: bigint('started_at_ms', { mode: 'number' }).notNull(),
+    finishedAtMs: bigint('finished_at_ms', { mode: 'number' }).notNull(),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+    reportStatus: text('report_status', { enum: ['pending', 'sent', 'failed', 'noop'] })
+      .notNull()
+      .default('pending'),
+  },
+);
