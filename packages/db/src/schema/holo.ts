@@ -398,6 +398,35 @@ export const mcpInvocations = pgTable(
 /** Forward-compatible alias. Prefer this in new code. */
 export const agentEvents = mcpInvocations;
 
+/**
+ * One row per time a user opens an MCP-invocation replay page. Used as the
+ * "per-CTO replay" metric (CP2 from /plan-ceo-review): a proxy that the
+ * OS-tomorrow framing is landing — we want to know how many distinct users
+ * have actually clicked into and reviewed at least one replay. Multiple
+ * views by the same user on the same invocation are kept as an audit trail
+ * (no unique constraint); aggregation queries use COUNT DISTINCT.
+ */
+export const replayViews = pgTable(
+  'replay_views',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    mcpInvocationId: uuid('mcp_invocation_id')
+      .notNull()
+      .references(() => mcpInvocations.id, { onDelete: 'cascade' }),
+    viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgViewedIdx: index('replay_views_org_viewed_idx').on(t.organizationId, t.viewedAt),
+    orgUserIdx: index('replay_views_org_user_idx').on(t.organizationId, t.userId),
+  }),
+);
+
 export const apiTokens = pgTable(
   'api_tokens',
   {

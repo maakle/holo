@@ -37,6 +37,18 @@ export default async function ReplayPage({ params }: ReplayPageProps) {
 
   if (!invocation) notFound();
 
+  // Record this view for the per-CTO replay metric (CP2). Best-effort —
+  // a failure here must not block rendering the replay.
+  try {
+    await db.insert(schema.replayViews).values({
+      organizationId: orgId,
+      userId: session.user.id,
+      mcpInvocationId: invocation.id,
+    });
+  } catch {
+    // swallow — telemetry-style write, not user-critical.
+  }
+
   const isError = !!invocation.errorCode;
 
   return (

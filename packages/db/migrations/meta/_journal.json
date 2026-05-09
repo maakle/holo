@@ -239,6 +239,13 @@
       "when": 1779004800000,
       "tag": "0033_chunks_embedding_model_default_small",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1779062400000,
+      "tag": "0034_replay_views",
+      "breakpoints": true
     }
   ]
 }
