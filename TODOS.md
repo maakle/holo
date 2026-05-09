@@ -8,19 +8,23 @@ Tracked work that isn't in scope for the current milestone but shouldn't be forg
 
 **What:** Implement the v0.1 test plan at `~/.gstack/projects/maakle-holo/maakle-main-eng-review-test-plan-20260429-122216.md` before any external CTO is invited to v0.1.
 
-**Why:** v0.0 ships untested by deliberate founder choice (the blast radius is the founder's own company; founder accepts the risk of internal data being seen in agent responses while iterating). v0.1 invites external CTOs onto holo with their own customer data — different blast radius. The minimum-viable test plan covers:
+**Why:** v0.0 ships untested by deliberate founder choice (the blast radius is the founder's own company; founder accepts the risk of internal data being seen in agent responses while iterating). v0.1 invites external CTOs onto holo with their own customer data — different blast radius.
 
-- Allowlist enforcement (CRITICAL — silent allowlist drift would leak data)
-- Per-connector ingestion + retrieval integration tests
-- Hybrid search behavior (BM25, vector, RRF fusion)
-- One Connections-page OAuth E2E
-- Skill eval harness with ≥10 golden-set entries (for v0.1 skill synthesis)
-- **Skill marketplace publish (CP1):** redaction-pass golden-set tests with 10 hand-labeled PII examples to verify LLM-redaction works; takedown flow E2E
-- **Observability dashboard (CP2):** snapshot test on the replay diff rendering; metric correctness for replay-views-per-CTO
-- **`npx holo init` (CP3 + DX D44):** integration test on a clean Linux container — full bootstrap completes + first MCP `search` query succeeds in ≤ 30 seconds (GitHub-only quickstart)
-- **`HoloError` format (DX D46):** golden-set tests for 5+ error scenarios (missing token, OAuth failure, ingestion fail, search miss, rate limit). Verify each error has `code`, `problem`, `cause`, `fix`, `docs_url` populated. ESLint rule blocks bare `throw new Error()`.
-- **"Connect your agent" page (DX D45):** snapshot tests for each generated config blob (Cursor, Claude Desktop, Cline, curl, Python, TypeScript). Verify token substitution and copy-button works.
-- **TTHW telemetry (DX D48):** end-to-end test: install → first search → metric emitted to local endpoint with anonymous UUID + duration. Privacy test: verify no data content in payload.
+**Status (2026-05-09 — see `claude/v01-test-plan` PR):**
+
+| Item | Status | Where |
+|---|---|---|
+| Allowlist enforcement (CRITICAL) | ✅ covered | `packages/connectors/test/shared/{allowlist,evaluate-allowlist}.test.ts` (DB-backed + pure-function); `packages/connectors/test/{notion,slack,github}.test.ts` allowlist-gating describe blocks |
+| Per-connector ingestion + retrieval integration | ✅ covered | All 9 `packages/connectors/test/*.test.ts` (github, slack, notion, grain, pylon, hubspot, linear, mintlify, zendesk); plus `packages/retrieval-core/test/connector-roundtrip.test.ts` for the embed→search round-trip |
+| Hybrid search (BM25, vector, RRF fusion) | ✅ covered | `packages/retrieval-core/test/{parity,query-router}.test.ts` |
+| `HoloError` format golden-set (5+ scenarios) | ✅ covered | `packages/errors/test/holo-error.scenarios.test.ts` (7 scenarios: missing token x2, OAuth failure, rate limit, search miss, allowlist empty, no active org). ESLint rule `local/no-bare-throw-error: error` already blocks bare throws. |
+| Connections-page OAuth E2E | 🟡 **partial / skipped** | `tests/e2e/tests/connections.spec.ts` exists but is `test.skip` because Better Auth verifies session cookies via HMAC and direct DB seeding fails verification. Unblocking needs option (1) call `auth.api.signInEmail` programmatically, (2) drive real OAuth via mocked GitHub, or (3) mock `getSession` at the Next.js handler boundary. |
+| "Connect your agent" snapshot tests for config blobs | ⏸ **deferred** | `mcpJsonConfig` / `curlVerify` are private helpers in `apps/web/src/components/connect-agent-panel.tsx`. Either export them (overlaps with the connect-agent-panel split PR) or use RTL/jsdom to render and snapshot. Pick one once the split PR lands. |
+| Skill eval harness (≥10 golden entries) | ❌ **blocked** | `packages/skills` is v0.5 per ROADMAP. No skill synthesizer to evaluate yet. |
+| Skill marketplace publish (CP1) — redaction golden-set + takedown E2E | ❌ **blocked** | No skill marketplace shipped. |
+| Observability dashboard (CP2) — replay diff snapshot + metric correctness | ❌ **blocked** | Replay diff feature not implemented. |
+| `npx holo init` (CP3 + DX D44) — clean-container integration test | ❌ **blocked** | No `holo init` command in `packages/cli` yet. |
+| TTHW telemetry (DX D48) — install→first-search timing + privacy assertion | ❌ **blocked** | No telemetry surface implemented. |
 
 **Pros:** Catches the allowlist regression that would cause an incident on day 1 of v0.1; per-connector tests catch ingestion drift when source APIs change; skill eval harness prevents silent quality regression on prompt iteration.
 
@@ -28,7 +32,7 @@ Tracked work that isn't in scope for the current milestone but shouldn't be forg
 
 **Context:** During /plan-eng-review on 2026-04-29, founder accepted v0.0-untested as a calculated risk for internal-only build. The non-optional gate for v0.1 was logged then. If this TODO is skipped, the v0.1 launch is at meaningful incident risk.
 
-**Depends on / blocked by:** Nothing — implementable in parallel with v0.1 feature work.
+**Depends on / blocked by:** Five remaining items are blocked on features (skill synthesizer, skill marketplace, observability replay, `holo init`, TTHW telemetry) that have not shipped. They become test-able as those features land.
 
 ---
 
