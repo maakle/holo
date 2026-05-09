@@ -147,6 +147,7 @@ export function createPylonSpec(_opts: PylonSpecOptions = {}): ConnectorSpec {
   return defineConnector({
     id: 'pylon',
     displayName: 'Pylon',
+    sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.pylon },
     auth: apiKey({ prefix: 'Bearer ' }),
     http: { baseUrl: 'https://api.usepylon.com' },
     async testConnection(ctx) {

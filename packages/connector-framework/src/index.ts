@@ -14,6 +14,7 @@ export type {
   ResourceSpec,
   ResourceSyncContext,
   ChunkUpsert,
+  ConnectorSyncSpec,
   ReportProgressFn,
   TestConnectionContext,
   TestConnectionResult,

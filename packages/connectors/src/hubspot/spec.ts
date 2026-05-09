@@ -7,6 +7,7 @@ import {
   type TestConnectionContext,
   type TestConnectionResult,
 } from '@holo/connector-framework';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '../sync-intervals';
 import { listRecords } from './api';
 import { processRecord } from './chunking';
 import type { HubspotObjectType, HubspotPage } from './types';
@@ -84,6 +85,8 @@ export function createHubspotSpec(_opts: HubspotSpecOptions = {}): ConnectorSpec
   return defineConnector({
     id: 'hubspot',
     displayName: 'HubSpot',
+
+    sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.hubspot },
 
     auth: apiKey({ prefix: 'Bearer ' }),
 

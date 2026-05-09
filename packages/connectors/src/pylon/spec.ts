@@ -7,6 +7,7 @@ import {
   type TestConnectionContext,
   type TestConnectionResult,
 } from '@holo/connector-framework';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '../sync-intervals';
 import { searchIssues } from './api';
 import { processTicket } from './chunking';
 
@@ -28,6 +29,8 @@ export function createPylonSpec(_opts: PylonSpecOptions = {}): ConnectorSpec {
   return defineConnector({
     id: 'pylon',
     displayName: 'Pylon',
+
+    sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.pylon },
 
     auth: apiKey({ prefix: 'Bearer ' }),
 

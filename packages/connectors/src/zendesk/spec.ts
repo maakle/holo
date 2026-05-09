@@ -8,6 +8,7 @@ import {
   type TestConnectionContext,
   type TestConnectionResult,
 } from '@holo/connector-framework';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '../sync-intervals';
 import {
   fetchAllCategories,
   fetchAllSections,
@@ -60,6 +61,8 @@ export function createZendeskSpec(opts: ZendeskSpecOptions = {}): ConnectorSpec 
   return defineConnector({
     id: 'zendesk',
     displayName: 'Zendesk Help Center',
+
+    sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.zendesk },
 
     auth: none(),
 

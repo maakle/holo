@@ -9,6 +9,7 @@ import {
   type TestConnectionResult,
 } from '@holo/connector-framework';
 import { evaluateAllowlist } from '../shared/allowlist';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '../sync-intervals';
 import { createSlackApiClient } from './api';
 import { processChannels, type ThreadsCursor } from './chunking';
 
@@ -99,6 +100,8 @@ export function createSlackSpec(opts: SlackSpecOptions): ConnectorSpec {
   return defineConnector({
     id: 'slack',
     displayName: 'Slack',
+
+    sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.slack },
 
     auth: oauth2({
       clientId: opts.clientId,

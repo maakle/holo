@@ -9,6 +9,7 @@ import {
   type TestConnectionResult,
 } from '@holo/connector-framework';
 import { evaluateAllowlist } from '../shared/allowlist';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '../sync-intervals';
 import { iterateAllAccessiblePages, NOTION_VERSION_HEADER, viewer, isStatus } from './api';
 import { processPages } from './chunking';
 
@@ -54,6 +55,8 @@ export function createNotionSpec(_opts: NotionSpecOptions = {}): ConnectorSpec {
   return defineConnector({
     id: 'notion',
     displayName: 'Notion',
+
+    sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.notion },
 
     auth: apiKey({ prefix: 'Bearer ' }),
 

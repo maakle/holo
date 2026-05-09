@@ -9,6 +9,7 @@ import {
   type TestConnectionResult,
 } from '@holo/connector-framework';
 import { evaluateAllowlist } from '../shared/allowlist';
+import { SYNC_INTERVAL_MS_BY_PROVIDER } from '../sync-intervals';
 import { listInstallationRepos } from './auth';
 import { defaultWorkDirRoot, processCodeRepos, processProseRepos } from './chunking';
 
@@ -70,6 +71,8 @@ export function createGithubSpec(opts: GithubSpecOptions): ConnectorSpec {
   return defineConnector({
     id: 'github',
     displayName: 'GitHub',
+
+    sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.github },
 
     auth,
 
