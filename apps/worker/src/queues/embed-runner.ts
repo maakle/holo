@@ -1,5 +1,6 @@
 import type { Sql } from 'postgres';
 import { holoError, ErrorCode } from '@holo/errors';
+import { resolveOpenAiModel } from '@holo/embedder';
 import {
   insertEmbeddedChunks,
   type ChunkInsertPayload,
@@ -18,12 +19,19 @@ export interface EmbedderClient {
   embedBatch(model: EmbeddingModel, texts: string[]): Promise<number[][]>;
 }
 
-// Mapping from chunk.kind → embedding model. Mirrors the rule in
-// packages/embedder/src/router.ts: `github-code` chunks go to voyage,
-// everything else to openai. Kept local so the worker doesn't have a
-// build-time dep on @holo/embedder.
+/**
+ * Routes a chunk to its embedding model. `github-code` always goes to
+ * Voyage; everything else goes to whatever OpenAI tier the operator
+ * has selected via `OPENAI_EMBEDDING_MODEL`. Mirrors the rule in
+ * packages/embedder/src/router.ts. Kept local so the worker doesn't
+ * pull a build-time dep on the full @holo/embedder runtime.
+ *
+ * The openai tag is read from env on every call rather than cached so
+ * tests can flip the env var per-case via `vi.stubEnv`.
+ */
 export function modelForChunkKind(kind: string): EmbeddingModel {
-  return kind === 'github-code' ? 'voyage-code-3' : 'openai-3-small';
+  if (kind === 'github-code') return 'voyage-code-3';
+  return resolveOpenAiModel().tag;
 }
 
 export type RunEmbedJobArgs = {
@@ -43,8 +51,11 @@ export type EmbedJobResult = {
 export async function runEmbedJob(args: RunEmbedJobArgs): Promise<EmbedJobResult> {
   const groups = groupByModel(args.payload.chunks);
   const all: EmbeddedChunkRow[] = [];
+  // Initialise every possible tag to 0 so the log line is consistent
+  // regardless of which OpenAI tier the operator has selected.
   const perModel: Record<EmbeddingModel, number> = {
     'openai-3-small': 0,
+    'openai-3-large': 0,
     'voyage-code-3': 0,
   };
 
@@ -83,13 +94,17 @@ export async function runEmbedJob(args: RunEmbedJobArgs): Promise<EmbedJobResult
 }
 
 function groupByModel(chunks: ChunkInsertPayload[]): Map<EmbeddingModel, ChunkInsertPayload[]> {
-  const groups = new Map<EmbeddingModel, ChunkInsertPayload[]>([
-    ['openai-3-small', []],
-    ['voyage-code-3', []],
-  ]);
+  // Build the bucket on demand so we don't have to enumerate every
+  // EmbeddingModel literal up front.
+  const groups = new Map<EmbeddingModel, ChunkInsertPayload[]>();
   for (const c of chunks) {
     const m = modelForChunkKind(c.kind);
-    groups.get(m)!.push(c);
+    let bucket = groups.get(m);
+    if (!bucket) {
+      bucket = [];
+      groups.set(m, bucket);
+    }
+    bucket.push(c);
   }
   return groups;
 }

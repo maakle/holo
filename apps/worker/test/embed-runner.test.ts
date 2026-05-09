@@ -82,7 +82,11 @@ describe('runEmbedJob', () => {
     const models = calls.map((c) => c[0]).sort();
     expect(models).toEqual(['openai-3-small', 'voyage-code-3']);
     expect(result.inserted).toBe(75);
-    expect(result.perModel).toEqual({ 'openai-3-small': 50, 'voyage-code-3': 25 });
+    expect(result.perModel).toEqual({
+      'openai-3-small': 50,
+      'openai-3-large': 0,
+      'voyage-code-3': 25,
+    });
     expect(fake.inserted.length).toBe(75);
     // Verify model is recorded correctly per row
     const codeInserted = fake.inserted.filter((r) => r.chunk.kind === 'github-code');
@@ -125,7 +129,11 @@ describe('runEmbedJob', () => {
     const result = await runEmbedJob({ payload, embedder, insertChunks: fake.insertChunks });
 
     expect(embedder.embedBatch).toHaveBeenCalledTimes(1); // openai only
-    expect(result.perModel).toEqual({ 'openai-3-small': 5, 'voyage-code-3': 0 });
+    expect(result.perModel).toEqual({
+      'openai-3-small': 5,
+      'openai-3-large': 0,
+      'voyage-code-3': 0,
+    });
   });
 
   it('throws on embedder vector/chunk count mismatch', async () => {

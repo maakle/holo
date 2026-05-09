@@ -1,12 +1,17 @@
 /**
- * Model tags. `openai-3-small` is the current-generation OpenAI embedder
- * (~6.5× cheaper than `-large` per token, very small recall delta in
- * practice); `openai-3-large` is retained as a *read* tag for chunks
- * embedded before the migration in PR #128. New embedders only ever
- * announce `openai-3-small` or `voyage-code-3`.
+ * Model tags Holo can store on `chunks.embedding_model`. Both OpenAI
+ * tiers are valid write targets — operators pick one per deploy via
+ * `OPENAI_EMBEDDING_MODEL` (see `resolveOpenAiModel` in
+ * `./openai-models`). The default is `openai-3-small`; flipping to
+ * `-large` requires re-running the backfill job to migrate existing
+ * chunks.
+ *
+ * Read and Write are the same union now that both `-small` and `-large`
+ * are first-class. Kept as separate aliases for self-documenting
+ * call-site intent.
  */
 export type EmbeddingModelRead = 'openai-3-small' | 'openai-3-large' | 'voyage-code-3';
-export type EmbeddingModelWrite = 'openai-3-small' | 'voyage-code-3';
+export type EmbeddingModelWrite = EmbeddingModelRead;
 
 export interface Embedder {
   readonly model: EmbeddingModelWrite;

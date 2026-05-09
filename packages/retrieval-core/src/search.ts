@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { DB } from '@holo/db';
+import { resolveOpenAiModel } from '@holo/embedder';
 import { embedQuery, embedQueryWith, type EmbeddingModel } from './query-router';
 
 export interface SearchInput {
@@ -155,13 +156,18 @@ export async function search(input: SearchInput): Promise<SearchResult[]> {
     return firstResults;
   }
 
-  // Dual-model fallback: try the OTHER model and merge via RRF.
-  // NOTE: `openai-3-large` chunks (legacy, pre-backfill) are dark to this
-  // path because the cached OpenAI embedder produces `-small` vectors, and
-  // search.ts filters chunks by their stored model tag. They become
-  // searchable again as PR #129's backfill rewrites them.
+  // Dual-model fallback: try the OTHER family (voyage ↔ openai) and
+  // merge via RRF. Chunks tagged with the *non-active* OpenAI tier
+  // (e.g. an in-flight backfill leaving some rows on `openai-3-large`
+  // while the operator has flipped to `-small`) are dark to this path
+  // — search.ts filters by exact model tag and the cached OpenAI
+  // embedder only produces vectors in the operator's selected tier.
+  // They become searchable again as the embed-backfill job rewrites
+  // them.
   const otherModel: EmbeddingModel =
-    primary.model === 'voyage-code-3' ? 'openai-3-small' : 'voyage-code-3';
+    primary.model === 'voyage-code-3'
+      ? resolveOpenAiModel().tag
+      : 'voyage-code-3';
   let secondaryResults: SearchResult[] = [];
   try {
     const secondary = await embedQueryWith(input.q, otherModel);

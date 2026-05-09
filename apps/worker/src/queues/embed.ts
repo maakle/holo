@@ -65,7 +65,10 @@ export class EmbedProcessor extends WorkerHost {
       embedder: getEmbedder(),
     });
     this.logger.log(
-      `embed job ${job.id} inserted=${result.inserted} openai=${result.perModel['openai-3-small']} voyage=${result.perModel['voyage-code-3']}`,
+      `embed job ${job.id} inserted=${result.inserted} `
+        + `openai-small=${result.perModel['openai-3-small']} `
+        + `openai-large=${result.perModel['openai-3-large']} `
+        + `voyage=${result.perModel['voyage-code-3']}`,
     );
     return result;
   }
