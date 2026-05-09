@@ -6,6 +6,7 @@ import {
   createSlackSpec,
   createLinearSpec,
   createGoogleDriveSpec,
+  createGitlabSpec,
 } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
@@ -140,11 +141,39 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
       );
       const authorizeUrl = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
       return NextResponse.json({ authorizeUrl });
+    } else if (provider === 'gitlab') {
+      // GitLab.com OAuth Application — same shape as Linear, different
+      // env vars + spec. Self-hosted GitLab instances are not supported
+      // in v1; the spec hard-codes gitlab.com endpoints.
+      if (!env.GITLAB_CONNECTOR_CLIENT_ID || !env.GITLAB_CONNECTOR_CLIENT_SECRET) {
+        throw holoError({
+          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+          problem: 'GitLab connector credentials are not configured',
+          fix: 'Set GITLAB_CONNECTOR_CLIENT_ID and GITLAB_CONNECTOR_CLIENT_SECRET in the environment.',
+        });
+      }
+      const redirectUri = `${publicOrigin}/api/connectors/gitlab/callback`;
+      const spec = createGitlabSpec({
+        clientId: env.GITLAB_CONNECTOR_CLIENT_ID,
+        clientSecret: env.GITLAB_CONNECTOR_CLIENT_SECRET,
+      });
+      const csrfNonce = shared.generateCsrfNonce();
+      const state = await shared.signState(
+        {
+          user_id: session.user.id,
+          organization_id: orgId,
+          csrf_nonce: csrfNonce,
+          provider,
+        },
+        env.BETTER_AUTH_SECRET,
+      );
+      const authorizeUrl = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
+      return NextResponse.json({ authorizeUrl });
     } else {
       throw holoError({
         code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: `${provider} connector does not use the OAuth initiate flow`,
-        fix: 'OAuth-redirect connectors: GitHub, Slack, Linear, Google Drive. API-key connectors (Notion, Pylon, HubSpot, Grain) use their own /connect endpoints.',
+        fix: 'OAuth-redirect connectors: GitHub, GitLab, Slack, Linear, Google Drive. API-key connectors (Notion, Pylon, HubSpot, Grain) use their own /connect endpoints.',
       });
     }
   } catch (e) {

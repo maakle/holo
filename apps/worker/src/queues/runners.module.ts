@@ -14,6 +14,7 @@ import {
   createGrainSpec,
   createSlackSpec,
   createGithubSpec,
+  createGitlabSpec,
   createMintlifySpec,
   createZendeskSpec,
   createGoogleDriveSpec,
@@ -93,6 +94,27 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
         createGenericRunner(githubSpec, deps, { resources: ['code'], shape: 'code' }),
       );
     }
+    // GitLab: same one-spec / two-queue shape as GitHub. The framework's
+    // `resources` filter drives prose-queue jobs into the `prose` resource
+    // and code-queue jobs into the `code` resource on a single spec
+    // instance, so the createGitlabSpec call only happens once. OAuth
+    // creds are present at boot only when env vars are set; the spec is
+    // still registered so the queues exist (a sync job will fail with
+    // NOT_IMPLEMENTED if creds are missing, matching the OAuth runners).
+    {
+      const gitlabSpec = createGitlabSpec({
+        clientId: process.env.GITLAB_CONNECTOR_CLIENT_ID ?? '',
+        clientSecret: process.env.GITLAB_CONNECTOR_CLIENT_SECRET ?? '',
+      });
+      setSyncRunner(
+        QUEUE_NAMES.GITLAB_PROSE_SYNC,
+        createGenericRunner(gitlabSpec, deps, { resources: ['prose'] }),
+      );
+      setSyncRunner(
+        QUEUE_NAMES.GITLAB_CODE_SYNC,
+        createGenericRunner(gitlabSpec, deps, { resources: ['code'], shape: 'code' }),
+      );
+    }
     setSyncRunner(QUEUE_NAMES.GRAIN_SYNC, createGenericRunner(createGrainSpec(), deps));
     setSyncRunner(QUEUE_NAMES.PYLON_SYNC, createGenericRunner(createPylonSpec(), deps));
     setSyncRunner(QUEUE_NAMES.HUBSPOT_SYNC, createGenericRunner(createHubspotSpec(), deps));
@@ -147,7 +169,7 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       createGenericRunner(createAirtableSpec(), deps),
     );
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, mintlify, zendesk, googledrive, airtable',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable',
     );
 
     // Reap any 'running' rows the previous worker incarnation left behind

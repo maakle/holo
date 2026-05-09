@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { GithubCodeSyncModule } from './github-code';
 import { GithubProseSyncModule } from './github-prose';
+import { GitlabCodeSyncModule } from './gitlab-code';
+import { GitlabProseSyncModule } from './gitlab-prose';
 import { SlackSyncModule } from './slack';
 import { NotionSyncModule } from './notion';
 import { GrainSyncModule } from './grain';
@@ -17,6 +19,8 @@ import { SyncSchedulerService } from './sync-scheduler.service';
   imports: [
     GithubCodeSyncModule,
     GithubProseSyncModule,
+    GitlabCodeSyncModule,
+    GitlabProseSyncModule,
     SlackSyncModule,
     NotionSyncModule,
     GrainSyncModule,

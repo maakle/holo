@@ -38,6 +38,13 @@ const EnvSchema = z.object({
   LINEAR_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   GOOGLEDRIVE_CONNECTOR_CLIENT_ID: z.string().optional(),
   GOOGLEDRIVE_CONNECTOR_CLIENT_SECRET: z.string().optional(),
+  // GitLab OAuth Application credentials. Register at
+  // https://gitlab.com/-/profile/applications with redirect URI
+  // `${WEB_PUBLIC_URL}/api/connectors/gitlab/callback` and scopes
+  // `read_api`, `read_repository`, `read_user`. Optional so unrelated
+  // dev environments don't have to register an app.
+  GITLAB_CONNECTOR_CLIENT_ID: z.string().optional(),
+  GITLAB_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().optional(),
   /**
