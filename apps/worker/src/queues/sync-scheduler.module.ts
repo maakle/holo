@@ -13,6 +13,7 @@ import { MintlifySyncModule } from './mintlify';
 import { ZendeskSyncModule } from './zendesk';
 import { GoogleDriveSyncModule } from './googledrive';
 import { AirtableSyncModule } from './airtable';
+import { GoogleChatSyncModule } from './google-chat';
 import { SyncSchedulerService } from './sync-scheduler.service';
 
 @Module({
@@ -31,6 +32,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
     ZendeskSyncModule,
     GoogleDriveSyncModule,
     AirtableSyncModule,
+    GoogleChatSyncModule,
   ],
   providers: [SyncSchedulerService],
 })

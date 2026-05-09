@@ -45,6 +45,13 @@ const EnvSchema = z.object({
   // dev environments don't have to register an app.
   GITLAB_CONNECTOR_CLIENT_ID: z.string().optional(),
   GITLAB_CONNECTOR_CLIENT_SECRET: z.string().optional(),
+  /**
+   * Google Cloud OAuth client used by the Google Chat connector.
+   * Same client (Web application type) consented for the Chat scopes
+   * (chat.spaces.readonly + chat.messages.readonly).
+   */
+  GOOGLE_CHAT_CONNECTOR_CLIENT_ID: z.string().optional(),
+  GOOGLE_CHAT_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().optional(),
   /**

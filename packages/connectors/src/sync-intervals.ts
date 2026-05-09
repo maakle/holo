@@ -29,6 +29,7 @@ export const SYNC_INTERVAL_MS_BY_PROVIDER: Record<SyncProvider, number> = {
   mintlify: 24 * HOUR_MS,
   googledrive: 6 * HOUR_MS,
   airtable: 6 * HOUR_MS,
+  'google-chat': 4 * HOUR_MS,
 };
 
 export function getSyncIntervalMs(provider: SyncProvider): number {

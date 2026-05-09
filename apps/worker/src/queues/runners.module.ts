@@ -19,6 +19,7 @@ import {
   createZendeskSpec,
   createGoogleDriveSpec,
   createAirtableSpec,
+  createGoogleChatSpec,
   githubAppConfigFromEnv,
 } from '@holo/connectors';
 import { setSyncRunner } from './sync-runner-registry';
@@ -168,8 +169,21 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       QUEUE_NAMES.AIRTABLE_SYNC,
       createGenericRunner(createAirtableSpec(), deps),
     );
+    // Google Chat: OAuth-only. Like Slack/Linear, registering the runner
+    // unconditionally keeps the queue alive even when env credentials are
+    // absent — a sync job in that state will surface NOT_IMPLEMENTED.
+    setSyncRunner(
+      QUEUE_NAMES.GOOGLE_CHAT_SYNC,
+      createGenericRunner(
+        createGoogleChatSpec({
+          clientId: process.env.GOOGLE_CHAT_CONNECTOR_CLIENT_ID ?? '',
+          clientSecret: process.env.GOOGLE_CHAT_CONNECTOR_CLIENT_SECRET ?? '',
+        }),
+        deps,
+      ),
+    );
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat',
     );
 
     // Reap any 'running' rows the previous worker incarnation left behind

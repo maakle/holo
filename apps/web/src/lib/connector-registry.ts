@@ -29,7 +29,8 @@ export interface ConnectorMeta {
     | 'mintlify'
     | 'zendesk'
     | 'googledrive'
-    | 'airtable';
+    | 'airtable'
+    | 'google-chat';
   displayName: string;
   description: string;
   category: ConnectorCategoryId;
@@ -134,5 +135,13 @@ export const CONNECTORS: ConnectorMeta[] = [
     category: 'productivity',
     implemented: true,
     flowType: 'apikey',
+  },
+  {
+    id: 'google-chat',
+    displayName: 'Google Chat',
+    description: 'Spaces, threads, and messages from Google Chat.',
+    category: 'communication',
+    implemented: true,
+    flowType: 'oauth',
   },
 ];

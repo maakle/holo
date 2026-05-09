@@ -93,6 +93,14 @@ export type {
 } from './airtable/index';
 export { createGrainSpec } from './grain/index';
 export type { GrainSpecOptions } from './grain/index';
+export { createGoogleChatSpec, GOOGLE_CHAT_SCOPES } from './google-chat/index';
+export type {
+  GoogleChatSpecOptions,
+  GoogleChatSpace,
+  GoogleChatMessage,
+  GoogleChatUser,
+  GoogleChatThread,
+} from './google-chat/index';
 export {
   createMintlifySpec,
   fetchLlmsIndex,

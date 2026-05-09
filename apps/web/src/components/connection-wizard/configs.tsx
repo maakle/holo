@@ -251,6 +251,21 @@ const airtableConfig: ConnectorWizardConfig = {
   ],
 };
 
+const googleChatConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'install',
+      label: 'Authorize',
+      render: (ctx) =>
+        oauthInstallStep(ctx, {
+          installButtonLabel: 'Authorize Google Chat',
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 const zendeskConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
@@ -291,6 +306,7 @@ const REGISTRY: Record<ConnectorMeta['id'], ConnectorWizardConfig<any>> = {
   zendesk: zendeskConfig,
   googledrive: googleDriveConfig,
   airtable: airtableConfig,
+  'google-chat': googleChatConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

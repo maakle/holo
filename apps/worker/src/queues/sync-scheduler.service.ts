@@ -67,6 +67,7 @@ export class SyncSchedulerService implements OnModuleInit {
     @InjectQueue(QUEUE_NAMES.ZENDESK_SYNC) zendesk: Queue,
     @InjectQueue(QUEUE_NAMES.GOOGLEDRIVE_SYNC) googledrive: Queue,
     @InjectQueue(QUEUE_NAMES.AIRTABLE_SYNC) airtable: Queue,
+    @InjectQueue(QUEUE_NAMES.GOOGLE_CHAT_SYNC) googleChat: Queue,
   ) {
     this.queueMap = {
       github: [QUEUE_NAMES.GITHUB_CODE_SYNC, QUEUE_NAMES.GITHUB_PROSE_SYNC],
@@ -81,6 +82,7 @@ export class SyncSchedulerService implements OnModuleInit {
       zendesk: [QUEUE_NAMES.ZENDESK_SYNC],
       googledrive: [QUEUE_NAMES.GOOGLEDRIVE_SYNC],
       airtable: [QUEUE_NAMES.AIRTABLE_SYNC],
+      'google-chat': [QUEUE_NAMES.GOOGLE_CHAT_SYNC],
     };
     this.queuesByName = {
       [QUEUE_NAMES.GITHUB_CODE_SYNC]: ghCode,
@@ -97,6 +99,7 @@ export class SyncSchedulerService implements OnModuleInit {
       [QUEUE_NAMES.ZENDESK_SYNC]: zendesk,
       [QUEUE_NAMES.GOOGLEDRIVE_SYNC]: googledrive,
       [QUEUE_NAMES.AIRTABLE_SYNC]: airtable,
+      [QUEUE_NAMES.GOOGLE_CHAT_SYNC]: googleChat,
     };
   }
 

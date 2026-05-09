@@ -7,6 +7,7 @@ import {
   createLinearSpec,
   createGoogleDriveSpec,
   createGitlabSpec,
+  createGoogleChatSpec,
 } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
@@ -169,11 +170,44 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
       );
       const authorizeUrl = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
       return NextResponse.json({ authorizeUrl });
+    } else if (provider === 'google-chat') {
+      if (
+        !env.GOOGLE_CHAT_CONNECTOR_CLIENT_ID ||
+        !env.GOOGLE_CHAT_CONNECTOR_CLIENT_SECRET
+      ) {
+        throw holoError({
+          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+          problem: 'Google Chat connector credentials are not configured',
+          fix: 'Set GOOGLE_CHAT_CONNECTOR_CLIENT_ID and GOOGLE_CHAT_CONNECTOR_CLIENT_SECRET in the environment.',
+        });
+      }
+      const redirectUri = `${publicOrigin}/api/connectors/google-chat/callback`;
+      const spec = createGoogleChatSpec({
+        clientId: env.GOOGLE_CHAT_CONNECTOR_CLIENT_ID,
+        clientSecret: env.GOOGLE_CHAT_CONNECTOR_CLIENT_SECRET,
+      });
+      const csrfNonce = shared.generateCsrfNonce();
+      const state = await shared.signState(
+        {
+          user_id: session.user.id,
+          organization_id: orgId,
+          csrf_nonce: csrfNonce,
+          provider,
+        },
+        env.BETTER_AUTH_SECRET,
+      );
+      // Google requires `access_type=offline` + `prompt=consent` to issue a
+      // refresh token on every consent (without `prompt=consent`, returning
+      // users skip consent and Google omits the refresh token, breaking the
+      // 6h sync cycle once the 1h access token expires).
+      const base = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
+      const authorizeUrl = `${base}&access_type=offline&prompt=consent&include_granted_scopes=true`;
+      return NextResponse.json({ authorizeUrl });
     } else {
       throw holoError({
         code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: `${provider} connector does not use the OAuth initiate flow`,
-        fix: 'OAuth-redirect connectors: GitHub, GitLab, Slack, Linear, Google Drive. API-key connectors (Notion, Pylon, HubSpot, Grain) use their own /connect endpoints.',
+        fix: 'OAuth-redirect connectors: GitHub, GitLab, Slack, Linear, Google Drive, Google Chat. API-key connectors (Notion, Pylon, HubSpot, Grain) use their own /connect endpoints.',
       });
     }
   } catch (e) {
