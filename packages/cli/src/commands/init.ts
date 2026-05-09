@@ -1,10 +1,9 @@
-import { randomBytes, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { randomBytes } from 'node:crypto';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import * as readline from 'node:readline';
-import { DOCKER_COMPOSE_TEMPLATE, TELEMETRY_PRIVACY_NOTICE } from './init-templates';
+import { DOCKER_COMPOSE_TEMPLATE } from './init-templates';
 
 function randomAlphanumeric(length: number): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -74,29 +73,12 @@ async function askValue(deps: PromptDeps, question: string): Promise<string> {
   return answer;
 }
 
-interface InstallState {
-  installId: string;
-  startedAt: number;
-  optedInToTelemetry: boolean;
-}
-
-function writeInstallState(state: InstallState): string {
-  const dir = join(homedir(), '.holo');
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  const path = join(dir, 'install-state.json');
-  writeFileSync(path, JSON.stringify(state, null, 2) + '\n', 'utf8');
-  return path;
-}
-
 interface InitOptions {
   prompt?: PromptDeps;
-  /** Override homedir for tests; defaults to os.homedir() via writeInstallState. */
-  skipInstallStateWrite?: boolean;
 }
 
 export async function initCommand(_args: string[], opts: InitOptions = {}): Promise<void> {
   const deps = opts.prompt ?? defaultPromptDeps();
-  const startedAt = Date.now();
 
   console.log('🚀 holo init — self-hosted context layer');
   console.log('');
@@ -144,15 +126,6 @@ export async function initCommand(_args: string[], opts: InitOptions = {}): Prom
   const ghClientId = await askValue(deps, 'GitHub OAuth client ID (sign-in): ');
   const ghClientSecret = await askValue(deps, 'GitHub OAuth client secret (sign-in): ');
 
-  // TTHW telemetry opt-in (DX D48). Default ON with a clear explanation.
-  console.log(TELEMETRY_PRIVACY_NOTICE);
-  const telemetryOptIn = await askConfirm(
-    deps,
-    'Send opt-in TTHW telemetry? [Y/n] ',
-    true,
-  );
-
-  const installId = randomUUID();
   const postgresPassword = randomAlphanumeric(24);
   const betterAuthSecret = randomAlphanumeric(32);
   const tokenEncryptionKey = randomHex(32);
@@ -171,32 +144,10 @@ export async function initCommand(_args: string[], opts: InitOptions = {}): Prom
     `GITHUB_LOGIN_CLIENT_SECRET=${ghClientSecret || '<REPLACE_ME>'}`,
     `MCP_PUBLIC_URL=http://localhost:8080`,
     `WEB_PUBLIC_URL=http://localhost:3000`,
-    `# TTHW telemetry — see ~/.holo/install-state.json. Edit OPT_IN to change later.`,
-    `HOLO_TELEMETRY_INSTALL_ID=${installId}`,
-    `HOLO_TELEMETRY_STARTED_AT=${startedAt}`,
-    `HOLO_TELEMETRY_OPT_IN=${telemetryOptIn}`,
     '',
   ];
   writeFileSync(envPath, envLines.join('\n'), 'utf8');
   console.log('✓ Generated .env');
-
-  // Persist install state to ~/.holo/install-state.json so the server can
-  // verify which install this is on first MCP search. Distinct from the
-  // .env vars: the home-dir copy is the audit trail; the env vars are how
-  // the running server reads them.
-  if (!opts.skipInstallStateWrite) {
-    try {
-      const path = writeInstallState({
-        installId,
-        startedAt,
-        optedInToTelemetry: telemetryOptIn,
-      });
-      console.log(`✓ Wrote install state to ${path}`);
-    } catch (err) {
-      console.warn(`⚠️  Could not write ~/.holo/install-state.json: ${(err as Error).message}`);
-      console.warn('   Continuing — telemetry opt-in flag is still set in .env.');
-    }
-  }
 
   // Bundled docker-compose template — write it if there isn't one already.
   const composePath = join(cwd, 'docker-compose.yml');

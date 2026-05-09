@@ -65,9 +65,6 @@ export const DOCKER_COMPOSE_TEMPLATE = `services:
       GITHUB_LOGIN_CLIENT_SECRET: \${GITHUB_LOGIN_CLIENT_SECRET}
       GITHUB_CONNECTOR_CLIENT_ID: \${GITHUB_CONNECTOR_CLIENT_ID}
       GITHUB_CONNECTOR_CLIENT_SECRET: \${GITHUB_CONNECTOR_CLIENT_SECRET}
-      HOLO_TELEMETRY_INSTALL_ID: \${HOLO_TELEMETRY_INSTALL_ID:-}
-      HOLO_TELEMETRY_STARTED_AT: \${HOLO_TELEMETRY_STARTED_AT:-}
-      HOLO_TELEMETRY_OPT_IN: \${HOLO_TELEMETRY_OPT_IN:-false}
       EMAIL_PROVIDER: \${EMAIL_PROVIDER:-console}
       RESEND_API_KEY: \${RESEND_API_KEY:-}
       NODE_ENV: production
@@ -94,21 +91,4 @@ export const DOCKER_COMPOSE_TEMPLATE = `services:
 volumes:
   holo_pg_data:
   holo_redis_data:
-`;
-
-export const TELEMETRY_PRIVACY_NOTICE = `
-holo collects opt-in time-to-hello-world (TTHW) telemetry to track how long
-the quickstart actually takes for new installs. We use the aggregate p50/p95
-to report install-time honestly on the docs site.
-
-What is sent (only if you opt in):
-  - An anonymous install ID (random UUID, generated locally)
-  - The 'init started' timestamp
-  - The 'first MCP search succeeded' timestamp
-
-What is NOT sent: any of your data, secrets, env vars, IPs, hostnames,
-project paths, connector contents, or anything that could identify you or
-your org.
-
-You can change this later by editing HOLO_TELEMETRY_OPT_IN in .env.
 `;
