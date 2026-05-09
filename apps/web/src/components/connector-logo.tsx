@@ -25,8 +25,7 @@ const FILE_BY_ID: Partial<Record<ConnectorMeta['id'], string>> = {
   zendesk: '/connectors/zendesk.png',
   googledrive: '/connectors/googledrive.webp',
   airtable: '/connectors/airtable.webp',
-  // No brand asset checked in yet — falls through to the text-initial
-  // rendering below until a real webp is dropped at /connectors/google-chat.webp.
+  'google-chat': '/connectors/googlechat.webp',
 };
 
 export function ConnectorLogo({ id, className }: Props) {
