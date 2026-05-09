@@ -6,7 +6,7 @@ import {
   type RouterChunk,
 } from '../src/router';
 
-function stubEmbedder(model: 'openai-3-large' | 'voyage-code-3', tag: number): Embedder {
+function stubEmbedder(model: 'openai-3-small' | 'voyage-code-3', tag: number): Embedder {
   return {
     model,
     dimensions: 1024,
@@ -18,7 +18,7 @@ function stubEmbedder(model: 'openai-3-large' | 'voyage-code-3', tag: number): E
   };
 }
 
-const openai = stubEmbedder('openai-3-large', 1);
+const openai = stubEmbedder('openai-3-small', 1);
 const voyage = stubEmbedder('voyage-code-3', 2);
 const registry: EmbedderRegistry = { openai, voyage };
 
@@ -35,12 +35,12 @@ describe('getEmbedderForChunkKind', () => {
       'slack-thread',
       'notion-page',
     ]) {
-      expect(getEmbedderForChunkKind(kind, registry).model).toBe('openai-3-large');
+      expect(getEmbedderForChunkKind(kind, registry).model).toBe('openai-3-small');
     }
   });
 
   it('defaults unknown kinds to openai', () => {
-    expect(getEmbedderForChunkKind('unknown-kind', registry).model).toBe('openai-3-large');
+    expect(getEmbedderForChunkKind('unknown-kind', registry).model).toBe('openai-3-small');
   });
 });
 
@@ -55,9 +55,9 @@ describe('embedChunks', () => {
     const out = await embedChunks(chunks, registry);
     expect(out).toHaveLength(4);
     expect(out[0]!.embeddingModel).toBe('voyage-code-3');
-    expect(out[1]!.embeddingModel).toBe('openai-3-large');
+    expect(out[1]!.embeddingModel).toBe('openai-3-small');
     expect(out[2]!.embeddingModel).toBe('voyage-code-3');
-    expect(out[3]!.embeddingModel).toBe('openai-3-large');
+    expect(out[3]!.embeddingModel).toBe('openai-3-small');
     expect(out[0]!.chunk.content).toBe('code1');
     expect(out[1]!.chunk.content).toBe('pr1');
     expect(out[2]!.chunk.content).toBe('code2');

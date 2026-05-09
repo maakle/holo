@@ -25,7 +25,7 @@ describe('chunks content_hash schema', () => {
     expect(rows[0]!.is_nullable).toBe('NO');
   });
 
-  it('chunks.embedding_model is NOT NULL text with default containing openai-3-large', async () => {
+  it('chunks.embedding_model is NOT NULL text with default containing openai-3-small', async () => {
     const rows = await sql<
       { column_name: string; data_type: string; is_nullable: string; column_default: string }[]
     >`
@@ -38,7 +38,7 @@ describe('chunks content_hash schema', () => {
     expect(rows.length).toBe(1);
     expect(rows[0]!.data_type).toBe('text');
     expect(rows[0]!.is_nullable).toBe('NO');
-    expect(rows[0]!.column_default).toContain('openai-3-large');
+    expect(rows[0]!.column_default).toContain('openai-3-small');
   });
 
   it('indexes chunks_content_hash_idx and chunks_metadata_pr_idx exist', async () => {

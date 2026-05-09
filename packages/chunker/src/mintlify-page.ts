@@ -19,7 +19,7 @@ const OVERLAP = 150;
 
 export const mintlifyPageChunker: Chunker<MintlifyPageInput> = {
   kind: 'mintlify-page',
-  embeddingModel: 'openai-3-large',
+  embeddingModel: 'openai-3-small',
   async chunk(input: MintlifyPageInput, ctx: ChunkContext): Promise<Chunk[]> {
     if (input.content.trim().length === 0) return [];
 

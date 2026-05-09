@@ -5,7 +5,14 @@ import {
 } from '@holo/embedder';
 import { holoError, ErrorCode } from '@holo/errors';
 
-export type EmbeddingModel = 'openai-3-large' | 'voyage-code-3';
+/**
+ * Models we may query with. `openai-3-large` is retained as a legacy read
+ * tag for chunks embedded before the migration in PR #128 — new queries
+ * default to `openai-3-small` (see `embedQuery`). Once the backfill (PR
+ * #129) drops chunks tagged `openai-3-large` to zero, the legacy tag can
+ * be removed from this union.
+ */
+export type EmbeddingModel = 'openai-3-small' | 'openai-3-large' | 'voyage-code-3';
 
 export interface EmbedQueryResult {
   embedding: number[];
@@ -63,5 +70,5 @@ export async function embedQueryWith(
 }
 
 export async function embedQuery(q: string): Promise<EmbedQueryResult> {
-  return embedQueryWith(q, looksLikeCode(q) ? 'voyage-code-3' : 'openai-3-large');
+  return embedQueryWith(q, looksLikeCode(q) ? 'voyage-code-3' : 'openai-3-small');
 }

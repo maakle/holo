@@ -29,7 +29,7 @@ function formatMessage(
 
 export const slackThreadChunker: Chunker<SlackThreadInput> = {
   kind: 'slack-thread',
-  embeddingModel: 'openai-3-large',
+  embeddingModel: 'openai-3-small',
   async chunk(input: SlackThreadInput, ctx: ChunkContext): Promise<Chunk[]> {
     const parentExternalId = `slack-thread:${input.channelId}:${input.threadTs}`;
     const aclSubjects = [

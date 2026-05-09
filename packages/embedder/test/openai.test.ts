@@ -17,7 +17,7 @@ function fakeEmbedResponse(count: number, dim = 1024) {
       index: i,
       embedding: Array.from({ length: dim }, () => Math.random()),
     })),
-    model: 'text-embedding-3-large',
+    model: 'text-embedding-3-small',
     usage: { prompt_tokens: count * 5, total_tokens: count * 5 },
   };
 }
@@ -34,9 +34,9 @@ afterEach(() => {
 });
 
 describe('createOpenAiEmbedder', () => {
-  it('exposes model: openai-3-large and dimensions: 1024', () => {
+  it('exposes model: openai-3-small and dimensions: 1024', () => {
     const embedder = createOpenAiEmbedder({ apiKey: 'test-key' });
-    expect(embedder.model).toBe('openai-3-large');
+    expect(embedder.model).toBe('openai-3-small');
     expect(embedder.dimensions).toBe(1024);
   });
 

@@ -1,4 +1,9 @@
-export type { Embedder, EmbedderRegistry } from './contract';
+export type {
+  Embedder,
+  EmbedderRegistry,
+  EmbeddingModelRead,
+  EmbeddingModelWrite,
+} from './contract';
 export { createOpenAiEmbedder } from './openai';
 export type { CreateOpenAiEmbedderOptions } from './openai';
 export { createVoyageEmbedder } from './voyage';

@@ -156,8 +156,12 @@ export async function search(input: SearchInput): Promise<SearchResult[]> {
   }
 
   // Dual-model fallback: try the OTHER model and merge via RRF.
+  // NOTE: `openai-3-large` chunks (legacy, pre-backfill) are dark to this
+  // path because the cached OpenAI embedder produces `-small` vectors, and
+  // search.ts filters chunks by their stored model tag. They become
+  // searchable again as PR #129's backfill rewrites them.
   const otherModel: EmbeddingModel =
-    primary.model === 'voyage-code-3' ? 'openai-3-large' : 'voyage-code-3';
+    primary.model === 'voyage-code-3' ? 'openai-3-small' : 'voyage-code-3';
   let secondaryResults: SearchResult[] = [];
   try {
     const secondary = await embedQueryWith(input.q, otherModel);

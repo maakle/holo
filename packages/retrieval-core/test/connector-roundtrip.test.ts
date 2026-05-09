@@ -176,7 +176,7 @@ describe('connector roundtrip (Phase 12.2)', () => {
           VALUES (
             ${orgId}, ${sourceId}, ${artifactId},
             ${c.kind}, ${c.content}, ${c.contentHash},
-            'github', 'openai-3-large',
+            'github', 'openai-3-small',
             ${literal}::vector(1024),
             ${JSON.stringify(c.metadata)}::jsonb,
             ARRAY[${'org:' + orgId}]::text[]

@@ -54,7 +54,7 @@ function buildReviewContent(input: GithubPrInput): string {
 
 export const githubPrChunker: Chunker<GithubPrInput> = {
   kind: 'github-pr',
-  embeddingModel: 'openai-3-large',
+  embeddingModel: 'openai-3-small',
   async chunk(input: GithubPrInput, ctx: ChunkContext): Promise<Chunk[]> {
     const parentExternalId = `pr:${input.repoFullName}#${input.prNumber}`;
     const aclSubjects = [`org:${ctx.organizationId}`];

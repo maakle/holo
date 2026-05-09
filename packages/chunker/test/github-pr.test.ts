@@ -70,6 +70,6 @@ describe('githubPrChunker', () => {
 
   it('chunker exposes correct kind and embeddingModel', () => {
     expect(githubPrChunker.kind).toBe('github-pr');
-    expect(githubPrChunker.embeddingModel).toBe('openai-3-large');
+    expect(githubPrChunker.embeddingModel).toBe('openai-3-small');
   });
 });

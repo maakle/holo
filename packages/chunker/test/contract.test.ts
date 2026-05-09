@@ -5,7 +5,7 @@ describe('Chunker contract', () => {
   it('Chunker<TInput> has kind, embeddingModel, chunk(input, ctx)', () => {
     expectTypeOf<Chunker<{ x: number }>>().toMatchTypeOf<{
       readonly kind: string;
-      readonly embeddingModel: 'openai-3-large' | 'voyage-code-3';
+      readonly embeddingModel: 'openai-3-small' | 'voyage-code-3';
       chunk(input: { x: number }, ctx: ChunkContext): Promise<Chunk[]>;
     }>();
   });

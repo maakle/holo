@@ -124,7 +124,7 @@ export const chunks = pgTable(
     kind: text('kind').notNull(),
     content: text('content').notNull(),
     contentHash: text('content_hash').notNull(),
-    embeddingModel: text('embedding_model').notNull().default('openai-3-large'),
+    embeddingModel: text('embedding_model').notNull().default('openai-3-small'),
     contentTsvector: tsvector('content_tsvector'),
     embedding: vector('embedding', { dimensions: 1024 }),
     aclSubjects: text('acl_subjects')

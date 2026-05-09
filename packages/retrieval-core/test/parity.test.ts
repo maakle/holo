@@ -20,7 +20,7 @@ const openaiKey = process.env.OPENAI_API_KEY;
 
 const TEST_SLUG = 'test-parity';
 
-// Embed using the real OpenAI API (1024-dim, text-embedding-3-large).
+// Embed using the real OpenAI API (1024-dim, text-embedding-3-small).
 async function embedTexts(texts: string[]): Promise<number[][]> {
   const embedder = createOpenAiEmbedder({ apiKey: openaiKey! });
   return embedder.embed(texts);
@@ -125,7 +125,7 @@ beforeAll(async () => {
         ${f.content},
         ${`hash-${f.persona}`},
         ${f.provider},
-        'openai-3-large',
+        'openai-3-small',
         ${vectorLiteral}::vector(1024),
         ${JSON.stringify({ artifact_kind: f.artifactKind, external_id: f.externalId })}::jsonb,
         ARRAY[${'org:' + orgId}]::text[]
