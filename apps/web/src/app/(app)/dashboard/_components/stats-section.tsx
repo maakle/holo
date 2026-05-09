@@ -31,7 +31,7 @@ export async function StatsSection({ orgId }: { orgId: string }) {
   ] as const;
 
   return (
-    <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
+    <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
       {stats.map(({ label, value, icon: Icon, href }) => (
         <Link
           key={label}
@@ -56,7 +56,7 @@ export async function StatsSection({ orgId }: { orgId: string }) {
 
 export function StatsSkeleton() {
   return (
-    <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
+    <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
       {[0, 1, 2].map((i) => (
         <div key={i} className="h-28 rounded-md border border-border bg-surface" />
       ))}

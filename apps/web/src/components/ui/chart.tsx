@@ -49,7 +49,7 @@ const ChartContainer = React.forwardRef<
         data-chart={chartId}
         ref={ref}
         className={cn(
-          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-[var(--text-subtle)] [&_.recharts-curve.recharts-tooltip-cursor]:stroke-[var(--border)] [&_.recharts-layer]:outline-hidden [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-[var(--surface-2)] [&_.recharts-sector]:outline-hidden [&_.recharts-surface]:outline-hidden",
+          "aspect-video text-xs [&_.recharts-cartesian-axis-tick_text]:fill-[var(--text-subtle)] [&_.recharts-curve.recharts-tooltip-cursor]:stroke-[var(--border)] [&_.recharts-layer]:outline-hidden [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-[var(--surface-2)] [&_.recharts-sector]:outline-hidden [&_.recharts-surface]:outline-hidden",
           className,
         )}
         {...props}

@@ -4,19 +4,24 @@ import { getServerContext } from '@/lib/server-context';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { InvocationsChart, type InvocationsBucket } from './invocations-chart';
 import { SyncThroughputChart, type SyncBucket } from './sync-throughput-chart';
+import { RangePicker, type Range } from './range-picker';
 
-const RANGE_HOURS = 24 * 7; // 7 days
-const BUCKET_HOURS = 6;
+const CONFIG: Record<Range, { rangeHours: number; bucketHours: number; bucketLabel: string }> = {
+  '7d': { rangeHours: 24 * 7, bucketHours: 6, bucketLabel: '6h buckets' },
+  '30d': { rangeHours: 24 * 30, bucketHours: 24, bucketLabel: 'daily' },
+};
 
-export async function ChartsSection({ orgId }: { orgId: string }) {
+export async function ChartsSection({ orgId, range }: { orgId: string; range: Range }) {
   const { db } = await getServerContext();
-  const since = new Date(Date.now() - RANGE_HOURS * 60 * 60 * 1000);
+  const { rangeHours, bucketHours, bucketLabel } = CONFIG[range];
+  const since = new Date(Date.now() - rangeHours * 60 * 60 * 1000);
+  const rangeDays = Math.round(rangeHours / 24);
 
   const [invocationRows, syncRows] = await Promise.all([
     db
       .select({
         bucket: sql<Date>`date_trunc('hour', ${schema.mcpInvocations.createdAt})
-          - make_interval(hours => extract(hour from ${schema.mcpInvocations.createdAt})::int % ${BUCKET_HOURS})`.as('bucket'),
+          - make_interval(hours => extract(hour from ${schema.mcpInvocations.createdAt})::int % ${bucketHours})`.as('bucket'),
         ok: sql<number>`sum(case when ${schema.mcpInvocations.errorCode} is null then 1 else 0 end)::int`.as('ok'),
         errors: sql<number>`sum(case when ${schema.mcpInvocations.errorCode} is not null then 1 else 0 end)::int`.as('errors'),
       })
@@ -47,7 +52,7 @@ export async function ChartsSection({ orgId }: { orgId: string }) {
       .orderBy(sql`bucket`),
   ]);
 
-  const invocationBuckets = fillInvocationBuckets(invocationRows, since, BUCKET_HOURS);
+  const invocationBuckets = fillInvocationBuckets(invocationRows, since, bucketHours);
   const { buckets: syncBuckets, providers } = pivotSyncRows(syncRows, since);
 
   const hasInvocations = invocationBuckets.some((b) => b.ok + b.errors > 0);
@@ -56,15 +61,15 @@ export async function ChartsSection({ orgId }: { orgId: string }) {
   );
 
   return (
-    <section className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+    <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader>
           <div className="flex items-baseline justify-between gap-3">
             <div className="flex flex-col gap-1">
               <CardTitle>Invocations</CardTitle>
-              <CardDescription>Last 7 days · 6h buckets</CardDescription>
+              <CardDescription>Last {rangeDays} days · {bucketLabel}</CardDescription>
             </div>
-            <span className="caption">7d</span>
+            <RangePicker value={range} />
           </div>
         </CardHeader>
         <div className="px-5 pb-5">
@@ -83,7 +88,7 @@ export async function ChartsSection({ orgId }: { orgId: string }) {
               <CardTitle>Sync throughput</CardTitle>
               <CardDescription>Records ingested per day, by connector</CardDescription>
             </div>
-            <span className="caption">7d</span>
+            <RangePicker value={range} />
           </div>
         </CardHeader>
         <div className="px-5 pb-5">
@@ -100,7 +105,7 @@ export async function ChartsSection({ orgId }: { orgId: string }) {
 
 export function ChartsSkeleton() {
   return (
-    <section className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+    <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {[0, 1].map((i) => (
         <div key={i} className="h-[260px] rounded-md border border-border bg-surface" />
       ))}

@@ -39,6 +39,7 @@ const nextConfig = {
     '@holo/db',
     '@holo/env',
     '@holo/errors',
+    '@holo/sync-providers',
   ],
   turbopack: {},
   webpack: (config, { isServer }) => {

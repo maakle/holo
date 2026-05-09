@@ -10,15 +10,22 @@ import { StatsSection, StatsSkeleton } from './_components/stats-section';
 import { RecentInvocations, RecentInvocationsSkeleton } from './_components/recent-invocations';
 import { ChartsSection, ChartsSkeleton } from './_components/charts-section';
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
   const { auth} = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
   const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/sign-in');
 
+  const params = await searchParams;
+  const range: '7d' | '30d' = params.range === '30d' ? '30d' : '7d';
+
   return (
-    <div className="space-y-10">
+    <div className="space-y-4">
       <header className="flex flex-col gap-2">
         <span className="caption">Overview</span>
         <h1 className="font-display text-h1 font-semibold tracking-tight">Welcome back.</h1>
@@ -32,11 +39,11 @@ export default async function DashboardPage() {
         <StatsSection orgId={orgId} />
       </Suspense>
 
-      <Suspense fallback={<ChartsSkeleton />}>
-        <ChartsSection orgId={orgId} />
+      <Suspense key={range} fallback={<ChartsSkeleton />}>
+        <ChartsSection orgId={orgId} range={range} />
       </Suspense>
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Suspense fallback={<RecentInvocationsSkeleton />}>
           <RecentInvocations orgId={orgId} />
         </Suspense>
