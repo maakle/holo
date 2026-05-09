@@ -30,14 +30,14 @@ Three internal agents (support-question, interview-prep, customer-success) live 
 
 ### v0.1 — Skills + public release · 🟡 in progress
 
-**Shipped:** `packages/skills` (synth + eval + executor + redactor + golden set), REST/OpenAPI via `@hono/zod-openapi`, static API-token auth, "Connect your agent" panel, dashboard charts, GitHub Discussions, the v0.1 test plan ([TODOS.md item 1](../TODOS.md)).
+**Shipped:** `packages/skills` (synth + eval + executor + redactor + golden set), REST/OpenAPI via `@hono/zod-openapi`, static API-token auth, "Connect your agent" panel (Claude / ChatGPT / Gemini / Slack / OpenAPI / Custom MCP), dashboard charts, GitHub Discussions, the v0.1 test plan ([TODOS.md item 1](../TODOS.md)).
 
 **Active work (next up):**
 
-- [ ] **CP2 — observability dashboard + read-only replay diff.** Last-100-invocations view, side-by-side query/result diff, per-CTO replay metric. *List view, detail view, and `ReplayPanels` side-by-side diff are shipped on main; only the per-CTO replay-view metric remains.*
-- [ ] **CP3 — `npx holo init`.** macOS/Linux quickstart, GitHub-only at install, ≤30s TTFUQ, opt-in TTHW telemetry (DX D44/D48). *`packages/cli/src/commands/init.ts` exists with `.env` scaffolding, secret generation, Docker check, macOS/Linux support; missing: TTHW telemetry, opt-in privacy prompt, docker-compose scaffold, in-init GitHub OAuth setup.*
+- [x] **CP2 — observability dashboard + read-only replay diff.** Last-100-invocations view, side-by-side query/result diff, per-CTO replay metric. `replay_views` table records each replay open; the observability list-page toolbar surfaces the distinct-viewer count.
+- [x] **CP3 — `npx holo init`.** macOS/Linux quickstart, GitHub-only at install, ≤30s TTFUQ, opt-in TTHW telemetry (DX D44/D48). Interactive prompts for the three keys, opt-in privacy prompt, anonymous install ID + start timestamp recorded to `.env` and `~/.holo/install-state.json`, bundled docker-compose template. The gateway-side first-search reporter (POST to `HOLO_TELEMETRY_ENDPOINT`) is a follow-up.
 - [x] **MCP OAuth on the gateway.** Real OAuth 2.1 + PKCE provider (`@holo/oauth-provider`), `/api/oauth/authorize` + `/token` + `/register`, gateway middleware validating bearer tokens, `oauth_auth_codes` + `oauth_access_tokens` tables — all on main. Per-user OAuth ACL fan-out is tracked separately under v0.2/v0.3.
-- [ ] **BYO-agent reach demo.** ChatGPT Action + Gemini function call hitting the same instance an MCP client uses.
+- [x] **BYO-agent reach demo.** ChatGPT Action + Gemini function call hitting the same instance an MCP client uses. ChatGPT MCP/Action via the `ChatGPT` and `OpenAPI` tabs; Gemini via the new `Gemini` tab — both dispatch to the same gateway base with the same API tokens.
 
 **Release plumbing:**
 
