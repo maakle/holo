@@ -7,6 +7,7 @@ import { TestingSection } from './testing-section';
 import { ClaudeSetup } from './setups/claude';
 import { ChatGPTSetup } from './setups/chatgpt';
 import { CustomMcpSetup } from './setups/custom-mcp';
+import { GeminiSetup } from './setups/gemini';
 import { OpenApiSetup } from './setups/openapi';
 import { SlackSetup } from './setups/slack';
 
@@ -204,6 +205,14 @@ export function ConnectAgentPanel({ mcpUrl, gatewayBase, orgId }: Props) {
           <ClaudeSetup mcpUrl={mcpUrl} token={token} copied={copied} onCopy={copy} />
         )}
         {activeTab === 'ChatGPT' && <ChatGPTSetup mcpUrl={mcpUrl} token={token} />}
+        {activeTab === 'Gemini' && (
+          <GeminiSetup
+            gatewayBase={gatewayBase}
+            token={token}
+            copied={copied}
+            onCopy={copy}
+          />
+        )}
         {activeTab === 'Slack' && <SlackSetup />}
         {activeTab === 'OpenAPI' && (
           <OpenApiSetup
