@@ -10,6 +10,7 @@ import { LinearSyncModule } from './linear';
 import { MintlifySyncModule } from './mintlify';
 import { ZendeskSyncModule } from './zendesk';
 import { GoogleDriveSyncModule } from './googledrive';
+import { AirtableSyncModule } from './airtable';
 import { SyncSchedulerService } from './sync-scheduler.service';
 
 @Module({
@@ -25,6 +26,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
     MintlifySyncModule,
     ZendeskSyncModule,
     GoogleDriveSyncModule,
+    AirtableSyncModule,
   ],
   providers: [SyncSchedulerService],
 })

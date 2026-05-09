@@ -32,6 +32,7 @@ const registry: Record<string, SyncRunner> = {
   'mintlify-sync': stubRunner('mintlify'),
   'zendesk-sync': stubRunner('zendesk'),
   'googledrive-sync': stubRunner('googledrive'),
+  'airtable-sync': stubRunner('airtable'),
 };
 
 export function getSyncRunner(queue: string): SyncRunner {

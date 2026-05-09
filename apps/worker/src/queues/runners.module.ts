@@ -17,6 +17,7 @@ import {
   createMintlifySpec,
   createZendeskSpec,
   createGoogleDriveSpec,
+  createAirtableSpec,
   githubAppConfigFromEnv,
 } from '@holo/connectors';
 import { setSyncRunner } from './sync-runner-registry';
@@ -138,8 +139,15 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
         deps,
       ),
     );
+    // Airtable: API-key (personal access token) auth, no env credentials
+    // required at boot. The token is collected per-org via the connect route
+    // and loaded from connector_credentials by the framework's loadTokens.
+    setSyncRunner(
+      QUEUE_NAMES.AIRTABLE_SYNC,
+      createGenericRunner(createAirtableSpec(), deps),
+    );
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, mintlify, zendesk, googledrive',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, mintlify, zendesk, googledrive, airtable',
     );
 
     // Reap any 'running' rows the previous worker incarnation left behind

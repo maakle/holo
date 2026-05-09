@@ -14,6 +14,7 @@ Per-connector setup guides for developers running Holo locally or configuring a 
 | Mintlify Docs | API key (none for public sites) | _todo_ |
 | Zendesk Help Center | API key (none for public help centers) | _todo_ |
 | Google Drive | OAuth | [googledrive.md](./googledrive.md) |
+| Airtable | API key (personal access token) | [airtable.md](./airtable.md) |
 
 ## Conventions
 

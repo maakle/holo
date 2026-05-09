@@ -27,7 +27,8 @@ export interface ConnectorMeta {
     | 'linear'
     | 'mintlify'
     | 'zendesk'
-    | 'googledrive';
+    | 'googledrive'
+    | 'airtable';
   displayName: string;
   description: string;
   category: ConnectorCategoryId;
@@ -116,5 +117,13 @@ export const CONNECTORS: ConnectorMeta[] = [
     category: 'productivity',
     implemented: true,
     flowType: 'oauth',
+  },
+  {
+    id: 'airtable',
+    displayName: 'Airtable',
+    description: 'Bases, tables, and records the personal access token can see.',
+    category: 'productivity',
+    implemented: true,
+    flowType: 'apikey',
   },
 ];

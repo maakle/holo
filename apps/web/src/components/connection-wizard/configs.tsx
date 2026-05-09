@@ -213,6 +213,29 @@ const mintlifyConfig: ConnectorWizardConfig = {
   ],
 };
 
+const airtableConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'apikey',
+      label: 'Personal access token',
+      render: (ctx) =>
+        apiKeyStep(ctx, {
+          placeholder: 'Airtable personal access token (pat…)',
+          helpText:
+            'Personal access tokens are scoped to a specific list of bases. Holo only sees what you grant the token in Airtable.',
+          helpUrl: 'https://airtable.com/create/tokens',
+          instructions: [
+            'Open airtable.com/create/tokens and click "Create new token". Name it "Holo".',
+            'Add the scopes data.records:read, schema.bases:read, and user.email:read.',
+            'Under Access, grant the token access to the bases you want Holo to ingest, then copy the token and paste it below.',
+          ],
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 const zendeskConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
@@ -251,6 +274,7 @@ const REGISTRY: Record<ConnectorMeta['id'], ConnectorWizardConfig<any>> = {
   mintlify: mintlifyConfig,
   zendesk: zendeskConfig,
   googledrive: googleDriveConfig,
+  airtable: airtableConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
