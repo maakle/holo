@@ -66,6 +66,7 @@ export {
   parseServiceAccountKey,
   isGoogleServiceAccountProvider,
   googleServiceAccountScopes,
+  invalidateGoogleServiceAccountTokenCache,
   GOOGLE_SERVICE_ACCOUNT_PROVIDERS,
   __clearGoogleServiceAccountTokenCacheForTests,
 } from './google-shared/index';

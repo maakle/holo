@@ -93,6 +93,17 @@ function ServiceAccountStep<TState>({
       setError('Enter the Workspace email the service account should act as.');
       return;
     }
+    // The impersonation email must be a real Workspace user, not the
+    // service account itself. Google silently hands back an SA-only token
+    // when you "impersonate" the SA, which leaves API calls running as the
+    // bot — spaces.list / drives.list then return nothing visible, which
+    // is genuinely confusing to debug. Catch the obvious shape here.
+    if (impersonationEmail.trim().toLowerCase().endsWith('.iam.gserviceaccount.com')) {
+      setError(
+        'Use a real Workspace user (e.g. you, or admin@yourcompany.com) — not the service account\'s own email. The service account impersonates that user; everything Holo sees is filtered by what they can see.',
+      );
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -368,6 +379,14 @@ function PasteCredentialsBody({
         Workspace email the service account should impersonate.
       </p>
 
+      <div className="rounded-md border border-border bg-surface-2/40 px-3 py-2 text-[12px] text-text-muted">
+        <span className="font-medium text-text">Recommended:</span> a
+        dedicated user like{' '}
+        <span className="font-mono text-text">holo@yourcompany.com</span> —
+        invite it to the spaces / folders to index. Your own account works
+        for testing.
+      </div>
+
       <label className="flex flex-col gap-1">
         <span className="text-[12px] text-text-subtle">
           Impersonation email
@@ -376,15 +395,17 @@ function PasteCredentialsBody({
           type="email"
           value={impersonationEmail}
           onChange={(e) => setImpersonationEmail(e.target.value)}
-          placeholder={args.impersonationHint ?? 'admin@yourcompany.com'}
+          placeholder={args.impersonationHint ?? 'holo@yourcompany.com'}
           className="w-full rounded-md border border-border bg-bg py-2 px-3 text-[13px] text-text placeholder:text-text-subtle focus:outline-hidden focus:focus-ring"
           autoComplete="off"
           spellCheck={false}
           disabled={busy}
         />
         <span className="text-[11px] text-text-subtle">
-          The Workspace user the service account acts as. Holo only sees
-          what this user can see — pick someone with broad access.
+          A real Workspace user —
+          <strong className="font-medium text-text"> not</strong> the
+          service account&apos;s own email. The SA impersonates this user;
+          Holo only sees what they can see.
         </span>
       </label>
 

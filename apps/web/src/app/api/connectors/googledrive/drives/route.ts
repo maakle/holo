@@ -28,6 +28,10 @@ const FOLDER_MIME = 'application/vnd.google-apps.folder';
 // Drive resource IDs are URL-safe strings. Bounded length keeps a hostile
 // client from stuffing arbitrary garbage through validation.
 const ID_RE = /^[A-Za-z0-9_-]{8,128}$/;
+// Drive's API treats the literal `root` as the My Drive top-level folder
+// id for the impersonation user. We accept it on the browse path but never
+// persist it as an allowlist pattern (My Drive is `mydrive` there).
+const ROOT_FOLDER_ID = 'root';
 
 interface SharedDrive {
   id: string;
@@ -145,7 +149,7 @@ export async function GET(req: Request) {
     const driveId = url.searchParams.get('driveId');
 
     if (folderId) {
-      if (!ID_RE.test(folderId)) {
+      if (folderId !== ROOT_FOLDER_ID && !ID_RE.test(folderId)) {
         throw holoError({
           code: ErrorCode.HOLO_INVALID_INPUT,
           problem: `Invalid folder id '${folderId}'`,

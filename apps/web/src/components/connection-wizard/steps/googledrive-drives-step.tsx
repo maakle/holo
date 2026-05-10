@@ -171,7 +171,10 @@ function GoogleDriveDrivesStep({ ctx }: { ctx: WizardContext<GoogleDriveDrivesSt
 
   async function loadChildren(node: TreeNode): Promise<void> {
     if (node.kind === 'file') return;
-    if (state.children[node.key] !== undefined) return;
+    // Don't refetch if cached, but DO retry on a previous error so the user
+    // can recover by clicking the chevron again after fixing the cause.
+    const cached = state.children[node.key];
+    if (Array.isArray(cached) || cached === 'loading') return;
     if (node.folderId === null) return;
     setState({ children: { ...state.children, [node.key]: 'loading' } });
     try {
@@ -421,9 +424,9 @@ function TreeRow({
   const isFolderType =
     node.kind === 'folder' || node.kind === 'drive' || node.kind === 'mydrive';
   return (
-    <div className="flex items-start border-b border-border last:border-b-0 hover:bg-surface-2/40">
+    <div className="flex min-w-0 items-start border-b border-border last:border-b-0 hover:bg-surface-2/40">
       <div
-        className="flex flex-1 items-start gap-2 px-3 py-2"
+        className="flex min-w-0 flex-1 items-start gap-2 px-3 py-2"
         style={{ paddingLeft: 12 + indent }}
       >
         <button
@@ -443,18 +446,26 @@ function TreeRow({
             )
           ) : null}
         </button>
-        <label className="flex flex-1 cursor-pointer items-start gap-2">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={checked}
-            onChange={onToggleSelect}
-          />
+        <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2">
+          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5"
+              checked={checked}
+              onChange={onToggleSelect}
+            />
+          </span>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-[13px] text-text">
-              <NodeIcon kind={node.kind} mimeType={undefined} />
-              <span className="truncate font-medium">{node.label}</span>
-              <NodeBadge kind={node.kind} />
+            <div className="flex min-w-0 items-center gap-2 text-[13px] text-text">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                <NodeIcon kind={node.kind} mimeType={undefined} />
+              </span>
+              <span className="min-w-0 flex-1 truncate font-medium">
+                {node.label}
+              </span>
+              <span className="shrink-0">
+                <NodeBadge kind={node.kind} />
+              </span>
             </div>
             {expanded && childrenState === 'error' ? (
               <p className="mt-0.5 text-[11px] text-error">
@@ -464,12 +475,7 @@ function TreeRow({
               Array.isArray(childrenState) &&
               childrenState.length === 0 &&
               isFolderType ? (
-              <p
-                className="mt-0.5 text-[11px] text-text-subtle"
-                style={{ paddingLeft: 0 }}
-              >
-                Empty.
-              </p>
+              <p className="mt-0.5 text-[11px] text-text-subtle">Empty.</p>
             ) : null}
           </div>
         </label>

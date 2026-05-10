@@ -24,6 +24,87 @@ interface ListSpacesResponse {
 // want to insert an arbitrary user-supplied string as an allowlist pattern.
 const SPACE_NAME_RE = /^spaces\/[A-Za-z0-9_-]+$/;
 
+interface ChatUser {
+  name?: string;
+  displayName?: string;
+  type?: 'TYPE_UNSPECIFIED' | 'HUMAN' | 'BOT';
+}
+
+interface ChatMessage {
+  sender?: ChatUser;
+}
+
+/**
+ * Resolve a human-readable label for an unnamed space (DM or group chat).
+ *
+ * Google Chat doesn't surface counterparty names on `spaces.list` — DMs come
+ * back with empty `displayName`. We could call `members.list` but that
+ * requires `chat.memberships.readonly`, which isn't in our DWD scope set
+ * (and adding scopes forces every existing install to re-authorize). Instead
+ * we sample recent messages: each message carries the sender's `displayName`
+ * inline, so the first non-bot, non-self sender is who the DM is *with*.
+ *
+ * Returns null when no signal exists (empty DM, only self-sent, etc.) — the
+ * picker falls back to the generic "Direct message" label.
+ */
+async function resolveDmLabel(
+  accessToken: string,
+  spaceName: string,
+  selfUserName: string | null,
+  isGroupChat: boolean,
+): Promise<string | null> {
+  try {
+    const params = new URLSearchParams({
+      pageSize: '25',
+      orderBy: 'createTime desc',
+    });
+    const res = await fetch(
+      `https://chat.googleapis.com/v1/${spaceName}/messages?${params.toString()}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as { messages?: ChatMessage[] };
+    const seen = new Map<string, string>(); // user resource name → display name
+    for (const m of json.messages ?? []) {
+      const s = m.sender;
+      if (!s || !s.name) continue;
+      if (s.type === 'BOT') continue;
+      if (selfUserName && s.name === selfUserName) continue;
+      if (!s.displayName) continue;
+      if (!seen.has(s.name)) seen.set(s.name, s.displayName);
+    }
+    const names = [...seen.values()];
+    if (names.length === 0) return null;
+    if (isGroupChat) {
+      // Group chats: comma-join the participants we've observed so the user
+      // gets some idea. Cap to avoid runaway labels.
+      const joined = names.slice(0, 4).join(', ');
+      return names.length > 4 ? `${joined}, …` : joined;
+    }
+    // DM: there should only be one counterparty.
+    return names[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+interface UserinfoResponse {
+  sub: string;
+  email?: string;
+}
+
+async function fetchUserinfo(accessToken: string): Promise<UserinfoResponse | null> {
+  try {
+    const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as UserinfoResponse;
+  } catch {
+    return null;
+  }
+}
+
 async function listAllSpaces(accessToken: string): Promise<ChatSpace[]> {
   const out: ChatSpace[] = [];
   let pageToken: string | undefined;
@@ -97,17 +178,47 @@ export async function GET() {
     );
     const defaultAll = includedExact.size === 0;
 
-    // Surface DMs in the UI but flag them — admins can opt in, but the
-    // default-all sync path filters them out (see google-chat spec).
+    // Resolve human names for DMs and group chats — Google's spaces.list
+    // returns empty displayName for both, which leaves the picker stuck on
+    // "Direct message · Direct message · Direct message…". We sample recent
+    // messages (already in scope) to identify the counterparty.
+    const userinfo = await fetchUserinfo(minted.accessToken);
+    const selfUserName = userinfo?.sub ? `users/${userinfo.sub}` : null;
+
+    const unnamed = spaces.filter(
+      (s) =>
+        !s.displayName?.trim() &&
+        (s.spaceType === 'DIRECT_MESSAGE' || s.spaceType === 'GROUP_CHAT'),
+    );
+    // Cap how many we enrich per request — 50 is enough for the typical
+    // user's DM list, but stops us from issuing hundreds of message-list
+    // calls on enormous accounts.
+    const toEnrich = unnamed.slice(0, 50);
+    const resolved = new Map<string, string>();
+    await Promise.all(
+      toEnrich.map(async (s) => {
+        const label = await resolveDmLabel(
+          minted.accessToken,
+          s.name,
+          selfUserName,
+          s.spaceType === 'GROUP_CHAT',
+        );
+        if (label) resolved.set(s.name, label);
+      }),
+    );
+
     return NextResponse.json({
       defaultAll,
-      spaces: spaces.map((s) => ({
-        name: s.name,
-        displayName: s.displayName ?? '',
-        spaceType: s.spaceType ?? 'SPACE_TYPE_UNSPECIFIED',
-        isDirectMessage: s.spaceType === 'DIRECT_MESSAGE',
-        selected: includedExact.has(s.name),
-      })),
+      spaces: spaces.map((s) => {
+        const resolvedName = resolved.get(s.name);
+        return {
+          name: s.name,
+          displayName: s.displayName?.trim() || resolvedName || '',
+          spaceType: s.spaceType ?? 'SPACE_TYPE_UNSPECIFIED',
+          isDirectMessage: s.spaceType === 'DIRECT_MESSAGE',
+          selected: includedExact.has(s.name),
+        };
+      }),
     });
   } catch (e) {
     if (e instanceof HoloError) {

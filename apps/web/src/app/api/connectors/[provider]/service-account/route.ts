@@ -9,6 +9,7 @@ import {
   parseServiceAccountKey,
   mintDelegatedAccessToken,
   googleServiceAccountScopes,
+  invalidateGoogleServiceAccountTokenCache,
   isGoogleServiceAccountProvider,
   type GoogleServiceAccountProvider,
 } from '@holo/connectors';
@@ -82,6 +83,17 @@ export async function POST(
         fix: 'Enter the Workspace user the service account should act as.',
       });
     }
+    // Block the common footgun: pasting the service account's own email
+    // as the impersonation user. Google returns a SA-only token for that
+    // case (no `invalid_grant`), and downstream API calls then run as the
+    // bot — which is in zero spaces / sees zero files. Fail loudly here.
+    if (impersonationEmail.endsWith('.iam.gserviceaccount.com')) {
+      throw holoError({
+        code: ErrorCode.HOLO_INVALID_INPUT,
+        problem: 'impersonationEmail must be a Workspace user, not the service account itself',
+        fix: 'Enter a real Workspace user email (e.g. yours or admin@yourcompany.com). Holo will only see what that user can see.',
+      });
+    }
 
     // Step 1: parse + validate the JSON shape (throws HoloError on bad input).
     const key = parseServiceAccountKey(keyJsonRaw);
@@ -139,6 +151,15 @@ export async function POST(
         lastValidatedAt: new Date(),
       });
     }
+
+    // Drop the cached delegated token for this (org, provider) pair so the
+    // next call to loadGoogleServiceAccountToken mints a fresh one against
+    // the just-saved row. Without this, a reconnect that changes the
+    // impersonation email or rotates the key keeps handing back the
+    // previous token until natural expiry (~50 min) — and any picker /
+    // sync call in that window runs as the old identity, returning empty
+    // results that look like a permissions bug.
+    invalidateGoogleServiceAccountTokenCache(orgId, provider);
 
     // Step 4b: upsert the source row so sync queues have a target.
     await db

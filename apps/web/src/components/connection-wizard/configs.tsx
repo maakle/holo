@@ -127,7 +127,7 @@ const googleDriveConfig: ConnectorWizardConfig<GoogleDriveDrivesState> = {
       render: (ctx) =>
         serviceAccountStep(ctx, {
           scopes: GOOGLEDRIVE_SCOPES,
-          impersonationHint: 'admin@yourcompany.com',
+          impersonationHint: 'holo@yourcompany.com',
           apiToEnable: { label: 'Google Drive API', host: 'drive.googleapis.com' },
         }),
     },
@@ -296,7 +296,7 @@ const googleChatConfig: ConnectorWizardConfig<GoogleChatSpacesState> = {
       render: (ctx) =>
         serviceAccountStep(ctx, {
           scopes: GOOGLE_CHAT_SCOPES,
-          impersonationHint: 'admin@yourcompany.com',
+          impersonationHint: 'holo@yourcompany.com',
           apiToEnable: { label: 'Google Chat API', host: 'chat.googleapis.com' },
           extraSteps: [
             {

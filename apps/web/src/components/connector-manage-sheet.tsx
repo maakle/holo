@@ -109,6 +109,17 @@ export function ConnectorManageSheet({
   const isGithub = meta.id === 'github';
   const isSlack = meta.id === 'slack';
 
+  // Connectors with a scope-picker step that's worth re-opening without
+  // forcing a full reconnect. Map connector id → the wizard step id that
+  // hosts the picker. Slack/GitHub already render dedicated pickers inline
+  // in the manage sheet, so they don't appear here.
+  const SCOPE_STEP_BY_CONNECTOR: Record<string, string | undefined> = {
+    googledrive: 'drives',
+    'google-chat': 'spaces',
+    gitlab: 'projects',
+  };
+  const editScopeStepId = SCOPE_STEP_BY_CONNECTOR[meta.id];
+
   // Live running state comes from the shared bulk-status store — every row,
   // sheet, and badge on the page reads from the same poll loop.
   const status = useConnectorStatus(meta.id);
@@ -310,6 +321,28 @@ export function ConnectorManageSheet({
               <Button variant="secondary" size="sm" onClick={reconnect} disabled={busy}>
                 {isGithub ? 'Manage installation' : 'Reconnect'}
               </Button>
+              {editScopeStepId ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    // Close the sheet and re-open the wizard at the picker
+                    // step. The picker re-loads existing selections on mount,
+                    // so the user can adjust scope without redoing credentials.
+                    onOpenChange(false);
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(
+                        new CustomEvent(`holo:open-wizard:${meta.id}`, {
+                          detail: { initialStepId: editScopeStepId },
+                        }),
+                      );
+                    }
+                  }}
+                  disabled={busy}
+                >
+                  Edit scope
+                </Button>
+              ) : null}
               <div className="ml-auto">
                 <Button
                   variant="ghost"

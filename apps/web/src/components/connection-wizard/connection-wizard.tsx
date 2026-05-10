@@ -118,7 +118,7 @@ export function ConnectionWizard<TState>({
         else onOpenChange(true);
       }}
     >
-      <AlertDialogContent className="max-w-xl">
+      <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle>Set up {meta.displayName}</AlertDialogTitle>
           <AlertDialogDescription>

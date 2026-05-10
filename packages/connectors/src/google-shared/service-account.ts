@@ -195,6 +195,20 @@ export function __clearGoogleServiceAccountTokenCacheForTests(): void {
   tokenCache.clear();
 }
 
+/**
+ * Invalidate the cached delegated token for one (org, provider) pair. Call
+ * after upserting the SA row so the next `loadGoogleServiceAccountToken`
+ * mints a fresh token against the current impersonationEmail / key — rather
+ * than handing back a token bound to the previous values for up to ~50
+ * minutes.
+ */
+export function invalidateGoogleServiceAccountTokenCache(
+  organizationId: string,
+  provider: GoogleServiceAccountProvider,
+): void {
+  tokenCache.delete(cacheKey(organizationId, provider));
+}
+
 export interface LoadGoogleServiceAccountTokenInput {
   db: DB;
   organizationId: string;
