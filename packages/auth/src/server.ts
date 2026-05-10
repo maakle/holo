@@ -121,6 +121,81 @@ async function sendInvitationEmail(
   });
 }
 
+function slugifyOrgName(s: string): string {
+  const cleaned = s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32);
+  return cleaned || 'workspace';
+}
+
+export type ProvisionResult =
+  | { created: true; organizationId: string }
+  | { created: false; reason: 'pending_invite' | 'existing_member' };
+
+/**
+ * Body of the `user.create.after` Better Auth hook, extracted for testability.
+ *
+ * Provisions a personal organization owned by the new user and repoints the
+ * user's `organization_id` (set by Better Auth's additionalFields default to
+ * the demo "default" org) to it. This is the multi-tenant boundary — signups
+ * must NOT silently land in the shared default org.
+ *
+ * No-ops when:
+ *   - There's a pending invitation for this email. Better Auth's
+ *     `acceptInvitation` handler will create the member row with the invited
+ *     role; pre-creating here would race the unique (org, user) constraint.
+ *   - The user already has a `member` row (idempotency on hook re-entry).
+ */
+export async function provisionPersonalOrgOnSignup(
+  db: DB,
+  newUser: { id: string; email: string; name?: string | null },
+): Promise<ProvisionResult> {
+  const pendingInvite = await db
+    .select({ id: schema.invitation.id })
+    .from(schema.invitation)
+    .where(
+      and(
+        eq(schema.invitation.email, newUser.email.toLowerCase()),
+        eq(schema.invitation.status, 'pending'),
+      ),
+    )
+    .limit(1);
+  if (pendingInvite[0]) return { created: false, reason: 'pending_invite' };
+
+  const existing = await db
+    .select({ id: schema.member.id })
+    .from(schema.member)
+    .where(eq(schema.member.userId, newUser.id))
+    .limit(1);
+  if (existing[0]) return { created: false, reason: 'existing_member' };
+
+  const displayName = (newUser.name ?? '').trim() || newUser.email.split('@')[0]!;
+  const orgName = `${displayName}'s workspace`;
+  const slug = `${slugifyOrgName(displayName)}-${crypto.randomUUID().slice(0, 6)}`;
+
+  const [newOrg] = await db
+    .insert(schema.organization)
+    .values({ name: orgName, slug })
+    .returning({ id: schema.organization.id });
+
+  await db
+    .update(schema.user)
+    .set({ organizationId: newOrg!.id })
+    .where(eq(schema.user.id, newUser.id));
+
+  await db.insert(schema.member).values({
+    organizationId: newOrg!.id,
+    userId: newUser.id,
+    role: 'owner',
+  });
+
+  return { created: true, organizationId: newOrg!.id };
+}
+
 export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
   return betterAuth({
     database: drizzleAdapter(db, {
@@ -161,46 +236,12 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
       },
     },
     databaseHooks: {
-      // Auto-enroll new users in their home org so the org plugin sees them
-      // as a member. Two important rules:
-      //   1. Skip if there's a pending invitation for this email — better-auth's
-      //      acceptInvitation handler will create the member row with the
-      //      invited role. Pre-creating here would fire the unique constraint
-      //      on (organization_id, user_id), abort acceptInvitation mid-flight,
-      //      and leave the user with the wrong role plus a stale "pending" row.
-      //   2. New users default to 'member', not 'owner'. The seed creates the
-      //      default org's owner explicitly (Default User); subsequent direct
-      //      signups should not silently inherit owner privileges.
       user: {
         create: {
+          // See provisionPersonalOrgOnSignup for behavior + invariants.
           after: async (createdUser) => {
-            const u = createdUser as { id: string; email: string; organizationId?: string };
-            const orgId = u.organizationId ?? defaultOrganizationId;
-
-            const pendingInvite = await db
-              .select({ id: schema.invitation.id })
-              .from(schema.invitation)
-              .where(
-                and(
-                  eq(schema.invitation.email, u.email.toLowerCase()),
-                  eq(schema.invitation.status, 'pending'),
-                ),
-              )
-              .limit(1);
-            if (pendingInvite[0]) return;
-
-            const existing = await db
-              .select({ id: schema.member.id })
-              .from(schema.member)
-              .where(eq(schema.member.userId, u.id))
-              .limit(1);
-            if (existing[0]) return;
-
-            await db.insert(schema.member).values({
-              organizationId: orgId,
-              userId: u.id,
-              role: 'member',
-            });
+            const u = createdUser as { id: string; email: string; name?: string | null };
+            await provisionPersonalOrgOnSignup(db, u);
           },
         },
       },

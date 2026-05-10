@@ -17,9 +17,12 @@ export const user = pgTable('user', {
   emailVerified: boolean('email_verified').notNull().default(false),
   name: text('name'),
   image: text('image'),
-  // The user's "home" / default organization. Each user is auto-enrolled
-  // here at signup. Multi-tenancy: a user can belong to additional orgs via
-  // the `member` table; the active org is tracked on `session`.
+  // The user's "home" organization — populated at signup with a personal
+  // org owned by the user (see databaseHooks.user.create.after in
+  // packages/auth/src/server.ts). NOT the shared "default" org; that one is
+  // demo-only and joinable solely by explicit invitation. Multi-tenancy:
+  // a user can belong to additional orgs via `member`; active org per
+  // session is tracked on `session.activeOrganizationId`.
   organizationId: uuid('organization_id')
     .notNull()
     .references(() => organization.id),
