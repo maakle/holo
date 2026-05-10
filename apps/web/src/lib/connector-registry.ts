@@ -35,7 +35,7 @@ export interface ConnectorMeta {
   description: string;
   category: ConnectorCategoryId;
   implemented: boolean;
-  flowType: 'oauth' | 'apikey'; // oauth = redirect flow, apikey = inline form
+  flowType: 'oauth' | 'apikey' | 'service-account'; // oauth = redirect flow, apikey = inline form, service-account = paste JSON key + impersonation email
 }
 
 export const CONNECTORS: ConnectorMeta[] = [
@@ -126,7 +126,7 @@ export const CONNECTORS: ConnectorMeta[] = [
       'Google Docs, Sheets, Slides, and uploaded text/markdown files across My Drive and Shared Drives.',
     category: 'productivity',
     implemented: true,
-    flowType: 'oauth',
+    flowType: 'service-account',
   },
   {
     id: 'airtable',
@@ -142,6 +142,6 @@ export const CONNECTORS: ConnectorMeta[] = [
     description: 'Spaces, threads, and messages from Google Chat.',
     category: 'communication',
     implemented: true,
-    flowType: 'oauth',
+    flowType: 'service-account',
   },
 ];

@@ -1,4 +1,4 @@
-export { createGoogleDriveSpec } from './spec';
+export { createGoogleDriveSpec, GOOGLEDRIVE_SCOPES } from './spec';
 export type { GoogleDriveSpecOptions } from './spec';
 export {
   DRIVE_API_BASE,

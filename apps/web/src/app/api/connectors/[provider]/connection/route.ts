@@ -3,7 +3,11 @@ import { headers } from 'next/headers';
 import { and, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
-import { githubAppConfigFromEnv, uninstallApp } from '@holo/connectors';
+import {
+  githubAppConfigFromEnv,
+  uninstallApp,
+  isGoogleServiceAccountProvider,
+} from '@holo/connectors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
@@ -135,6 +139,62 @@ export async function DELETE(
       drainedCounts = removed;
     } catch (err) {
       console.error(`[disconnect/${provider}] drainJobsForOrg failed:`, err);
+    }
+
+    // Google service-account connectors store credentials in
+    // `connector_service_accounts` (one row per org+provider, no userId).
+    // Disconnect is a full tear-down: delete the SA row, sources, allowlist.
+    // No remote uninstall — the SA itself lives in the customer's Google
+    // Cloud project; we only revoke our access by dropping the key locally.
+    if (isGoogleServiceAccountProvider(provider)) {
+      const deletedSa = await db
+        .delete(schema.connectorServiceAccounts)
+        .where(
+          and(
+            eq(schema.connectorServiceAccounts.organizationId, orgId),
+            eq(schema.connectorServiceAccounts.provider, provider),
+          ),
+        )
+        .returning({ id: schema.connectorServiceAccounts.id });
+      const deletedSources = await db
+        .delete(schema.sources)
+        .where(
+          and(
+            eq(schema.sources.organizationId, orgId),
+            eq(schema.sources.provider, provider),
+          ),
+        )
+        .returning({ id: schema.sources.id });
+      const deletedAllow = await db
+        .delete(schema.connectorAllowlists)
+        .where(
+          and(
+            eq(schema.connectorAllowlists.organizationId, orgId),
+            eq(schema.connectorAllowlists.provider, provider),
+          ),
+        )
+        .returning({ id: schema.connectorAllowlists.id });
+      emitAuditEvent({
+        db,
+        organizationId: orgId,
+        userId,
+        eventType: 'connector.disconnected',
+        resourceType: 'connector',
+        resourceId: provider,
+        meta: {
+          provider,
+          removedServiceAccounts: deletedSa.length,
+          removedSources: deletedSources.length,
+          removedAllowlistRows: deletedAllow.length,
+        },
+      });
+      return NextResponse.json({
+        ok: true,
+        removedServiceAccounts: deletedSa.length,
+        removedSources: deletedSources.length,
+        removedAllowlistRows: deletedAllow.length,
+        drainedJobs: drainedCounts,
+      });
     }
 
     // Capture this user's still-valid token BEFORE we mark it revoked — we

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
+  apiKey,
   defineConnector,
-  oauth2,
   type ConnectorSpec,
   type ResourceSyncContext,
   type TestConnectionContext,
@@ -18,9 +18,7 @@ import {
 import { processFile } from './chunking';
 
 export interface GoogleDriveSpecOptions {
-  clientId: string;
-  clientSecret: string;
-  /** Override fetch (tests). Threads through both auth and HTTP. */
+  /** Override fetch (tests). */
   fetchImpl?: typeof fetch;
 }
 
@@ -30,8 +28,8 @@ export interface GoogleDriveSpecOptions {
  *
  * One cursor row covers My Drive *and* every Shared Drive: Drive returns
  * results in ascending modifiedTime order, and the watermark is global to
- * the user's view. Per-drive cursors would buy us nothing and would force
- * us to track which drives still exist between runs.
+ * the impersonated user's view. Per-drive cursors would buy us nothing and
+ * would force us to track which drives still exist between runs.
  */
 const filesCursorSchema = z
   .object({
@@ -43,47 +41,27 @@ const filesCursorSchema = z
 type FilesCursor = z.infer<typeof filesCursorSchema>;
 
 /**
- * Append Google-specific authorize params (`access_type=offline`,
- * `prompt=consent`) by stuffing them into the base URL. The framework's
- * oauth2 strategy detects the existing query string and appends with `&`,
- * so this composes cleanly with the standard client_id/redirect_uri params.
- *
- * Without `access_type=offline` Google never returns a refresh token, and
- * the integration silently breaks the moment the access token expires.
- * `prompt=consent` forces re-issuance on re-auth so the refresh token is
- * present even if the user previously connected.
- */
-const AUTHORIZE_URL =
-  'https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&prompt=consent&include_granted_scopes=true';
-
-const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-
-/**
  * `drive.readonly` covers My Drive + Shared Drives (read access to file
- * metadata + content). `drive.metadata.readonly` is implied. We do not
- * request the broad `drive` scope — the connector is read-only by design.
+ * metadata + content). Defined in @holo/sync-providers so the wizard and
+ * the worker share a single source. The connector is read-only by design —
+ * we never request the broad `drive` scope. The Workspace admin lists
+ * exactly these scopes in Admin Console → Security → API Controls →
+ * Domain-wide Delegation when granting the SA's client_id.
  */
-const SCOPES: ReadonlyArray<string> = [
-  'https://www.googleapis.com/auth/drive.readonly',
-  'https://www.googleapis.com/auth/userinfo.email',
-];
+export { GOOGLEDRIVE_SCOPES } from '@holo/sync-providers';
 
-export function createGoogleDriveSpec(opts: GoogleDriveSpecOptions): ConnectorSpec {
+export function createGoogleDriveSpec(opts: GoogleDriveSpecOptions = {}): ConnectorSpec {
   return defineConnector({
     id: 'googledrive',
     displayName: 'Google Drive',
 
     sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.googledrive },
 
-    auth: oauth2({
-      clientId: opts.clientId,
-      clientSecret: opts.clientSecret,
-      authorizeUrl: AUTHORIZE_URL,
-      tokenUrl: TOKEN_URL,
-      scopes: SCOPES,
-      refreshable: true,
-      fetchImpl: opts.fetchImpl,
-    }),
+    // The framework-bridge mints a fresh delegated access token before each
+    // sync via Google's JWT bearer flow (loadGoogleServiceAccountToken) and
+    // hands it to the spec via tokens.accessToken. The spec just attaches it
+    // as a Bearer header.
+    auth: apiKey(),
 
     http: {
       baseUrl: DRIVE_API_BASE,
@@ -113,11 +91,11 @@ export function createGoogleDriveSpec(opts: GoogleDriveSpecOptions): ConnectorSp
           let highestModifiedTime = ctx.cursor.modifiedTime;
           let pageNum = 0;
 
-          // Drives we'll iterate. `null` is My Drive; everything else is a
-          // Shared Drive id. Listing the user's shared drives once at the
-          // top of the run — they don't change mid-sync, and pulling them
-          // up front means we don't repeat the listSharedDrives call per
-          // page of files.
+          // Drives we'll iterate. `null` is the impersonated user's My Drive;
+          // everything else is a Shared Drive id. Listing the user's shared
+          // drives once at the top of the run — they don't change mid-sync,
+          // and pulling them up front means we don't repeat the
+          // listSharedDrives call per page of files.
           const driveIds: Array<string | null> = [null];
           {
             let token: string | null | undefined = null;

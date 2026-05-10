@@ -329,6 +329,9 @@ export async function deleteWorkspace(
       .delete(schema.connectorCredentials)
       .where(eq(schema.connectorCredentials.organizationId, organizationId));
     await tx
+      .delete(schema.connectorServiceAccounts)
+      .where(eq(schema.connectorServiceAccounts.organizationId, organizationId));
+    await tx
       .delete(schema.mcpInvocations)
       .where(eq(schema.mcpInvocations.organizationId, organizationId));
     await tx

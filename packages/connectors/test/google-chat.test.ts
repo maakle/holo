@@ -67,27 +67,24 @@ function makeFetch(
 
 describe('createGoogleChatSpec', () => {
   it('declares the expected id, http config, and one resource', () => {
-    const spec = createGoogleChatSpec({ clientId: 'cid', clientSecret: 'csec' });
+    const spec = createGoogleChatSpec();
     expect(spec.id).toBe('google-chat');
     expect(spec.displayName).toBe('Google Chat');
     expect(spec.http?.baseUrl).toBe('https://chat.googleapis.com');
     expect(spec.resources).toHaveLength(1);
     expect(spec.resources[0]!.id).toBe('threads');
-    expect(spec.auth.kind).toBe('oauth2');
-    expect(spec.auth.refreshable).toBe(true);
+    // The spec attaches a Bearer token via the apiKey strategy — the bridge
+    // mints delegated access tokens for the org's service account before
+    // each sync (loadGoogleServiceAccountToken). No OAuth refresh.
+    expect(spec.auth.kind).toBe('apiKey');
+    expect(spec.auth.refreshable).toBe(false);
   });
 
-  it('builds a Google authorize URL with the read-only Chat scopes', () => {
-    const spec = createGoogleChatSpec({ clientId: 'cid', clientSecret: 'csec' });
-    const url = spec.auth.buildAuthorizeUrl!({
-      redirectUri: 'https://app.example.com/api/connectors/google-chat/callback',
-      state: 'state-abc',
-    });
-    expect(url).toContain('accounts.google.com/o/oauth2/v2/auth');
-    expect(url).toContain('client_id=cid');
-    expect(url).toContain('chat.spaces.readonly');
-    expect(url).toContain('chat.messages.readonly');
-    expect(url).toContain('state=state-abc');
+  it('attaches the bridge-supplied Bearer token on every request', async () => {
+    const spec = createGoogleChatSpec();
+    const header = spec.auth.authHeader({ accessToken: 'sa-minted-token' });
+    expect(header.name).toBe('Authorization');
+    expect(header.value).toBe('Bearer sa-minted-token');
   });
 });
 
@@ -150,7 +147,7 @@ describe('Google Chat sync (full)', () => {
       return jsonResponse({});
     });
 
-    const spec = createGoogleChatSpec({ clientId: 'cid', clientSecret: 'csec' });
+    const spec = createGoogleChatSpec();
     const { stores, enqueued, savedCursors } = makeStores();
 
     const result = await runConnectorSync({
@@ -190,7 +187,7 @@ describe('Google Chat sync (full)', () => {
 
   it('attaches Authorization: Bearer <token> on every request', async () => {
     const { fetchImpl, calls } = makeFetch(() => jsonResponse({ spaces: [] }));
-    const spec = createGoogleChatSpec({ clientId: 'cid', clientSecret: 'csec' });
+    const spec = createGoogleChatSpec();
     const { stores } = makeStores();
     await runConnectorSync({
       spec,
@@ -222,7 +219,7 @@ describe('Google Chat sync (full)', () => {
         ],
       });
     });
-    const spec = createGoogleChatSpec({ clientId: 'cid', clientSecret: 'csec' });
+    const spec = createGoogleChatSpec();
     const { stores, enqueued } = makeStores();
     await runConnectorSync({
       spec,
@@ -245,7 +242,7 @@ describe('Google Chat sync (incremental)', () => {
       }
       return jsonResponse({ messages: [] });
     });
-    const spec = createGoogleChatSpec({ clientId: 'cid', clientSecret: 'csec' });
+    const spec = createGoogleChatSpec();
     const { stores } = makeStores({
       cursors: {
         threads: {
@@ -274,7 +271,7 @@ describe('Google Chat testConnection', () => {
     const { fetchImpl } = makeFetch(() =>
       jsonResponse({ sub: 'sub-1', email: 'alice@kombo.dev' }),
     );
-    const spec = createGoogleChatSpec({ clientId: 'cid', clientSecret: 'csec' });
+    const spec = createGoogleChatSpec();
     const { createHttpClient } = await import('@holo/connector-framework');
     const api = createHttpClient({
       config: spec.http!,

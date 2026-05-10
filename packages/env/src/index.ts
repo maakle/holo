@@ -36,8 +36,10 @@ const EnvSchema = z.object({
   SLACK_CONNECTOR_SIGNING_SECRET: z.string().optional(),
   LINEAR_CONNECTOR_CLIENT_ID: z.string().optional(),
   LINEAR_CONNECTOR_CLIENT_SECRET: z.string().optional(),
-  GOOGLEDRIVE_CONNECTOR_CLIENT_ID: z.string().optional(),
-  GOOGLEDRIVE_CONNECTOR_CLIENT_SECRET: z.string().optional(),
+  // Google Drive + Google Chat use per-org service accounts with
+  // domain-wide delegation, not OAuth — there are no global client
+  // credentials. The JSON key + impersonation email are collected per-org via
+  // the wizard and stored in connector_service_accounts.
   // GitLab OAuth Application credentials. Register at
   // https://gitlab.com/-/profile/applications with redirect URI
   // `${WEB_PUBLIC_URL}/api/connectors/gitlab/callback` and scopes
@@ -45,13 +47,6 @@ const EnvSchema = z.object({
   // dev environments don't have to register an app.
   GITLAB_CONNECTOR_CLIENT_ID: z.string().optional(),
   GITLAB_CONNECTOR_CLIENT_SECRET: z.string().optional(),
-  /**
-   * Google Cloud OAuth client used by the Google Chat connector.
-   * Same client (Web application type) consented for the Chat scopes
-   * (chat.spaces.readonly + chat.messages.readonly).
-   */
-  GOOGLE_CHAT_CONNECTOR_CLIENT_ID: z.string().optional(),
-  GOOGLE_CHAT_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().optional(),
   /**

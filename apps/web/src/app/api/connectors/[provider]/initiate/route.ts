@@ -5,9 +5,7 @@ import {
   shared,
   createSlackSpec,
   createLinearSpec,
-  createGoogleDriveSpec,
   createGitlabSpec,
-  createGoogleChatSpec,
 } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
@@ -114,34 +112,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
       );
       const authorizeUrl = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
       return NextResponse.json({ authorizeUrl });
-    } else if (provider === 'googledrive') {
-      if (
-        !env.GOOGLEDRIVE_CONNECTOR_CLIENT_ID ||
-        !env.GOOGLEDRIVE_CONNECTOR_CLIENT_SECRET
-      ) {
-        throw holoError({
-          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
-          problem: 'Google Drive connector credentials are not configured',
-          fix: 'Set GOOGLEDRIVE_CONNECTOR_CLIENT_ID and GOOGLEDRIVE_CONNECTOR_CLIENT_SECRET in the environment.',
-        });
-      }
-      const redirectUri = `${publicOrigin}/api/connectors/googledrive/callback`;
-      const spec = createGoogleDriveSpec({
-        clientId: env.GOOGLEDRIVE_CONNECTOR_CLIENT_ID,
-        clientSecret: env.GOOGLEDRIVE_CONNECTOR_CLIENT_SECRET,
-      });
-      const csrfNonce = shared.generateCsrfNonce();
-      const state = await shared.signState(
-        {
-          user_id: session.user.id,
-          organization_id: orgId,
-          csrf_nonce: csrfNonce,
-          provider,
-        },
-        env.BETTER_AUTH_SECRET,
-      );
-      const authorizeUrl = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
-      return NextResponse.json({ authorizeUrl });
     } else if (provider === 'gitlab') {
       // GitLab.com OAuth Application — same shape as Linear, different
       // env vars + spec. Self-hosted GitLab instances are not supported
@@ -170,44 +140,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
       );
       const authorizeUrl = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
       return NextResponse.json({ authorizeUrl });
-    } else if (provider === 'google-chat') {
-      if (
-        !env.GOOGLE_CHAT_CONNECTOR_CLIENT_ID ||
-        !env.GOOGLE_CHAT_CONNECTOR_CLIENT_SECRET
-      ) {
-        throw holoError({
-          code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
-          problem: 'Google Chat connector credentials are not configured',
-          fix: 'Set GOOGLE_CHAT_CONNECTOR_CLIENT_ID and GOOGLE_CHAT_CONNECTOR_CLIENT_SECRET in the environment.',
-        });
-      }
-      const redirectUri = `${publicOrigin}/api/connectors/google-chat/callback`;
-      const spec = createGoogleChatSpec({
-        clientId: env.GOOGLE_CHAT_CONNECTOR_CLIENT_ID,
-        clientSecret: env.GOOGLE_CHAT_CONNECTOR_CLIENT_SECRET,
-      });
-      const csrfNonce = shared.generateCsrfNonce();
-      const state = await shared.signState(
-        {
-          user_id: session.user.id,
-          organization_id: orgId,
-          csrf_nonce: csrfNonce,
-          provider,
-        },
-        env.BETTER_AUTH_SECRET,
-      );
-      // Google requires `access_type=offline` + `prompt=consent` to issue a
-      // refresh token on every consent (without `prompt=consent`, returning
-      // users skip consent and Google omits the refresh token, breaking the
-      // 6h sync cycle once the 1h access token expires).
-      const base = spec.auth.buildAuthorizeUrl!({ redirectUri, state });
-      const authorizeUrl = `${base}&access_type=offline&prompt=consent&include_granted_scopes=true`;
-      return NextResponse.json({ authorizeUrl });
     } else {
       throw holoError({
         code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: `${provider} connector does not use the OAuth initiate flow`,
-        fix: 'OAuth-redirect connectors: GitHub, GitLab, Slack, Linear, Google Drive, Google Chat. API-key connectors (Notion, Pylon, HubSpot, Grain) use their own /connect endpoints.',
+        fix: 'OAuth-redirect connectors: GitHub, GitLab, Slack, Linear. API-key connectors (Notion, Pylon, HubSpot, Grain, Airtable, Mintlify, Zendesk) use their own /connect endpoints. Google Drive and Google Chat use the /service-account endpoint.',
       });
     }
   } catch (e) {

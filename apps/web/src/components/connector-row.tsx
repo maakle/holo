@@ -3,12 +3,6 @@ import { useEffect, useState } from 'react';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { SyncStatusBadge } from '@/components/sync-status-badge';
 import { ConnectorManageSheet } from '@/components/connector-manage-sheet';
 import { ConnectionWizard } from '@/components/connection-wizard/connection-wizard';
@@ -31,21 +25,6 @@ interface Props {
   allowlist?: AllowlistEntry[];
   lastSyncedAt?: string | null;
   lastSyncStatus?: string | null;
-}
-
-function formatRelative(iso: string): string {
-  const then = new Date(iso).getTime();
-  const diff = Date.now() - then;
-  if (diff < 0) return 'just now';
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d ago`;
-  return new Date(iso).toLocaleDateString();
 }
 
 export function ConnectorRow({
@@ -121,9 +100,7 @@ export function ConnectorRow({
           <div className="flex items-center gap-2">
             <span className="text-[14px] font-medium text-text">{meta.displayName}</span>
             {connected ? (
-              <Badge variant="success">
-                Connected{connectedAs ? ` · ${connectedAs}` : ''}
-              </Badge>
+              <Badge variant="success">Connected</Badge>
             ) : (
               <Badge variant="neutral">Not connected</Badge>
             )}
@@ -135,49 +112,6 @@ export function ConnectorRow({
             ) : null}
           </div>
           <p className="mt-1 text-[13px] leading-5 text-text-muted">{meta.description}</p>
-          {connected && allowlist.length > 0 ? (
-            <TooltipProvider delayDuration={150}>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {allowlist.map((a) => {
-                  const display =
-                    a.label != null
-                      ? meta.id === 'slack'
-                        ? `#${a.label}`
-                        : a.label
-                      : a.pattern;
-                  return (
-                    <Tooltip key={a.pattern}>
-                      <TooltipTrigger asChild>
-                        <span className="inline-flex cursor-default items-center rounded-md border border-accent/30 bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] px-1.5 py-0.5 text-[11px] font-medium text-accent">
-                          {display}
-                          {a.isGlob ? <span className="ml-1 opacity-60">*</span> : null}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-medium">
-                            {a.isGlob ? `Glob: ${a.pattern}` : display}
-                          </span>
-                          {a.label != null ? (
-                            <span className="font-mono text-[10px] text-text-muted">
-                              {a.pattern}
-                            </span>
-                          ) : null}
-                          <span className="text-text-muted">
-                            {lastSyncedAt
-                              ? `Last synced ${formatRelative(lastSyncedAt)}${
-                                  lastSyncStatus ? ` · ${lastSyncStatus}` : ''
-                                }`
-                              : 'Never synced'}
-                          </span>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            </TooltipProvider>
-          ) : null}
         </div>
         <div className="flex shrink-0 items-center justify-end gap-2 pt-0.5">
           {!connected ? (
@@ -199,6 +133,7 @@ export function ConnectorRow({
           connectedAs={connectedAs}
           lastSyncedAt={lastSyncedAt ?? null}
           lastSyncStatus={lastSyncStatus ?? null}
+          allowlist={allowlist}
           allowlistCount={allowlist.length}
           githubDefaultAll={meta.id === 'github' && allowlist.length === 0}
           slackDefaultAll={meta.id === 'slack' && allowlist.length === 0}

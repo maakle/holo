@@ -292,7 +292,7 @@ function ScopeBlock({
               type="button"
               onClick={() => onCopy(scope, scope)}
               aria-label={`Copy ${scope}`}
-              className="flex shrink-0 items-center gap-1 rounded-sm px-1 py-0.5 text-[11px] text-text-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:text-text focus:opacity-100 focus:outline-hidden focus:focus-ring"
+              className="flex shrink-0 items-center gap-1 rounded-sm px-1 py-0.5 text-[11px] text-text-subtle hover:text-text focus:outline-hidden focus:focus-ring"
             >
               {copied === scope ? (
                 <Check className="h-3 w-3 text-success" aria-hidden />

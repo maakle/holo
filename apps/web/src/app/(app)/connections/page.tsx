@@ -61,6 +61,19 @@ export default async function ConnectionsPage({
     .limit(1);
   const githubConnected = githubInstallRows.length > 0;
   const githubAccountLogin = githubInstallRows[0]?.accountLogin ?? null;
+
+  // Google connectors use service accounts (org-scoped, no userId) — same
+  // shape as GitHub installations. Any active SA row for the org means the
+  // connector is connected for everyone.
+  const serviceAccountRows = await db
+    .select({ provider: schema.connectorServiceAccounts.provider })
+    .from(schema.connectorServiceAccounts)
+    .where(
+      and(
+        eq(schema.connectorServiceAccounts.organizationId, orgId),
+        eq(schema.connectorServiceAccounts.status, 'active'),
+      ),
+    );
   const sourceRows = await db
     .select({
       id: schema.sources.id,
@@ -110,10 +123,17 @@ export default async function ConnectionsPage({
 
   const connected = new Map(
     credRows
-      .filter((r) => r.status === 'active' && r.provider !== 'github')
+      .filter(
+        (r) =>
+          r.status === 'active' &&
+          r.provider !== 'github' &&
+          r.provider !== 'googledrive' &&
+          r.provider !== 'google-chat',
+      )
       .map((r) => [r.provider, true]),
   );
   if (githubConnected) connected.set('github', true);
+  for (const sa of serviceAccountRows) connected.set(sa.provider, true);
   const sourceName = new Map(sourceRows.map((r) => [r.provider, r.name]));
   // For GitHub, fall back to the installation's account_login when no
   // source row exists yet (very brief window between install and first sync).
