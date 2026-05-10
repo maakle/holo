@@ -31,6 +31,11 @@ import {
   type SlackChannelsState,
 } from './steps/slack-channels-step';
 import { slackInviteStep } from './steps/slack-invite-step';
+import {
+  gitlabProjectsStep,
+  gitlabProjectsInitialState,
+  type GitlabProjectsState,
+} from './steps/gitlab-projects-step';
 
 const slackConfig: ConnectorWizardConfig<SlackChannelsState> = {
   initialState: slackChannelsInitialState,
@@ -64,8 +69,8 @@ const githubConfig: ConnectorWizardConfig = {
   ],
 };
 
-const gitlabConfig: ConnectorWizardConfig = {
-  initialState: {},
+const gitlabConfig: ConnectorWizardConfig<GitlabProjectsState> = {
+  initialState: gitlabProjectsInitialState,
   steps: [
     {
       id: 'install',
@@ -75,6 +80,7 @@ const gitlabConfig: ConnectorWizardConfig = {
           installButtonLabel: 'Authorize GitLab',
         }),
     },
+    { id: 'projects', label: 'Pick projects', render: gitlabProjectsStep },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
   ],
 };
