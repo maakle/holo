@@ -11,6 +11,7 @@ const DOCS_URL = `${GITHUB_URL}#readme`;
 const ROADMAP_URL = `${GITHUB_URL}/blob/main/docs/ROADMAP.md`;
 const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/ARCHITECTURE.md`;
 const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
+const GITHUB_API_REPO_URL = 'https://api.github.com/repos/maakle/holo';
 
 export default async function Home() {
   const auth = await getServerAuth();
@@ -74,21 +75,20 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
   return (
     <section className="relative border-b border-border">
       <BackdropGrid />
-      <div className="relative mx-auto max-w-[1024px] px-6 pt-20 pb-20 text-center md:pt-28">
-        <p className="caption text-text-subtle">
-          Open-source · AGPL-3.0 · Self-hostable
-        </p>
-        <h1 className="mx-auto mt-6 max-w-[920px] text-balance font-display text-[44px] font-semibold leading-[1.05] tracking-tight md:text-[60px]">
+      <div className="relative mx-auto max-w-[1024px] px-6 pt-16 pb-20 text-center md:pt-24">
+        <div className="flex flex-col items-center gap-2">
+          {/* Async server component: fetches GitHub star count with 1h cache. */}
+          <StarButton />
+          <p className="caption text-text-subtle">Open source · Self-hostable</p>
+        </div>
+        <h1 className="mx-auto mt-8 max-w-[920px] text-balance font-display text-[44px] font-semibold leading-[1.05] tracking-tight md:text-[60px]">
           The agent context layer
           <br />
           for your company.
         </h1>
-        <p className="mx-auto mt-6 max-w-[640px] text-balance text-[15px] leading-6 text-text-muted">
-          Built for the sales and support teams already drowning in &ldquo;can our product do
-          this?&rdquo; questions. Holo connects your tools once, continuously ingests everything
-          your company knows — code, docs, conversations, calls — and exposes it as one
-          scope-aware context any agent can call over MCP or OpenAPI. Bring your own — Claude,
-          Cursor, ChatGPT, anything — and plug into the loop.
+        <p className="mx-auto mt-6 max-w-[560px] text-balance text-[15px] leading-6 text-text-muted">
+          Connect your tools once. Holo ingests everything your company knows and serves it
+          to every agent over MCP or OpenAPI.
           <span className="text-text"> Layer today. Agent OS tomorrow.</span>
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -102,7 +102,7 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
             href={GITHUB_URL}
             className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-surface px-6 text-[14px] font-medium text-text transition-colors hover:border-border-strong"
           >
-            Star on GitHub
+            View on GitHub
           </a>
         </div>
         <p className="mt-6 text-[12px] text-text-subtle">
@@ -110,6 +110,75 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
         </p>
       </div>
     </section>
+  );
+}
+
+/**
+ * GitHub star button with live count. Server-rendered with a 1-hour fetch
+ * cache so we don't hammer GitHub's unauthenticated API (60 req/h limit) on
+ * every page render — even though the route is `force-dynamic`, Next caches
+ * the underlying fetch by URL + revalidate. Falls back gracefully to a
+ * count-less "Star" button if the API is unreachable.
+ */
+async function StarButton() {
+  let countLabel: string | null = null;
+  try {
+    const res = await fetch(GITHUB_API_REPO_URL, {
+      next: { revalidate: 3600 },
+      headers: {
+        // GitHub requires User-Agent on every API request.
+        'User-Agent': 'holo-landing',
+        Accept: 'application/vnd.github+json',
+      },
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { stargazers_count?: number };
+      const n = json.stargazers_count;
+      if (typeof n === 'number') countLabel = formatStarCount(n);
+    }
+  } catch {
+    // Network error or rate-limited — render the button without a count.
+  }
+  return (
+    <a
+      href={GITHUB_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Star holo on GitHub"
+      className="inline-flex items-center gap-2 rounded-full border border-border bg-surface py-1.5 pl-4 pr-1.5 text-[13px] font-medium text-text shadow-xs transition-colors hover:border-border-strong"
+    >
+      <GitHubMark className="h-4 w-4" aria-hidden />
+      <span>Star</span>
+      {countLabel ? (
+        <span className="rounded-full border border-border bg-bg px-2 py-0.5 text-[12px] font-medium text-text-muted tabular-nums">
+          {countLabel}
+        </span>
+      ) : null}
+    </a>
+  );
+}
+
+function formatStarCount(n: number): string {
+  if (n < 1000) return String(n);
+  const k = n / 1000;
+  // 7,300 → "7.3k", 12,500 → "12.5k", 1,000 → "1k", 10,000 → "10k"
+  const fixed = k >= 10 ? k.toFixed(0) : k.toFixed(1);
+  return fixed.replace(/\.0$/, '') + 'k';
+}
+
+function GitHubMark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      className={className}
+      aria-hidden
+    >
+      <path
+        fillRule="evenodd"
+        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"
+      />
+    </svg>
   );
 }
 
@@ -134,9 +203,8 @@ function CodeShowcase() {
             One layer. Every agent. Same procedures.
           </h2>
           <p className="mt-4 text-balance text-[15px] leading-6 text-text-muted">
-            MCP for Claude, Cursor, Cline. REST + OpenAPI for ChatGPT Actions, Gemini, n8n.
-            Same backend, same data, same learned procedures — the protocol is the agent&apos;s
-            choice, not yours.
+            MCP for Claude, Cursor, Cline. REST + OpenAPI for ChatGPT, Gemini, n8n. Same
+            backend — the protocol is the agent&apos;s choice.
           </p>
         </div>
         <CodeCard
@@ -161,12 +229,10 @@ function VisionBand() {
         <p className="mt-4 text-balance font-display text-[22px] leading-snug tracking-tight text-text md:text-[26px]">
           The <span className="text-accent">AI operating system for companies</span> and the{' '}
           <span className="text-accent">company brain</span> — a self-updating context layer
-          underneath every agent your team runs, and the procedural extraction layer that
-          turns scattered artifacts into invokable skills. The substrate of an AI-native
-          company.
+          underneath every agent. The substrate of an AI-native company.
         </p>
         <p className="mx-auto mt-4 max-w-[560px] text-[12px] text-text-subtle">
-          Two adjacent YC Requests for Startups. Holo is the open-source, self-hostable take.
+          Two adjacent YC Requests for Startups. Holo is the open-source take.
         </p>
       </div>
     </section>
@@ -181,10 +247,9 @@ function FinalCTA({ isAuthed }: { isAuthed: boolean }) {
         <h2 className="mx-auto max-w-none text-balance font-display text-[34px] font-semibold leading-tight tracking-tight md:text-[44px]">
           One brain. Every agent. Self-hostable.
         </h2>
-        <p className="mx-auto mt-5 max-w-[560px] text-balance text-[15px] leading-6 text-text-muted">
-          If you&apos;re already running multiple agents, holo is the shared, self-updating
-          context layer that makes them coherent. The substrate of an AI-native company.
-          Star the repo, run it locally, or sign in.
+        <p className="mx-auto mt-5 max-w-[520px] text-balance text-[15px] leading-6 text-text-muted">
+          The shared context layer that makes your agents coherent. Star the repo, run it
+          locally, or sign in.
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
@@ -240,18 +305,18 @@ function SiteFooter() {
 const PILLARS = [
   {
     label: 'Context layer',
-    title: 'Connect once. Index everything. Stay fresh.',
-    body: 'Slack, GitHub, Notion, Grain, Pylon, HubSpot — six connectors live, more on the way. A continuous sync loop keeps the ACL-aware index current as your company keeps working. Hybrid retrieval (pgvector + tsvector, RRF-fused) over one source of truth every agent reads.',
+    title: 'Connect once. Index everything.',
+    body: '13+ connectors, continuous ACL-aware sync. Hybrid retrieval (vector + full-text) over one source of truth every agent reads.',
   },
   {
     label: 'Procedures',
     title: 'Not just search. Callable skills.',
-    body: 'Holo learns the procedures your team has already proven out — how a refund is approved, how a security review unfolds — and exposes them as MCP-invokable skills. Agents do not just look things up; they invoke what the company has done before.',
+    body: 'Holo learns the procedures your team has proven out and exposes them as MCP-invokable skills. Agents invoke what the company has done before.',
   },
   {
     label: 'Governance',
     title: 'Scoped access. Full observability.',
-    body: 'Allowlist-scoped at ingestion: channels, repos, and pages can never reach an agent if they never reached holo. Every call is logged, attributable, and replayable. Per-agent tool allowlists and row-level data scopes round out the personas model — the difference between a useful demo and a tool the company will let into the loop.',
+    body: 'Allowlist-scoped at ingestion. Every call logged, attributable, replayable. Per-agent tool allowlists and row-level data scopes.',
   },
 ] as const;
 
@@ -290,26 +355,26 @@ function PillarsBand() {
 const USE_CASES = [
   {
     label: 'Sales enablement',
-    title: 'Answer "can our product do this?" in seconds, not days.',
-    body: 'Account executives and solutions engineers paste the question straight into Slack or their agent of choice. Holo answers from the source code itself — the only ground truth that does not rot — alongside Linear tickets, prior calls, and the deal record in Salesforce or HubSpot. Every answer cites where it came from, so reps can forward it to the prospect with confidence.',
+    title: 'Answer "can our product do this?" in seconds.',
+    body: 'AEs and SEs paste the question into Slack or their agent. Holo answers from source code, Linear, prior calls, and the deal record — every answer cited.',
     trace: 'search → get_repo → get_ticket → get_deal → draft',
   },
   {
     label: 'Customer support',
     title: 'Drafted replies with the right sources attached.',
-    body: 'A Zendesk, Pylon, or Aircall webhook fires on a new ticket or call. Holo pulls the customer’s history, the matching docs page, the closest past resolution, and any open engineering work — and posts a draft reply for the human to approve. Time-to-first-response drops; tone stays consistent; nothing gets answered from a stale doc.',
+    body: 'A new ticket fires a webhook. Holo pulls the customer’s history, matching docs, and prior resolutions — and posts a draft reply for the human to approve.',
     trace: 'search → get_ticket → get_doc → get_issue → draft',
   },
   {
     label: 'Security & compliance',
     title: 'Security questionnaires answered with citations.',
-    body: 'A founder or security lead pastes a customer questionnaire into a chat agent. Holo pulls prior answers from Notion, the architecture docs, and the actual repo for evidence, then drafts responses with a link back to every source. The week-long scramble before each enterprise deal turns into a one-pass review.',
+    body: 'Paste the questionnaire into chat. Holo pulls prior answers, architecture docs, and source code as evidence — drafts answers with links to every source.',
     trace: 'search → get_doc → get_file → draft',
   },
   {
     label: 'Everyone else',
     title: 'One search box across every system.',
-    body: 'A dashboard search box or a Slack /ask command hits the REST surface directly. Ops, design, PM, and revops get ranked results across every connector with deep links back to the source — no agent, no MCP client, no LLM in the path.',
+    body: 'A dashboard search box or a Slack /ask command hits REST directly. Ranked results across every connector — no agent, no MCP, no LLM in the path.',
     trace: 'POST /v1/search → ranked chunks',
   },
 ] as const;
@@ -323,11 +388,9 @@ function UseCasesBand() {
           <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
             Start with sales and support. Extend from there.
           </h2>
-          <p className="mx-auto mt-4 max-w-[600px] text-balance text-[15px] leading-6 text-text-muted">
-            Holo is a primitive, not a product. The wedge is the team already paying for the
-            problem in lost deals and slow tickets — sales enablement and customer support.
-            Once the layer is in, security reviews and a company-wide search box come for
-            free. Same backend, same audit trail, different consumers.
+          <p className="mx-auto mt-4 max-w-[560px] text-balance text-[15px] leading-6 text-text-muted">
+            Sales enablement and customer support are the wedge. Once the layer is in,
+            security reviews and a company-wide search box come for free.
           </p>
         </div>
         <div className="mt-12 grid gap-6 sm:grid-cols-2">
@@ -351,19 +414,19 @@ function UseCasesBand() {
 const OBSERVABILITY_ITEMS = [
   {
     title: 'Tool traffic',
-    body: 'Which procedures get called, by which agent, how often, p50/p95 latency, error rates. The load-bearing surface, made visible.',
+    body: 'Which procedures get called, by which agent, p50/p95 latency, error rates.',
   },
   {
     title: 'Failed queries',
-    body: 'What agents tried to ask but got nothing. Every gap is a candidate for the next learned procedure — the feedback loop that makes the layer improve over time.',
+    body: 'What agents tried to ask but got nothing. Every gap is a candidate for the next learned procedure.',
   },
   {
     title: 'Audit & replay',
-    body: 'Per-call attribution: which agent, which user, which records. Replay any past invocation side-by-side. The artifact your security buyer needs before signing off.',
+    body: 'Per-call attribution: which agent, which user, which records. Replay any past invocation side-by-side.',
   },
   {
     title: 'Anomaly signals',
-    body: 'Sudden spikes, exfiltration shapes, prompt-injection-shaped tool calls. The dashboard surfaces them before they become incidents.',
+    body: 'Spikes, exfiltration shapes, prompt-injection-shaped tool calls — surfaced before they become incidents.',
   },
 ] as const;
 
@@ -376,9 +439,9 @@ function ObservabilityBand() {
           <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
             See what every agent did.
           </h2>
-          <p className="mx-auto mt-4 max-w-[600px] text-balance text-[15px] leading-6 text-text-muted">
-            You handed agents the keys to your CRM and Slack. The dashboard is how you keep track
-            of what they did with them — and how you make the layer better the longer it runs.
+          <p className="mx-auto mt-4 max-w-[560px] text-balance text-[15px] leading-6 text-text-muted">
+            You handed agents the keys to your CRM and Slack. The dashboard shows what they
+            did with them.
           </p>
         </div>
         <div className="mt-12 grid gap-6 sm:grid-cols-2 md:grid-cols-4">
