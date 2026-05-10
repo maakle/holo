@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { withActiveOrg } from '@/lib/with-active-org';
 import { activeQueueNames, getQueueByName, SYNC_PROVIDERS } from '@/lib/sync-queue';
@@ -16,6 +16,13 @@ export type ConnectorSyncStatus = {
   lastStatus: string | null;
   embedQueued: number;
   chunksIndexed: number;
+  /**
+   * The user pressed Disconnect and the worker is still cleaning up the
+   * `sources` cascade in the background. The dashboard renders a
+   * "Disconnecting…" pill and blocks reconnects while this is true; the
+   * worker flips it to false by marking `connector_disconnect_jobs.finished_at`.
+   */
+  disconnecting: boolean;
 };
 
 export type BulkStatusResponse = {
@@ -29,6 +36,7 @@ function emptyStatus(): ConnectorSyncStatus {
     lastStatus: null,
     embedQueued: 0,
     chunksIndexed: 0,
+    disconnecting: false,
   };
 }
 
@@ -37,6 +45,25 @@ export const GET = withActiveOrg(async ({ ctx, orgId }) => {
   const statuses = Object.fromEntries(
       PROVIDERS.map((p) => [p, emptyStatus()]),
     ) as Record<Provider, ConnectorSyncStatus>;
+
+    // Open disconnect-cleanup jobs flag the row regardless of whether any
+    // sources still exist — the cleanup job often deletes the last source
+    // before the row is marked finished, and the UI must keep showing
+    // "Disconnecting…" through that gap. Done before the sources-empty
+    // early-return for the same reason.
+    const pendingDisconnects = await db
+      .select({ provider: schema.connectorDisconnectJobs.provider })
+      .from(schema.connectorDisconnectJobs)
+      .where(
+        and(
+          eq(schema.connectorDisconnectJobs.organizationId, orgId),
+          isNull(schema.connectorDisconnectJobs.finishedAt),
+        ),
+      );
+    for (const row of pendingDisconnects) {
+      const p = row.provider as Provider;
+      if (p in statuses) statuses[p].disconnecting = true;
+    }
 
     const sourceRows = await db
       .select({ id: schema.sources.id, provider: schema.sources.provider })

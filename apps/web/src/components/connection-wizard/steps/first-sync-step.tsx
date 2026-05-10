@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Check, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { notifySyncTriggered } from '@/lib/sync-events';
@@ -75,8 +76,31 @@ function FirstSyncStep<TState>({
   const embedQueued = status.embedQueued;
   const [latestRun, setLatestRun] = useState<RunRow | null>(null);
   const [activeRun, setActiveRun] = useState<RunRow | null>(null);
+  const [stopping, setStopping] = useState(false);
   const startedRef = useRef<number>(startedAt ?? Date.now());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function stopSync() {
+    setStopping(true);
+    try {
+      const res = await fetch(`/api/connectors/${meta.id}/stop`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        toast.success('Sync stopped');
+        // Reset the dialog-local timer so when the user re-runs the sync
+        // (or backs up to fix the credential step) the elapsed counter
+        // doesn't carry over.
+        startedRef.current = Date.now();
+        ctx.refreshServer();
+      } else {
+        const body = (await res.json().catch(() => ({}))) as { fix?: string };
+        toast.error(body.fix ?? 'Could not stop sync');
+      }
+    } finally {
+      setStopping(false);
+    }
+  }
 
   useEffect(() => {
     notifySyncTriggered(meta.id);
@@ -232,9 +256,22 @@ function FirstSyncStep<TState>({
         </p>
       </div>
       <AlertDialogFooter>
-        {failedRun ? (
-          <Button variant="ghost" onClick={ctx.goPrev}>
-            Back
+        {/* Back is always available — lets users step back to the credential
+            step to fix mistakes (wrong scopes, wrong impersonation email)
+            without abandoning the wizard. */}
+        <Button variant="ghost" onClick={ctx.goPrev}>
+          Back
+        </Button>
+        {/* Stop appears only while the sync is actively running. Cancels the
+            queued/in-flight job server-side so the user can fix config and
+            retry without waiting for it to fail or complete. */}
+        {(running || activeRun) && !failedRun ? (
+          <Button
+            variant="secondary"
+            onClick={stopSync}
+            disabled={stopping}
+          >
+            {stopping ? 'Stopping…' : 'Stop sync'}
           </Button>
         ) : null}
         <Button variant="primary" onClick={ctx.close}>

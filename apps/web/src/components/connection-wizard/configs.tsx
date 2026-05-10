@@ -129,11 +129,19 @@ const linearConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
     {
-      id: 'install',
-      label: 'Authorize',
+      id: 'apikey',
+      label: 'API key',
       render: (ctx) =>
-        oauthInstallStep(ctx, {
-          installButtonLabel: 'Authorize Linear',
+        apiKeyStep(ctx, {
+          placeholder: 'Linear personal API key (lin_api_…)',
+          helpText:
+            'Personal API keys grant Holo read access to every issue, project, and team you can see in Linear. Connect from a workspace admin (or a service-style user with broad team access) to mirror the full workspace.',
+          helpUrl: 'https://linear.app/settings/account/security',
+          instructions: [
+            'Open linear.app → Settings → Security & access → Personal API keys, then click "New API key".',
+            'Label it "Holo" and create the key. Copy the lin_api_… value (you can\'t see it again after closing the dialog).',
+            'Paste it below. Holo validates it by calling the viewer query before saving.',
+          ],
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
@@ -284,7 +292,7 @@ const googleChatConfig: ConnectorWizardConfig = {
               label: 'Configure a Chat app',
               href: 'https://console.cloud.google.com/apis/api/chat.googleapis.com/hangouts-chat',
               body:
-                'Even with the API enabled, Chat requires a configured app on the project. On the Configuration tab, set an App name and set App status to "LIVE — available to users in your domain". Otherwise the first sync 404s with "Google Chat app not found".',
+                'Open the Configuration tab. Uncheck "Build as a Workspace Add-on". App name: "Holo". Avatar URL: https://raw.githubusercontent.com/maakle/holo/main/apps/web/public/logo.png. Description (≤40 chars): "Read-only ingestion for Holo". Turn OFF Interactive Features — Holo only reads via service account, no triggers needed. App status: "LIVE — available to users in your domain". Save. Full field-by-field guide: docs/connectors/google-chat.md.',
             },
           ],
         }),

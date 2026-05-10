@@ -5,7 +5,10 @@ import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { SYNC_INTERVAL_MS_BY_PROVIDER } from '@holo/connectors/sync-intervals';
 import type { SyncProvider } from '@holo/sync-providers';
-import { useConnectorStatus } from '@/lib/connectors-status-store';
+import {
+  notifyDisconnectTriggered,
+  useConnectorStatus,
+} from '@/lib/connectors-status-store';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -224,14 +227,31 @@ export function ConnectorManageSheet({
       const body = (await res.json().catch(() => ({}))) as {
         fix?: string;
         problem?: string;
+        disconnecting?: boolean;
       };
+      // Anything 4xx/5xx is a hard failure — surface it inline so the user
+      // can retry without losing the dialog. 2xx covers both 200 (the
+      // last-active-credential path that doesn't need cleanup) and 202
+      // (cleanup enqueued and running in the background).
       if (!res.ok) {
         setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
         return;
       }
       setConfirmingDisconnect(false);
       onOpenChange(false);
-      toast.success(`${meta.displayName} disconnected`);
+      if (body.disconnecting) {
+        // Optimistic: the route already completed the bounded fast bits
+        // (token revoke / remote uninstall / credential row deletion). The
+        // worker is still chewing through `db.delete(sources)`. Notify the
+        // status store so it fast-polls and the row paints "Disconnecting…"
+        // immediately.
+        notifyDisconnectTriggered();
+        toast.success(
+          `${meta.displayName}: cleanup running in the background — large workspaces can take a moment.`,
+        );
+      } else {
+        toast.success(`${meta.displayName} disconnected`);
+      }
       router.refresh();
     } finally {
       setBusy(false);

@@ -90,35 +90,18 @@ function makeFetch(
 }
 
 describe('createLinearSpec', () => {
-  const opts = { clientId: 'cid', clientSecret: 'csec' };
-
   it('declares the expected id, http config, and one resource', () => {
-    const spec = createLinearSpec(opts);
+    const spec = createLinearSpec();
     expect(spec.id).toBe('linear');
     expect(spec.displayName).toBe('Linear');
     expect(spec.http?.baseUrl).toBe('https://api.linear.app');
     expect(spec.resources).toHaveLength(1);
     expect(spec.resources[0]!.id).toBe('issues');
-    expect(spec.auth.kind).toBe('oauth2');
-  });
-
-  it('builds the OAuth authorize URL with `read` scope', () => {
-    const spec = createLinearSpec(opts);
-    const url = spec.auth.buildAuthorizeUrl!({
-      redirectUri: 'https://app/cb',
-      state: 'state-jwt',
-    });
-    expect(url).toContain('https://linear.app/oauth/authorize?');
-    expect(url).toContain('client_id=cid');
-    expect(url).toContain('scope=read');
-    expect(url).toContain('redirect_uri=https%3A%2F%2Fapp%2Fcb');
-    expect(url).toContain('state=state-jwt');
+    expect(spec.auth.kind).toBe('apiKey');
   });
 });
 
 describe('Linear sync (full)', () => {
-  const opts = { clientId: 'cid', clientSecret: 'csec' };
-
   it('paginates through multiple GraphQL pages and emits one chunk per issue', async () => {
     const issuesP1 = [
       makeIssue({ id: 'i1', identifier: 'ENG-1', title: 'one', updatedAt: '2026-05-01T10:00:00Z' }),
@@ -144,7 +127,7 @@ describe('Linear sync (full)', () => {
       });
     });
 
-    const spec = createLinearSpec({ ...opts, fetchImpl });
+    const spec = createLinearSpec({ fetchImpl });
     const { stores, enqueued, savedCursors } = makeStores();
 
     const result = await runConnectorSync({
@@ -194,7 +177,7 @@ describe('Linear sync (full)', () => {
       }),
     );
 
-    const spec = createLinearSpec({ ...opts, fetchImpl });
+    const spec = createLinearSpec({ fetchImpl });
     const { stores, enqueued } = makeStores();
     await runConnectorSync({
       spec,
@@ -224,13 +207,13 @@ describe('Linear sync (full)', () => {
     expect(chunk.metadata['labels']).toEqual(['bug', 'p1']);
   });
 
-  it('attaches Authorization: Bearer <token> to every request', async () => {
+  it('attaches the personal API key as Authorization with no prefix', async () => {
     const { fetchImpl, calls } = makeFetch(() =>
       jsonResponse({
         data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } },
       }),
     );
-    const spec = createLinearSpec({ ...opts, fetchImpl });
+    const spec = createLinearSpec({ fetchImpl });
     const { stores } = makeStores();
     await runConnectorSync({
       spec,
@@ -239,13 +222,14 @@ describe('Linear sync (full)', () => {
       sourceId: 's',
       fetchImpl,
     });
-    expect(calls[0]!.headers.get('Authorization')).toBe('Bearer lin_test_token');
+    // Linear's docs spell this out: personal API keys go in the
+    // Authorization header verbatim, no Bearer scheme. OAuth tokens use
+    // Bearer — we don't support OAuth anymore.
+    expect(calls[0]!.headers.get('Authorization')).toBe('lin_test_token');
   });
 });
 
 describe('Linear sync (incremental)', () => {
-  const opts = { clientId: 'cid', clientSecret: 'csec' };
-
   it('passes the stored cursor as the GraphQL `since` variable', async () => {
     const { fetchImpl, calls } = makeFetch(() =>
       jsonResponse({
@@ -258,7 +242,7 @@ describe('Linear sync (incremental)', () => {
       }),
     );
 
-    const spec = createLinearSpec({ ...opts, fetchImpl });
+    const spec = createLinearSpec({ fetchImpl });
     const { stores, enqueued, savedCursors } = makeStores({
       cursors: { issues: { updatedAt: '2026-05-03T10:00:00Z' } },
     });
@@ -282,7 +266,7 @@ describe('Linear sync (incremental)', () => {
         data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } },
       }),
     );
-    const spec = createLinearSpec({ ...opts, fetchImpl });
+    const spec = createLinearSpec({ fetchImpl });
     const { stores, enqueued } = makeStores({
       cursors: { issues: { updatedAt: '2026-05-03T10:00:00Z' } },
     });
@@ -300,13 +284,11 @@ describe('Linear sync (incremental)', () => {
 });
 
 describe('Linear error handling', () => {
-  const opts = { clientId: 'cid', clientSecret: 'csec' };
-
   it('surfaces GraphQL `errors` array as HOLO_FETCH_FAILED', async () => {
     const { fetchImpl } = makeFetch(() =>
       jsonResponse({ errors: [{ message: 'Authentication required' }] }),
     );
-    const spec = createLinearSpec({ ...opts, fetchImpl });
+    const spec = createLinearSpec({ fetchImpl });
     const { stores } = makeStores();
     await expect(
       runConnectorSync({ spec, stores, organizationId: 'o', sourceId: 's', fetchImpl }),
@@ -318,7 +300,7 @@ describe('Linear error handling', () => {
 
   it('rejects when `data` field is missing', async () => {
     const { fetchImpl } = makeFetch(() => jsonResponse({}));
-    const spec = createLinearSpec({ ...opts, fetchImpl });
+    const spec = createLinearSpec({ fetchImpl });
     const { stores } = makeStores();
     await expect(
       runConnectorSync({ spec, stores, organizationId: 'o', sourceId: 's', fetchImpl }),
@@ -327,8 +309,6 @@ describe('Linear error handling', () => {
 });
 
 describe('Linear testConnection', () => {
-  const opts = { clientId: 'cid', clientSecret: 'csec' };
-
   it('returns the org id and name from the viewer query', async () => {
     const { fetchImpl } = makeFetch(() =>
       jsonResponse({
@@ -342,24 +322,19 @@ describe('Linear testConnection', () => {
         },
       }),
     );
-    const spec = createLinearSpec({ ...opts, fetchImpl });
-    // The framework's testConnection takes a TestConnectionContext with an
-    // HTTP client preconfigured with the user's tokens. Build it the same
-    // way the runtime would.
-    const { createHttpClient, apiKey } = await import('@holo/connector-framework');
+    const spec = createLinearSpec({ fetchImpl });
+    // Build the HTTP client the same way the connect route does — using the
+    // spec's own apiKey auth strategy.
+    const { createHttpClient } = await import('@holo/connector-framework');
+    const tokens = { accessToken: 'lin_token' };
     const api = createHttpClient({
       config: spec.http!,
-      // For testing, swap in apiKey so we don't need the OAuth path; the
-      // tokens just need an accessToken to set the Authorization header.
-      auth: apiKey({ prefix: 'Bearer ' }),
-      tokens: { accessToken: 'lin_token' },
+      auth: spec.auth,
+      tokens,
       fetchImpl,
       sleep: async () => {},
     });
-    const result = await spec.testConnection({
-      api,
-      tokens: { accessToken: 'lin_token' },
-    });
+    const result = await spec.testConnection({ api, tokens });
     expect(result.externalId).toBe('org-abc');
     expect(result.name).toBe('Holo Inc');
   });

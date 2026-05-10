@@ -119,23 +119,10 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     setSyncRunner(QUEUE_NAMES.GRAIN_SYNC, createGenericRunner(createGrainSpec(), deps));
     setSyncRunner(QUEUE_NAMES.PYLON_SYNC, createGenericRunner(createPylonSpec(), deps));
     setSyncRunner(QUEUE_NAMES.HUBSPOT_SYNC, createGenericRunner(createHubspotSpec(), deps));
-    // Linear is the first framework-native connector. createGenericRunner
-    // turns any ConnectorSpec into a SyncRunner via the framework's
-    // runConnectorSync + a Drizzle-backed RuntimeStores in framework-bridge.
-    // OAuth credentials are present at boot only when the env vars are set;
-    // we still register the spec so the queue exists either way (a sync job
-    // will fail with NOT_IMPLEMENTED if creds are missing, matching how the
-    // other OAuth runners behave).
-    setSyncRunner(
-      QUEUE_NAMES.LINEAR_SYNC,
-      createGenericRunner(
-        createLinearSpec({
-          clientId: process.env.LINEAR_CONNECTOR_CLIENT_ID ?? '',
-          clientSecret: process.env.LINEAR_CONNECTOR_CLIENT_SECRET ?? '',
-        }),
-        deps,
-      ),
-    );
+    // Linear: personal API key auth, no env credentials required at boot.
+    // The token is collected per-user via the connect route and loaded from
+    // connector_credentials by the framework's loadTokens.
+    setSyncRunner(QUEUE_NAMES.LINEAR_SYNC, createGenericRunner(createLinearSpec(), deps));
     // Mintlify is fully public — no env credentials required. The per-source
     // base URL lives on `sources.metadata.baseUrl` and the framework's
     // `ctx.sourceMetadata` surfaces it inside the spec.

@@ -221,7 +221,7 @@ describe('Grain sync — full sweep', () => {
 });
 
 describe('Grain sync — incremental', () => {
-  it('passes the stored cursor as after_datetime', async () => {
+  it('never sends a date filter in the request body (Grain rejects unknown props)', async () => {
     const { fetchImpl, calls } = makeFetch((req) => {
       if (req.url.endsWith('/recordings') && req.method === 'POST') {
         return jsonResponse({
@@ -245,9 +245,48 @@ describe('Grain sync — incremental', () => {
     const list = calls.find(
       (c) => c.url.endsWith('/recordings') && c.method === 'POST',
     );
-    expect((list!.body as { after_datetime?: string }).after_datetime).toBe(
-      '2026-05-04T00:00:00Z',
+    const body = list!.body as Record<string, unknown>;
+    expect(body).not.toHaveProperty('after_datetime');
+    expect(Object.keys(body).sort()).toEqual(['include']);
+  });
+
+  it('skips recordings older than the stored cursor without fetching their transcripts', async () => {
+    let transcriptFetches = 0;
+    const { fetchImpl, calls } = makeFetch((req) => {
+      if (req.url.endsWith('/recordings') && req.method === 'POST') {
+        return jsonResponse({
+          recordings: [
+            makeRecording({ id: 'old', startedAt: '2026-05-03T10:00:00Z' }),
+            makeRecording({ id: 'new', startedAt: '2026-05-05T10:00:00Z' }),
+          ],
+          cursor: null,
+        });
+      }
+      transcriptFetches += 1;
+      return jsonResponse([
+        { speaker: 'Alice', start: 0, end: 1000, text: 'hi', participant_id: 'u1' },
+      ]);
+    });
+    const spec = createGrainSpec({ fetchImpl });
+    const { stores, enqueued } = makeStores({
+      cursors: { recordings: { latestStartedAt: '2026-05-04T00:00:00Z' } },
+    });
+    await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+    // Only the newer recording is processed: one transcript fetch, no chunks
+    // emitted for the older one.
+    expect(transcriptFetches).toBe(1);
+    expect(enqueued.every((c) => c.sourceArtifactId === 'grain-call:new')).toBe(true);
+    // Sanity: list call had no date filter.
+    const list = calls.find(
+      (c) => c.url.endsWith('/recordings') && c.method === 'POST',
     );
+    expect(list!.body as Record<string, unknown>).not.toHaveProperty('after_datetime');
   });
 });
 

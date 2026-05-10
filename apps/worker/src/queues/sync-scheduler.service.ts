@@ -42,7 +42,10 @@ export function __setSchedulerSqlForTests(sql: Sql | null): void {
  * sync. GitHub fans out to two queues (code + prose) on the same cadence;
  * everything else is one queue per provider.
  */
-type SyncQueueName = Exclude<QueueName, 'embed' | 'embed-backfill'>;
+type SyncQueueName = Exclude<
+  QueueName,
+  'embed' | 'embed-backfill' | 'disconnect-cleanup'
+>;
 type QueueMap = Record<SyncProvider, ReadonlyArray<SyncQueueName>>;
 
 @Injectable()
