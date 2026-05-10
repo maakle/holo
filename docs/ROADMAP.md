@@ -59,7 +59,7 @@ Three internal agents (support-question, interview-prep, customer-success) live 
 - [ ] Free-form unsupervised skill extraction (variant a), gated on broader golden-set coverage.
 - [ ] Replay live-execution with per-tool effect classification ([TODOS.md item 5](../TODOS.md)).
 - [ ] Windows support for `npx holo init`.
-- [ ] Railway + Coolify one-click templates.
+- [ ] Coolify one-click template + other self-hosted PaaS support (Railway is the supported launch path).
 - [ ] Managed cloud beta.
 - [ ] Audit log surface for self-hosters.
 - [ ] `execute_skill` MCP tool.

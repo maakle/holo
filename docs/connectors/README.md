@@ -10,10 +10,11 @@ Per-connector setup guides for developers running Holo locally or configuring a 
 | Grain | OAuth | _todo_ |
 | Pylon | API key | _todo_ |
 | HubSpot | OAuth | _todo_ |
-| Linear | OAuth | _todo_ |
+| Linear | API key (personal API key) | _todo_ |
 | Mintlify Docs | API key (none for public sites) | _todo_ |
 | Zendesk Help Center | API key (none for public help centers) | _todo_ |
 | Google Drive | OAuth | [googledrive.md](./googledrive.md) |
+| Google Chat | Service account (DWD) | [google-chat.md](./google-chat.md) |
 | Airtable | API key (personal access token) | [airtable.md](./airtable.md) |
 
 ## Conventions
