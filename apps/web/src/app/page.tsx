@@ -4,6 +4,8 @@ import { getServerAuth } from '@/lib/server-context';
 import { HoloLogo } from '@/components/logo';
 import { ToolsAgentGraph } from '@/components/tools-agent-graph';
 
+export const dynamic = 'force-dynamic';
+
 const GITHUB_URL = 'https://github.com/maakle/holo';
 const DOCS_URL = `${GITHUB_URL}#readme`;
 const ROADMAP_URL = `${GITHUB_URL}/blob/main/docs/ROADMAP.md`;

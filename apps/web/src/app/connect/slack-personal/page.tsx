@@ -2,6 +2,8 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getServerContext } from '@/lib/server-context';
 
+export const dynamic = 'force-dynamic';
+
 export default async function SlackPersonalConnectPage({
   searchParams,
 }: {

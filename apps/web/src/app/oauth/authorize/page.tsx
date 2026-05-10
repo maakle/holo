@@ -6,6 +6,8 @@ import { schema } from '@holo/db';
 import { mintAuthCode } from '@holo/oauth-provider';
 import { emitAuditEvent } from '@holo/audit';
 
+export const dynamic = 'force-dynamic';
+
 interface Props {
   searchParams: Promise<{
     client_id?: string;
