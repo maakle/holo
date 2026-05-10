@@ -251,6 +251,50 @@ export const syncRuns = pgTable(
   }),
 );
 
+/**
+ * Workspace-scoped Google service account credentials. One row per
+ * (organization, provider) — the row is the org's connection to that Google
+ * surface and replaces per-user OAuth for googledrive + google-chat.
+ *
+ * `keyJson` holds the encrypted JSON key downloaded from the Google Cloud
+ * Console (service account → keys → add key). `impersonationEmail` is the
+ * Workspace user the SA acts as via domain-wide delegation; the bridge mints
+ * a delegated access token before each sync via the JWT bearer flow.
+ *
+ * No userId — service accounts are organization-level credentials, not
+ * user-level. The installer is recorded for audit only.
+ */
+export const connectorServiceAccounts = pgTable(
+  'connector_service_accounts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    provider: text('provider', { enum: SYNC_PROVIDERS }).notNull(),
+    /** Encrypted JSON key blob (the full file from Google Cloud Console). */
+    keyJson: encryptedText('key_json').notNull(),
+    /** Workspace user the SA impersonates via DWD (e.g. admin@company.com). */
+    impersonationEmail: text('impersonation_email').notNull(),
+    /** Service account's client_email — surfaced to admins on the settings page so they know which SA to grant DWD to. Derived from keyJson at install time, kept here so we don't have to decrypt to display. */
+    serviceAccountEmail: text('service_account_email').notNull(),
+    /** SA client_id from the JSON key. The Workspace admin pastes this into Admin Console → Security → API Controls → Domain-wide Delegation. Pre-extracted so the dashboard can show it without decrypting. */
+    serviceAccountClientId: text('service_account_client_id').notNull(),
+    status: text('status', { enum: ['active', 'revoked'] }).notNull().default('active'),
+    installedByUserId: uuid('installed_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    connectedAt: timestamp('connected_at', { withTimezone: true }).notNull().defaultNow(),
+    lastValidatedAt: timestamp('last_validated_at', { withTimezone: true }),
+  },
+  (t) => ({
+    orgProviderUniq: uniqueIndex('connector_service_accounts_org_provider_uniq').on(
+      t.organizationId,
+      t.provider,
+    ),
+  }),
+);
+
 export const githubInstallations = pgTable(
   'github_installations',
   {

@@ -68,3 +68,28 @@ export const SYNC_QUEUE_NAMES: readonly string[] = Object.values(
 export function queueNamesFor(provider: SyncProvider): readonly string[] {
   return QUEUE_NAMES_BY_PROVIDER[provider];
 }
+
+/**
+ * OAuth scopes the Google service account requires per provider, surfaced
+ * here (in a client-safe constants package) so both the worker — which mints
+ * delegated tokens via JWT bearer — and the wizard UI — which displays the
+ * scopes for admins to paste into Workspace Admin Console → Domain-wide
+ * Delegation — read from a single source. If these drift from what the
+ * worker requests at mint time, Google rejects with `invalid_grant`.
+ */
+export const GOOGLEDRIVE_SCOPES = [
+  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/userinfo.email',
+] as const;
+
+export const GOOGLE_CHAT_SCOPES = [
+  'https://www.googleapis.com/auth/chat.spaces.readonly',
+  'https://www.googleapis.com/auth/chat.messages.readonly',
+  'openid',
+  'email',
+] as const;
+
+export const GOOGLE_SERVICE_ACCOUNT_SCOPES = {
+  googledrive: GOOGLEDRIVE_SCOPES,
+  'google-chat': GOOGLE_CHAT_SCOPES,
+} as const satisfies Partial<Record<SyncProvider, readonly string[]>>;

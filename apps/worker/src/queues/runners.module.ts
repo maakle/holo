@@ -149,18 +149,13 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       QUEUE_NAMES.ZENDESK_SYNC,
       createGenericRunner(createZendeskSpec(), deps),
     );
-    // Google Drive uses standard OAuth2 with refresh tokens. Same shape as
-    // Linear/Slack: register the runner regardless of env presence so the
-    // queue exists; jobs fail loudly if creds are missing.
+    // Google Drive runs against a per-org service account with domain-wide
+    // delegation. The framework-bridge loads the SA from
+    // connector_service_accounts and mints a delegated access token before
+    // each sync — no global OAuth credentials needed at boot.
     setSyncRunner(
       QUEUE_NAMES.GOOGLEDRIVE_SYNC,
-      createGenericRunner(
-        createGoogleDriveSpec({
-          clientId: process.env.GOOGLEDRIVE_CONNECTOR_CLIENT_ID ?? '',
-          clientSecret: process.env.GOOGLEDRIVE_CONNECTOR_CLIENT_SECRET ?? '',
-        }),
-        deps,
-      ),
+      createGenericRunner(createGoogleDriveSpec(), deps),
     );
     // Airtable: API-key (personal access token) auth, no env credentials
     // required at boot. The token is collected per-org via the connect route
@@ -169,18 +164,12 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       QUEUE_NAMES.AIRTABLE_SYNC,
       createGenericRunner(createAirtableSpec(), deps),
     );
-    // Google Chat: OAuth-only. Like Slack/Linear, registering the runner
-    // unconditionally keeps the queue alive even when env credentials are
-    // absent — a sync job in that state will surface NOT_IMPLEMENTED.
+    // Google Chat runs against a per-org service account with domain-wide
+    // delegation — same shape as Google Drive. The bridge mints delegated
+    // tokens before each sync via loadGoogleServiceAccountToken.
     setSyncRunner(
       QUEUE_NAMES.GOOGLE_CHAT_SYNC,
-      createGenericRunner(
-        createGoogleChatSpec({
-          clientId: process.env.GOOGLE_CHAT_CONNECTOR_CLIENT_ID ?? '',
-          clientSecret: process.env.GOOGLE_CHAT_CONNECTOR_CLIENT_SECRET ?? '',
-        }),
-        deps,
-      ),
+      createGenericRunner(createGoogleChatSpec(), deps),
     );
     this.logger.log(
       'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat',

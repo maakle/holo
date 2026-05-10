@@ -18,7 +18,13 @@ import type { ConnectorMeta } from '@/lib/connector-registry';
 import type { ConnectorWizardConfig } from './types';
 import { oauthInstallStep } from './steps/oauth-install-step';
 import { apiKeyStep } from './steps/api-key-step';
+import { serviceAccountStep } from './steps/service-account-step';
 import { firstSyncStep } from './steps/first-sync-step';
+// Imported from @holo/sync-providers (client-safe constants module) rather
+// than @holo/connectors — the connectors barrel pulls the chunker package,
+// which transitively requires tree-sitter (a native node module) and breaks
+// the browser bundle. The two locations share the same source-of-truth.
+import { GOOGLEDRIVE_SCOPES, GOOGLE_CHAT_SCOPES } from '@holo/sync-providers';
 import {
   slackChannelsStep,
   slackChannelsInitialState,
@@ -101,10 +107,11 @@ const googleDriveConfig: ConnectorWizardConfig = {
   steps: [
     {
       id: 'install',
-      label: 'Authorize',
+      label: 'Service account',
       render: (ctx) =>
-        oauthInstallStep(ctx, {
-          installButtonLabel: 'Authorize Google Drive',
+        serviceAccountStep(ctx, {
+          scopes: GOOGLEDRIVE_SCOPES,
+          impersonationHint: 'admin@yourcompany.com',
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
@@ -242,9 +249,16 @@ const airtableConfig: ConnectorWizardConfig = {
           helpUrl: 'https://airtable.com/create/tokens',
           instructions: [
             'Open airtable.com/create/tokens and click "Create new token". Name it "Holo".',
-            'Add the scopes data.records:read, schema.bases:read, and user.email:read.',
+            'Add the scopes below (use the copy buttons to paste each into Airtable\'s scope picker).',
             'Under Access, grant the token access to the bases you want Holo to ingest, then copy the token and paste it below.',
           ],
+          scopes: {
+            required: [
+              'data.records:read',
+              'schema.bases:read',
+              'user.email:read',
+            ],
+          },
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
@@ -256,10 +270,11 @@ const googleChatConfig: ConnectorWizardConfig = {
   steps: [
     {
       id: 'install',
-      label: 'Authorize',
+      label: 'Service account',
       render: (ctx) =>
-        oauthInstallStep(ctx, {
-          installButtonLabel: 'Authorize Google Chat',
+        serviceAccountStep(ctx, {
+          scopes: GOOGLE_CHAT_SCOPES,
+          impersonationHint: 'admin@yourcompany.com',
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },

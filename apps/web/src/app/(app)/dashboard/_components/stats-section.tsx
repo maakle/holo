@@ -6,7 +6,7 @@ import { getServerContext } from '@/lib/server-context';
 
 export async function StatsSection({ orgId }: { orgId: string }) {
   const { db } = await getServerContext();
-  const [credRows, githubRows, skillRows, invocationRows] = await Promise.all([
+  const [credRows, githubRows, serviceAccountRows, skillRows, invocationRows] = await Promise.all([
     db
       .select({ value: count() })
       .from(schema.connectorCredentials)
@@ -15,6 +15,10 @@ export async function StatsSection({ orgId }: { orgId: string }) {
       .select({ value: count() })
       .from(schema.githubInstallations)
       .where(eq(schema.githubInstallations.organizationId, orgId)),
+    db
+      .select({ value: count() })
+      .from(schema.connectorServiceAccounts)
+      .where(eq(schema.connectorServiceAccounts.organizationId, orgId)),
     db.select({ value: count() }).from(schema.skills).where(eq(schema.skills.organizationId, orgId)),
     db
       .select({ value: count() })
@@ -22,7 +26,10 @@ export async function StatsSection({ orgId }: { orgId: string }) {
       .where(eq(schema.mcpInvocations.organizationId, orgId)),
   ]);
 
-  const connectionCount = (credRows[0]?.value ?? 0) + (githubRows[0]?.value ?? 0);
+  const connectionCount =
+    (credRows[0]?.value ?? 0) +
+    (githubRows[0]?.value ?? 0) +
+    (serviceAccountRows[0]?.value ?? 0);
 
   const stats = [
     { label: 'Connections', value: connectionCount, icon: Plug, href: '/connections' },

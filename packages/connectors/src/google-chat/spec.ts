@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { ErrorCode, holoError } from '@holo/errors';
 import {
+  apiKey,
   defineConnector,
-  oauth2,
   type ConnectorSpec,
   type ResourceSyncContext,
   type TestConnectionContext,
@@ -15,29 +15,17 @@ import { processSpaces, type ThreadsCursor } from './chunking';
 import type { GoogleChatSpace } from './types';
 
 /**
- * Read-only scopes — sufficient for ingest. We deliberately avoid Workspace
- * Admin scopes (`chat.admin.*`) so installing the connector doesn't require
- * super-admin consent in Google Workspace.
+ * Read-only scopes the SA needs after domain-wide delegation. Defined in
+ * @holo/sync-providers so the wizard UI (client-side) and the worker
+ * (server-side, mints tokens) read from the same source. The Workspace
+ * admin lists exactly these in Admin Console → Security → API Controls →
+ * Domain-wide Delegation.
  *
- * `chat.spaces.readonly` lets us enumerate spaces the consenting user is in;
- * `chat.messages.readonly` lets us read those spaces' history. Coverage is
- * therefore "spaces the connecting user has joined" — same membership shape
- * as Slack's bot-as-member model.
+ * `chat.spaces.readonly` enumerates spaces the impersonated user is in;
+ * `chat.messages.readonly` reads their history. `openid` + `email` give
+ * testConnection a stable identity probe (Chat has no workspace endpoint).
  */
-export const GOOGLE_CHAT_SCOPES = [
-  'https://www.googleapis.com/auth/chat.spaces.readonly',
-  'https://www.googleapis.com/auth/chat.messages.readonly',
-  // Standard OIDC scopes so testConnection has something stable to identify
-  // the workspace by (Chat doesn't expose a workspace identity endpoint).
-  'openid',
-  'email',
-] as const;
-
-export interface GoogleChatSpecOptions {
-  clientId: string;
-  clientSecret: string;
-  fetchImpl?: typeof fetch;
-}
+export { GOOGLE_CHAT_SCOPES } from '@holo/sync-providers';
 
 const threadsCursorSchema = z
   .object({
@@ -48,9 +36,10 @@ const threadsCursorSchema = z
 
 /**
  * Resolve which spaces to sync. Prefers an explicit allowlist; falls back to
- * "all spaces the user is a member of" when no allowlist row is set — Google
- * Chat's own membership UI is the access boundary, requiring admins to
- * re-pick spaces here would be redundant friction. Mirrors Slack's behaviour.
+ * "all spaces the impersonated user is a member of" when no allowlist row is
+ * set — Google Chat's own membership UI is the access boundary, requiring
+ * admins to re-pick spaces here would be redundant friction. Mirrors Slack's
+ * behaviour.
  */
 async function resolveSpaces(
   ctx: ResourceSyncContext<ThreadsCursor>,
@@ -65,31 +54,25 @@ async function resolveSpaces(
     return allSpaces.filter((s) => allowed.has(s.name));
   } catch (err) {
     if ((err as { code?: string }).code !== ErrorCode.HOLO_ALLOWLIST_EMPTY) throw err;
-    // Default: every space the user is in. Skip DMs to avoid ingesting
-    // private 1:1 chats by accident — admins can opt them in via allowlist.
+    // Default: every space the impersonated user is in. Skip DMs to avoid
+    // ingesting private 1:1 chats by accident — admins can opt them in via
+    // allowlist.
     return allSpaces.filter((s) => s.spaceType !== 'DIRECT_MESSAGE');
   }
 }
 
-export function createGoogleChatSpec(opts: GoogleChatSpecOptions): ConnectorSpec {
+export function createGoogleChatSpec(): ConnectorSpec {
   return defineConnector({
     id: 'google-chat',
     displayName: 'Google Chat',
 
     sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER['google-chat'] },
 
-    auth: oauth2({
-      clientId: opts.clientId,
-      clientSecret: opts.clientSecret,
-      authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-      tokenUrl: 'https://oauth2.googleapis.com/token',
-      scopes: GOOGLE_CHAT_SCOPES,
-      // Google issues refresh tokens only when `access_type=offline` and
-      // `prompt=consent` are set on the authorize URL — handled by the
-      // initiate route via extra params (see web/api/connectors/[provider]).
-      refreshable: true,
-      fetchImpl: opts.fetchImpl,
-    }),
+    // The framework-bridge mints a fresh delegated access token before each
+    // sync via Google's JWT bearer flow (loadGoogleServiceAccountToken) and
+    // hands it to the spec via tokens.accessToken. The spec just attaches it
+    // as a Bearer header — same shape as static-token connectors.
+    auth: apiKey(),
 
     http: {
       baseUrl: 'https://chat.googleapis.com',
@@ -97,9 +80,9 @@ export function createGoogleChatSpec(opts: GoogleChatSpecOptions): ConnectorSpec
     },
 
     async testConnection(ctx: TestConnectionContext): Promise<TestConnectionResult> {
-      // Google's userinfo endpoint identifies the consenting user; Chat itself
-      // has no /me. We use the email's domain as the workspace name proxy so
-      // the dashboard shows something meaningful.
+      // Google's userinfo endpoint identifies the impersonated user; Chat
+      // itself has no /me. Use the email's domain as the workspace name proxy
+      // so the dashboard shows something meaningful.
       try {
         const info = await ctx.api.get<{
           sub: string;
@@ -116,7 +99,7 @@ export function createGoogleChatSpec(opts: GoogleChatSpecOptions): ConnectorSpec
         throw holoError({
           code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
           problem: `Google userinfo failed: ${(err as Error).message}`,
-          fix: 'Re-authorize the Google Chat connector to obtain a fresh token.',
+          fix: 'Verify the service account JSON key, impersonation email, and domain-wide delegation setup in Google Workspace Admin Console.',
         });
       }
     },

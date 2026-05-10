@@ -26,7 +26,12 @@ import {
   type ConnectorTokens,
   type RuntimeStores,
 } from '@holo/connector-framework';
-import { loadGithubInstallationToken, githubAppConfigFromEnv } from '@holo/connectors';
+import {
+  loadGithubInstallationToken,
+  githubAppConfigFromEnv,
+  loadGoogleServiceAccountToken,
+  isGoogleServiceAccountProvider,
+} from '@holo/connectors';
 import type { SyncRunner, SyncResult } from './sync-dispatch';
 import type { SyncJobPayload } from './types';
 import type { EmbedJobPayload, ChunkInsertPayload } from './embed-insert';
@@ -71,6 +76,22 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
         return { accessToken: '' };
       }
 
+      // Google Drive + Google Chat are backed by per-org service accounts
+      // (connector_service_accounts) instead of per-user OAuth. We mint a
+      // fresh delegated access token on every sync via Google's JWT bearer
+      // flow — the helper signs a JWT with the SA private key and exchanges
+      // it for a 1h token impersonating the Workspace user the admin chose
+      // at install time. Tokens are cached in-process for ~50 minutes so
+      // back-to-back syncs in the same worker incarnation don't re-mint.
+      if (isGoogleServiceAccountProvider(providerId)) {
+        const { accessToken, expiresAt } = await loadGoogleServiceAccountToken({
+          db: deps.db,
+          organizationId,
+          provider: providerId,
+        });
+        return { accessToken, expiresAt };
+      }
+
       const rows = await deps.db
         .select({
           accessToken: schema.connectorCredentials.accessToken,
@@ -112,6 +133,14 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
     },
 
     async saveTokens({ organizationId, providerId, tokens }): Promise<void> {
+      // Google SA tokens are minted on demand from connector_service_accounts;
+      // there's nothing to persist on a "refresh". The bridge's loadTokens
+      // returns a freshly-minted token on every sync, and the spec's apiKey
+      // strategy is refreshable=false so this branch shouldn't normally fire.
+      if (isGoogleServiceAccountProvider(providerId)) return;
+      // GitHub installation tokens are minted per-call inside
+      // loadGithubInstallationToken's cache; we never persist them.
+      if (providerId === 'github') return;
       await deps.db
         .update(schema.connectorCredentials)
         .set({

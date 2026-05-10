@@ -45,8 +45,9 @@ async function loadBannerInitial(
   orgId: string,
 ): Promise<ConnectAgentBannerInitial> {
   // "Real connector" = anything other than our synthetic sample provider:
-  // active connector_credentials OR a github_installations row.
-  const [credCount, ghCount, sampleSource, realChunkRow] = await Promise.all([
+  // active connector_credentials OR a github_installations row OR an active
+  // connector_service_accounts row (Google Drive / Google Chat).
+  const [credCount, ghCount, saCount, sampleSource, realChunkRow] = await Promise.all([
     db
       .select({ c: sql<number>`count(*)::int` })
       .from(schema.connectorCredentials)
@@ -60,6 +61,15 @@ async function loadBannerInitial(
       .select({ c: sql<number>`count(*)::int` })
       .from(schema.githubInstallations)
       .where(eq(schema.githubInstallations.organizationId, orgId)),
+    db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(schema.connectorServiceAccounts)
+      .where(
+        and(
+          eq(schema.connectorServiceAccounts.organizationId, orgId),
+          eq(schema.connectorServiceAccounts.status, 'active'),
+        ),
+      ),
     db
       .select({ id: schema.sources.id })
       .from(schema.sources)
@@ -82,7 +92,9 @@ async function loadBannerInitial(
   ]);
 
   const hasRealConnector =
-    (credCount[0]?.c ?? 0) > 0 || (ghCount[0]?.c ?? 0) > 0;
+    (credCount[0]?.c ?? 0) > 0 ||
+    (ghCount[0]?.c ?? 0) > 0 ||
+    (saCount[0]?.c ?? 0) > 0;
 
   return {
     hasRealConnector,

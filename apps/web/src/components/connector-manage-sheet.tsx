@@ -32,6 +32,12 @@ import {
 import { notifySyncTriggered } from '@/lib/sync-events';
 import { openOAuthPopup } from '@/lib/oauth-popup';
 
+interface AllowlistEntry {
+  pattern: string;
+  isGlob: boolean;
+  label: string | null;
+}
+
 interface Props {
   meta: ConnectorMeta;
   open: boolean;
@@ -39,6 +45,8 @@ interface Props {
   connectedAs?: string;
   lastSyncedAt: string | null;
   lastSyncStatus: string | null;
+  /** Allowlist entries with optional human-readable labels. */
+  allowlist?: AllowlistEntry[];
   /** Number of allowlist entries already saved on the server (GitHub). */
   allowlistCount?: number;
   /** True when the GitHub allowlist is empty — default-all mode. */
@@ -78,6 +86,7 @@ export function ConnectorManageSheet({
   connectedAs,
   lastSyncedAt,
   lastSyncStatus,
+  allowlist = [],
   allowlistCount,
   githubDefaultAll,
   slackDefaultAll,
@@ -89,6 +98,10 @@ export function ConnectorManageSheet({
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 
   const isApiKey = meta.flowType === 'apikey';
+  // Service-account connectors (googledrive, google-chat) collect their JSON
+  // key + impersonation email through the wizard, not the OAuth popup. Same
+  // "can't pre-fill here" behaviour as apikey reconnects.
+  const needsInlineReconnect = isApiKey || meta.flowType === 'service-account';
   const isGithub = meta.id === 'github';
   const isSlack = meta.id === 'slack';
 
@@ -167,11 +180,12 @@ export function ConnectorManageSheet({
     setError(null);
     setInfo(null);
     try {
-      // For OAuth providers, restart the OAuth flow. For api-key providers we
-      // can't pre-fill the form here — close the sheet and let the user paste
-      // a new token in the inline form on the row. Surface a hint instead.
-      if (isApiKey) {
-        setInfo('Close this panel and paste a fresh token in the row form.');
+      // For OAuth providers, restart the OAuth flow. For api-key and
+      // service-account providers we can't pre-fill the form here — close
+      // the sheet and let the user paste a new token in the inline form on
+      // the row. Surface a hint instead.
+      if (needsInlineReconnect) {
+        setInfo('Close this panel and re-run the connection wizard from the row.');
         return;
       }
       const res = await fetch(`/api/connectors/${meta.id}/initiate`, { method: 'POST' });
@@ -229,10 +243,11 @@ export function ConnectorManageSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl">
         <SheetHeader>
-          <SheetTitle>
-            {meta.displayName}
+          <SheetTitle className="flex flex-wrap items-center gap-2">
+            <span>{meta.displayName}</span>
+            <Badge variant="success">Connected</Badge>
             {connectedAs ? (
-              <span className="ml-2 text-text-muted font-normal">· {connectedAs}</span>
+              <span className="text-text-muted font-normal">· {connectedAs}</span>
             ) : null}
           </SheetTitle>
           <SheetDescription>
@@ -363,6 +378,32 @@ export function ConnectorManageSheet({
                   initialSelectedCount={allowlistCount}
                   initialDefaultAll={slackDefaultAll}
                 />
+              </section>
+            ) : null}
+
+            {/* Access — what this connection can see. GitHub/Slack render
+                their own pickers above, so skip the chip list there. */}
+            {!isGithub && !isSlack && allowlist.length > 0 ? (
+              <section className="flex flex-col gap-2">
+                <div className="flex items-baseline justify-between">
+                  <h3 className="text-[13px] font-medium text-text">Access</h3>
+                  <Badge variant="neutral">{allowlist.length}</Badge>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {allowlist.map((a) => {
+                    const display = a.label ?? a.pattern;
+                    return (
+                      <span
+                        key={a.pattern}
+                        title={a.label != null ? a.pattern : undefined}
+                        className="inline-flex cursor-default items-center rounded-md border border-accent/30 bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] px-1.5 py-0.5 text-[11px] font-medium text-accent"
+                      >
+                        {display}
+                        {a.isGlob ? <span className="ml-1 opacity-60">*</span> : null}
+                      </span>
+                    );
+                  })}
+                </div>
               </section>
             ) : null}
 

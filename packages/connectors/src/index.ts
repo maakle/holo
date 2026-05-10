@@ -41,6 +41,7 @@ export type { LinearSpecOptions } from './linear/index';
 export {
   createGoogleDriveSpec,
   GOOGLEDRIVE_FILE_KIND,
+  GOOGLEDRIVE_SCOPES,
   buildIncrementalListQuery as buildGoogleDriveListQuery,
 } from './googledrive/index';
 export type {
@@ -50,6 +51,20 @@ export type {
   DriveFilesPage,
   SharedDrive,
 } from './googledrive/index';
+export {
+  loadGoogleServiceAccountToken,
+  mintDelegatedAccessToken,
+  parseServiceAccountKey,
+  isGoogleServiceAccountProvider,
+  googleServiceAccountScopes,
+  GOOGLE_SERVICE_ACCOUNT_PROVIDERS,
+  __clearGoogleServiceAccountTokenCacheForTests,
+} from './google-shared/index';
+export type {
+  GoogleServiceAccountKey,
+  GoogleServiceAccountProvider,
+  LoadGoogleServiceAccountTokenInput,
+} from './google-shared/index';
 export {
   createGitlabSpec,
   createGitlabApiClient,
@@ -95,7 +110,6 @@ export { createGrainSpec } from './grain/index';
 export type { GrainSpecOptions } from './grain/index';
 export { createGoogleChatSpec, GOOGLE_CHAT_SCOPES } from './google-chat/index';
 export type {
-  GoogleChatSpecOptions,
   GoogleChatSpace,
   GoogleChatMessage,
   GoogleChatUser,

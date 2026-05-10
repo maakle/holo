@@ -246,6 +246,13 @@
       "when": 1779062400000,
       "tag": "0034_replay_views",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1779148800000,
+      "tag": "0035_connector_service_accounts",
+      "breakpoints": true
     }
   ]
 }
