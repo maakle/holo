@@ -1,8 +1,11 @@
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { config as loadEnv } from 'dotenv';
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-loadEnv({ path: path.resolve(__dirname, '../../../.env') });
+// Load .env from repo root when running locally via `pnpm -F @holo/db migrate`
+// (cwd is packages/db). In production the file won't exist; dotenv silently
+// returns { error } and the platform-injected env wins. We deliberately avoid
+// import.meta.url / __dirname so this file works identically when run via tsx
+// (ESM) and when bundled by esbuild as CJS for the Railway pre-deploy step.
+loadEnv({ path: path.resolve(process.cwd(), '../../.env') });
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
@@ -22,7 +25,7 @@ async function main() {
   const sql = postgres(url, { max: 1 });
   const migrationDb = drizzle(sql);
   const migrationsFolder =
-    process.env.MIGRATIONS_DIR ?? path.resolve(__dirname, '../migrations');
+    process.env.MIGRATIONS_DIR ?? path.resolve(process.cwd(), 'migrations');
   await migrate(migrationDb, { migrationsFolder });
 
   const db = drizzle(sql, { schema });
