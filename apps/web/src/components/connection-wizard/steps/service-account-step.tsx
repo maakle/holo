@@ -11,6 +11,31 @@ interface Args {
   scopes: ReadonlyArray<string>;
   /** Provider-specific name for the impersonation field hint. */
   impersonationHint?: string;
+  /**
+   * Google API the user must enable in their GCP project before the first
+   * sync will succeed. Skipping this is the most common cause of a 403 on
+   * the first sync ("API has not been used in project … or it is disabled").
+   */
+  apiToEnable?: {
+    /** Display label, e.g. "Google Chat API". */
+    label: string;
+    /** API host, e.g. "chat.googleapis.com" — used for the console URL. */
+    host: string;
+  };
+  /**
+   * Provider-specific setup steps that aren't covered by the generic
+   * service-account flow — e.g. Google Chat's "configure a Chat app" page,
+   * which is required even after the Chat API is enabled. Rendered after
+   * apiToEnable and before the IAM step.
+   */
+  extraSteps?: ReadonlyArray<{
+    /** Headline link text. */
+    label: string;
+    /** URL the label points to. */
+    href: string;
+    /** One-line explanation of *why* this step is needed. */
+    body: string;
+  }>;
 }
 
 /**
@@ -96,7 +121,36 @@ function ServiceAccountStep<TState>({
             with domain-wide delegation. One workspace-wide install — no
             per-user OAuth, no token churn when employees leave.
           </p>
-          <ol className="flex flex-col gap-1 text-[12px] text-text-muted list-decimal pl-4">
+          <ol className="flex flex-col gap-3 text-[12px] text-text-muted list-decimal pl-4">
+            {args.apiToEnable ? (
+              <li>
+                Enable the{' '}
+                <a
+                  href={`https://console.cloud.google.com/apis/library/${args.apiToEnable.host}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent underline-offset-2 hover:underline"
+                >
+                  {args.apiToEnable.label}
+                </a>{' '}
+                in the GCP project you&apos;ll use. Without this, the first
+                sync 403s with &ldquo;API has not been used in project … or it
+                is disabled.&rdquo;
+              </li>
+            ) : null}
+            {args.extraSteps?.map((step) => (
+              <li key={step.href}>
+                <a
+                  href={step.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent underline-offset-2 hover:underline"
+                >
+                  {step.label}
+                </a>
+                . {step.body}
+              </li>
+            ))}
             <li>
               In{' '}
               <a
@@ -107,31 +161,43 @@ function ServiceAccountStep<TState>({
               >
                 Google Cloud Console → IAM → Service Accounts
               </a>
-              , create a service account (or pick an existing one) and add a
-              JSON key (Keys → Add key → Create new key → JSON).
+              , create a service account (or pick an existing one). You can
+              skip the optional &ldquo;Grant this service account access&rdquo;
+              (IAM roles) step — Holo doesn&apos;t need any project-level role.
             </li>
             <li>
-              Enable domain-wide delegation on the service account, then copy
-              its <span className="font-mono">client ID</span>.
+              Open the service account, go to the{' '}
+              <span className="font-medium text-text">Keys</span> tab, then{' '}
+              <span className="font-medium text-text">Add key → Create new key → JSON</span>
+              . Google downloads the file once — you&apos;ll paste its contents
+              below.
             </li>
             <li>
-              In{' '}
-              <a
-                href="https://admin.google.com/ac/owl/domainwidedelegation"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-accent underline-offset-2 hover:underline"
-              >
-                Workspace Admin Console → Security → API Controls → Domain-wide
-                Delegation
-              </a>
-              , add a new client with the service account&apos;s client ID and
-              the scopes shown below.
+              Back on the service account&apos;s{' '}
+              <span className="font-medium text-text">Details</span> tab, enable
+              domain-wide delegation, then copy its{' '}
+              <span className="font-mono">client ID</span>. (DWD is what
+              actually grants Workspace data access — not the IAM role above.)
+            </li>
+            <li className="flex flex-col gap-2">
+              <span>
+                In{' '}
+                <a
+                  href="https://admin.google.com/ac/owl/domainwidedelegation"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent underline-offset-2 hover:underline"
+                >
+                  Workspace Admin Console → Security → API Controls →
+                  Domain-wide Delegation
+                </a>
+                , add a new client with the service account&apos;s client ID
+                and paste these scopes:
+              </span>
+              <ScopeBlock scopes={args.scopes} />
             </li>
             <li>Paste the full JSON key file and the impersonation email below.</li>
           </ol>
-
-          <ScopeBlock scopes={args.scopes} />
 
           <label className="flex flex-col gap-1">
             <span className="text-[12px] text-text-subtle">
@@ -212,9 +278,10 @@ function isValidEmail(value: string): boolean {
 
 function ScopeBlock({ scopes }: { scopes: ReadonlyArray<string> }) {
   const [copied, setCopied] = useState(false);
+  const joined = scopes.join(',');
   async function copyAll() {
     try {
-      await navigator.clipboard.writeText(scopes.join(','));
+      await navigator.clipboard.writeText(joined);
       setCopied(true);
       toast.success('Scopes copied');
       setTimeout(() => setCopied(false), 1200);
@@ -224,31 +291,27 @@ function ScopeBlock({ scopes }: { scopes: ReadonlyArray<string> }) {
   }
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] uppercase tracking-[0.04em] text-text-subtle">
           OAuth scopes (paste into DWD)
         </span>
         <button
           type="button"
           onClick={copyAll}
-          className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-text-muted hover:text-text focus:outline-hidden focus:focus-ring"
+          className="flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-text-muted hover:text-text focus:outline-hidden focus:focus-ring"
         >
           {copied ? (
             <>
               <Check className="h-3 w-3 text-success" aria-hidden /> Copied
             </>
           ) : (
-            'Copy all'
+            'Copy'
           )}
         </button>
       </div>
-      <ul className="flex flex-col gap-0.5">
-        {scopes.map((s) => (
-          <li key={s} className="font-mono text-[12px] text-text">
-            {s}
-          </li>
-        ))}
-      </ul>
+      <code className="block break-all font-mono text-[12px] leading-relaxed text-text">
+        {joined}
+      </code>
     </div>
   );
 }

@@ -19,6 +19,9 @@ type RunRow = {
   durationMs: number | null;
   artifactCount: number | null;
   failedReason: string | null;
+  failedCause: string | null;
+  failedCode: string | null;
+  failedFix: string | null;
   finishedOn: number | null;
   processedOn: number | null;
   liveArtifactCount: number | null;
@@ -151,8 +154,18 @@ function FirstSyncStep<TState>({
                 {failedRun.failedReason}
               </p>
             ) : null}
+            {failedRun.failedCause ? (
+              <p className="mt-2 wrap-break-word text-[12px] text-text-muted">
+                {failedRun.failedCause}
+              </p>
+            ) : null}
+            {failedRun.failedFix ? (
+              <p className="mt-2 wrap-break-word text-[12px] text-text">
+                <span className="font-medium">Fix:</span> {failedRun.failedFix}
+              </p>
+            ) : null}
             <p className="mt-2 text-text-muted">
-              Full stack trace and per-file breakdown live under{' '}
+              Full history and per-file breakdown live under{' '}
               <span className="font-medium text-text">Manage</span> → Sync history.
             </p>
           </div>

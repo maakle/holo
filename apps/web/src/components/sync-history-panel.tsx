@@ -15,6 +15,8 @@ type Run = {
   attempts: number;
   artifactCount: number | null;
   failedReason: string | null;
+  failedCause: string | null;
+  failedCode: string | null;
   failedFix: string | null;
   skipReason: string | null;
   liveArtifactCount: number | null;
@@ -375,15 +377,26 @@ export function SyncHistoryPanel({ provider }: Props) {
                         </table>
                       </div>
                     ) : null}
-                    {r.state === 'failed' && r.failedReason ? (
-                      <div className="mt-2.5 rounded-sm border border-error/30 bg-[color-mix(in_srgb,var(--error)_8%,transparent)] p-2 font-mono text-[11px] text-error">
-                        <div>{r.failedReason}</div>
-                        {r.failedFix ? (
-                          <div className="mt-1 text-error/80">Fix: {r.failedFix}</div>
+                    {r.state === 'failed' && (r.failedReason || r.failedCause) ? (
+                      <div className="mt-2.5 rounded-sm border border-error/30 bg-[color-mix(in_srgb,var(--error)_8%,transparent)] p-2 text-[11px] text-error">
+                        {r.failedReason ? (
+                          <div className="font-mono wrap-break-word">{r.failedReason}</div>
                         ) : null}
-                        <div className="mt-2 text-[10px] text-error/70">
-                          Full stack trace and underlying cause are in the worker logs.
-                        </div>
+                        {r.failedCode ? (
+                          <div className="mt-1 font-mono text-[10px] text-error/70">
+                            {r.failedCode}
+                          </div>
+                        ) : null}
+                        {r.failedCause ? (
+                          <div className="mt-2 wrap-break-word text-error/90">
+                            {r.failedCause}
+                          </div>
+                        ) : null}
+                        {r.failedFix ? (
+                          <div className="mt-2 wrap-break-word text-error">
+                            <span className="font-medium">Fix:</span> {r.failedFix}
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                     {!r.breakdown && r.state === 'completed' ? (

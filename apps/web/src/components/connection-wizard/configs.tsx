@@ -118,6 +118,7 @@ const googleDriveConfig: ConnectorWizardConfig = {
         serviceAccountStep(ctx, {
           scopes: GOOGLEDRIVE_SCOPES,
           impersonationHint: 'admin@yourcompany.com',
+          apiToEnable: { label: 'Google Drive API', host: 'drive.googleapis.com' },
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
@@ -277,6 +278,15 @@ const googleChatConfig: ConnectorWizardConfig = {
         serviceAccountStep(ctx, {
           scopes: GOOGLE_CHAT_SCOPES,
           impersonationHint: 'admin@yourcompany.com',
+          apiToEnable: { label: 'Google Chat API', host: 'chat.googleapis.com' },
+          extraSteps: [
+            {
+              label: 'Configure a Chat app',
+              href: 'https://console.cloud.google.com/apis/api/chat.googleapis.com/hangouts-chat',
+              body:
+                'Even with the API enabled, Chat requires a configured app on the project. On the Configuration tab, set an App name and set App status to "LIVE — available to users in your domain". Otherwise the first sync 404s with "Google Chat app not found".',
+            },
+          ],
         }),
     },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },

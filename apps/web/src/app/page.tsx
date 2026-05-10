@@ -11,7 +11,6 @@ const DOCS_URL = `${GITHUB_URL}#readme`;
 const ROADMAP_URL = `${GITHUB_URL}/blob/main/docs/ROADMAP.md`;
 const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/ARCHITECTURE.md`;
 const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
-const GITHUB_API_REPO_URL = 'https://api.github.com/repos/maakle/holo';
 
 export default async function Home() {
   const auth = await getServerAuth();
@@ -77,7 +76,6 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
       <BackdropGrid />
       <div className="relative mx-auto max-w-[1024px] px-6 pt-16 pb-20 text-center md:pt-24">
         <div className="flex flex-col items-center gap-2">
-          {/* Async server component: fetches GitHub star count with 1h cache. */}
           <StarButton />
           <p className="caption text-text-subtle">Open source · Self-hostable</p>
         </div>
@@ -113,57 +111,19 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
   );
 }
 
-/**
- * GitHub star button with live count. Server-rendered with a 1-hour fetch
- * cache so we don't hammer GitHub's unauthenticated API (60 req/h limit) on
- * every page render — even though the route is `force-dynamic`, Next caches
- * the underlying fetch by URL + revalidate. Falls back gracefully to a
- * count-less "Star" button if the API is unreachable.
- */
-async function StarButton() {
-  let countLabel: string | null = null;
-  try {
-    const res = await fetch(GITHUB_API_REPO_URL, {
-      next: { revalidate: 3600 },
-      headers: {
-        // GitHub requires User-Agent on every API request.
-        'User-Agent': 'holo-landing',
-        Accept: 'application/vnd.github+json',
-      },
-    });
-    if (res.ok) {
-      const json = (await res.json()) as { stargazers_count?: number };
-      const n = json.stargazers_count;
-      if (typeof n === 'number') countLabel = formatStarCount(n);
-    }
-  } catch {
-    // Network error or rate-limited — render the button without a count.
-  }
+function StarButton() {
   return (
     <a
       href={GITHUB_URL}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Star holo on GitHub"
-      className="inline-flex items-center gap-2 rounded-full border border-border bg-surface py-1.5 pl-4 pr-1.5 text-[13px] font-medium text-text shadow-xs transition-colors hover:border-border-strong"
+      className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5 text-[13px] font-medium text-text shadow-xs transition-colors hover:border-border-strong"
     >
       <GitHubMark className="h-4 w-4" aria-hidden />
-      <span>Star</span>
-      {countLabel ? (
-        <span className="rounded-full border border-border bg-bg px-2 py-0.5 text-[12px] font-medium text-text-muted tabular-nums">
-          {countLabel}
-        </span>
-      ) : null}
+      <span>Star us on GitHub</span>
     </a>
   );
-}
-
-function formatStarCount(n: number): string {
-  if (n < 1000) return String(n);
-  const k = n / 1000;
-  // 7,300 → "7.3k", 12,500 → "12.5k", 1,000 → "1k", 10,000 → "10k"
-  const fixed = k >= 10 ? k.toFixed(0) : k.toFixed(1);
-  return fixed.replace(/\.0$/, '') + 'k';
 }
 
 function GitHubMark({ className }: { className?: string }) {

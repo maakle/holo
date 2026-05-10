@@ -23,7 +23,13 @@ type RunRow = {
   durationMs: number | null;
   attempts: number;
   artifactCount: number | null;
+  /** Short one-line summary, e.g. "GET https://… returned 403". */
   failedReason: string | null;
+  /** Underlying provider error text (Google's "Enable the Chat API at …",
+   * GitHub's rate-limit message, etc.). Often the actionable part. */
+  failedCause: string | null;
+  /** HoloError code (HOLO_FETCH_FAILED, HOLO_AUTH_NO_SESSION, …). */
+  failedCode: string | null;
   failedFix: string | null;
   skipReason: string | null;
   /** Live count of chunks committed since the run started — only populated
@@ -61,6 +67,58 @@ function redactSecrets(s: string): string {
     .replace(/(https?:\/\/)([^@/\s]+)@/g, '$1<redacted>@')
     .replace(/gh[opusr]_[A-Za-z0-9]{20,}/g, '<redacted-token>')
     .replace(/xox[abpsr]-[A-Za-z0-9-]{10,}/g, '<redacted-token>');
+}
+
+/**
+ * Derive a user-actionable fix from error_problem + error_cause.
+ *
+ * The framework writes a `fix` field on every HoloError, but `sync_runs`
+ * doesn't persist it (no error_fix column yet). For now we re-derive a fix
+ * at API render time by pattern-matching the cause text we *did* persist —
+ * provider error bodies are stable enough for this to be useful, and the
+ * common cases (Google API not enabled, expired token, rate limit) are
+ * exactly the ones where the generic "Re-authenticate the integration"
+ * fallback was misleading.
+ */
+function deriveFix(args: {
+  problem: string | null;
+  cause: string | null;
+}): string | null {
+  const haystack = `${args.problem ?? ''}\n${args.cause ?? ''}`;
+  // Google "API not enabled" — the cause string includes a console URL the
+  // user can click straight through to.
+  const apiDisabled = /API has not been used in project (\d+) before or it is disabled/i.exec(
+    haystack,
+  );
+  if (apiDisabled) {
+    const projectId = apiDisabled[1];
+    const apiHost = /https:\/\/([a-z0-9-]+\.googleapis\.com)/i.exec(haystack)?.[1];
+    if (projectId && apiHost) {
+      return `Enable the ${apiHost} API in your Google Cloud project ${projectId}, wait ~1 minute, then retry.`;
+    }
+    return 'Enable the relevant Google API in your Cloud project, wait ~1 minute, then retry.';
+  }
+  // Google Chat-specific: even with the API enabled, the project needs a
+  // configured "Chat app" (App name, status = LIVE) before /v1/spaces works.
+  if (/Google Chat app not found/i.test(haystack)) {
+    return 'Configure a Chat app in your Google Cloud project: open the Chat API → Configuration tab, set an App name, and set App status to "LIVE - available to users in your domain". Then retry.';
+  }
+  if (/PERMISSION_DENIED|insufficient.*scope/i.test(haystack)) {
+    return 'Service account lacks the required scope. Re-check the Domain-wide Delegation entry in Workspace Admin and that you pasted all listed scopes.';
+  }
+  if (/invalid_grant|token.*expired|unauthorized_client/i.test(haystack)) {
+    return 'Credentials are stale. Reconnect the integration to issue fresh tokens.';
+  }
+  if (/returned 401\b/.test(haystack)) {
+    return 'Re-authenticate the integration — the token was rejected.';
+  }
+  if (/returned 403\b/.test(haystack)) {
+    return 'The account is authenticated but lacks access. Verify scopes/permissions on the impersonated user or token.';
+  }
+  if (/returned 429\b|rate.?limit/i.test(haystack)) {
+    return 'Provider rate-limited the sync. It will retry automatically; nothing to do unless this persists.';
+  }
+  return null;
 }
 
 export async function GET(
@@ -107,6 +165,7 @@ export async function GET(
         breakdown: schema.syncRuns.breakdown,
         errorCode: schema.syncRuns.errorCode,
         errorProblem: schema.syncRuns.errorProblem,
+        errorCause: schema.syncRuns.errorCause,
         skipReason: schema.syncRuns.skipReason,
         progressCurrent: schema.syncRuns.progressCurrent,
         progressTotal: schema.syncRuns.progressTotal,
@@ -161,6 +220,8 @@ export async function GET(
                   ? 'cancelled'
                   : 'active';
         const problem = r.errorProblem ? redactSecrets(r.errorProblem) : null;
+        const cause = r.errorCause ? redactSecrets(r.errorCause) : null;
+        const fix = problem || cause ? deriveFix({ problem, cause }) : null;
         // Only spend a query on rows that are still in flight — once a run
         // finishes, artifactCount is authoritative.
         const liveArtifactCount =
@@ -178,7 +239,9 @@ export async function GET(
           attempts: 0,
           artifactCount: r.artifactCount,
           failedReason: problem,
-          failedFix: null,
+          failedCause: cause,
+          failedCode: r.errorCode ?? null,
+          failedFix: fix,
           skipReason: r.skipReason ?? null,
           liveArtifactCount,
           progressCurrent: r.progressCurrent ?? null,
@@ -233,6 +296,8 @@ export async function GET(
           attempts: j.attemptsMade ?? 0,
           artifactCount: null,
           failedReason: null,
+          failedCause: null,
+          failedCode: null,
           failedFix: null,
           skipReason: null,
           liveArtifactCount: null,
