@@ -1,8 +1,4 @@
-export type ConnectorCategoryId =
-  | 'source-control'
-  | 'communication'
-  | 'productivity'
-  | 'customer';
+export type ConnectorCategoryId = 'source-control' | 'communication' | 'productivity' | 'customer';
 
 export interface ConnectorCategory {
   id: ConnectorCategoryId;
@@ -30,10 +26,23 @@ export interface ConnectorMeta {
     | 'zendesk'
     | 'googledrive'
     | 'airtable'
-    | 'google-chat';
+    | 'google-chat'
+    | 'confluence'
+    | 'jira'
+    | 'intercom'
+    | 'microsoft-teams'
+    | 'microsoft-365'
+    | 'asana';
   displayName: string;
   description: string;
   category: ConnectorCategoryId;
+  /**
+   * `true` when the connector has a working ingestion path + wizard. `false`
+   * means the tile renders in the UI as "Coming soon" — no connect flow, no
+   * wizard config required. Treat `implemented: false` as the public roadmap
+   * surface: anything from `docs/ROADMAP.md` "Next connections to build" that
+   * we want users to see is queued.
+   */
   implemented: boolean;
   flowType: 'oauth' | 'apikey' | 'service-account'; // oauth = redirect flow, apikey = inline form, service-account = paste JSON key + impersonation email
 }
@@ -143,5 +152,56 @@ export const CONNECTORS: ConnectorMeta[] = [
     category: 'communication',
     implemented: true,
     flowType: 'service-account',
+  },
+  // Coming soon — surfaced from docs/ROADMAP.md "Next connections to build".
+  // Order here matches the visible category sort (alphabetical by display
+  // name); the roadmap doc remains the source of truth for build priority.
+  {
+    id: 'confluence',
+    displayName: 'Confluence',
+    description: 'Spaces, pages, and inline comments from Confluence Cloud.',
+    category: 'productivity',
+    implemented: false,
+    flowType: 'oauth',
+  },
+  {
+    id: 'jira',
+    displayName: 'Jira',
+    description: 'Issues, sprints, and project metadata from Jira Cloud.',
+    category: 'productivity',
+    implemented: false,
+    flowType: 'oauth',
+  },
+  {
+    id: 'intercom',
+    displayName: 'Intercom',
+    description: 'Conversations, contacts, and help center articles.',
+    category: 'customer',
+    implemented: false,
+    flowType: 'oauth',
+  },
+  {
+    id: 'microsoft-teams',
+    displayName: 'Microsoft Teams',
+    description: 'Channels, threads, and messages from Microsoft Teams.',
+    category: 'communication',
+    implemented: false,
+    flowType: 'oauth',
+  },
+  {
+    id: 'microsoft-365',
+    displayName: 'Microsoft 365',
+    description: 'SharePoint sites, OneDrive files, and Office documents.',
+    category: 'productivity',
+    implemented: false,
+    flowType: 'oauth',
+  },
+  {
+    id: 'asana',
+    displayName: 'Asana',
+    description: 'Projects, tasks, and comments from Asana.',
+    category: 'productivity',
+    implemented: false,
+    flowType: 'oauth',
   },
 ];

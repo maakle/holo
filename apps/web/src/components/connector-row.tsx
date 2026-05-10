@@ -51,6 +51,7 @@ export function ConnectorRow({
   });
   const config = getWizardConfig(meta.id);
   const connected = status === 'connected';
+  const comingSoon = !meta.implemented;
 
   function setWizardOpen(open: boolean) {
     setWizardOpenState(open);
@@ -99,22 +100,21 @@ export function ConnectorRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-[14px] font-medium text-text">{meta.displayName}</span>
-            {connected ? (
+            {comingSoon ? (
+              <Badge variant="neutral">Coming soon</Badge>
+            ) : connected ? (
               <Badge variant="success">Connected</Badge>
             ) : (
               <Badge variant="neutral">Not connected</Badge>
             )}
-            {connected ? (
-              <SyncStatusBadge
-                provider={meta.id}
-                initialLastSyncedAt={lastSyncedAt ?? null}
-              />
+            {!comingSoon && connected ? (
+              <SyncStatusBadge provider={meta.id} initialLastSyncedAt={lastSyncedAt ?? null} />
             ) : null}
           </div>
           <p className="mt-1 text-[13px] leading-5 text-text-muted">{meta.description}</p>
         </div>
         <div className="flex shrink-0 items-center justify-end gap-2 pt-0.5">
-          {!connected ? (
+          {comingSoon ? null : !connected ? (
             <Button variant="primary" size="sm" onClick={connect}>
               Connect
             </Button>
@@ -125,7 +125,7 @@ export function ConnectorRow({
           )}
         </div>
       </div>
-      {connected ? (
+      {!comingSoon && connected ? (
         <ConnectorManageSheet
           meta={meta}
           open={showManage}
@@ -139,18 +139,20 @@ export function ConnectorRow({
           slackDefaultAll={meta.id === 'slack' && allowlist.length === 0}
         />
       ) : null}
-      <ConnectionWizard
-        meta={meta}
-        config={config}
-        open={wizardOpen}
-        onOpenChange={(next) => {
-          setWizardOpen(next);
-          if (!next) setWizardInitialStepId(undefined);
-        }}
-        connected={connected}
-        connectedAs={connectedAs}
-        initialStepId={wizardInitialStepId}
-      />
+      {!comingSoon && config ? (
+        <ConnectionWizard
+          meta={meta}
+          config={config}
+          open={wizardOpen}
+          onOpenChange={(next) => {
+            setWizardOpen(next);
+            if (!next) setWizardInitialStepId(undefined);
+          }}
+          connected={connected}
+          connectedAs={connectedAs}
+          initialStepId={wizardInitialStepId}
+        />
+      ) : null}
     </div>
   );
 }

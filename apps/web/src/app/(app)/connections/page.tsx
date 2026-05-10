@@ -5,10 +5,7 @@ import { schema, getSampleDataStatus } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { CONNECTORS } from '@/lib/connector-registry';
-import {
-  ConnectorBrowser,
-  type ConnectorBrowserItem,
-} from '@/components/connector-browser';
+import { ConnectorBrowser, type ConnectorBrowserItem } from '@/components/connector-browser';
 import { SlackOnboardingTrigger } from '@/components/slack-onboarding-trigger';
 import { ConnectErrorBanner } from '@/components/connect-error-banner';
 import { SampleConnectorRow } from '@/components/sample-connector-row';
@@ -19,7 +16,7 @@ export default async function ConnectionsPage({
   searchParams: Promise<{ connect_error?: string; connect_fix?: string }>;
 }) {
   const sp = await searchParams;
-  const { auth, db} = await getServerContext();
+  const { auth, db } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
@@ -121,7 +118,12 @@ export default async function ConnectionsPage({
     .from(schema.connectorAllowlists)
     .where(eq(schema.connectorAllowlists.organizationId, orgId));
 
-  const connected = new Map(
+  // Maps are keyed by raw provider strings so lookups by any
+  // ConnectorMeta['id'] — including the "coming soon" tiles whose IDs aren't
+  // in SYNC_PROVIDERS — typecheck cleanly. Unimplemented connectors simply
+  // miss the lookup (they have no DB rows) and render in the disconnected
+  // state, which the row component reinterprets as "Coming soon".
+  const connected = new Map<string, boolean>(
     credRows
       .filter(
         (r) =>
@@ -134,7 +136,7 @@ export default async function ConnectionsPage({
   );
   if (githubConnected) connected.set('github', true);
   for (const sa of serviceAccountRows) connected.set(sa.provider, true);
-  const sourceName = new Map(sourceRows.map((r) => [r.provider, r.name]));
+  const sourceName = new Map<string, string>(sourceRows.map((r) => [r.provider, r.name]));
   // For GitHub, fall back to the installation's account_login when no
   // source row exists yet (very brief window between install and first sync).
   if (!sourceName.has('github') && githubAccountLogin) {
@@ -157,8 +159,8 @@ export default async function ConnectionsPage({
         <span className="caption">Connections</span>
         <h1 className="font-display text-h1 font-semibold tracking-tight">Connect your tools</h1>
         <p className="max-w-2xl text-[15px] leading-6 text-text-muted">
-          Connect the tools your team&apos;s work lives in. holo ingests and indexes them so
-          your agents can retrieve real context.
+          Connect the tools your team&apos;s work lives in. holo ingests and indexes them so your
+          agents can retrieve real context.
         </p>
       </header>
       {sp.connect_error ? (
