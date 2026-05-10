@@ -21,7 +21,9 @@ async function main() {
   }
   const sql = postgres(url, { max: 1 });
   const migrationDb = drizzle(sql);
-  await migrate(migrationDb, { migrationsFolder: './migrations' });
+  const migrationsFolder =
+    process.env.MIGRATIONS_DIR ?? path.resolve(__dirname, '../migrations');
+  await migrate(migrationDb, { migrationsFolder });
 
   const db = drizzle(sql, { schema });
   const org = await seedDefaultOrganization(db);

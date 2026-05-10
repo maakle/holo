@@ -10,6 +10,7 @@ healthcheckPath = "/api/health"
 [services.variables]
 PORT = "3000"
 NODE_ENV = "production"
+MIGRATIONS_DIR = "/repo/migrations"
 
 [[services]]
 name = "holo-gateway"

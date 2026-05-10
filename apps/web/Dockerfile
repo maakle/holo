@@ -12,6 +12,12 @@ RUN pnpm install --frozen-lockfile --filter "@holo/web..."
 FROM deps AS build
 COPY apps/web apps/web/
 RUN pnpm -F @holo/web build
+# Bundle the DB migration runner into a single self-contained file so the
+# slim runtime image can run migrations as a Railway Pre-Deploy step
+# without pulling in pnpm or workspace packages.
+RUN npx --yes esbuild@0.24.0 packages/db/src/migrate.ts \
+    --bundle --platform=node --target=node20 --format=cjs \
+    --outfile=/repo/migrate.cjs
 
 FROM node:20-alpine AS runtime
 WORKDIR /repo
@@ -21,5 +27,7 @@ ENV HOSTNAME=0.0.0.0
 COPY --from=build /repo/apps/web/.next/standalone /repo
 COPY --from=build /repo/apps/web/.next/static /repo/apps/web/.next/static
 COPY --from=build /repo/apps/web/public /repo/apps/web/public
+COPY --from=build /repo/migrate.cjs /repo/migrate.cjs
+COPY --from=build /repo/packages/db/migrations /repo/migrations
 EXPOSE 3000
 CMD ["node", "/repo/apps/web/server.js"]
