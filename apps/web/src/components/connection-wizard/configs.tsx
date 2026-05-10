@@ -154,7 +154,7 @@ const hubspotConfig: ConnectorWizardConfig = {
             'https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/account-service-keys',
           instructions: [
             'In HubSpot, open your developer account → Development → Keys → Service Keys (beta), then click "Create service key".',
-            'Add the scopes below (use the copy buttons to paste each into HubSpot\'s scope picker).',
+            "Add the scopes below (use the copy buttons to paste each into HubSpot's scope picker).",
             'Copy the generated key and paste it below.',
           ],
           scopes: {
@@ -255,15 +255,11 @@ const airtableConfig: ConnectorWizardConfig = {
           helpUrl: 'https://airtable.com/create/tokens',
           instructions: [
             'Open airtable.com/create/tokens and click "Create new token". Name it "Holo".',
-            'Add the scopes below (use the copy buttons to paste each into Airtable\'s scope picker).',
+            "Add the scopes below (use the copy buttons to paste each into Airtable's scope picker).",
             'Under Access, grant the token access to the bases you want Holo to ingest, then copy the token and paste it below.',
           ],
           scopes: {
-            required: [
-              'data.records:read',
-              'schema.bases:read',
-              'user.email:read',
-            ],
+            required: ['data.records:read', 'schema.bases:read', 'user.email:read'],
           },
         }),
     },
@@ -313,8 +309,13 @@ const zendeskConfig: ConnectorWizardConfig = {
 // Registry holds heterogeneous configs (each connector has its own state
 // shape). Consumers don't introspect the state from the outside — they hand
 // the config to <ConnectionWizard> which threads the type through.
+//
+// Partial: connectors marked `implemented: false` in the registry (the
+// "coming soon" tiles surfaced from docs/ROADMAP.md) deliberately have no
+// wizard config. The connector row renders them with a "Coming soon" badge
+// and no Connect button, so getWizardConfig is never called for them.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const REGISTRY: Record<ConnectorMeta['id'], ConnectorWizardConfig<any>> = {
+const REGISTRY: Partial<Record<ConnectorMeta['id'], ConnectorWizardConfig<any>>> = {
   slack: slackConfig,
   github: githubConfig,
   gitlab: gitlabConfig,
@@ -331,6 +332,6 @@ const REGISTRY: Record<ConnectorMeta['id'], ConnectorWizardConfig<any>> = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getWizardConfig(id: ConnectorMeta['id']): ConnectorWizardConfig<any> {
+export function getWizardConfig(id: ConnectorMeta['id']): ConnectorWizardConfig<any> | undefined {
   return REGISTRY[id];
 }

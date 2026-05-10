@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { SYNC_INTERVAL_MS_BY_PROVIDER } from '@holo/connectors/sync-intervals';
+import type { SyncProvider } from '@holo/sync-providers';
 import { useConnectorStatus } from '@/lib/connectors-status-store';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
@@ -138,9 +139,7 @@ export function ConnectorManageSheet({
         if (removed > 0) parts.push(`dropped ${removed} queued`);
         if (cancelled > 0) parts.push(`cancelled ${cancelled} running`);
         const tail =
-          active > 0
-            ? ' — the worker will exit at the next checkpoint (within seconds).'
-            : '.';
+          active > 0 ? ' — the worker will exit at the next checkpoint (within seconds).' : '.';
         setInfo(`Stopped: ${parts.join(', ')}${tail}`);
         // Force the bulk-status store to repoll immediately so the action bar
         // flips from "Stop sync" → "Sync now" without waiting for the next
@@ -258,7 +257,11 @@ export function ConnectorManageSheet({
               : 'Never synced'}
           </SheetDescription>
           <p className="text-[12px] text-text-muted">
-            Syncs automatically every {formatInterval(SYNC_INTERVAL_MS_BY_PROVIDER[meta.id])}
+            {/* The manage sheet is only mounted for connected (implemented)
+                connectors, so meta.id is guaranteed to be a SyncProvider — the
+                cast is the type-level expression of that runtime invariant. */}
+            Syncs automatically every{' '}
+            {formatInterval(SYNC_INTERVAL_MS_BY_PROVIDER[meta.id as SyncProvider])}
           </p>
         </SheetHeader>
 
@@ -297,9 +300,7 @@ export function ConnectorManageSheet({
                 <span>Syncing…</span>
                 <span>
                   {status.chunksIndexed.toLocaleString()} indexed
-                  {status.embedQueued > 0
-                    ? ` · ${status.embedQueued.toLocaleString()} queued`
-                    : ''}
+                  {status.embedQueued > 0 ? ` · ${status.embedQueued.toLocaleString()} queued` : ''}
                 </span>
               </div>
             ) : null}
