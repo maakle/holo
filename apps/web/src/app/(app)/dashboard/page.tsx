@@ -9,6 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { StatsSection, StatsSkeleton } from './_components/stats-section';
 import { RecentInvocations, RecentInvocationsSkeleton } from './_components/recent-invocations';
 import { ChartsSection, ChartsSkeleton } from './_components/charts-section';
+import {
+  FailedSyncsAlert,
+  FailedSyncsAlertSkeleton,
+} from './_components/failed-syncs-alert';
 
 export default async function DashboardPage({
   searchParams,
@@ -34,6 +38,10 @@ export default async function DashboardPage({
           and watch every agent invocation in one place.
         </p>
       </header>
+
+      <Suspense fallback={<FailedSyncsAlertSkeleton />}>
+        <FailedSyncsAlert orgId={orgId} />
+      </Suspense>
 
       <Suspense fallback={<StatsSkeleton />}>
         <StatsSection orgId={orgId} />
