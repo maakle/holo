@@ -34,8 +34,9 @@ const EnvSchema = z.object({
    * misconfigured deploy never silently processes unsigned input.
    */
   SLACK_CONNECTOR_SIGNING_SECRET: z.string().optional(),
-  LINEAR_CONNECTOR_CLIENT_ID: z.string().optional(),
-  LINEAR_CONNECTOR_CLIENT_SECRET: z.string().optional(),
+  // Linear uses per-user personal API keys (Settings → API → Personal API
+  // keys). The token is collected through the wizard and stored in
+  // connector_credentials — no global OAuth client to register.
   // Google Drive + Google Chat use per-org service accounts with
   // domain-wide delegation, not OAuth — there are no global client
   // credentials. The JSON key + impersonation email are collected per-org via

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
+  apiKey,
   defineConnector,
-  oauth2,
   type ConnectorSpec,
   type ResourceSyncContext,
   type TestConnectionContext,
@@ -13,9 +13,7 @@ import { processIssue } from './chunking';
 import type { LinearIssuesResponse, LinearViewerResponse } from './types';
 
 export interface LinearSpecOptions {
-  clientId: string;
-  clientSecret: string;
-  /** Override fetch (tests). Threads through both the auth strategy and the runtime client. */
+  /** Override fetch (tests). */
   fetchImpl?: typeof fetch;
 }
 
@@ -28,24 +26,19 @@ const issuesCursorSchema = z
 
 type IssuesCursor = z.infer<typeof issuesCursorSchema>;
 
-export function createLinearSpec(opts: LinearSpecOptions): ConnectorSpec {
+export function createLinearSpec(_opts: LinearSpecOptions = {}): ConnectorSpec {
   return defineConnector({
     id: 'linear',
     displayName: 'Linear',
 
     sync: { intervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.linear },
 
-    auth: oauth2({
-      clientId: opts.clientId,
-      clientSecret: opts.clientSecret,
-      authorizeUrl: 'https://linear.app/oauth/authorize',
-      tokenUrl: 'https://api.linear.app/oauth/token',
-      scopes: ['read'],
-      // Linear OAuth tokens default to ~10y; a refresh exchange isn't part
-      // of their flow. On 401 during sync, the user must re-connect.
-      refreshable: false,
-      fetchImpl: opts.fetchImpl,
-    }),
+    // Linear personal API keys are workspace-issued (Settings → API → Personal
+    // API keys) and stay valid as long as the issuing user has workspace
+    // access. We pass the key directly with no `Bearer ` prefix — that's
+    // Linear's documented format for personal API keys (OAuth tokens use
+    // Bearer; we no longer support that path).
+    auth: apiKey({ prefix: '' }),
 
     http: {
       baseUrl: 'https://api.linear.app',
