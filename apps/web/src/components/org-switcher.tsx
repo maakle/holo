@@ -23,6 +23,13 @@ export function OrgSwitcher({
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
 
+  // Sync with SSR props when the layout re-renders after a mutation (e.g.
+  // workspace rename). Without this, useState(initialOrgs) shadows fresh
+  // server data and the trigger keeps the old name until a hard refresh.
+  useEffect(() => {
+    setOrgs(initialOrgs);
+  }, [initialOrgs]);
+
   const active = activeOrgId ? orgs.find((o) => o.id === activeOrgId) ?? null : null;
   const hasOrgs = orgs.length > 0;
   const display = active?.name ?? (hasOrgs ? 'Select workspace' : 'No workspace');

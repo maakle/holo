@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { sql as drizzleSql, eq, and } from 'drizzle-orm';
-import { schema } from '@holo/db';
+import { removeSampleData, schema } from '@holo/db';
 import { provisionPersonalOrgOnSignup } from '../src/server';
 
 const url = process.env.DATABASE_URL ?? 'postgresql://holo:holo@localhost:5436/holo';
@@ -49,6 +49,9 @@ afterAll(async () => {
     await db.delete(schema.user).where(eq(schema.user.id, userId));
   }
   for (const orgId of createdOrgIds) {
+    // Sample data is seeded on signup; sources/source_artifacts/chunks
+    // don't cascade-delete with the org, so clear them before dropping it.
+    await removeSampleData(db, orgId);
     await db.delete(schema.organization).where(eq(schema.organization.id, orgId));
   }
   for (const email of EMAILS) {
@@ -111,6 +114,20 @@ describe('provisionPersonalOrgOnSignup', () => {
       .where(eq(schema.organization.id, result.organizationId));
     expect(orgRow[0]!.name).toBe("Mathias's workspace");
     expect(orgRow[0]!.slug.startsWith('mathias-')).toBe(true);
+
+    // Sample Star Wars data is seeded on signup so the new workspace shows
+    // live content immediately. Asserting via the sample source row keeps
+    // this resilient to artifact-count tweaks.
+    const sampleSource = await db
+      .select({ id: schema.sources.id })
+      .from(schema.sources)
+      .where(
+        and(
+          eq(schema.sources.organizationId, result.organizationId),
+          eq(schema.sources.provider, 'sample'),
+        ),
+      );
+    expect(sampleSource).toHaveLength(1);
   });
 
   it('skips when there is a pending invitation for the email (acceptInvitation will handle membership)', async () => {

@@ -26,6 +26,12 @@ const FILE_BY_ID: Partial<Record<ConnectorMeta['id'], string>> = {
   googledrive: '/connectors/googledrive.webp',
   airtable: '/connectors/airtable.webp',
   'google-chat': '/connectors/googlechat.webp',
+  asana: '/connectors/asana.webp',
+  confluence: '/connectors/confluence.webp',
+  jira: '/connectors/jira.webp',
+  intercom: '/connectors/intercom.webp',
+  'microsoft-teams': '/connectors/teams.webp',
+  'microsoft-365': '/connectors/office.webp',
 };
 
 export function ConnectorLogo({ id, className }: Props) {

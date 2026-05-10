@@ -133,8 +133,10 @@ export async function updateWorkspace(
     meta: { field, value: cleanValue },
   });
 
-  revalidatePath('/settings');
-  revalidatePath('/');
+  // 'layout' invalidates the (app) layout that fetches memberOrgs for the
+  // sidebar OrgSwitcher; without it, the trigger keeps the old name until
+  // a full page reload.
+  revalidatePath('/settings', 'layout');
   return { ok: true, field, value: cleanValue };
 }
 

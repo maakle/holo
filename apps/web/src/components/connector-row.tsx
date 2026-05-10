@@ -101,7 +101,7 @@ export function ConnectorRow({
           <div className="flex items-center gap-2">
             <span className="text-[14px] font-medium text-text">{meta.displayName}</span>
             {comingSoon ? (
-              <Badge variant="neutral">Coming soon</Badge>
+              <Badge variant="accent">Coming soon</Badge>
             ) : connected ? (
               <Badge variant="success">Connected</Badge>
             ) : (

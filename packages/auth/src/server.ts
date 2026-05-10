@@ -3,7 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { emailOTP, organization } from 'better-auth/plugins';
 import { and, eq } from 'drizzle-orm';
 import type { DB } from '@holo/db';
-import { schema } from '@holo/db';
+import { ensureSampleData, schema } from '@holo/db';
 import type { Env } from '@holo/env';
 import { holoError, ErrorCode } from '@holo/errors';
 import { renderInvitationEmail, renderOtpEmail } from './email-templates';
@@ -192,6 +192,11 @@ export async function provisionPersonalOrgOnSignup(
     userId: newUser.id,
     role: 'owner',
   });
+
+  // Seed Star Wars sample data so the new workspace shows live content on
+  // first login. Matches the bootstrap seed and the in-app
+  // CreateWorkspaceForm — every workspace should have demo data by default.
+  await ensureSampleData(db, newOrg!.id);
 
   return { created: true, organizationId: newOrg!.id };
 }
