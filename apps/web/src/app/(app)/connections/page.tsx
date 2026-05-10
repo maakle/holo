@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { schema, getSampleDataStatus } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
@@ -9,6 +9,7 @@ import { ConnectorBrowser, type ConnectorBrowserItem } from '@/components/connec
 import { SlackOnboardingTrigger } from '@/components/slack-onboarding-trigger';
 import { ConnectErrorBanner } from '@/components/connect-error-banner';
 import { SampleConnectorRow } from '@/components/sample-connector-row';
+import { loadLatestSyncStatusByProvider } from '@/lib/sync-status';
 
 export default async function ConnectionsPage({
   searchParams,
@@ -102,6 +103,17 @@ export default async function ConnectionsPage({
       lastSyncByProvider.set(provider, { at: c.lastRunAt, status: c.lastStatus });
     }
   }
+  // `connector_cursors.last_status` is only written on successful syncs (the
+  // worker's cursor upsert hard-codes `status: 'ok'`), so failures never
+  // surface there. Overlay the latest *finished* sync_runs row per provider
+  // to expose 'failed' / 'stalled' on the card.
+  const latestRunByProvider = await loadLatestSyncStatusByProvider(db, orgId);
+  for (const [provider, run] of latestRunByProvider) {
+    const cur = lastSyncByProvider.get(provider);
+    if (!cur || run.finishedAt >= cur.at) {
+      lastSyncByProvider.set(provider, { at: run.finishedAt, status: run.status });
+    }
+  }
 
   const sampleStatus = hideSampleData
     ? { active: false, artifactCount: 0, installedAt: null, kindBreakdown: [] }
@@ -117,6 +129,20 @@ export default async function ConnectionsPage({
     })
     .from(schema.connectorAllowlists)
     .where(eq(schema.connectorAllowlists.organizationId, orgId));
+
+  // Open disconnect-cleanup jobs (worker hasn't finished) — render those rows
+  // in "Disconnecting…" state on first paint instead of flashing the
+  // pre-disconnect "Connected" UI for one polling tick.
+  const disconnectingRows = await db
+    .select({ provider: schema.connectorDisconnectJobs.provider })
+    .from(schema.connectorDisconnectJobs)
+    .where(
+      and(
+        eq(schema.connectorDisconnectJobs.organizationId, orgId),
+        isNull(schema.connectorDisconnectJobs.finishedAt),
+      ),
+    );
+  const disconnectingProviders = new Set(disconnectingRows.map((r) => r.provider));
 
   // Maps are keyed by raw provider strings so lookups by any
   // ConnectorMeta['id'] — including the "coming soon" tiles whose IDs aren't
@@ -188,6 +214,7 @@ export default async function ConnectionsPage({
           allowlist: allowlistByProvider.get(meta.id) ?? [],
           lastSyncedAt: lastSyncByProvider.get(meta.id)?.at.toISOString() ?? null,
           lastSyncStatus: lastSyncByProvider.get(meta.id)?.status ?? null,
+          initialDisconnecting: disconnectingProviders.has(meta.id),
         }))}
       />
     </div>

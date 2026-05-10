@@ -19,6 +19,7 @@ import { AirtableSyncModule } from './queues/airtable';
 import { GoogleChatSyncModule } from './queues/google-chat';
 import { EmbedModule } from './queues/embed';
 import { EmbedBackfillModule } from './queues/embed-backfill';
+import { DisconnectCleanupModule } from './queues/disconnect-cleanup';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 import { SyncRunnersModule } from './queues/runners.module';
 import { SlackSubjectsModule } from './slack-subjects/slack-subjects.module';
@@ -73,6 +74,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     GoogleChatSyncModule,
     EmbedModule,
     EmbedBackfillModule,
+    DisconnectCleanupModule,
     SyncRunnersModule,
     SyncSchedulerModule,
   ],

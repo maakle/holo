@@ -21,18 +21,24 @@ export const QUEUE_NAMES = {
   // OpenAI model (PR #128 → text-embedding-3-small). Kept separate from
   // EMBED so it doesn't compete with live ingest for OpenAI quota.
   EMBED_BACKFILL: 'embed-backfill',
+  // Async cleanup after Disconnect — see @holo/sync-providers
+  // DISCONNECT_CLEANUP_QUEUE for why this is split off the request thread.
+  DISCONNECT_CLEANUP: 'disconnect-cleanup',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
 // Compile-time guard: every queue named in @holo/sync-providers must also
-// appear in QUEUE_NAMES (except 'embed' and 'embed-backfill', which have
-// no provider). Adding a connector to the registry without wiring a
-// @Processor here is a TS error, not a silent runtime drop into a queue
-// no worker is listening on.
+// appear in QUEUE_NAMES (except 'embed', 'embed-backfill', and
+// 'disconnect-cleanup', which have no provider). Adding a connector to
+// the registry without wiring a @Processor here is a TS error, not a
+// silent runtime drop into a queue no worker is listening on.
 type RegistrySyncQueueName =
   (typeof QUEUE_NAMES_BY_PROVIDER)[SyncProvider][number];
-type WorkerSyncQueueName = Exclude<QueueName, 'embed' | 'embed-backfill'>;
+type WorkerSyncQueueName = Exclude<
+  QueueName,
+  'embed' | 'embed-backfill' | 'disconnect-cleanup'
+>;
 type _RegistrySubsetOfWorker =
   RegistrySyncQueueName extends WorkerSyncQueueName ? true : never;
 type _WorkerSubsetOfRegistry =
@@ -62,6 +68,10 @@ export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   // Backfill is intentionally serial: rewriting legacy chunks is one-shot
   // work that should never crowd live ingest off OpenAI.
   'embed-backfill': 1,
+  // Disconnect cleanup: serial. Each job is a single cascading delete on
+  // sources, which is itself heavy on the DB; running them in parallel
+  // would just contend for the same locks.
+  'disconnect-cleanup': 1,
 };
 
 export type SyncJobPayload = {

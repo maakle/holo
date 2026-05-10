@@ -1,5 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +10,11 @@ import { ConnectorManageSheet } from '@/components/connector-manage-sheet';
 import { ConnectionWizard } from '@/components/connection-wizard/connection-wizard';
 import { getWizardConfig } from '@/components/connection-wizard/configs';
 import { ConnectorLogo } from '@/components/connector-logo';
+import {
+  useConnectorStatus,
+  useHasLiveConnectorStatus,
+  useOnDisconnectCompleted,
+} from '@/lib/connectors-status-store';
 
 interface AllowlistEntry {
   pattern: string;
@@ -25,6 +32,12 @@ interface Props {
   allowlist?: AllowlistEntry[];
   lastSyncedAt?: string | null;
   lastSyncStatus?: string | null;
+  /**
+   * SSR hint: a `connector_disconnect_jobs` row was open at page load. The
+   * row mounts in "Disconnecting…" state without waiting for the first
+   * status poll. The live store overrides once it has data.
+   */
+  initialDisconnecting?: boolean;
 }
 
 export function ConnectorRow({
@@ -34,8 +47,21 @@ export function ConnectorRow({
   allowlist = [],
   lastSyncedAt,
   lastSyncStatus,
+  initialDisconnecting = false,
 }: Props) {
+  const router = useRouter();
   const [showManage, setShowManage] = useState(false);
+  const liveStatus = useConnectorStatus(meta.id);
+  const hasLive = useHasLiveConnectorStatus();
+  // Until the first status poll lands the live snapshot is the empty default
+  // and would override a true SSR hint with a false live value. Trust the
+  // SSR hint until live data is available, then trust the live store.
+  const isDisconnecting = hasLive ? liveStatus.disconnecting : initialDisconnecting;
+  const refresh = useCallback(() => router.refresh(), [router]);
+  // Once the worker flips `finished_at` and the next poll sees
+  // disconnecting=false, refresh the server data so the row goes from
+  // "Disconnecting…" back to "Not connected" with a working Connect button.
+  useOnDisconnectCompleted(meta.id, refresh);
   // Persist wizard open-state + current step to sessionStorage so the wizard
   // survives any page reload (notably: next dev's Fast Refresh hard-reload
   // when the OAuth popup hits new routes that get lazy-compiled).
@@ -78,13 +104,17 @@ export function ConnectorRow({
   useEffect(() => {
     const eventName = `holo:open-wizard:${meta.id}`;
     const handler = (ev: Event) => {
+      // Ignore reopen requests while the disconnect cleanup worker is still
+      // running — otherwise the user could bounce into the wizard against
+      // half-cleaned state.
+      if (isDisconnecting) return;
       const detail = (ev as CustomEvent<{ initialStepId?: string }>).detail;
       setWizardInitialStepId(detail?.initialStepId);
       setWizardOpen(true);
     };
     window.addEventListener(eventName, handler);
     return () => window.removeEventListener(eventName, handler);
-  }, [meta.id]);
+  }, [meta.id, isDisconnecting]);
 
   function connect() {
     setWizardInitialStepId(undefined);
@@ -102,19 +132,31 @@ export function ConnectorRow({
             <span className="text-[14px] font-medium text-text">{meta.displayName}</span>
             {comingSoon ? (
               <Badge variant="accent">Coming soon</Badge>
+            ) : isDisconnecting ? (
+              <Badge variant="neutral" className="gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                Disconnecting…
+              </Badge>
             ) : connected ? (
               <Badge variant="success">Connected</Badge>
             ) : (
               <Badge variant="neutral">Not connected</Badge>
             )}
-            {!comingSoon && connected ? (
+            {!comingSoon && connected && !isDisconnecting ? (
               <SyncStatusBadge provider={meta.id} initialLastSyncedAt={lastSyncedAt ?? null} />
             ) : null}
+            {!comingSoon && connected && !isDisconnecting && lastSyncStatus === 'failed' ? (
+              <Badge variant="error">Sync failed</Badge>
+            ) : null}
           </div>
-          <p className="mt-1 text-[13px] leading-5 text-text-muted">{meta.description}</p>
+          <p className="mt-1 text-[13px] leading-5 text-text-muted">
+            {isDisconnecting
+              ? 'Cleanup runs in the background — large workspaces can take a moment.'
+              : meta.description}
+          </p>
         </div>
         <div className="flex shrink-0 items-center justify-end gap-2 pt-0.5">
-          {comingSoon ? null : !connected ? (
+          {comingSoon || isDisconnecting ? null : !connected ? (
             <Button variant="primary" size="sm" onClick={connect}>
               Connect
             </Button>

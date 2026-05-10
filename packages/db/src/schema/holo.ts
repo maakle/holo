@@ -838,3 +838,32 @@ export const chatMessages = pgTable(
     ),
   }),
 );
+
+// Tracks an in-flight async cleanup after the user disconnects a connector.
+// The DELETE route inserts a row, runs the bounded fast bits sync (revoke
+// token, remote uninstall, drop credential/installation/SA rows, drain
+// BullMQ), then enqueues a `disconnect-cleanup` job that deletes the
+// `sources` rows for that (org, provider) — which cascades through
+// `source_artifacts` → `chunks` and is the slow part for large workspaces.
+// While `finished_at IS NULL` the dashboard renders a "Disconnecting…"
+// state and re-connects are blocked.
+export const connectorDisconnectJobs = pgTable(
+  'connector_disconnect_jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    enqueuedAt: timestamp('enqueued_at', { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    error: text('error'),
+  },
+  (t) => ({
+    orgProviderPendingUniq: uniqueIndex(
+      'connector_disconnect_jobs_org_provider_pending_uniq',
+    )
+      .on(t.organizationId, t.provider)
+      .where(sql`${t.finishedAt} IS NULL`),
+  }),
+);

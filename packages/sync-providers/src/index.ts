@@ -65,6 +65,22 @@ export const SYNC_QUEUE_NAMES: readonly string[] = Object.values(
   QUEUE_NAMES_BY_PROVIDER,
 ).flat();
 
+/**
+ * Single shared queue for async cleanup after disconnect. The DELETE route
+ * does the fast, bounded work synchronously (token revoke, remote uninstall,
+ * credential/installation/SA row deletion, BullMQ drain) and enqueues one
+ * job here per disconnect to handle the slow part: deleting `sources` for
+ * (org, provider), which cascades through `source_artifacts` → `chunks`
+ * and can take minutes for large workspaces.
+ */
+export const DISCONNECT_CLEANUP_QUEUE = 'disconnect-cleanup';
+
+export type DisconnectCleanupJobPayload = {
+  jobRowId: string;
+  organizationId: string;
+  provider: SyncProvider;
+};
+
 export function queueNamesFor(provider: SyncProvider): readonly string[] {
   return QUEUE_NAMES_BY_PROVIDER[provider];
 }

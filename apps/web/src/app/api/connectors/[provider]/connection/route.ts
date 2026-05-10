@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { and, eq } from 'drizzle-orm';
-import { schema } from '@holo/db';
+import { and, eq, isNull } from 'drizzle-orm';
+import { schema, type DB } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import {
   githubAppConfigFromEnv,
@@ -13,11 +13,39 @@ import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import {
   drainJobsForOrg,
+  enqueueDisconnectCleanup,
   isSyncProvider,
   SYNC_PROVIDERS_FIX_HINT,
   type Provider,
 } from '@/lib/sync-queue';
 
+/**
+ * Disconnect a connector for the active org.
+ *
+ * The handler is split into two phases:
+ *
+ * 1. **Synchronous, bounded fast bits** (run inline so we can fail the request
+ *    on auth/remote-API errors before we tell the user "ok, cleaning up"):
+ *    - Capture the Slack token before we revoke it (we may need it for the
+ *      apps.uninstall call below).
+ *    - Run the provider's remote uninstall (GitHub App, Slack apps.uninstall).
+ *    - Drop the credential / installation / service-account rows so a
+ *      subsequent reconnect attempt can't re-use this user's stale token,
+ *      and so the dashboard's `connected` derivation flips to false.
+ *    - Drain queued/delayed sync jobs for this org so the worker doesn't
+ *      pick one up after the credential is gone.
+ *
+ * 2. **Async cleanup** — enqueued, returned to the user as `disconnecting:true`:
+ *    - Delete `sources` for (org, provider) — cascades through
+ *      `source_artifacts` → `chunks`. This is the slow part for big
+ *      workspaces (millions of chunks), so blocking the request thread on
+ *      it leaves the user staring at "Disconnecting…" for a minute or
+ *      more. Instead the dashboard reads `connector_disconnect_jobs`
+ *      where `finished_at IS NULL` to render the in-flight state and to
+ *      block reconnects until the cleanup actually completes.
+ *    - Delete `connector_allowlists` for the same scope (folded in here so
+ *      the next reconnect starts from a clean slate).
+ */
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ provider: string }> },
@@ -33,7 +61,7 @@ export async function DELETE(
     }
     const provider: Provider = rawProvider;
 
-    const { auth, db, env} = await getServerContext();
+    const { auth, db, env } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -45,14 +73,19 @@ export async function DELETE(
     const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
 
-    // GitHub uses an org-level App installation. Disconnect order matters:
-    //   1. Read installation_id locally (we lose it once we delete the row).
-    //   2. Tell GitHub to uninstall the App so it disappears from the
-    //      admin's github.com/settings/installations page.
-    //   3. Delete local rows (installation, sources, allowlist) regardless
-    //      of whether the GitHub-side uninstall actually changed anything —
-    //      a 404 from GitHub is treated as success (already gone).
+    // Per-branch metadata reported back to the caller and folded into the
+    // audit event. Concrete fields vary by provider; values are filled in
+    // below.
+    const auditMeta: Record<string, unknown> = { provider };
+
     if (provider === 'github') {
+      // GitHub uses an org-level App installation. Disconnect order matters:
+      //   1. Read installation_id locally (we lose it once we delete the row).
+      //   2. Tell GitHub to uninstall the App so it disappears from the
+      //      admin's github.com/settings/installations page.
+      //   3. Delete the local installation row regardless of whether the
+      //      GitHub-side uninstall actually changed anything — a 404 from
+      //      GitHub is treated as success (already gone).
       const installRows = await db
         .select({ installationId: schema.githubInstallations.installationId })
         .from(schema.githubInstallations)
@@ -84,69 +117,15 @@ export async function DELETE(
         .delete(schema.githubInstallations)
         .where(eq(schema.githubInstallations.organizationId, orgId))
         .returning({ id: schema.githubInstallations.id });
-      const deletedSources = await db
-        .delete(schema.sources)
-        .where(
-          and(
-            eq(schema.sources.organizationId, orgId),
-            eq(schema.sources.provider, 'github'),
-          ),
-        )
-        .returning({ id: schema.sources.id });
-      const deletedAllow = await db
-        .delete(schema.connectorAllowlists)
-        .where(
-          and(
-            eq(schema.connectorAllowlists.organizationId, orgId),
-            eq(schema.connectorAllowlists.provider, 'github'),
-          ),
-        )
-        .returning({ id: schema.connectorAllowlists.id });
-      emitAuditEvent({
-        db,
-        organizationId: orgId,
-        userId,
-        eventType: 'connector.disconnected',
-        resourceType: 'connector',
-        resourceId: provider,
-        meta: {
-          provider,
-          remoteUninstalled,
-          remoteAlreadyGone,
-          removedInstallations: deletedInstalls.length,
-          removedSources: deletedSources.length,
-          removedAllowlistRows: deletedAllow.length,
-        },
-      });
-      return NextResponse.json({
-        ok: true,
-        remoteUninstalled,
-        remoteAlreadyGone,
-        removedInstallations: deletedInstalls.length,
-        removedSources: deletedSources.length,
-        removedAllowlistRows: deletedAllow.length,
-      });
-    }
-
-    // Drain any waiting/delayed sync jobs for this org BEFORE we revoke the
-    // token / delete the source. Otherwise a worker could pick one up after
-    // the source row is gone and either run with a soon-to-be-invalid token
-    // (Slack's account_inactive) or fail the sync_runs FK insert (every
-    // other provider). Best-effort: a Redis blip shouldn't block disconnect.
-    let drainedCounts: Record<string, number> | null = null;
-    try {
-      const { removed } = await drainJobsForOrg(provider, orgId);
-      drainedCounts = removed;
-    } catch (err) {
-      console.error(`[disconnect/${provider}] drainJobsForOrg failed:`, err);
-    }
-
-    // Google service-account connectors store credentials in
-    // `connector_service_accounts` (one row per org+provider, no userId).
-    // Disconnect is a full tear-down: delete the SA row, sources, allowlist.
-    // No remote uninstall — the SA itself lives in the customer's Google
-    // Cloud project; we only revoke our access by dropping the key locally.
-    if (isGoogleServiceAccountProvider(provider)) {
+      auditMeta.remoteUninstalled = remoteUninstalled;
+      auditMeta.remoteAlreadyGone = remoteAlreadyGone;
+      auditMeta.removedInstallations = deletedInstalls.length;
+    } else if (isGoogleServiceAccountProvider(provider)) {
+      // Google service-account connectors store credentials in
+      // `connector_service_accounts` (one row per org+provider, no userId).
+      // Disconnect is a full tear-down: delete the SA row sync. No remote
+      // uninstall — the SA itself lives in the customer's Google Cloud
+      // project; we only revoke our access by dropping the key locally.
       const deletedSa = await db
         .delete(schema.connectorServiceAccounts)
         .where(
@@ -156,159 +135,143 @@ export async function DELETE(
           ),
         )
         .returning({ id: schema.connectorServiceAccounts.id });
-      const deletedSources = await db
-        .delete(schema.sources)
+      auditMeta.removedServiceAccounts = deletedSa.length;
+    } else {
+      // Capture this user's still-valid token BEFORE we mark it revoked — we
+      // may need it below to call Slack's apps.uninstall when this is the last
+      // credential for the org. (Slack's revoke/uninstall calls require an
+      // active bot token.)
+      const tokenToUninstall =
+        provider === 'slack'
+          ? (
+              await db
+                .select({ accessToken: schema.connectorCredentials.accessToken })
+                .from(schema.connectorCredentials)
+                .where(
+                  and(
+                    eq(schema.connectorCredentials.organizationId, orgId),
+                    eq(schema.connectorCredentials.userId, userId),
+                    eq(schema.connectorCredentials.provider, 'slack'),
+                    eq(schema.connectorCredentials.status, 'active'),
+                  ),
+                )
+                .limit(1)
+            )[0]?.accessToken ?? null
+          : null;
+
+      // Mark this user's credential revoked. Other users in the same org keep theirs.
+      await db
+        .update(schema.connectorCredentials)
+        .set({ status: 'revoked' })
         .where(
           and(
-            eq(schema.sources.organizationId, orgId),
-            eq(schema.sources.provider, provider),
+            eq(schema.connectorCredentials.organizationId, orgId),
+            eq(schema.connectorCredentials.userId, userId),
+            eq(schema.connectorCredentials.provider, provider),
           ),
-        )
-        .returning({ id: schema.sources.id });
-      const deletedAllow = await db
-        .delete(schema.connectorAllowlists)
-        .where(
-          and(
-            eq(schema.connectorAllowlists.organizationId, orgId),
-            eq(schema.connectorAllowlists.provider, provider),
-          ),
-        )
-        .returning({ id: schema.connectorAllowlists.id });
-      emitAuditEvent({
-        db,
-        organizationId: orgId,
-        userId,
-        eventType: 'connector.disconnected',
-        resourceType: 'connector',
-        resourceId: provider,
-        meta: {
-          provider,
-          removedServiceAccounts: deletedSa.length,
-          removedSources: deletedSources.length,
-          removedAllowlistRows: deletedAllow.length,
-        },
-      });
-      return NextResponse.json({
-        ok: true,
-        removedServiceAccounts: deletedSa.length,
-        removedSources: deletedSources.length,
-        removedAllowlistRows: deletedAllow.length,
-        drainedJobs: drainedCounts,
-      });
-    }
-
-    // Capture this user's still-valid token BEFORE we mark it revoked — we
-    // may need it below to call Slack's apps.uninstall when this is the last
-    // credential for the org. (Slack's revoke/uninstall calls require an
-    // active bot token.)
-    const tokenToUninstall =
-      provider === 'slack'
-        ? (
-            await db
-              .select({ accessToken: schema.connectorCredentials.accessToken })
-              .from(schema.connectorCredentials)
-              .where(
-                and(
-                  eq(schema.connectorCredentials.organizationId, orgId),
-                  eq(schema.connectorCredentials.userId, userId),
-                  eq(schema.connectorCredentials.provider, 'slack'),
-                  eq(schema.connectorCredentials.status, 'active'),
-                ),
-              )
-              .limit(1)
-          )[0]?.accessToken ?? null
-        : null;
-
-    // Mark this user's credential revoked. Other users in the same org keep theirs.
-    await db
-      .update(schema.connectorCredentials)
-      .set({ status: 'revoked' })
-      .where(
-        and(
-          eq(schema.connectorCredentials.organizationId, orgId),
-          eq(schema.connectorCredentials.userId, userId),
-          eq(schema.connectorCredentials.provider, provider),
-        ),
-      );
-
-    // If no active credentials remain for this org+provider, tear down sources +
-    // allowlist so future scheduler boots stop syncing this provider. This
-    // cascades through source_artifacts → chunks via FK onDelete cascade.
-    const remaining = await db
-      .select({ id: schema.connectorCredentials.id })
-      .from(schema.connectorCredentials)
-      .where(
-        and(
-          eq(schema.connectorCredentials.organizationId, orgId),
-          eq(schema.connectorCredentials.provider, provider),
-          eq(schema.connectorCredentials.status, 'active'),
-        ),
-      );
-
-    // For Slack, when the last user disconnects we also fully uninstall the
-    // app from the workspace via apps.uninstall — that revokes the token,
-    // removes the holo bot from every channel it joined, and removes the
-    // app from the workspace's installed-apps list. Best-effort: a failure
-    // here doesn't block local cleanup (matches the GitHub disconnect
-    // policy at line ~64 above).
-    let slackRemoteUninstalled: boolean | null = null;
-    if (
-      provider === 'slack' &&
-      remaining.length === 0 &&
-      tokenToUninstall &&
-      env.SLACK_CONNECTOR_CLIENT_ID &&
-      env.SLACK_CONNECTOR_CLIENT_SECRET
-    ) {
-      try {
-        const params = new URLSearchParams({
-          client_id: env.SLACK_CONNECTOR_CLIENT_ID,
-          client_secret: env.SLACK_CONNECTOR_CLIENT_SECRET,
-        });
-        const res = await fetch(
-          `https://slack.com/api/apps.uninstall?${params.toString()}`,
-          {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${tokenToUninstall}` },
-          },
         );
-        const json = (await res.json()) as { ok: boolean; error?: string };
-        slackRemoteUninstalled = json.ok;
-        if (!json.ok) {
-          console.error(
-            `[disconnect/slack] apps.uninstall returned not-ok: ${json.error}`,
+
+      // If no active credentials remain for this org+provider this is the
+      // "last user disconnects" path. For Slack we additionally fully
+      // uninstall the app from the workspace via apps.uninstall — that
+      // revokes the token, removes the holo bot from every channel it
+      // joined, and removes the app from the workspace's installed-apps
+      // list. Best-effort: a failure here doesn't block local cleanup.
+      const remaining = await db
+        .select({ id: schema.connectorCredentials.id })
+        .from(schema.connectorCredentials)
+        .where(
+          and(
+            eq(schema.connectorCredentials.organizationId, orgId),
+            eq(schema.connectorCredentials.provider, provider),
+            eq(schema.connectorCredentials.status, 'active'),
+          ),
+        );
+
+      let slackRemoteUninstalled: boolean | null = null;
+      if (
+        provider === 'slack' &&
+        remaining.length === 0 &&
+        tokenToUninstall &&
+        env.SLACK_CONNECTOR_CLIENT_ID &&
+        env.SLACK_CONNECTOR_CLIENT_SECRET
+      ) {
+        try {
+          const params = new URLSearchParams({
+            client_id: env.SLACK_CONNECTOR_CLIENT_ID,
+            client_secret: env.SLACK_CONNECTOR_CLIENT_SECRET,
+          });
+          const res = await fetch(
+            `https://slack.com/api/apps.uninstall?${params.toString()}`,
+            {
+              method: 'GET',
+              headers: { Authorization: `Bearer ${tokenToUninstall}` },
+            },
           );
+          const json = (await res.json()) as { ok: boolean; error?: string };
+          slackRemoteUninstalled = json.ok;
+          if (!json.ok) {
+            console.error(
+              `[disconnect/slack] apps.uninstall returned not-ok: ${json.error}`,
+            );
+          }
+        } catch (err) {
+          console.error('[disconnect/slack] apps.uninstall failed:', err);
+          slackRemoteUninstalled = false;
         }
-      } catch (err) {
-        console.error('[disconnect/slack] apps.uninstall failed:', err);
-        slackRemoteUninstalled = false;
+      }
+
+      auditMeta.remainingCredentials = remaining.length;
+      auditMeta.lastUser = remaining.length === 0;
+      if (provider === 'slack') {
+        auditMeta.slackRemoteUninstalled = slackRemoteUninstalled;
+      }
+
+      // Source / allowlist deletion is deferred to the worker only when this
+      // was the last active user for this org — otherwise sources are still
+      // in use by other users' credentials and must stay put. We signal that
+      // to the worker by simply not enqueueing.
+      if (remaining.length > 0) {
+        emitAuditEvent({
+          db,
+          organizationId: orgId,
+          userId,
+          eventType: 'connector.disconnected',
+          resourceType: 'connector',
+          resourceId: provider,
+          meta: auditMeta,
+        });
+        return NextResponse.json({
+          ok: true,
+          disconnecting: false,
+          ...auditMeta,
+        });
       }
     }
 
-    let removedSources = 0;
-    let removedAllowlistRows = 0;
-    if (remaining.length === 0) {
-      const deletedSources = await db
-        .delete(schema.sources)
-        .where(
-          and(
-            eq(schema.sources.organizationId, orgId),
-            eq(schema.sources.provider, provider),
-          ),
-        )
-        .returning({ id: schema.sources.id });
-      removedSources = deletedSources.length;
-
-      const deletedAllow = await db
-        .delete(schema.connectorAllowlists)
-        .where(
-          and(
-            eq(schema.connectorAllowlists.organizationId, orgId),
-            eq(schema.connectorAllowlists.provider, provider),
-          ),
-        )
-        .returning({ id: schema.connectorAllowlists.id });
-      removedAllowlistRows = deletedAllow.length;
+    // Drain any waiting/delayed sync jobs for this org BEFORE we tell the
+    // worker we're cleaning up. Otherwise a sync job could re-create artifacts
+    // mid-cleanup. Best-effort: a Redis blip shouldn't block disconnect.
+    let drainedCounts: Record<string, number> | null = null;
+    try {
+      const { removed } = await drainJobsForOrg(provider, orgId);
+      drainedCounts = removed;
+    } catch (err) {
+      console.error(`[disconnect/${provider}] drainJobsForOrg failed:`, err);
     }
+    auditMeta.drainedJobs = drainedCounts;
+
+    // Insert (or pick up) the disconnect-cleanup job row. The partial unique
+    // index on (organizationId, provider) WHERE finished_at IS NULL means a
+    // second Disconnect click while a cleanup is already in flight no-ops on
+    // the existing row instead of spawning a duplicate.
+    const jobRowId = await upsertDisconnectJob(db, orgId, provider);
+
+    await enqueueDisconnectCleanup({
+      jobRowId,
+      organizationId: orgId,
+      provider,
+    });
 
     emitAuditEvent({
       db,
@@ -317,23 +280,20 @@ export async function DELETE(
       eventType: 'connector.disconnected',
       resourceType: 'connector',
       resourceId: provider,
-      meta: {
-        provider,
-        removedSources,
-        removedAllowlistRows,
-        remainingCredentials: remaining.length,
-        slackRemoteUninstalled,
-      },
+      meta: { ...auditMeta, disconnectJobId: jobRowId },
     });
 
-    return NextResponse.json({
-      ok: true,
-      removedSources,
-      removedAllowlistRows,
-      remainingCredentials: remaining.length,
-      slackRemoteUninstalled,
-      drainedJobs: drainedCounts,
-    });
+    // 202 Accepted: we've kicked off cleanup, the dashboard should poll the
+    // status endpoint to find out when it actually finishes.
+    return NextResponse.json(
+      {
+        ok: true,
+        disconnecting: true,
+        disconnectJobId: jobRowId,
+        ...auditMeta,
+      },
+      { status: 202 },
+    );
   } catch (e) {
     if (e instanceof HoloError) {
       return NextResponse.json({ problem: e.problem, fix: e.fix }, { status: 400 });
@@ -341,4 +301,61 @@ export async function DELETE(
     console.error(e);
     return NextResponse.json({ problem: 'internal error' }, { status: 500 });
   }
+}
+
+/**
+ * Insert a `connector_disconnect_jobs` row, or pick up the open one already
+ * present for this (org, provider). Returns the row id either way so the
+ * worker can mark it finished when it's done.
+ */
+async function upsertDisconnectJob(
+  db: DB,
+  organizationId: string,
+  provider: Provider,
+): Promise<string> {
+  const inserted = await db
+    .insert(schema.connectorDisconnectJobs)
+    .values({ organizationId, provider })
+    .onConflictDoNothing({
+      target: [
+        schema.connectorDisconnectJobs.organizationId,
+        schema.connectorDisconnectJobs.provider,
+      ],
+      where: isNull(schema.connectorDisconnectJobs.finishedAt),
+    })
+    .returning({ id: schema.connectorDisconnectJobs.id });
+  const insertedRow = inserted[0];
+  if (insertedRow) return insertedRow.id;
+
+  const existing = await db
+    .select({ id: schema.connectorDisconnectJobs.id })
+    .from(schema.connectorDisconnectJobs)
+    .where(
+      and(
+        eq(schema.connectorDisconnectJobs.organizationId, organizationId),
+        eq(schema.connectorDisconnectJobs.provider, provider),
+        isNull(schema.connectorDisconnectJobs.finishedAt),
+      ),
+    )
+    .limit(1);
+  const existingRow = existing[0];
+  if (!existingRow) {
+    // Race: the partial unique blocked our insert but the existing row got
+    // marked finished between then and our SELECT. Insert again — this time
+    // there's no conflicting row.
+    const reinserted = await db
+      .insert(schema.connectorDisconnectJobs)
+      .values({ organizationId, provider })
+      .returning({ id: schema.connectorDisconnectJobs.id });
+    const reinsertedRow = reinserted[0];
+    if (!reinsertedRow) {
+      throw holoError({
+        code: ErrorCode.HOLO_INTERNAL,
+        problem: 'disconnect-cleanup insert returned no rows',
+        fix: 'Retry the disconnect; this is almost always a transient DB hiccup.',
+      });
+    }
+    return reinsertedRow.id;
+  }
+  return existingRow.id;
 }

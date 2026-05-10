@@ -253,6 +253,13 @@
       "when": 1779148800000,
       "tag": "0035_connector_service_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1779235200000,
+      "tag": "0036_connector_disconnect_jobs",
+      "breakpoints": true
     }
   ]
 }

@@ -3,10 +3,12 @@ import { Queue } from 'bullmq';
 import { and, eq } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import {
+  DISCONNECT_CLEANUP_QUEUE,
   QUEUE_NAMES_BY_PROVIDER,
   SYNC_PROVIDERS,
   SYNC_PROVIDERS_FIX_HINT,
   isSyncProvider,
+  type DisconnectCleanupJobPayload,
   type SyncProvider,
 } from '@holo/sync-providers';
 
@@ -90,6 +92,23 @@ export function getQueueByName(name: string): Queue {
  * Returns counts per state for logging. Best-effort: a Redis hiccup
  * shouldn't block the disconnect response.
  */
+/**
+ * Enqueue an async cleanup job for a connector that has just been disconnected.
+ * The DELETE route calls this after running the bounded fast bits inline; the
+ * worker handles the slow `db.delete(sources)` cascade off-thread so the
+ * request returns immediately.
+ */
+export async function enqueueDisconnectCleanup(
+  payload: DisconnectCleanupJobPayload,
+): Promise<void> {
+  await getQueue(DISCONNECT_CLEANUP_QUEUE).add('cleanup', payload, {
+    removeOnComplete: 100,
+    removeOnFail: 100,
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+  });
+}
+
 export async function drainJobsForOrg(
   provider: Provider,
   organizationId: string,

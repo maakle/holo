@@ -15,6 +15,12 @@ export interface ConnectorBrowserItem {
   allowlist: { pattern: string; isGlob: boolean; label: string | null }[];
   lastSyncedAt: string | null;
   lastSyncStatus: string | null;
+  /**
+   * Initial render hint: a `connector_disconnect_jobs` row with `finished_at IS
+   * NULL` was present at SSR time, so the row should mount in its
+   * "Disconnecting…" state without waiting for the first status poll.
+   */
+  initialDisconnecting?: boolean;
 }
 
 interface Props {
@@ -124,6 +130,7 @@ export function ConnectorBrowser({ items, showSampleNav }: Props) {
                         allowlist={item.allowlist}
                         lastSyncedAt={item.lastSyncedAt}
                         lastSyncStatus={item.lastSyncStatus}
+                        initialDisconnecting={item.initialDisconnecting}
                       />
                     </div>
                   ))}
