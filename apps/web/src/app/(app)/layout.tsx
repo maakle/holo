@@ -7,6 +7,8 @@ import { getServerContext } from '@/lib/server-context';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppTopbar } from '@/components/app-topbar';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const { auth, db} = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
