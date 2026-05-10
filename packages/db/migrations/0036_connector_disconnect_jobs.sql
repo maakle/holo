@@ -16,7 +16,4 @@ CREATE TABLE "connector_disconnect_jobs" (
 );
 --> statement-breakpoint
 ALTER TABLE "connector_disconnect_jobs" ADD CONSTRAINT "connector_disconnect_jobs_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
--- Partial unique index: at most one open cleanup per (org, provider). A user
--- clicking Disconnect a second time before the first finishes is a no-op
--- against the existing job rather than spawning a duplicate.
-CREATE UNIQUE INDEX "connector_disconnect_jobs_org_provider_pending_uniq" ON "connector_disconnect_jobs" USING btree ("organization_id","provider") WHERE "finished_at" IS NULL;
+CREATE UNIQUE INDEX "connector_disconnect_jobs_org_provider_pending_uniq" ON "connector_disconnect_jobs" USING btree ("organization_id","provider") WHERE "connector_disconnect_jobs"."finished_at" IS NULL;
