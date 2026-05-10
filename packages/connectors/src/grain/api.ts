@@ -14,22 +14,21 @@ import type {
 const RECORDINGS_PATH = '/_/public-api/v2/recordings';
 
 /**
- * One page of `/recordings` (POST). When `updatedAfter` is set Grain returns
- * recordings whose `start_datetime` is strictly after that ISO timestamp,
- * sorted ascending. The opaque `cursor` advances pagination.
+ * One page of `/recordings` (POST). The Grain v2 schema accepts only `cursor`
+ * (opaque pagination token) and `include` (response shape selector); it
+ * rejects any other property. Incremental filtering is applied client-side
+ * by the caller.
  */
 export async function listRecordings(
   api: HttpClient,
   opts: {
     cursor?: string;
-    updatedAfter?: string;
     include?: Record<string, boolean>;
   },
 ): Promise<{ recordings: GrainRecording[]; nextCursor?: string }> {
   const body: Record<string, unknown> = {
     include: opts.include ?? { ai_summary: true, participants: true },
   };
-  if (opts.updatedAfter) body['after_datetime'] = opts.updatedAfter;
   if (opts.cursor) body['cursor'] = opts.cursor;
   const raw = await api.post<GrainRecordingsPage>(RECORDINGS_PATH, body);
   return {

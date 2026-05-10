@@ -78,13 +78,20 @@ export function createGrainSpec(_opts: GrainSpecOptions = {}): ConnectorSpec {
               message: `Fetching recordings · page ${pageNum}`,
             });
 
-            const page = await listRecordings(ctx.api, {
-              cursor,
-              updatedAfter: ctx.cursor.latestStartedAt,
-            });
+            const page = await listRecordings(ctx.api, { cursor });
 
             for (const rec of page.recordings) {
               ctx.signal?.throwIfAborted();
+              // Grain's v2 schema rejects any date filter on /recordings, so
+              // we always sweep the full list and skip recordings we've
+              // already ingested. The transcript fetch is the expensive call;
+              // skipping here keeps incremental syncs cheap.
+              if (
+                ctx.cursor.latestStartedAt &&
+                rec.start_datetime <= ctx.cursor.latestStartedAt
+              ) {
+                continue;
+              }
               await processRecording(ctx, rec);
               if (!highestStartedAt || rec.start_datetime > highestStartedAt) {
                 highestStartedAt = rec.start_datetime;
