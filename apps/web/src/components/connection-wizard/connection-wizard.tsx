@@ -20,6 +20,12 @@ interface Props<TState> {
   connected: boolean;
   connectedAs?: string;
   initialStepId?: string;
+  /**
+   * When true, credential-entry steps will render their input form even
+   * though `connected` is true. Threaded into WizardContext for the
+   * Reconnect flow from the manage sheet.
+   */
+  forceCredentialEntry?: boolean;
 }
 
 export function ConnectionWizard<TState>({
@@ -30,6 +36,7 @@ export function ConnectionWizard<TState>({
   connected,
   connectedAs,
   initialStepId,
+  forceCredentialEntry,
 }: Props<TState>) {
   const router = useRouter();
   const initialIndex = useMemo(() => {
@@ -85,6 +92,7 @@ export function ConnectionWizard<TState>({
     meta,
     connected,
     connectedAs,
+    forceCredentialEntry,
     state,
     setState: (patch) => setState((prev) => ({ ...prev, ...patch })),
     goNext: () => setStepIndex((i) => Math.min(i + 1, config.steps.length - 1)),

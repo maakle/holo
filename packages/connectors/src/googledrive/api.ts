@@ -12,6 +12,7 @@ import { ErrorCode, holoError } from '@holo/errors';
 import type { ConnectorTokens, HttpClient } from '@holo/connector-framework';
 import type {
   DriveAbout,
+  DriveFile,
   DriveFilesPage,
   SharedDrivesPage,
 } from './types';
@@ -98,6 +99,76 @@ export async function listSharedDrives(
   };
   if (pageToken) query['pageToken'] = pageToken;
   return api.get<SharedDrivesPage>('/drives', { query });
+}
+
+export interface ListFolderChildrenArgs {
+  /** Parent folder id. Use `'root'` for the impersonation user's My Drive root. */
+  folderId: string;
+  /**
+   * When set, restrict to a specific Shared Drive — required for shared-drive
+   * roots and any descendant of a shared drive. Omit for My Drive.
+   */
+  driveId?: string;
+  pageToken?: string | null;
+  /**
+   * Extra `q` clauses ANDed onto the base "in parents and !trashed" filter.
+   * Used by the picker for one-shot trees and by the spec to add modifiedTime
+   * filters during incremental walks.
+   */
+  extraQuery?: string;
+  /** Field set — caller picks based on whether they need owners etc. */
+  fields?: string;
+}
+
+const CHILDREN_FIELDS_BASIC =
+  'nextPageToken,incompleteSearch,files(id,name,mimeType,modifiedTime,driveId,shortcutDetails(targetId,targetMimeType))';
+
+/**
+ * One page of `'<folderId>' in parents` listings. Always sets
+ * supportsAllDrives + includeItemsFromAllDrives so the same call shape works
+ * across My Drive and Shared Drives. The picker uses this to enumerate one
+ * folder at a time; the spec uses it inside a BFS walk for folder-scoped
+ * allowlist entries.
+ */
+export async function listFolderChildren(
+  api: HttpClient,
+  args: ListFolderChildrenArgs,
+): Promise<DriveFilesPage> {
+  const parts = [
+    `'${args.folderId}' in parents`,
+    `trashed = false`,
+  ];
+  if (args.extraQuery) parts.push(args.extraQuery);
+  const query: Record<string, string> = {
+    q: parts.join(' and '),
+    fields: args.fields ?? CHILDREN_FIELDS_BASIC,
+    pageSize: '200',
+    orderBy: 'folder,name',
+    supportsAllDrives: 'true',
+    includeItemsFromAllDrives: 'true',
+    spaces: 'drive',
+  };
+  if (args.driveId) {
+    query['driveId'] = args.driveId;
+    query['corpora'] = 'drive';
+  } else {
+    query['corpora'] = 'user';
+  }
+  if (args.pageToken) query['pageToken'] = args.pageToken;
+  return api.get<DriveFilesPage>('/files', { query });
+}
+
+/** Fetch a single file by id. Used for `file:<id>` allowlist entries. */
+export async function getFile(
+  api: HttpClient,
+  fileId: string,
+): Promise<DriveFile> {
+  return api.get<DriveFile>(`/files/${encodeURIComponent(fileId)}`, {
+    query: {
+      fields: FILE_FIELDS,
+      supportsAllDrives: 'true',
+    },
+  });
 }
 
 /**

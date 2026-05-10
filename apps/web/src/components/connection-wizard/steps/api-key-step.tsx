@@ -44,7 +44,10 @@ function ApiKeyStep<TState>({
   ctx: WizardContext<TState>;
   args: Args;
 }) {
-  const { meta, connected, connectedAs } = ctx;
+  const { meta, connected, connectedAs, forceCredentialEntry } = ctx;
+  // Reconnect from the manage sheet flips this on so the user can rotate
+  // their key without disconnecting first.
+  const showConnectedBanner = connected && !forceCredentialEntry;
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +85,7 @@ function ApiKeyStep<TState>({
 
   return (
     <>
-      {connected ? (
+      {showConnectedBanner ? (
         <div className="rounded-md border border-success/40 bg-[color-mix(in_srgb,var(--success,#16a34a)_8%,transparent)] px-3 py-2 text-[13px] text-text">
           <div className="flex items-center gap-2">
             <Check className="h-4 w-4 text-success" aria-hidden />
@@ -167,7 +170,7 @@ function ApiKeyStep<TState>({
         </div>
       )}
       <AlertDialogFooter>
-        {connected ? (
+        {showConnectedBanner ? (
           <Button variant="primary" onClick={ctx.goNext}>
             Continue
           </Button>

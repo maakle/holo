@@ -183,11 +183,20 @@ export function ConnectorManageSheet({
     setInfo(null);
     try {
       // For OAuth providers, restart the OAuth flow. For api-key and
-      // service-account providers we can't pre-fill the form here — close
-      // the sheet and let the user paste a new token in the inline form on
-      // the row. Surface a hint instead.
+      // service-account providers, close the sheet and re-open the wizard
+      // in credential-entry mode via the row's open-wizard event — same
+      // path the Connect button uses, but with `reconnect: true` so the
+      // install step bypasses its "already connected" banner and lets the
+      // user paste a new key.
       if (needsInlineReconnect) {
-        setInfo('Close this panel and re-run the connection wizard from the row.');
+        onOpenChange(false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent(`holo:open-wizard:${meta.id}`, {
+              detail: { initialStepId: 'install', reconnect: true },
+            }),
+          );
+        }
         return;
       }
       const res = await fetch(`/api/connectors/${meta.id}/initiate`, { method: 'POST' });

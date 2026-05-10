@@ -11,6 +11,13 @@ export interface WizardContext<TState = Record<string, unknown>> {
   connected: boolean;
   /** Display name of the connected workspace/account, when available. */
   connectedAs?: string;
+  /**
+   * When true, credential-entry steps (apikey, service-account) should render
+   * the input form even if `connected` is true. Set by the "Reconnect" flow
+   * in the manage sheet so users can rotate a key or paste a new service
+   * account JSON without disconnecting first.
+   */
+  forceCredentialEntry?: boolean;
   /** Shared state passed between steps. Each connector defines its own shape. */
   state: TState;
   /** Shallow-merge patch into the shared state. */

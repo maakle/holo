@@ -36,6 +36,16 @@ import {
   gitlabProjectsInitialState,
   type GitlabProjectsState,
 } from './steps/gitlab-projects-step';
+import {
+  googleChatSpacesStep,
+  googleChatSpacesInitialState,
+  type GoogleChatSpacesState,
+} from './steps/google-chat-spaces-step';
+import {
+  googleDriveDrivesStep,
+  googleDriveDrivesInitialState,
+  type GoogleDriveDrivesState,
+} from './steps/googledrive-drives-step';
 
 const slackConfig: ConnectorWizardConfig<SlackChannelsState> = {
   initialState: slackChannelsInitialState,
@@ -108,8 +118,8 @@ const grainConfig: ConnectorWizardConfig = {
   ],
 };
 
-const googleDriveConfig: ConnectorWizardConfig = {
-  initialState: {},
+const googleDriveConfig: ConnectorWizardConfig<GoogleDriveDrivesState> = {
+  initialState: googleDriveDrivesInitialState,
   steps: [
     {
       id: 'install',
@@ -121,6 +131,7 @@ const googleDriveConfig: ConnectorWizardConfig = {
           apiToEnable: { label: 'Google Drive API', host: 'drive.googleapis.com' },
         }),
     },
+    { id: 'drives', label: 'Pick content', render: googleDriveDrivesStep },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
   ],
 };
@@ -276,8 +287,8 @@ const airtableConfig: ConnectorWizardConfig = {
   ],
 };
 
-const googleChatConfig: ConnectorWizardConfig = {
-  initialState: {},
+const googleChatConfig: ConnectorWizardConfig<GoogleChatSpacesState> = {
+  initialState: googleChatSpacesInitialState,
   steps: [
     {
       id: 'install',
@@ -297,6 +308,7 @@ const googleChatConfig: ConnectorWizardConfig = {
           ],
         }),
     },
+    { id: 'spaces', label: 'Pick spaces', render: googleChatSpacesStep },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
   ],
 };

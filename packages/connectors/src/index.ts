@@ -42,6 +42,12 @@ export {
   createGoogleDriveSpec,
   GOOGLEDRIVE_FILE_KIND,
   GOOGLEDRIVE_SCOPES,
+  MY_DRIVE_ALLOWLIST_KEY,
+  parseScope,
+  classifyScopes,
+  encodeDriveScope,
+  encodeFolderScope,
+  encodeFileScope,
   buildIncrementalListQuery as buildGoogleDriveListQuery,
 } from './googledrive/index';
 export type {
@@ -50,6 +56,9 @@ export type {
   DriveFile,
   DriveFilesPage,
   SharedDrive,
+  ParsedScope,
+  ScopeKind,
+  ClassifiedScopes,
 } from './googledrive/index';
 export {
   loadGoogleServiceAccountToken,

@@ -1,6 +1,15 @@
 export { createGoogleDriveSpec, GOOGLEDRIVE_SCOPES } from './spec';
 export type { GoogleDriveSpecOptions } from './spec';
 export {
+  MY_DRIVE_ALLOWLIST_KEY,
+  parseScope,
+  classifyScopes,
+  encodeDriveScope,
+  encodeFolderScope,
+  encodeFileScope,
+} from './scopes';
+export type { ParsedScope, ScopeKind, ClassifiedScopes } from './scopes';
+export {
   DRIVE_API_BASE,
   NATIVE_DOC_MIME,
   NATIVE_SHEET_MIME,

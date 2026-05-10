@@ -75,6 +75,10 @@ export function ConnectorRow({
     if (typeof window === 'undefined') return undefined;
     return sessionStorage.getItem(wizardStepKey) ?? undefined;
   });
+  // Force credential-entry mode lives in memory only — it's a transient
+  // intent ("the user just clicked Reconnect") that shouldn't survive a
+  // page reload, unlike the wizard's open-state.
+  const [wizardReconnect, setWizardReconnect] = useState(false);
   const config = getWizardConfig(meta.id);
   const connected = status === 'connected';
   const comingSoon = !meta.implemented;
@@ -108,8 +112,9 @@ export function ConnectorRow({
       // running — otherwise the user could bounce into the wizard against
       // half-cleaned state.
       if (isDisconnecting) return;
-      const detail = (ev as CustomEvent<{ initialStepId?: string }>).detail;
+      const detail = (ev as CustomEvent<{ initialStepId?: string; reconnect?: boolean }>).detail;
       setWizardInitialStepId(detail?.initialStepId);
+      setWizardReconnect(detail?.reconnect === true);
       setWizardOpen(true);
     };
     window.addEventListener(eventName, handler);
@@ -118,6 +123,7 @@ export function ConnectorRow({
 
   function connect() {
     setWizardInitialStepId(undefined);
+    setWizardReconnect(false);
     setWizardOpen(true);
   }
 
@@ -188,11 +194,15 @@ export function ConnectorRow({
           open={wizardOpen}
           onOpenChange={(next) => {
             setWizardOpen(next);
-            if (!next) setWizardInitialStepId(undefined);
+            if (!next) {
+              setWizardInitialStepId(undefined);
+              setWizardReconnect(false);
+            }
           }}
           connected={connected}
           connectedAs={connectedAs}
           initialStepId={wizardInitialStepId}
+          forceCredentialEntry={wizardReconnect}
         />
       ) : null}
     </div>
