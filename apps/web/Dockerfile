@@ -20,6 +20,6 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 COPY --from=build /repo/apps/web/.next/standalone /repo
 COPY --from=build /repo/apps/web/.next/static /repo/apps/web/.next/static
-COPY --from=build /repo/apps/web/public /repo/apps/web/public 2>/dev/null || true
+COPY --from=build /repo/apps/web/public /repo/apps/web/public
 EXPOSE 3000
 CMD ["node", "/repo/apps/web/server.js"]
