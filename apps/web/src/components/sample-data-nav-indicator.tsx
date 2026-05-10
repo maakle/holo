@@ -36,7 +36,7 @@ export function SampleDataNavIndicator({ initialActive }: Props) {
   return (
     <Link
       href="/connections#sample"
-      className="mx-2 mt-2 flex items-start gap-2 rounded-md border border-warning/40 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] px-2 py-1.5 text-[12px] leading-4 text-text transition-colors duration-micro hover:bg-[color-mix(in_srgb,var(--warning)_16%,transparent)]"
+      className="mx-2 mt-2 mb-2 flex items-start gap-2 rounded-md border border-warning/40 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] px-2 py-1.5 text-[12px] leading-4 text-text transition-colors duration-micro hover:bg-[color-mix(in_srgb,var(--warning)_16%,transparent)]"
     >
       <Sparkles className="mt-[2px] h-3.5 w-3.5 shrink-0 text-warning" aria-hidden />
       <div className="min-w-0">
