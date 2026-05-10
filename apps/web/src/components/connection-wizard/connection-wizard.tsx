@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check } from 'lucide-react';
 import {
@@ -40,6 +40,26 @@ export function ConnectionWizard<TState>({
 
   const [stepIndex, setStepIndex] = useState(initialIndex);
   const [state, setState] = useState<TState>(config.initialState);
+
+  // Whenever the wizard transitions closed → open with no explicit
+  // `initialStepId`, rewind to step 0 (or the connected case's resume point).
+  // Without this, a user who advanced past step 1, closed the dialog,
+  // disconnected, then clicked "Connect" again would land back on whatever
+  // step they last sat on — even though the connector is freshly disconnected
+  // and they need to redo the credential step.
+  const wasOpenRef = useRef(open);
+  useEffect(() => {
+    if (open && !wasOpenRef.current) {
+      // Honor an explicit caller-provided step (e.g. Slack post-connect deep
+      // link to "channels"); otherwise reset to step 0 for a clean start.
+      setStepIndex(initialIndex);
+      // Reset state too — leftover wizard state from a prior connection
+      // attempt (e.g. half-typed JSON) is more confusing than helpful when
+      // starting fresh.
+      setState(config.initialState);
+    }
+    wasOpenRef.current = open;
+  }, [open, initialIndex, config.initialState]);
 
   // Persist the active step to sessionStorage so we restore to the same step
   // after any reload (next dev's Fast Refresh hard-reload while the OAuth
