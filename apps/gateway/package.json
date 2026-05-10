@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch --include '../../packages/**/src/**/*.ts' --env-file=../../.env src/main.ts",
-    "start": "tsx --env-file=../../.env src/main.ts",
+    "start": "tsx --env-file-if-exists=../../.env src/main.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
