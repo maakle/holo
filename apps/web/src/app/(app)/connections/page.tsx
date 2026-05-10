@@ -4,8 +4,11 @@ import { eq, and } from 'drizzle-orm';
 import { schema, getSampleDataStatus } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
-import { CONNECTORS, CONNECTOR_CATEGORIES } from '@/lib/connector-registry';
-import { ConnectorRow } from '@/components/connector-row';
+import { CONNECTORS } from '@/lib/connector-registry';
+import {
+  ConnectorBrowser,
+  type ConnectorBrowserItem,
+} from '@/components/connector-browser';
 import { SlackOnboardingTrigger } from '@/components/slack-onboarding-trigger';
 import { ConnectErrorBanner } from '@/components/connect-error-banner';
 import { SampleConnectorRow } from '@/components/sample-connector-row';
@@ -146,73 +149,25 @@ export default async function ConnectionsPage({
         slackAllowlistEmpty={(allowlistByProvider.get('slack') ?? []).length === 0}
         connectedAs={sourceName.get('slack')}
       />
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-[180px_1fr]">
-        <nav className="hidden md:block">
-          <div className="sticky top-6 flex flex-col gap-1">
-            <span className="caption mb-2 text-text-subtle">Categories</span>
-            {!hideSampleData ? (
-              <a
-                href="#cat-sample"
-                className="text-[13px] leading-6 text-text-muted transition-colors duration-micro hover:text-text"
-              >
-                Sample data
-              </a>
-            ) : null}
-            {CONNECTOR_CATEGORIES.filter((c) =>
-              CONNECTORS.some((m) => m.category === c.id),
-            ).map((cat) => (
-              <a
-                key={cat.id}
-                href={`#cat-${cat.id}`}
-                className="text-[13px] leading-6 text-text-muted transition-colors duration-micro hover:text-text"
-              >
-                {cat.label}
-              </a>
-            ))}
-          </div>
-        </nav>
-
-        <div className="flex flex-col gap-8">
-          {!hideSampleData ? (
-            <SampleConnectorRow
-              installed={sampleStatus.active}
-              artifactCount={sampleStatus.artifactCount}
-              installedAt={sampleStatus.installedAt}
-              kindBreakdown={sampleStatus.kindBreakdown}
-            />
-          ) : null}
-          {CONNECTOR_CATEGORIES.map((cat) => {
-            const items = CONNECTORS.filter((m) => m.category === cat.id);
-            if (items.length === 0) return null;
-            return (
-              <section
-                key={cat.id}
-                id={`cat-${cat.id}`}
-                className="flex flex-col gap-3 scroll-mt-6"
-              >
-                <span className="caption text-text-subtle">{cat.label}</span>
-                <div className="overflow-hidden rounded-md border border-border bg-surface">
-                  {items.map((meta, idx) => (
-                    <div
-                      key={meta.id}
-                      className={idx > 0 ? 'border-t border-border' : undefined}
-                    >
-                      <ConnectorRow
-                        meta={meta}
-                        status={connected.get(meta.id) ? 'connected' : 'disconnected'}
-                        connectedAs={sourceName.get(meta.id)}
-                        allowlist={allowlistByProvider.get(meta.id) ?? []}
-                        lastSyncedAt={lastSyncByProvider.get(meta.id)?.at.toISOString() ?? null}
-                        lastSyncStatus={lastSyncByProvider.get(meta.id)?.status ?? null}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      </div>
+      {!hideSampleData ? (
+        <SampleConnectorRow
+          installed={sampleStatus.active}
+          artifactCount={sampleStatus.artifactCount}
+          installedAt={sampleStatus.installedAt}
+          kindBreakdown={sampleStatus.kindBreakdown}
+        />
+      ) : null}
+      <ConnectorBrowser
+        showSampleNav={!hideSampleData}
+        items={CONNECTORS.map<ConnectorBrowserItem>((meta) => ({
+          meta,
+          status: connected.get(meta.id) ? 'connected' : 'disconnected',
+          connectedAs: sourceName.get(meta.id),
+          allowlist: allowlistByProvider.get(meta.id) ?? [],
+          lastSyncedAt: lastSyncByProvider.get(meta.id)?.at.toISOString() ?? null,
+          lastSyncStatus: lastSyncByProvider.get(meta.id)?.status ?? null,
+        }))}
+      />
     </div>
   );
 }
