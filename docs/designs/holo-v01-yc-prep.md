@@ -76,3 +76,30 @@ The combined effect of D34/35/36 + the 3 accepted CPs is a meaningfully stronger
 - **Demo:** "Here are 5 procedures holo extracted from one engineering team's last quarter of work. Here's an external Cursor agent invoking one of them via MCP. And here's the replay button showing exactly what context grounded the answer."
 
 This is the difference between "interesting middleware" and "ambitious platform." Same code in v0.1; different framing + 3 small features.
+
+## External validation signals
+
+Running list of public datapoints from operators running coding agents at scale that confirm the theses underneath holo's three pillars. Update as new signals land.
+
+### 2026-05-11 — Tobi Lütke on Shopify's River (Slack-native coding agent)
+
+Source: https://x.com/tobi/status/2053121182044451016
+
+What he says, in his numbers: River authored **1,870 PRs in the last week** in Shopify's main monorepo, and roughly **1 in 8 merged PRs** last week was authored by River and reviewed by humans. Across the last 30 days, **5,938 employees** worked with River in 4,450 Slack channels.
+
+The merge rate went from **36% → 77% over two months**. He's explicit about the cause:
+
+> "We did not retrain a model. We did not switch models. An improvement from 36% to 77% over two months came from people watching River work, noticing where it got stuck, and writing down what it should have known and helping make River itself a better teammate. Every team's accumulated taste flows into the agent."
+
+**This is the skills/procedures pillar.** It is the strongest public datapoint we have so far that the lever on coding-agent quality at company scale is *procedural knowledge captured from how the team actually works* — not the model, not the retriever, not the prompt. The 2x merge-rate gain over two months is exactly the curve [ADR-0003](../decisions/0003-skills-on-top-of-context-layer.md) bets on.
+
+Secondary validations from the same post, in priority order:
+
+- **Observability is the growth flywheel, not the compliance tax.** River only operates in public Slack channels — DMs are refused. "Every conversation is therefore searchable. Anyone at Shopify can jump in… People started learning from each other." This is the same mechanic CP2 (read-only replay) ships in v0.1, reframed: replay isn't just for audit, it's the substrate the team uses to *write down what the agent should have known*. The governance pillar is what makes the procedures pillar compound.
+- **Per-team scoped context is required, not optional.** "Every channel can pre-load the zones, skills, and instructions its team needs, written by the people closest to the work." This is the scoped-personas + per-skill allowlist model on the v0.2 roadmap, validated as table-stakes for an agent that lands in production.
+- **The agent needs unified access to everything the company writes.** River reads code, runs tests, opens PRs, queries the data warehouse, looks at prod traces, lives in Slack. The exact context-duplication pain [ADR-0004](../decisions/0004-multi-agent-shared-context-wedge.md) names — Shopify solved it by building the connectors themselves into one agent. The holo bet is that the next 1000 teams will not.
+- **Memory matters.** "River also has a memory that is constantly learning and un-learning critical information about the company and the best way to do work." Aligns with the procedural-extraction direction in `packages/skills` (skills stay current as procedures evolve).
+
+**Honest caveat — what this does *not* validate.** River *is* the agent; holo says "bring your own agent." So the post validates the mechanic (context + procedures + observability compound to 2x agent quality at company scale) but not the positioning (shared MCP layer vs. one company-built agent). The counter-argument it implicitly raises: companies with the engineering muscle to build their own River may not need a layer underneath it. The bet is that the long tail — the next 100 engineering teams that want a River — cannot afford to write their own, and that's the market holo serves. Worth pressure-testing in cold-DM conversations: ask peer CTOs whether they'd rather build their own River or point a Cursor/Claude agent at a holo instance with the same context surface.
+
+**For the YC pitch:** this is the strongest external proof point we have that the procedures pillar is the right wedge — and it lands as a quantitative number (2x merge rate, two months, same model) from a credibly-known operator. Lead with it.
