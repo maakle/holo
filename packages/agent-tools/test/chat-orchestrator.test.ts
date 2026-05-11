@@ -1,0 +1,275 @@
+import { describe, it, expect } from 'vitest';
+import type { LLMClient, LLMRequest, LLMResponse } from '@holo/llm';
+import {
+  runChatAgentLoop,
+  type ChatLocalTool,
+  type ChatToolContext,
+} from '../src/chat-orchestrator';
+
+// Fake LLM that replays a scripted sequence of responses. Each call pops the
+// next response; if any responses are left over at the end, the test fails.
+function scriptedLLM(script: LLMResponse[]): {
+  client: LLMClient;
+  calls: LLMRequest[];
+  remaining: () => number;
+} {
+  const queue = [...script];
+  const calls: LLMRequest[] = [];
+  return {
+    calls,
+    remaining: () => queue.length,
+    client: {
+      complete(req: LLMRequest): Promise<LLMResponse> {
+        // Snapshot messages by value so callers can inspect the state at the
+        // moment of the call without being affected by later loop mutations.
+        calls.push({ ...req, messages: req.messages.map((m) => ({ ...m })) });
+        const next = queue.shift();
+        if (!next) throw new Error('scriptedLLM: no more responses queued');
+        return Promise.resolve(next);
+      },
+    },
+  };
+}
+
+// Minimal tool context — the tools registered in each test never touch the db,
+// so we don't need a real Drizzle handle.
+const baseCtx: ChatToolContext = {
+  // The real shape is a Drizzle DB; cast is safe because our test tools
+  // never read it.
+  db: {} as ChatToolContext['db'],
+  organizationId: 'org-test',
+  userSubjects: ['org:org-test', 'user:user-test'],
+};
+
+const echoTool: ChatLocalTool = {
+  name: 'echo',
+  description: 'Returns its input unchanged.',
+  inputSchema: { type: 'object', properties: { value: { type: 'string' } } },
+  async run(_ctx, args) {
+    return { echoed: args };
+  },
+};
+
+const failingTool: ChatLocalTool = {
+  name: 'broken',
+  description: 'Always throws.',
+  inputSchema: { type: 'object', properties: {} },
+  async run() {
+    throw new Error('boom');
+  },
+};
+
+describe('runChatAgentLoop', () => {
+  it('returns the assistant text on a direct end_turn (no tools used)', async () => {
+    const { client, calls } = scriptedLLM([
+      {
+        stopReason: 'end_turn',
+        content: [{ type: 'text', text: 'Hello there.' }],
+      },
+    ]);
+
+    const result = await runChatAgentLoop({
+      llm: client,
+      model: 'test-model',
+      toolCtx: baseCtx,
+      initialMessages: [{ role: 'user', content: 'hi' }],
+      tools: [echoTool],
+    });
+
+    expect(result.kind).toBe('answer');
+    if (result.kind !== 'answer') throw new Error('unreachable');
+    expect(result.answer).toBe('Hello there.');
+    expect(result.toolCalls).toEqual([]);
+    expect(result.modelCalls).toBe(1);
+    // Tools were registered in the request despite not being used.
+    expect(calls[0]?.tools?.map((t) => t.name)).toEqual(['echo']);
+  });
+
+  it('dispatches tool_use, feeds the result back, then returns the final answer', async () => {
+    const { client, calls } = scriptedLLM([
+      {
+        stopReason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'call-1',
+            name: 'echo',
+            input: { value: 'ping' },
+          },
+        ],
+      },
+      {
+        stopReason: 'end_turn',
+        content: [{ type: 'text', text: 'Tool returned ping.' }],
+      },
+    ]);
+
+    const result = await runChatAgentLoop({
+      llm: client,
+      model: 'test-model',
+      toolCtx: baseCtx,
+      initialMessages: [{ role: 'user', content: 'use the echo tool' }],
+      tools: [echoTool],
+    });
+
+    expect(result.kind).toBe('answer');
+    if (result.kind !== 'answer') throw new Error('unreachable');
+    expect(result.answer).toBe('Tool returned ping.');
+    expect(result.modelCalls).toBe(2);
+    expect(result.toolCalls).toHaveLength(1);
+    expect(result.toolCalls[0]).toMatchObject({
+      id: 'call-1',
+      name: 'echo',
+      input: { value: 'ping' },
+      output: { echoed: { value: 'ping' } },
+    });
+    expect(result.toolCalls[0]?.isError).toBeUndefined();
+
+    // The second model call must have the tool_result block appended.
+    const secondCall = calls[1]!;
+    const lastMsg = secondCall.messages[secondCall.messages.length - 1]!;
+    expect(lastMsg.role).toBe('user');
+    expect(Array.isArray(lastMsg.content)).toBe(true);
+    const blocks = lastMsg.content as Array<{ type: string; toolUseId?: string }>;
+    expect(blocks[0]?.type).toBe('tool_result');
+    expect(blocks[0]?.toolUseId).toBe('call-1');
+  });
+
+  it('records tool errors as isError traces and continues the loop', async () => {
+    const { client } = scriptedLLM([
+      {
+        stopReason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'call-1',
+            name: 'broken',
+            input: {},
+          },
+        ],
+      },
+      {
+        stopReason: 'end_turn',
+        content: [{ type: 'text', text: 'Tool failed; reporting.' }],
+      },
+    ]);
+
+    const result = await runChatAgentLoop({
+      llm: client,
+      model: 'test-model',
+      toolCtx: baseCtx,
+      initialMessages: [{ role: 'user', content: 'try it' }],
+      tools: [failingTool],
+    });
+
+    expect(result.kind).toBe('answer');
+    if (result.kind !== 'answer') throw new Error('unreachable');
+    expect(result.toolCalls).toHaveLength(1);
+    expect(result.toolCalls[0]?.isError).toBe(true);
+    expect(result.toolCalls[0]?.output).toBe('tool error: boom');
+  });
+
+  it('records unregistered-tool dispatches as isError traces', async () => {
+    const { client } = scriptedLLM([
+      {
+        stopReason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'call-1',
+            name: 'not_a_tool',
+            input: {},
+          },
+        ],
+      },
+      {
+        stopReason: 'end_turn',
+        content: [{ type: 'text', text: 'recovered' }],
+      },
+    ]);
+
+    const result = await runChatAgentLoop({
+      llm: client,
+      model: 'test-model',
+      toolCtx: baseCtx,
+      initialMessages: [{ role: 'user', content: 'try a bogus tool' }],
+      tools: [echoTool],
+    });
+
+    if (result.kind !== 'answer') throw new Error('expected answer');
+    expect(result.toolCalls[0]).toMatchObject({
+      name: 'not_a_tool',
+      isError: true,
+      output: 'tool not_a_tool not registered',
+    });
+  });
+
+  it('returns tool_cap_exceeded when too many tool calls fire', async () => {
+    // Three tool_use turns in a row should trip a cap of 2.
+    const toolTurn = {
+      stopReason: 'tool_use' as const,
+      content: [
+        {
+          type: 'tool_use' as const,
+          id: 'call-x',
+          name: 'echo',
+          input: { value: 'x' },
+        },
+      ],
+    };
+    const { client } = scriptedLLM([toolTurn, toolTurn, toolTurn]);
+
+    const result = await runChatAgentLoop({
+      llm: client,
+      model: 'test-model',
+      toolCtx: baseCtx,
+      initialMessages: [{ role: 'user', content: 'loop forever' }],
+      tools: [echoTool],
+      maxToolCalls: 2,
+    });
+
+    expect(result.kind).toBe('tool_cap_exceeded');
+    if (result.kind !== 'tool_cap_exceeded') throw new Error('unreachable');
+    expect(result.maxToolCalls).toBe(2);
+    expect(result.toolCalls).toHaveLength(2);
+  });
+
+  it('returns wall_clock_exceeded when the budget is blown before the next LLM call', async () => {
+    // Use an injected `now` that jumps past the wall clock budget after the
+    // first LLM round-trip.
+    let tick = 0;
+    const now = () => {
+      tick += 1;
+      // First call (startedAt) = 0, second (loop guard, second iter) = 999_999.
+      return tick === 1 ? 0 : 999_999;
+    };
+
+    const { client } = scriptedLLM([
+      {
+        stopReason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'call-1',
+            name: 'echo',
+            input: { value: 'x' },
+          },
+        ],
+      },
+    ]);
+
+    const result = await runChatAgentLoop({
+      llm: client,
+      model: 'test-model',
+      toolCtx: baseCtx,
+      initialMessages: [{ role: 'user', content: 'go' }],
+      tools: [echoTool],
+      wallClockMs: 1_000,
+      now,
+    });
+
+    expect(result.kind).toBe('wall_clock_exceeded');
+    if (result.kind !== 'wall_clock_exceeded') throw new Error('unreachable');
+    expect(result.wallClockMs).toBe(1_000);
+  });
+});
