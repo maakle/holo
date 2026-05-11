@@ -82,6 +82,14 @@ export function createAsanaSpec(_opts: AsanaSpecOptions = {}): ConnectorSpec {
           // "tasks modified since X across the workspace" endpoint without
           // additional scoping; the project walk is the most reliable filter
           // that works on every plan tier.
+          //
+          // Caveat: `modified_since` filters on the task's *own* `modified_at`.
+          // Asana does NOT bump a task's `modified_at` when its subtasks,
+          // comments, or attachments change. Incremental sync therefore
+          // misses pure-subtask edits until the parent is itself touched.
+          // Acceptable trade-off for v1: a 4h cadence catches most movement,
+          // and the first sync indexes everything regardless.
+          // https://developers.asana.com/reference/gettasks
           const me = await getUserMe(ctx.api);
           const workspaces = me.workspaces;
 

@@ -364,6 +364,27 @@ describe('Asana sync (pagination)', () => {
   });
 });
 
+describe('Asana /users/me opt_fields', () => {
+  it('requests email + workspaces via opt_fields (they are not in the compact default)', async () => {
+    const { fetchImpl, calls } = makeFetch(buildAsanaResponder({}));
+    const spec = createAsanaSpec({ fetchImpl });
+    const { stores } = makeStores();
+    await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+    const meCall = calls.find((c) => c.url.includes('/users/me'));
+    expect(meCall).toBeDefined();
+    const optFields = new URL(meCall!.url).searchParams.get('opt_fields') ?? '';
+    expect(optFields).toContain('workspaces.gid');
+    expect(optFields).toContain('workspaces.name');
+    expect(optFields).toContain('email');
+  });
+});
+
 describe('Asana testConnection', () => {
   it('returns the first workspace gid + name from /users/me', async () => {
     const { fetchImpl } = makeFetch(() =>

@@ -50,8 +50,17 @@ function buildQuery(params: Record<string, string | number | undefined>): string
   return s.length > 0 ? `?${s}` : '';
 }
 
+// `/users/me` returns only the compact user record by default — `email` and
+// `workspaces` are NOT included unless explicitly opted-in. The sync walks
+// `me.workspaces`, so omitting this opt_fields list silently returns
+// `workspaces: undefined` and the resource sync becomes a no-op.
+// https://developers.asana.com/docs/inputoutput-options
+const USER_ME_OPT_FIELDS = ['email', 'workspaces.gid', 'workspaces.name'].join(',');
+
 export async function getUserMe(api: HttpClient): Promise<AsanaUserMe> {
-  const env = await api.get<AsanaEnvelope<AsanaUserMe>>('/users/me');
+  const env = await api.get<AsanaEnvelope<AsanaUserMe>>(
+    `/users/me?opt_fields=${encodeURIComponent(USER_ME_OPT_FIELDS)}`,
+  );
   return env.data;
 }
 
