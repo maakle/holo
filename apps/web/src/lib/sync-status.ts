@@ -29,11 +29,14 @@ export async function loadLatestSyncStatusByProvider(
   db: Db,
   orgId: string,
 ): Promise<Map<string, LatestSyncStatus>> {
+  // `db.execute(sql`...`)` bypasses Drizzle's column-level type mapping, so
+  // postgres-js hands `finished_at` back as a raw ISO string instead of a
+  // Date. Type it accurately and coerce below.
   type Row = {
     source_id: string;
     provider: string;
     status: LatestSyncStatus['status'];
-    finished_at: Date;
+    finished_at: Date | string;
   };
   const result = await db.execute<Row>(sql`
     SELECT DISTINCT ON (source_id, queue_name)
@@ -62,7 +65,7 @@ export async function loadLatestSyncStatusByProvider(
       provider: r.provider,
       sourceId: r.source_id,
       status: r.status,
-      finishedAt: r.finished_at,
+      finishedAt: r.finished_at instanceof Date ? r.finished_at : new Date(r.finished_at),
     };
     const existing = byProvider.get(entry.provider);
     if (!existing) {
