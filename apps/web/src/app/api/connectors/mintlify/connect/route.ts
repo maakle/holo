@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { fetchLlmsIndex, normalizeBaseUrl } from '@holo/connectors';
+import { assertPublicHttpUrl } from '@holo/connector-framework';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
@@ -48,23 +49,10 @@ export async function POST(req: Request) {
       });
     }
 
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(rawUrl);
-    } catch {
-      throw holoError({
-        code: ErrorCode.HOLO_INVALID_INPUT,
-        problem: `Not a valid URL: ${rawUrl}`,
-        fix: 'Use a full URL like https://docs.kombo.dev',
-      });
-    }
-    if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
-      throw holoError({
-        code: ErrorCode.HOLO_INVALID_INPUT,
-        problem: `Unsupported protocol: ${parsedUrl.protocol}`,
-        fix: 'Use http:// or https:// — Mintlify sites are always HTTP.',
-      });
-    }
+    // Resolve + reject private/loopback/metadata addresses. Without this an
+    // authenticated user can probe (and re-probe via the persisted source)
+    // any host the worker can reach — cloud metadata, internal Redis, etc.
+    const parsedUrl = await assertPublicHttpUrl(rawUrl);
     const baseUrl = normalizeBaseUrl(`${parsedUrl.protocol}//${parsedUrl.host}${parsedUrl.pathname}`);
 
     // Probe llms.txt — if the site doesn't expose one, it's almost certainly

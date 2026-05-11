@@ -14,3 +14,5 @@ export type {
   RateLimitConfig,
   RetryConfig,
 } from './types';
+export { assertPublicHttpUrl, isPublicIp } from './url-guard';
+export type { AssertPublicUrlOptions } from './url-guard';

@@ -43,6 +43,8 @@ export {
   parseRetryAfter,
   exponentialBackoff,
   jitter,
+  assertPublicHttpUrl,
+  isPublicIp,
 } from './http';
 export type {
   HttpClient,
@@ -51,6 +53,7 @@ export type {
   RateLimitConfig,
   RetryConfig,
   CreateHttpClientInput,
+  AssertPublicUrlOptions,
 } from './http';
 
 // Pagination
