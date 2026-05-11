@@ -9,6 +9,35 @@ import type { SyncRunner } from './sync-dispatch';
 //
 // Tests inject their own runners via setSyncRunner() to exercise dispatch.
 
+// Startup gate. BullMQ workers are constructed (and start pulling jobs from
+// Redis) during Nest's onModuleInit, but SyncRunnersBootstrap doesn't replace
+// the stubs with real runners until onApplicationBootstrap — a few hundred ms
+// later. Without this gate, any sync job already in Redis at restart races
+// the bootstrap and gets dispatched against the stub, failing with
+// HOLO_CONNECTOR_NOT_IMPLEMENTED. Processors await registrationReady() before
+// looking up a runner; bootstrap resolves it once every setSyncRunner call
+// has run.
+let resolveReady: (() => void) | null = null;
+let registrationReady: Promise<void> = new Promise<void>((resolve) => {
+  resolveReady = resolve;
+});
+
+export function markRegistrationComplete(): void {
+  resolveReady?.();
+  resolveReady = null;
+}
+
+export function awaitRegistrationReady(): Promise<void> {
+  return registrationReady;
+}
+
+// Test seam: tests that call SyncProcessorBase.process() directly don't run
+// the bootstrap, so they open the gate themselves. Tests that exercise
+// runSyncJob() lower-level don't touch the gate at all.
+export function __markReadyForTests(): void {
+  markRegistrationComplete();
+}
+
 const stubRunner = (label: string): SyncRunner => {
   const fail = async (): Promise<never> => {
     throw holoError({

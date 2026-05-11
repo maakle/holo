@@ -73,7 +73,7 @@ function readPerProjectUpdatedAt(
 export async function runGitlabProseSync(
   input: RunGitlabProseSyncInput,
 ): Promise<RunGitlabProseSyncOutput> {
-  const { client, allowedProjects, organizationId, sourceId, enqueueEmbed, logger } = input;
+  const { client, allowedProjects, organizationId, enqueueEmbed, logger } = input;
   const acl = aclFor(organizationId);
   const perProjectUpdatedAt = readPerProjectUpdatedAt(input.cursorMetadata);
 

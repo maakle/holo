@@ -5,6 +5,7 @@ import { buildPaginator } from '../pagination/paginate';
 import type {
   ChunkUpsert,
   ConnectorSpec,
+  ConnectorTokens,
   ReportProgressFn,
   ResourceSpec,
   ResourceSyncContext,
@@ -18,6 +19,59 @@ import type {
 } from './stores';
 
 const DEFAULT_BATCH_SIZE = 50;
+/**
+ * Refresh threshold: if a token expires within this many ms, refresh it
+ * before kicking off the sync. Sized to cover the longest expected sync
+ * (~15 min for big GitHub orgs) plus a comfortable safety margin so a
+ * resource that runs late doesn't fire a stale token at the provider.
+ */
+const REFRESH_SKEW_MS = 20 * 60_000;
+
+function shouldRefresh(expiresAt: Date | undefined): boolean {
+  if (!expiresAt) return false;
+  return expiresAt.getTime() - Date.now() < REFRESH_SKEW_MS;
+}
+
+/**
+ * Load tokens and, when the spec uses a refreshable strategy and the
+ * access token is near expiry, refresh-and-persist before the resources
+ * run. The refresh is serialized via `stores.withAuthLock` so that
+ * concurrent jobs sharing `(organizationId, providerId)` — GitLab's prose
+ * and code queues both wake at the 6h mark — don't double-refresh and
+ * race over the rotated refresh token.
+ */
+async function loadValidTokens(args: {
+  spec: ConnectorSpec;
+  stores: RuntimeStores;
+  organizationId: string;
+}): Promise<ConnectorTokens> {
+  const { spec, stores, organizationId } = args;
+  const tokens = await stores.loadTokens({ organizationId, providerId: spec.id });
+
+  if (
+    !spec.auth.refreshable ||
+    !tokens.refreshToken ||
+    !shouldRefresh(tokens.expiresAt)
+  ) {
+    return tokens;
+  }
+
+  const refreshOnce = async (): Promise<ConnectorTokens> => {
+    // Re-read inside the critical section. If another worker beat us to
+    // the lock and already refreshed, the row now holds a fresh access
+    // token (and a rotated refresh token); calling auth.refresh() again
+    // would consume the old refresh token and fail.
+    const fresh = await stores.loadTokens({ organizationId, providerId: spec.id });
+    if (!fresh.refreshToken || !shouldRefresh(fresh.expiresAt)) return fresh;
+    const refreshed = await spec.auth.refresh({ refreshToken: fresh.refreshToken });
+    await stores.saveTokens?.({ organizationId, providerId: spec.id, tokens: refreshed });
+    return refreshed;
+  };
+
+  return stores.withAuthLock
+    ? stores.withAuthLock({ organizationId, providerId: spec.id }, refreshOnce)
+    : refreshOnce();
+}
 
 export interface RunConnectorSyncInput extends SyncJobInput {
   spec: ConnectorSpec;
@@ -69,7 +123,7 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
     });
   }
 
-  const tokens = await stores.loadTokens({ organizationId, providerId: spec.id });
+  const tokens = await loadValidTokens({ spec, stores, organizationId });
   const api = createHttpClient({
     config: spec.http,
     auth: spec.auth,

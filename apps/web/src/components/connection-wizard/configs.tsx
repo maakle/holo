@@ -131,7 +131,12 @@ const googleDriveConfig: ConnectorWizardConfig<GoogleDriveDrivesState> = {
           apiToEnable: { label: 'Google Drive API', host: 'drive.googleapis.com' },
         }),
     },
-    { id: 'drives', label: 'Pick content', render: googleDriveDrivesStep },
+    {
+      id: 'drives',
+      label: 'Pick content',
+      size: 'wide',
+      render: googleDriveDrivesStep,
+    },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
   ],
 };
@@ -308,7 +313,12 @@ const googleChatConfig: ConnectorWizardConfig<GoogleChatSpacesState> = {
           ],
         }),
     },
-    { id: 'spaces', label: 'Pick spaces', render: googleChatSpacesStep },
+    {
+      id: 'spaces',
+      label: 'Pick spaces',
+      size: 'wide',
+      render: googleChatSpacesStep,
+    },
     { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
   ],
 };

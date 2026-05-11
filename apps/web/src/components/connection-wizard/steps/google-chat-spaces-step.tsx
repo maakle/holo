@@ -162,7 +162,7 @@ function GoogleChatSpacesStep({ ctx }: { ctx: WizardContext<GoogleChatSpacesStat
             {spaces ? `${selected.size} / ${spaces.length}` : ''}
           </span>
         </div>
-        <div className="max-h-72 overflow-y-auto rounded-md border border-border bg-bg">
+        <div className="max-h-[60vh] overflow-y-auto rounded-md border border-border bg-bg">
           {!spaces ? (
             <div className="flex items-center gap-2 px-3 py-4 text-[12px] text-text-muted">
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />

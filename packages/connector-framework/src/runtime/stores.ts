@@ -24,6 +24,24 @@ export interface RuntimeStores {
   }): Promise<void>;
 
   /**
+   * Optional. Serialize the load → refresh → save sequence across concurrent
+   * sync jobs that share `(organizationId, providerId)` — e.g. GitLab's
+   * prose-queue and code-queue firing at the same minute. Hosts implement
+   * this with a database-level advisory lock so workers in different
+   * processes serialize too. The runtime calls `fn` inside the critical
+   * section; `fn` is expected to re-read tokens (since another waiter may
+   * have just refreshed), and only call `auth.refresh()` if still needed.
+   *
+   * Hosts that don't supply this fall back to no locking — fine for
+   * single-worker test setups but unsafe in production for providers that
+   * rotate refresh tokens (GitLab, Slack, etc.).
+   */
+  withAuthLock?<T>(
+    input: { organizationId: string; providerId: string },
+    fn: () => Promise<T>,
+  ): Promise<T>;
+
+  /**
    * Load the cursor JSONB for one resource. Returns `undefined` if no row
    * exists yet (first sync) — the framework will use the schema default.
    */

@@ -14,7 +14,8 @@
  *   methods. Both methods invoke the same path; per-resource branching on
  *   first-vs-incremental is handled by each resource's cursor schema default.
  */
-import { eq, and, desc } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import type { Queue } from 'bullmq';
 import { schema, type DB } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
@@ -162,6 +163,21 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
         );
     },
 
+    async withAuthLock({ organizationId, providerId }, fn) {
+      // Postgres advisory lock keyed on a stable hash of (org, provider).
+      // pg_advisory_xact_lock auto-releases at transaction end — so if `fn`
+      // throws, the lock is freed by the rollback. The body's loadTokens /
+      // saveTokens calls run on pool connections (not on `tx`), but that's
+      // fine: those queries auto-commit, and the lock just serializes
+      // refreshers — by the time the next waiter acquires it, the previous
+      // saveTokens has already committed the rotated refresh token.
+      return deps.db.transaction(async (tx) => {
+        const key = computeAuthLockKey(organizationId, providerId);
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(${key})`);
+        return fn();
+      });
+    },
+
     async loadCursor({ sourceId, resourceId }): Promise<unknown | undefined> {
       const rows = await deps.db
         .select({ metadata: schema.connectorCursors.metadata })
@@ -254,6 +270,20 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
       });
     },
   };
+}
+
+/**
+ * Stable 64-bit signed bigint derived from (organizationId, providerId).
+ * Postgres advisory lock keys are arbitrary; collisions across unrelated
+ * (org, provider) pairs would just cause a few microseconds of extra
+ * serialization, which is fine. We hash with SHA-256 and take the first
+ * 8 bytes as a signed BigInt so the value fits in a Postgres bigint.
+ */
+function computeAuthLockKey(organizationId: string, providerId: string): bigint {
+  const digest = createHash('sha256')
+    .update(`holo:auth-refresh:${organizationId}:${providerId}`)
+    .digest();
+  return digest.readBigInt64BE(0);
 }
 
 function toChunkInsertPayload(c: ChunkRecord): ChunkInsertPayload {

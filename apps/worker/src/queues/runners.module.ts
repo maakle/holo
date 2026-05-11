@@ -22,7 +22,7 @@ import {
   createGoogleChatSpec,
   githubAppConfigFromEnv,
 } from '@holo/connectors';
-import { setSyncRunner } from './sync-runner-registry';
+import { setSyncRunner, markRegistrationComplete } from './sync-runner-registry';
 import { reconcileOrphanedRuns } from './sync-runs-store';
 import type { EmbedJobPayload } from './embed-insert';
 
@@ -56,6 +56,36 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    try {
+      await this.registerRunners();
+    } finally {
+      // Open the startup gate even if a setSyncRunner call threw partway
+      // through — otherwise queued jobs would hang forever waiting on a
+      // promise that never resolves. With the gate open, anything still
+      // wired to the default stub surfaces HOLO_CONNECTOR_NOT_IMPLEMENTED
+      // loudly, which is the signal we want.
+      markRegistrationComplete();
+    }
+    // Reap any 'running' rows the previous worker incarnation left behind
+    // (crash, OOM, BullMQ stall). Without this, a dead worker's rows stay
+    // 'running' forever and pollute the dashboard. 30-min floor inside
+    // reconcileOrphanedRuns prevents reaping legitimately long syncs.
+    try {
+      const url = process.env.DATABASE_URL;
+      if (url) {
+        const sql = postgres(url, { max: 1, onnotice: () => {} });
+        const swept = await reconcileOrphanedRuns(sql);
+        await sql.end({ timeout: 5 });
+        if (swept > 0) {
+          this.logger.log(`reconciled ${swept} orphaned sync_runs row(s) → stalled`);
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`sync_runs reconciliation failed: ${(err as Error).message}`);
+    }
+  }
+
+  private async registerRunners(): Promise<void> {
     const deps = { db: getDb(), embedQueue: this.embedQueue };
     setSyncRunner(
       QUEUE_NAMES.SLACK_SYNC,
@@ -161,24 +191,6 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     this.logger.log(
       'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat',
     );
-
-    // Reap any 'running' rows the previous worker incarnation left behind
-    // (crash, OOM, BullMQ stall). Without this, a dead worker's rows stay
-    // 'running' forever and pollute the dashboard. 30-min floor inside
-    // reconcileOrphanedRuns prevents reaping legitimately long syncs.
-    try {
-      const url = process.env.DATABASE_URL;
-      if (url) {
-        const sql = postgres(url, { max: 1, onnotice: () => {} });
-        const swept = await reconcileOrphanedRuns(sql);
-        await sql.end({ timeout: 5 });
-        if (swept > 0) {
-          this.logger.log(`reconciled ${swept} orphaned sync_runs row(s) → stalled`);
-        }
-      }
-    } catch (err) {
-      this.logger.warn(`sync_runs reconciliation failed: ${(err as Error).message}`);
-    }
   }
 }
 

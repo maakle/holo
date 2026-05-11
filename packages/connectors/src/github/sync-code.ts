@@ -40,7 +40,7 @@ export interface GitShell {
   lsFiles(dir: string): Promise<string[]>;
   readFile(dir: string, filePath: string): Promise<Buffer>;
   headSha(dir: string): Promise<string>;
-  fetch(dir: string): Promise<void>;
+  fetch(dir: string, repoUrl: string): Promise<void>;
   diffNameStatus(dir: string, fromSha: string, toSha: string): Promise<DiffEntry[]>;
 }
 
@@ -117,14 +117,23 @@ export const realGitShell: GitShell = {
     return stdout.trim();
   },
 
-  async fetch(dir) {
+  async fetch(dir, repoUrl) {
+    // Fetch from the URL directly rather than the baked-in `remote.origin.url`.
+    // GitHub App installation tokens (and OAuth tokens) embedded at clone time
+    // expire after ~1 hour; relying on the stale URL from the initial clone
+    // makes every subsequent incremental sync fail with "Invalid username or
+    // token". The caller mints a fresh token per run and passes it here.
     try {
-      await execFileAsync('git', ['-C', dir, 'fetch', '--depth=1', 'origin']);
+      await execFileAsync(
+        'git',
+        [...ISOLATED_GIT_CONFIG, '-C', dir, 'fetch', '--depth=1', repoUrl],
+        { env: isolatedGitEnv() },
+      );
     } catch (cause) {
       throw holoError({
         code: ErrorCode.HOLO_FETCH_FAILED,
         problem: `git fetch failed in ${dir}`,
-        fix: 'Check network connectivity and access token.',
+        fix: 'Verify the App installation has access to the repo and that the access token has Contents: Read.',
         cause: redactSecrets(String(cause)),
       });
     }
@@ -182,9 +191,11 @@ export async function runGithubCodeSync(
     treeSitter: input.treeSitter,
   };
 
-  // Clone or fetch
+  // Clone or fetch — both need a fresh token-bearing URL because install
+  // tokens expire after ~1 hour, so an incremental sync 6h after the initial
+  // clone can't reuse the URL git stored in `remote.origin.url`.
   if (input.fromSha) {
-    await shell.fetch(input.workDir);
+    await shell.fetch(input.workDir, input.cloneUrl);
   } else {
     await shell.clone(input.cloneUrl, input.workDir);
   }

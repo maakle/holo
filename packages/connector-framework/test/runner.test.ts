@@ -1,9 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
 import { defineConnector } from '../src/define-connector';
 import { apiKey } from '../src/auth/api-key';
+import { oauth2 } from '../src/auth/oauth2';
 import { runConnectorSync } from '../src/runtime/runner';
 import type { ChunkRecord, RuntimeStores } from '../src/runtime/stores';
+import type { ConnectorTokens } from '../src/types';
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -362,5 +364,271 @@ describe('runConnectorSync', () => {
     expect(order).toEqual(['users', 'issues']);
     expect(result.artifactCount).toBe(2);
     expect(enqueued.map((c) => c.kind)).toEqual(['user', 'issue']);
+  });
+
+  describe('token refresh', () => {
+    /**
+     * Spec helper for refresh tests. Uses real oauth2() auth so we exercise
+     * the full strategy plumbing rather than a hand-rolled mock.
+     */
+    function makeRefreshableSpec(tokenEndpointResponses: ReadonlyArray<unknown>) {
+      let i = 0;
+      const tokenFetch: typeof fetch = (async () => {
+        const body = tokenEndpointResponses[i++];
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }) as unknown as typeof fetch;
+
+      return defineConnector({
+        id: 'demo-refresh',
+        displayName: 'Demo Refreshable',
+        sync: { intervalMs: 60_000 },
+        auth: oauth2({
+          clientId: 'cid',
+          clientSecret: 'csec',
+          authorizeUrl: 'https://auth.example.com/authorize',
+          tokenUrl: 'https://auth.example.com/token',
+          scopes: ['read'],
+          refreshable: true,
+          fetchImpl: tokenFetch,
+        }),
+        http: { baseUrl: 'https://api.example.com' },
+        async testConnection() {
+          return { externalId: 'x', name: 'X' };
+        },
+        resources: [
+          {
+            id: 'noop',
+            cursorSchema: z.record(z.string(), z.unknown()).default({}),
+            async sync(_ctx) {
+              return {};
+            },
+          },
+        ],
+      });
+    }
+
+    function refreshableStoresFor(initial: ConnectorTokens): {
+      stores: RuntimeStores;
+      saveTokens: ReturnType<typeof vi.fn>;
+      loadTokens: ReturnType<typeof vi.fn>;
+      withAuthLockCalls: { count: number };
+      current: { tokens: ConnectorTokens };
+    } {
+      const current = { tokens: initial };
+      const withAuthLockCalls = { count: 0 };
+      const loadTokens = vi.fn(async () => current.tokens);
+      const saveTokens = vi.fn(async ({ tokens }: { tokens: ConnectorTokens }) => {
+        current.tokens = tokens;
+      });
+      return {
+        current,
+        loadTokens,
+        saveTokens,
+        withAuthLockCalls,
+        stores: {
+          loadTokens,
+          saveTokens,
+          async withAuthLock(_input, fn) {
+            withAuthLockCalls.count += 1;
+            return fn();
+          },
+          async loadCursor() {
+            return undefined;
+          },
+          async saveCursor() {
+            // no-op
+          },
+          async loadExistingHashes() {
+            return new Set<string>();
+          },
+          async enqueueChunks() {
+            // no-op
+          },
+        },
+      };
+    }
+
+    it('refreshes when access token is near expiry and persists rotated tokens', async () => {
+      const spec = makeRefreshableSpec([
+        {
+          access_token: 'new-access',
+          refresh_token: 'new-refresh',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        },
+      ]);
+      const { stores, saveTokens, withAuthLockCalls, current } = refreshableStoresFor({
+        accessToken: 'stale',
+        refreshToken: 'old-refresh',
+        expiresAt: new Date(Date.now() + 60_000), // 1 min — well inside skew
+      });
+
+      await runConnectorSync({
+        spec,
+        stores,
+        organizationId: 'org-1',
+        sourceId: 'src-1',
+      });
+
+      expect(withAuthLockCalls.count).toBe(1);
+      expect(saveTokens).toHaveBeenCalledOnce();
+      expect(current.tokens.accessToken).toBe('new-access');
+      expect(current.tokens.refreshToken).toBe('new-refresh');
+    });
+
+    it('does not refresh when access token still has plenty of life', async () => {
+      const spec = makeRefreshableSpec([]);
+      const { stores, saveTokens, withAuthLockCalls } = refreshableStoresFor({
+        accessToken: 'fresh',
+        refreshToken: 'rt',
+        expiresAt: new Date(Date.now() + 60 * 60_000), // 1h — far outside skew
+      });
+
+      await runConnectorSync({
+        spec,
+        stores,
+        organizationId: 'org-1',
+        sourceId: 'src-1',
+      });
+
+      expect(withAuthLockCalls.count).toBe(0);
+      expect(saveTokens).not.toHaveBeenCalled();
+    });
+
+    it('skips refresh if a concurrent run refreshed inside the lock', async () => {
+      // Token endpoint should NOT be called: by the time fn() runs, the
+      // re-read inside the lock returns a non-expiring token.
+      const tokenFetch = vi.fn();
+      const spec = defineConnector({
+        id: 'demo-refresh',
+        displayName: 'Demo Refreshable',
+        sync: { intervalMs: 60_000 },
+        auth: oauth2({
+          clientId: 'cid',
+          clientSecret: 'csec',
+          authorizeUrl: 'https://auth.example.com/authorize',
+          tokenUrl: 'https://auth.example.com/token',
+          scopes: ['read'],
+          refreshable: true,
+          fetchImpl: tokenFetch as unknown as typeof fetch,
+        }),
+        http: { baseUrl: 'https://api.example.com' },
+        async testConnection() {
+          return { externalId: 'x', name: 'X' };
+        },
+        resources: [
+          {
+            id: 'noop',
+            cursorSchema: z.record(z.string(), z.unknown()).default({}),
+            async sync() {
+              return {};
+            },
+          },
+        ],
+      });
+
+      const initial: ConnectorTokens = {
+        accessToken: 'stale',
+        refreshToken: 'old-refresh',
+        expiresAt: new Date(Date.now() + 60_000), // expiring soon — triggers lock
+      };
+      const fresh: ConnectorTokens = {
+        accessToken: 'already-refreshed',
+        refreshToken: 'new-refresh',
+        expiresAt: new Date(Date.now() + 60 * 60_000),
+      };
+
+      let calls = 0;
+      const stores: RuntimeStores = {
+        async loadTokens() {
+          calls += 1;
+          // First call (outside the lock): old token, near expiry → triggers refresh path.
+          // Second call (inside the lock): a concurrent worker refreshed; not near expiry.
+          return calls === 1 ? initial : fresh;
+        },
+        async saveTokens() {
+          // would only be called if we actually refresh
+        },
+        async withAuthLock(_input, fn) {
+          return fn();
+        },
+        async loadCursor() {
+          return undefined;
+        },
+        async saveCursor() {},
+        async loadExistingHashes() {
+          return new Set();
+        },
+        async enqueueChunks() {},
+      };
+
+      await runConnectorSync({
+        spec,
+        stores,
+        organizationId: 'org-1',
+        sourceId: 'src-1',
+      });
+
+      expect(tokenFetch).not.toHaveBeenCalled();
+    });
+
+    it('does not refresh when the strategy is not refreshable, even if expiresAt is past', async () => {
+      const apiKeyStores = (() => {
+        const tokens: ConnectorTokens = {
+          accessToken: 'k',
+          expiresAt: new Date(Date.now() + 60_000),
+        };
+        const loadTokens = vi.fn(async () => tokens);
+        const saveTokens = vi.fn(async () => {});
+        return {
+          loadTokens,
+          saveTokens,
+          stores: {
+            loadTokens,
+            saveTokens,
+            async loadCursor() {
+              return undefined;
+            },
+            async saveCursor() {},
+            async loadExistingHashes() {
+              return new Set<string>();
+            },
+            async enqueueChunks() {},
+          } satisfies RuntimeStores,
+        };
+      })();
+
+      const spec = defineConnector({
+        id: 'demo',
+        displayName: 'Demo',
+        sync: { intervalMs: 60_000 },
+        auth: apiKey(),
+        http: { baseUrl: 'https://api.example.com' },
+        async testConnection() {
+          return { externalId: 'x', name: 'X' };
+        },
+        resources: [
+          {
+            id: 'noop',
+            cursorSchema: z.record(z.string(), z.unknown()).default({}),
+            async sync() {
+              return {};
+            },
+          },
+        ],
+      });
+
+      await runConnectorSync({
+        spec,
+        stores: apiKeyStores.stores,
+        organizationId: 'org-1',
+        sourceId: 'src-1',
+      });
+
+      expect(apiKeyStores.saveTokens).not.toHaveBeenCalled();
+    });
   });
 });

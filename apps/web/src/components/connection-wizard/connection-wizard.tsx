@@ -118,7 +118,38 @@ export function ConnectionWizard<TState>({
         else onOpenChange(true);
       }}
     >
-      <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <AlertDialogContent
+        // Sticky footer trick: AlertDialogContent is the scroll container
+        // (`overflow-y-auto`). Each step renders its body + an
+        // AlertDialogFooter as siblings inside a fragment, so the footer
+        // ends up as the dialog's last direct child. The arbitrary
+        // descendant variants below pin that last child to the bottom of
+        // the visible scroll area with a solid background, so action
+        // buttons stay reachable no matter how long the body grows.
+        className={[
+          current.size === 'wide' ? 'max-w-4xl' : 'max-w-2xl',
+          'max-h-[92vh] overflow-y-auto',
+          '[&>*:last-child]:sticky',
+          '[&>*:last-child]:bottom-0',
+          '[&>*:last-child]:z-10',
+          '[&>*:last-child]:bg-surface',
+          '[&>*:last-child]:-mx-6',
+          '[&>*:last-child]:-mb-6',
+          '[&>*:last-child]:px-6',
+          '[&>*:last-child]:py-3',
+          // Inset top divider via pseudo-element so the rule doesn't touch
+          // the dialog's rounded corners while the bg still bleeds edge-to-edge.
+          '[&>*:last-child]:relative',
+          '[&>*:last-child]:before:absolute',
+          '[&>*:last-child]:before:left-6',
+          '[&>*:last-child]:before:right-6',
+          '[&>*:last-child]:before:top-0',
+          '[&>*:last-child]:before:h-px',
+          '[&>*:last-child]:before:bg-border',
+          '[&>*:last-child]:before:content-[""]',
+          '[&>*:last-child]:mt-2',
+        ].join(' ')}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>Set up {meta.displayName}</AlertDialogTitle>
           <AlertDialogDescription>

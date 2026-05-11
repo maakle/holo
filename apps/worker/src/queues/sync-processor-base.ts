@@ -6,7 +6,7 @@ import { createDb, type DB } from '@holo/db';
 import { recordAgentEvent } from '@holo/audit';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { runSyncJob, type SyncResult } from './sync-dispatch';
-import { getSyncRunner } from './sync-runner-registry';
+import { getSyncRunner, awaitRegistrationReady } from './sync-runner-registry';
 import {
   createPostgresSyncCursorStore,
   type SyncCursorStore,
@@ -87,6 +87,14 @@ export abstract class SyncProcessorBase extends WorkerHost {
   protected abstract readonly queueName: QueueName;
 
   async process(job: Job<SyncJobPayload>): Promise<SyncResult> {
+    // BullMQ workers start consuming during Nest onModuleInit, but
+    // SyncRunnersBootstrap replaces the default stubs with real runners in
+    // onApplicationBootstrap. If a job is already in Redis at worker
+    // restart, it can land here before registration completes. Wait until
+    // bootstrap signals ready before resolving the runner — otherwise we'd
+    // dispatch against the stub and surface HOLO_CONNECTOR_NOT_IMPLEMENTED
+    // for a connector that's actually wired.
+    await awaitRegistrationReady();
     const jobId = job.id ?? `unidentified-${Date.now()}`;
     const ctx = `sourceId=${job.data.sourceId} queue=${this.queueName} jobId=${jobId}`;
     const sql = getSql();

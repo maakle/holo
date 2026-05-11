@@ -42,6 +42,15 @@ function getQueue(name: string): Queue {
  * BullMQ's jobId-based dedup only covers waiting/delayed (active jobs are
  * removed from the index), so this scan is necessary to also catch the
  * common case of "a worker is already running, don't pile on."
+ *
+ * `delayed` is tricky: it includes both retry-with-backoff *and* the
+ * recurring scheduler's next-fire instances. For providers on a cron
+ * cadence (every 6h for GitLab/GitHub, etc.) the next-fire is ALWAYS
+ * sitting in `delayed`, so a naive scan blocks every Sync-now click
+ * between cron ticks. We filter those out by checking for the BullMQ
+ * repeat marker — `opts.repeat` is set on the recurring-schedule's
+ * placeholder job and on each next-fire it spawns. A retry-backoff job
+ * does NOT carry that marker, so it still dedupes correctly.
  */
 async function hasInFlightJob(
   queueName: string,
@@ -51,7 +60,9 @@ async function hasInFlightJob(
   const jobs = await q.getJobs(['waiting', 'active', 'delayed'], 0, 200, false);
   for (const job of jobs) {
     const data = job.data as { sourceId?: string } | null;
-    if (data?.sourceId === sourceId) return true;
+    if (data?.sourceId !== sourceId) continue;
+    if (job.opts?.repeat) continue;
+    return true;
   }
   return false;
 }

@@ -324,7 +324,7 @@ function GoogleDriveDrivesStep({ ctx }: { ctx: WizardContext<GoogleDriveDrivesSt
           in — folder contents load on demand.
         </p>
 
-        <div className="max-h-96 overflow-y-auto rounded-md border border-border bg-bg">
+        <div className="max-h-[60vh] overflow-y-auto rounded-md border border-border bg-bg">
           {!loaded ? (
             <div className="flex items-center gap-2 px-3 py-4 text-[12px] text-text-muted">
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />

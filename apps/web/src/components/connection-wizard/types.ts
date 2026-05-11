@@ -37,6 +37,12 @@ export interface WizardStep<TState = Record<string, unknown>> {
   id: string;
   /** Short label shown in the stepper indicator. */
   label: string;
+  /**
+   * Dialog width for this step. `default` (max-w-2xl) suits credential
+   * forms; `wide` (max-w-4xl) suits tree pickers where filenames and
+   * deep folder paths blow out the standard width.
+   */
+  size?: 'default' | 'wide';
   /** Renders step body + footer buttons. Steps own their CTAs. */
   render: (ctx: WizardContext<TState>) => ReactNode;
 }

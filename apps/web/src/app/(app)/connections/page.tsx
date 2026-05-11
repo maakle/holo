@@ -106,12 +106,19 @@ export default async function ConnectionsPage({
   // `connector_cursors.last_status` is only written on successful syncs (the
   // worker's cursor upsert hard-codes `status: 'ok'`), so failures never
   // surface there. Overlay the latest *finished* sync_runs row per provider
-  // to expose 'failed' / 'stalled' on the card.
+  // to expose 'failed' / 'stalled' on the card. A non-ok run wins regardless
+  // of timestamp: for providers with multiple queues (github code + prose),
+  // a healthy queue's cursor will almost always be newer than the failing
+  // queue's last run, and we want the failure to surface.
   const latestRunByProvider = await loadLatestSyncStatusByProvider(db, orgId);
   for (const [provider, run] of latestRunByProvider) {
     const cur = lastSyncByProvider.get(provider);
-    if (!cur || run.finishedAt >= cur.at) {
-      lastSyncByProvider.set(provider, { at: run.finishedAt, status: run.status });
+    const runIsBad = run.status !== 'ok';
+    if (!cur || runIsBad || run.finishedAt >= cur.at) {
+      lastSyncByProvider.set(provider, {
+        at: cur && runIsBad ? cur.at : run.finishedAt,
+        status: run.status,
+      });
     }
   }
 

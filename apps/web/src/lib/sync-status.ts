@@ -12,10 +12,15 @@ export type LatestSyncStatus = {
 };
 
 /**
- * For each of the org's sources, return the latest *finished* row in
+ * For each (source, queue) pair, return the latest *finished* row in
  * `sync_runs` (status in {ok, failed, stalled, cancelled} — i.e. anything
  * with a non-null `finished_at`). Running rows are skipped so an in-progress
  * retry doesn't mask the prior failure.
+ *
+ * Distinct per queue (not just per source) because a provider can have
+ * multiple queues that share one source row — github's `code` and `prose`
+ * both run against the same `sources.id`. Collapsing to one row per source
+ * would let a healthy prose run mask a failing code run.
  *
  * Uses Postgres' `DISTINCT ON` to keep this to a single round trip even when
  * the org has many sources with long run histories.
@@ -31,12 +36,12 @@ export async function loadLatestSyncStatusByProvider(
     finished_at: Date;
   };
   const result = await db.execute<Row>(sql`
-    SELECT DISTINCT ON (source_id)
+    SELECT DISTINCT ON (source_id, queue_name)
            source_id, provider, status, finished_at
       FROM ${schema.syncRuns}
      WHERE organization_id = ${orgId}
        AND finished_at IS NOT NULL
-     ORDER BY source_id, finished_at DESC
+     ORDER BY source_id, queue_name, finished_at DESC
   `);
   // Drizzle's `execute` return shape differs by driver: postgres-js returns
   // an array-like directly; node-postgres returns `{ rows: T[] }`. The rest
