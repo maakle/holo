@@ -160,7 +160,11 @@ export type {
   ZendeskCategory,
   ZendeskArticlesPage,
 } from './zendesk/index';
-export { createJiraSpec, normalizeSiteUrl as normalizeJiraSiteUrl } from './jira/index';
+export {
+  createJiraSpec,
+  normalizeSiteUrl as normalizeJiraSiteUrl,
+  fetchServerInfo as fetchJiraServerInfo,
+} from './jira/index';
 export type {
   JiraSpecOptions,
   JiraIssue,
