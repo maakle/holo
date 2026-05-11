@@ -32,7 +32,10 @@ import {
   githubAppConfigFromEnv,
   loadGoogleServiceAccountToken,
   isGoogleServiceAccountProvider,
+  CONNECTOR_REGISTRATIONS,
+  deriveNoAuthProviders,
 } from '@holo/connectors';
+import type { SyncProvider } from '@holo/sync-providers';
 import type { SyncRunner, SyncResult } from './sync-dispatch';
 import type { SyncJobPayload } from './types';
 import type { EmbedJobPayload, ChunkInsertPayload } from './embed-insert';
@@ -41,6 +44,16 @@ export interface GenericRunnerDeps {
   db: DB;
   embedQueue: Queue<EmbedJobPayload>;
 }
+
+/**
+ * The set of providers whose auth mode is `none` — read from the
+ * connector registrations rather than hard-coded here. Adding a new
+ * `auth: none()` connector now means "register it"; the framework-bridge
+ * picks up the short-circuit automatically. Before the contract, a new
+ * no-auth connector silently threw HOLO_AUTH_NO_SESSION until someone
+ * remembered to append a `providerId === 'foo' ||` clause below.
+ */
+const NO_AUTH_PROVIDERS: ReadonlySet<SyncProvider> = deriveNoAuthProviders(CONNECTOR_REGISTRATIONS);
 
 /**
  * Build a Drizzle-backed RuntimeStores for one (db, embedQueue) pair. Stateless
@@ -68,12 +81,15 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
         return { accessToken: token };
       }
 
-      // Mintlify and Zendesk Help Center use the framework's `none()` auth
-      // strategy — public docs/help-center sites with no credential to load.
-      // The per-source baseUrl lives on `sources.metadata` and is read by the
-      // spec directly. Return an empty token so the framework's authHeader
-      // no-op fires.
-      if (providerId === 'mintlify' || providerId === 'zendesk') {
+      // No-auth connectors (Mintlify, Zendesk Help Center, and any future
+      // `auth: none()` provider) use the framework's `none()` auth
+      // strategy — public docs/help-center sites with no credential to
+      // load. The per-source baseUrl lives on `sources.metadata` and is
+      // read by the spec directly. Return an empty token so the
+      // framework's authHeader no-op fires. The allow-list is derived
+      // from CONNECTOR_REGISTRATIONS, so adding a new no-auth connector
+      // doesn't require touching this file.
+      if (NO_AUTH_PROVIDERS.has(providerId as SyncProvider)) {
         return { accessToken: '' };
       }
 
@@ -109,7 +125,18 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
             // includes it.
             eq(
               schema.connectorCredentials.provider,
-              providerId as 'github' | 'gitlab' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot' | 'linear' | 'googledrive' | 'google-chat' | 'jira',
+              providerId as
+                | 'github'
+                | 'gitlab'
+                | 'slack'
+                | 'notion'
+                | 'grain'
+                | 'pylon'
+                | 'hubspot'
+                | 'linear'
+                | 'googledrive'
+                | 'google-chat'
+                | 'jira',
             ),
             eq(schema.connectorCredentials.status, 'active'),
           ),
@@ -156,7 +183,18 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
             eq(schema.connectorCredentials.organizationId, organizationId),
             eq(
               schema.connectorCredentials.provider,
-              providerId as 'github' | 'gitlab' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot' | 'linear' | 'googledrive' | 'google-chat' | 'jira',
+              providerId as
+                | 'github'
+                | 'gitlab'
+                | 'slack'
+                | 'notion'
+                | 'grain'
+                | 'pylon'
+                | 'hubspot'
+                | 'linear'
+                | 'googledrive'
+                | 'google-chat'
+                | 'jira',
             ),
             eq(schema.connectorCredentials.status, 'active'),
           ),
@@ -251,10 +289,7 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
         .where(
           and(
             eq(schema.connectorAllowlists.organizationId, organizationId),
-            eq(
-              schema.connectorAllowlists.provider,
-              providerId as 'github' | 'slack' | 'notion',
-            ),
+            eq(schema.connectorAllowlists.provider, providerId as 'github' | 'slack' | 'notion'),
           ),
         );
       return rows;
