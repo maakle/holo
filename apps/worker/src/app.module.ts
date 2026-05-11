@@ -27,10 +27,6 @@ import { SlackSubjectsModule } from './slack-subjects/slack-subjects.module';
 import { SlackBotModule } from './slack-bot/slack-bot.module';
 import { ObservabilityModule } from './observability/observability.module';
 
-function parseRedisUrl(url: string): { host: string; port: number } {
-  const u = new URL(url);
-  return { host: u.hostname, port: Number(u.port || 6379) };
-}
 
 @Module({
   imports: [
@@ -52,7 +48,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
       },
     }),
     BullModule.forRoot({
-      connection: parseRedisUrl(process.env.REDIS_URL ?? 'redis://localhost:6382'),
+      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6382' },
     }),
     HeartbeatModule,
     SlackSubjectsModule,

@@ -15,18 +15,13 @@ import {
 export { SYNC_PROVIDERS, SYNC_PROVIDERS_FIX_HINT, isSyncProvider };
 export type Provider = SyncProvider;
 
-function parseRedisUrl(url: string): { host: string; port: number } {
-  const u = new URL(url);
-  return { host: u.hostname, port: Number(u.port || 6379) };
-}
-
 const queues = new Map<string, Queue>();
 
 function getQueue(name: string): Queue {
   let q = queues.get(name);
   if (!q) {
     q = new Queue(name, {
-      connection: parseRedisUrl(process.env.REDIS_URL ?? 'redis://localhost:6382'),
+      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6382' },
     });
     queues.set(name, q);
   }

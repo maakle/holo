@@ -34,17 +34,12 @@ export type SlackBotJob =
       responseUrl: string;
     };
 
-function parseRedisUrl(url: string): { host: string; port: number } {
-  const u = new URL(url);
-  return { host: u.hostname, port: Number(u.port || 6379) };
-}
-
 let queue: Queue<SlackBotJob> | null = null;
 
 export function getSlackBotQueue(redisUrl: string): Queue<SlackBotJob> {
   if (!queue) {
     queue = new Queue<SlackBotJob>(SLACK_BOT_QUEUE, {
-      connection: parseRedisUrl(redisUrl),
+      connection: { url: redisUrl },
     });
   }
   return queue;
