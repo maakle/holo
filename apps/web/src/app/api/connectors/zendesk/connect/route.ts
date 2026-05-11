@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { iterateArticlesIncremental } from '@holo/connectors';
+import { assertPublicHttpUrl } from '@holo/connector-framework';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
@@ -48,23 +49,12 @@ export async function POST(req: Request) {
       });
     }
 
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(rawUrl);
-    } catch {
-      throw holoError({
-        code: ErrorCode.HOLO_INVALID_INPUT,
-        problem: `Not a valid URL: ${rawUrl}`,
-        fix: 'Use a full URL like https://help.kombo.dev or https://kombo.zendesk.com',
-      });
-    }
-    if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
-      throw holoError({
-        code: ErrorCode.HOLO_INVALID_INPUT,
-        problem: `Unsupported protocol: ${parsedUrl.protocol}`,
-        fix: 'Use http:// or https://',
-      });
-    }
+    // Resolve + reject private/loopback/metadata addresses. Zendesk help
+    // centers run on either *.zendesk.com or customer apex domains, so we
+    // can't host-allowlist; the IP-based check is what stops an
+    // authenticated user from probing internal services here or via the
+    // persisted source on every sync tick.
+    const parsedUrl = await assertPublicHttpUrl(rawUrl);
 
     // Strip the path entirely — Zendesk help-center URLs land on
     // /hc/en-us/<...> in the browser, but the API hangs off the host
