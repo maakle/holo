@@ -25,6 +25,7 @@ export const SYNC_PROVIDERS = [
   'airtable',
   'google-chat',
   'asana',
+  'jira',
 ] as const;
 
 export type SyncProvider = (typeof SYNC_PROVIDERS)[number];
@@ -57,6 +58,7 @@ export const QUEUE_NAMES_BY_PROVIDER = {
   airtable: ['airtable-sync'],
   'google-chat': ['google-chat-sync'],
   asana: ['asana-sync'],
+  jira: ['jira-sync'],
 } as const satisfies Record<SyncProvider, readonly string[]>;
 
 export type SyncQueueName =
