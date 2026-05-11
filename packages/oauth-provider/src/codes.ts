@@ -19,6 +19,32 @@ export interface MintAuthCodeInput {
 }
 
 export async function mintAuthCode(db: DB, input: MintAuthCodeInput): Promise<string> {
+  // Re-validate redirect_uri server-side. The consent page checks this
+  // before rendering, but the server action that calls us trusts the
+  // hidden form field — without this lookup, an authenticated user could
+  // edit the field in their browser and mint a code for any registered
+  // client against any redirect they like (RFC 6749 §3.1.2.4 violation).
+  const clientRows = await db
+    .select({ redirectUris: schema.oauthClients.redirectUris })
+    .from(schema.oauthClients)
+    .where(eq(schema.oauthClients.clientId, input.clientId))
+    .limit(1);
+  const client = clientRows[0];
+  if (!client) {
+    throw holoError({
+      code: ErrorCode.HOLO_OAUTH_CODE_INVALID,
+      problem: `Unknown client_id: ${input.clientId}`,
+      fix: 'Register the client first or restart the OAuth flow.',
+    });
+  }
+  if (!client.redirectUris.includes(input.redirectUri)) {
+    throw holoError({
+      code: ErrorCode.HOLO_OAUTH_CODE_INVALID,
+      problem: 'redirect_uri is not registered for this client',
+      fix: 'Use a redirect_uri that was supplied when the client registered.',
+    });
+  }
+
   const code = base64Url(randomBytes(32));
   const expiresAt = new Date(Date.now() + CODE_TTL_MS);
   await db.insert(schema.oauthAuthCodes).values({
