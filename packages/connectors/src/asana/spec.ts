@@ -7,6 +7,7 @@ import {
   type TestConnectionContext,
   type TestConnectionResult,
 } from '@holo/connector-framework';
+import { holoError, ErrorCode } from '@holo/errors';
 import { SYNC_INTERVAL_MS_BY_PROVIDER } from '../sync-intervals';
 import { getUserMe, listProjectsPage, listTasksPage } from './api';
 import { processTask } from './chunking';
@@ -55,7 +56,11 @@ export function createAsanaSpec(_opts: AsanaSpecOptions = {}): ConnectorSpec {
       // token is useless for ingestion. Fail loudly so the connect flow
       // surfaces it instead of silently storing a token that syncs nothing.
       if (!workspace) {
-        throw new Error('Asana token has no workspaces — connect with a different account.');
+        throw holoError({
+          code: ErrorCode.HOLO_INVALID_INPUT,
+          problem: 'Asana token has no workspaces',
+          fix: 'Connect with an account that belongs to at least one Asana workspace.',
+        });
       }
       return {
         externalId: workspace.gid,
