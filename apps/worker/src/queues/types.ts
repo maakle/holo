@@ -17,6 +17,7 @@ export const QUEUE_NAMES = {
   AIRTABLE_SYNC: 'airtable-sync',
   GOOGLE_CHAT_SYNC: 'google-chat-sync',
   ASANA_SYNC: 'asana-sync',
+  JIRA_SYNC: 'jira-sync',
   EMBED: 'embed',
   // Background queue for re-embedding legacy chunks under the migrated
   // OpenAI model (PR #128 → text-embedding-3-small). Kept separate from
@@ -66,6 +67,7 @@ export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   'airtable-sync': 2,
   'google-chat-sync': 3,
   'asana-sync': 2,
+  'jira-sync': 2,
   embed: 5,
   // Backfill is intentionally serial: rewriting legacy chunks is one-shot
   // work that should never crowd live ingest off OpenAI.

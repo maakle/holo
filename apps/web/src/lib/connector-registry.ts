@@ -175,10 +175,10 @@ export const CONNECTORS: ConnectorMeta[] = [
   {
     id: 'jira',
     displayName: 'Jira',
-    description: 'Issues, sprints, and project metadata from Jira Cloud.',
+    description: 'Issues with inline comments and project metadata from Jira Cloud.',
     category: 'productivity',
-    implemented: false,
-    flowType: 'oauth',
+    implemented: true,
+    flowType: 'apikey',
   },
   {
     id: 'intercom',

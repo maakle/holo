@@ -160,6 +160,20 @@ export type {
   ZendeskCategory,
   ZendeskArticlesPage,
 } from './zendesk/index';
+export {
+  createJiraSpec,
+  normalizeSiteUrl as normalizeJiraSiteUrl,
+  fetchServerInfo as fetchJiraServerInfo,
+} from './jira/index';
+export type {
+  JiraSpecOptions,
+  JiraIssue,
+  JiraIssueSearchResponse,
+  JiraProject,
+  JiraProjectSearchResponse,
+  JiraMyself,
+  JiraServerInfo,
+} from './jira/index';
 
 // GitHub (framework-native spec + retained helpers for the bot, gateway,
 // install/uninstall flow, and the webhook receiver). All re-exported via

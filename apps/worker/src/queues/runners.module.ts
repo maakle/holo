@@ -21,6 +21,7 @@ import {
   createAirtableSpec,
   createGoogleChatSpec,
   createAsanaSpec,
+  createJiraSpec,
   githubAppConfigFromEnv,
 } from '@holo/connectors';
 import { setSyncRunner, markRegistrationComplete } from './sync-runner-registry';
@@ -154,6 +155,10 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     // The token is collected per-user via the connect route and loaded from
     // connector_credentials by the framework's loadTokens.
     setSyncRunner(QUEUE_NAMES.LINEAR_SYNC, createGenericRunner(createLinearSpec(), deps));
+    // Jira: basic-auth (email + API token) collected via the connect-route
+    // wizard. Per-tenant siteUrl lives on sources.metadata; the spec builds
+    // its own HttpClient per sync.
+    setSyncRunner(QUEUE_NAMES.JIRA_SYNC, createGenericRunner(createJiraSpec(), deps));
     // Mintlify is fully public — no env credentials required. The per-source
     // base URL lives on `sources.metadata.baseUrl` and the framework's
     // `ctx.sourceMetadata` surfaces it inside the spec.
@@ -194,7 +199,7 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     // the connect route and loaded from connector_credentials.
     setSyncRunner(QUEUE_NAMES.ASANA_SYNC, createGenericRunner(createAsanaSpec(), deps));
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat, asana',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat, asana, jira',
     );
   }
 }

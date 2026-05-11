@@ -1,0 +1,36 @@
+{
+  "issues": [
+    {
+      "id": "10003",
+      "key": "OPS-1",
+      "self": "https://acme.atlassian.net/rest/api/3/issue/10003",
+      "fields": {
+        "summary": "Rotate Atlassian admin token",
+        "description": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "Quarterly rotation." }]
+            }
+          ]
+        },
+        "status": {
+          "id": "1",
+          "name": "To Do",
+          "statusCategory": { "key": "new", "name": "To Do" }
+        },
+        "issuetype": { "id": "10003", "name": "Chore" },
+        "priority": { "id": "2", "name": "High" },
+        "assignee": null,
+        "reporter": { "accountId": "u-mike", "displayName": "Mike Smith" },
+        "project": { "id": "p-2", "key": "OPS", "name": "Operations" },
+        "labels": ["security"],
+        "created": "2026-05-03T09:00:00.000+0000",
+        "updated": "2026-05-10T08:00:00.000+0000",
+        "comment": { "total": 0, "comments": [] }
+      }
+    }
+  ],
+  "isLast": true
+}

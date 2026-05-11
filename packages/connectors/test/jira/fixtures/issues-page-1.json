@@ -1,0 +1,85 @@
+{
+  "issues": [
+    {
+      "id": "10001",
+      "key": "ENG-1",
+      "self": "https://acme.atlassian.net/rest/api/3/issue/10001",
+      "fields": {
+        "summary": "Hook up retrieval health endpoint",
+        "description": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                { "type": "text", "text": "Wire the dashboard to /api/health." }
+              ]
+            }
+          ]
+        },
+        "status": {
+          "id": "1",
+          "name": "In Progress",
+          "statusCategory": { "key": "indeterminate", "name": "In Progress" }
+        },
+        "issuetype": { "id": "10001", "name": "Story" },
+        "priority": { "id": "3", "name": "Medium" },
+        "assignee": {
+          "accountId": "u-jane",
+          "displayName": "Jane Doe",
+          "emailAddress": "jane@acme.test"
+        },
+        "reporter": { "accountId": "u-mike", "displayName": "Mike Smith" },
+        "project": { "id": "p-1", "key": "ENG", "name": "Engineering" },
+        "labels": ["backend", "p1"],
+        "created": "2026-05-01T09:00:00.000+0000",
+        "updated": "2026-05-09T15:22:00.000+0000",
+        "comment": {
+          "total": 1,
+          "comments": [
+            {
+              "id": "c-100",
+              "author": { "accountId": "u-jane", "displayName": "Jane Doe" },
+              "body": {
+                "type": "doc",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [{ "type": "text", "text": "Should we cache the result?" }]
+                  }
+                ]
+              },
+              "created": "2026-05-09T14:00:00.000+0000",
+              "updated": "2026-05-09T14:00:00.000+0000"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "10002",
+      "key": "ENG-2",
+      "self": "https://acme.atlassian.net/rest/api/3/issue/10002",
+      "fields": {
+        "summary": "Document the worker queue topology",
+        "description": null,
+        "status": {
+          "id": "10",
+          "name": "Done",
+          "statusCategory": { "key": "done", "name": "Done" }
+        },
+        "issuetype": { "id": "10002", "name": "Task" },
+        "priority": null,
+        "assignee": null,
+        "reporter": { "accountId": "u-mike", "displayName": "Mike Smith" },
+        "project": { "id": "p-1", "key": "ENG", "name": "Engineering" },
+        "labels": [],
+        "created": "2026-05-02T09:00:00.000+0000",
+        "updated": "2026-05-08T12:00:00.000+0000",
+        "comment": { "total": 0, "comments": [] }
+      }
+    }
+  ],
+  "nextPageToken": "page-2-token",
+  "isLast": false
+}
