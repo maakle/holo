@@ -109,7 +109,7 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
             // includes it.
             eq(
               schema.connectorCredentials.provider,
-              providerId as 'github' | 'gitlab' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot' | 'linear' | 'googledrive' | 'google-chat',
+              providerId as 'github' | 'gitlab' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot' | 'linear' | 'googledrive' | 'google-chat' | 'jira',
             ),
             eq(schema.connectorCredentials.status, 'active'),
           ),
@@ -156,7 +156,7 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
             eq(schema.connectorCredentials.organizationId, organizationId),
             eq(
               schema.connectorCredentials.provider,
-              providerId as 'github' | 'gitlab' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot' | 'linear' | 'googledrive' | 'google-chat',
+              providerId as 'github' | 'gitlab' | 'slack' | 'notion' | 'grain' | 'pylon' | 'hubspot' | 'linear' | 'googledrive' | 'google-chat' | 'jira',
             ),
             eq(schema.connectorCredentials.status, 'active'),
           ),
