@@ -167,12 +167,13 @@ export async function GET(req: Request) {
       },
     });
 
-    const ok = new URL('/connections/oauth-complete', req.url);
+    const ok = new URL('/connections/oauth-complete', env.BETTER_AUTH_URL);
     ok.searchParams.set('provider', 'github');
     ok.searchParams.set('status', 'ok');
     return NextResponse.redirect(ok);
   } catch (e) {
-    const u = new URL('/connections/oauth-complete', req.url);
+    const { env: errEnv } = await getServerContext();
+    const u = new URL('/connections/oauth-complete', errEnv.BETTER_AUTH_URL);
     u.searchParams.set('provider', 'github');
     u.searchParams.set('status', 'error');
     if (e instanceof HoloError) {
