@@ -1,8 +1,22 @@
 export * as shared from './shared/index';
+export { SYNC_INTERVAL_MS_BY_PROVIDER, getSyncIntervalMs } from './sync-intervals';
+// Connector registration contract — see ./contract.ts for the rationale.
+// The contract makes the recurring "no-auth allowlist", "SYNC_PROVIDERS
+// drift", and "refreshable OAuth missing expiresAt" bugs structurally
+// impossible.
 export {
-  SYNC_INTERVAL_MS_BY_PROVIDER,
-  getSyncIntervalMs,
-} from './sync-intervals';
+  defineConnectorRegistration,
+  indexRegistrations,
+  isRefreshableOAuth,
+  hasPersistTokens,
+  persistRefreshableOAuthTokens,
+  deriveNoAuthProviders,
+  deriveServiceAccountProviders,
+  deriveSyncIntervals,
+} from './contract';
+export type { ConnectorAuthMode, ConnectorRegistration, RefreshableOAuthTokens } from './contract';
+export { CONNECTOR_REGISTRATIONS, CONNECTOR_REGISTRATIONS_BY_PROVIDER } from './registrations';
+export type { ConnectorBootOptions } from './registrations';
 export { resolveAllowlist } from './shared/allowlist';
 export type { ResolveAllowlistInput, AllowlistResult, AllowlistRow } from './shared/allowlist';
 export { chunkHash, dedupeAgainstDb } from './shared/content-hash';
@@ -19,15 +33,8 @@ export {
 export type { SlackSpecOptions } from './slack/index';
 export { createSlackApiClient, createSlackUserApiClient } from './slack/index';
 export type { SlackApiClient, SlackUserApiClient } from './slack/index';
-export {
-  verifySlackSignature,
-  SLACK_REPLAY_WINDOW_SECONDS,
-} from './slack/index';
-export type {
-  VerifySlackInput,
-  SlackVerifyResult,
-  SlackVerifyFailure,
-} from './slack/index';
+export { verifySlackSignature, SLACK_REPLAY_WINDOW_SECONDS } from './slack/index';
+export type { VerifySlackInput, SlackVerifyResult, SlackVerifyFailure } from './slack/index';
 export type {
   SlackBlock,
   SlackChannel,
@@ -142,11 +149,7 @@ export {
   probeOpenApi,
   normalizeBaseUrl,
 } from './mintlify/index';
-export type {
-  MintlifySpecOptions,
-  LlmsIndex,
-  LlmsIndexEntry,
-} from './mintlify/index';
+export type { MintlifySpecOptions, LlmsIndex, LlmsIndexEntry } from './mintlify/index';
 export {
   createZendeskSpec,
   iterateArticlesIncremental,

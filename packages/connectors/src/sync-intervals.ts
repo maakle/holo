@@ -5,7 +5,11 @@ const HOUR_MS = 60 * 60 * 1000;
 /**
  * Default sync cadence per provider. Each `create*Spec()` factory reads
  * its entry to populate `spec.sync.intervalMs`, so the spec object and
- * this map stay in lockstep.
+ * this map stay in lockstep. The `ConnectorRegistration` for each
+ * provider (in `./registrations.ts`) reads from this same map, and the
+ * contract-invariants test asserts every registration's `syncIntervalMs`
+ * matches the entry here — so editing one value can't quietly desync
+ * the spec, the registration, and the worker scheduler.
  *
  * Cadence is currently a Holo-team decision (not customer-tunable). Values
  * trade OpenAI embedding cost against retrieval freshness:
