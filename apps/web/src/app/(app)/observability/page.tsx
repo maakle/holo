@@ -4,7 +4,7 @@ import { and, desc, eq, isNotNull, lt, sql } from 'drizzle-orm';
 import { schema, agentEventKind, type AgentEventKind } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
-import { ObservabilityView, type EventRow } from '@/components/observability-view';
+import { ObservabilityView, type EventRow } from '@/components/observability';
 
 const PAGE_SIZE = 200;
 
@@ -20,7 +20,7 @@ export default async function ObservabilityPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const { auth, db} = await getServerContext();
+  const { auth, db } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
 
@@ -75,7 +75,10 @@ export default async function ObservabilityPage({
   const statsRow = await db
     .select({
       total: sql<number>`count(*)::int`.as('total'),
-      errors: sql<number>`sum(case when ${schema.mcpInvocations.errorCode} is not null then 1 else 0 end)::int`.as('errors'),
+      errors:
+        sql<number>`sum(case when ${schema.mcpInvocations.errorCode} is not null then 1 else 0 end)::int`.as(
+          'errors',
+        ),
     })
     .from(schema.mcpInvocations)
     .where(and(eq(schema.mcpInvocations.organizationId, orgId)))
@@ -84,7 +87,9 @@ export default async function ObservabilityPage({
   const replayRow = await db
     .select({
       replays: sql<number>`count(*)::int`.as('replays'),
-      replayViewers: sql<number>`count(distinct ${schema.replayViews.userId})::int`.as('replay_viewers'),
+      replayViewers: sql<number>`count(distinct ${schema.replayViews.userId})::int`.as(
+        'replay_viewers',
+      ),
     })
     .from(schema.replayViews)
     .where(eq(schema.replayViews.organizationId, orgId))
