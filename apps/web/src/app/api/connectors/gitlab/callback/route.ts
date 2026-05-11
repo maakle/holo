@@ -84,6 +84,10 @@ export async function GET(req: Request) {
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken ?? null,
           scope: tokens.scope ?? null,
+          // GitLab.com access tokens live 2h. Without expiresAt the framework's
+          // shouldRefresh() returns false and the token is never rotated, so
+          // sync starts 401-ing the moment the first window closes.
+          expiresAt: tokens.expiresAt ?? null,
           status: 'active',
           lastRefreshedAt: new Date(),
         })
@@ -96,6 +100,7 @@ export async function GET(req: Request) {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken ?? null,
         scope: tokens.scope ?? null,
+        expiresAt: tokens.expiresAt ?? null,
         status: 'active',
       });
     }
