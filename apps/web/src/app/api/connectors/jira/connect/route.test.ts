@@ -7,7 +7,7 @@ const getServerContextMock = vi.fn();
 vi.mock('@/lib/server-context', () => ({ getServerContext: () => getServerContextMock() }));
 
 const resolveActiveOrgIdMock = vi.fn(() => 'org-1');
-vi.mock('@/lib/active-org', () => ({ resolveActiveOrgId: (s: unknown) => resolveActiveOrgIdMock() }));
+vi.mock('@/lib/active-org', () => ({ resolveActiveOrgId: (_s: unknown) => resolveActiveOrgIdMock() }));
 
 const enqueueInitialSyncMock = vi.fn(async () => undefined);
 vi.mock('@/lib/sync-queue', () => ({ enqueueInitialSync: () => enqueueInitialSyncMock() }));

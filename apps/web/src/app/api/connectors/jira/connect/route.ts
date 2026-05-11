@@ -95,7 +95,7 @@ export async function POST(req: Request) {
           eq(schema.connectorCredentials.userId, userId),
           eq(
             schema.connectorCredentials.provider,
-            'jira' as 'jira',
+            'jira' as const,
           ),
         ),
       );
