@@ -41,9 +41,11 @@ export const POST = withActiveOrg<{ provider: string }>(
     }
 
     const enqueued: string[] = [];
+    const deduped: string[] = [];
     for (const s of sourceRows) {
       const r = await enqueueResync(provider, { sourceId: s.id, organizationId: orgId });
       enqueued.push(...r.enqueued);
+      deduped.push(...r.deduped);
     }
 
     emitAuditEvent({
@@ -53,9 +55,14 @@ export const POST = withActiveOrg<{ provider: string }>(
       eventType: 'connector.resync_triggered',
       resourceType: 'connector',
       resourceId: provider,
-      meta: { provider, sources: sourceRows.length, queues: enqueued },
+      meta: { provider, sources: sourceRows.length, queues: enqueued, deduped },
     });
 
-    return { ok: true, sources: sourceRows.length, queues: enqueued };
+    return {
+      ok: true,
+      sources: sourceRows.length,
+      queues: enqueued,
+      deduped: deduped.length > 0 && enqueued.length === 0,
+    };
   },
 );

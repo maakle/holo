@@ -174,6 +174,7 @@ export function ConnectorManageSheet({
       const body = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
         queues?: string[];
+        deduped?: boolean;
         fix?: string;
         problem?: string;
       };
@@ -181,7 +182,11 @@ export function ConnectorManageSheet({
         setError(body.fix ?? body.problem ?? `HTTP ${res.status}`);
         return;
       }
-      setInfo(`Sync enqueued (${(body.queues ?? []).join(', ') || 'no queues'}).`);
+      if (body.deduped) {
+        setInfo('A sync is already running for this connector — your request folded in. No duplicate run was started.');
+      } else {
+        setInfo(`Sync enqueued (${(body.queues ?? []).join(', ') || 'no queues'}).`);
+      }
       notifySyncTriggered(meta.id);
     } finally {
       setBusy(false);

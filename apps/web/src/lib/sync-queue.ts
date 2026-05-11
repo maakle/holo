@@ -33,20 +33,55 @@ function getQueue(name: string): Queue {
   return q;
 }
 
+/**
+ * Check if a job for this (queue, sourceId) is already in-flight. We walk
+ * waiting + active + delayed; completed/failed don't count. Avoids the
+ * "click Save 3× → 3 concurrent workers chewing the same scope" footgun
+ * that surfaces as duplicate sync rows in the manage sheet.
+ *
+ * BullMQ's jobId-based dedup only covers waiting/delayed (active jobs are
+ * removed from the index), so this scan is necessary to also catch the
+ * common case of "a worker is already running, don't pile on."
+ */
+async function hasInFlightJob(
+  queueName: string,
+  sourceId: string,
+): Promise<boolean> {
+  const q = getQueue(queueName);
+  const jobs = await q.getJobs(['waiting', 'active', 'delayed'], 0, 200, false);
+  for (const job of jobs) {
+    const data = job.data as { sourceId?: string } | null;
+    if (data?.sourceId === sourceId) return true;
+  }
+  return false;
+}
+
 export async function enqueueResync(
   provider: Provider,
   payload: { sourceId: string; organizationId: string },
-): Promise<{ enqueued: string[] }> {
+): Promise<{ enqueued: string[]; deduped: string[] }> {
   const names = QUEUE_NAMES_BY_PROVIDER[provider];
   const enqueued: string[] = [];
+  const deduped: string[] = [];
   for (const name of names) {
+    if (await hasInFlightJob(name, payload.sourceId)) {
+      // Another job for this source is already running or queued —
+      // folding repeat-clicks into the existing run keeps the worker
+      // pool sane and avoids the duplicate "googledrive-sync" rows the
+      // user noticed in sync history. The picker's "Save & continue"
+      // and Sync now buttons remain idempotent from the user's POV: any
+      // changes saved to the allowlist before the in-flight job's next
+      // page-list query will be picked up automatically.
+      deduped.push(name);
+      continue;
+    }
     await getQueue(name).add('sync', payload, {
       removeOnComplete: 100,
       removeOnFail: 100,
     });
     enqueued.push(name);
   }
-  return { enqueued };
+  return { enqueued, deduped };
 }
 
 /**
