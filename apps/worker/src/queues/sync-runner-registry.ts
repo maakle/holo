@@ -18,7 +18,7 @@ import type { SyncRunner } from './sync-dispatch';
 // looking up a runner; bootstrap resolves it once every setSyncRunner call
 // has run.
 let resolveReady: (() => void) | null = null;
-let registrationReady: Promise<void> = new Promise<void>((resolve) => {
+const registrationReady: Promise<void> = new Promise<void>((resolve) => {
   resolveReady = resolve;
 });
 
