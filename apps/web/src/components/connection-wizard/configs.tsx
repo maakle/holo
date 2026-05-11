@@ -266,6 +266,29 @@ const mintlifyConfig: ConnectorWizardConfig = {
   ],
 };
 
+const asanaConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'apikey',
+      label: 'Personal access token',
+      render: (ctx) =>
+        apiKeyStep(ctx, {
+          placeholder: 'Asana personal access token',
+          helpText:
+            "Personal access tokens grant Holo read access to every workspace, project, and task the issuing user can see in Asana. Connect from a workspace admin (or a service-style user with broad project access) to mirror the full workspace.",
+          helpUrl: 'https://app.asana.com/0/my-apps',
+          instructions: [
+            'Open app.asana.com → My Profile → My Apps → Personal access tokens, then click "Create new token".',
+            'Label it "Holo" and create the token. Copy the value — Asana only shows it once.',
+            'Paste it below. Holo validates it by calling /users/me before saving.',
+          ],
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 const airtableConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
@@ -369,6 +392,7 @@ const REGISTRY: Partial<Record<ConnectorMeta['id'], ConnectorWizardConfig<any>>>
   googledrive: googleDriveConfig,
   airtable: airtableConfig,
   'google-chat': googleChatConfig,
+  asana: asanaConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -24,6 +24,7 @@ export const SYNC_PROVIDERS = [
   'googledrive',
   'airtable',
   'google-chat',
+  'asana',
 ] as const;
 
 export type SyncProvider = (typeof SYNC_PROVIDERS)[number];
@@ -55,6 +56,7 @@ export const QUEUE_NAMES_BY_PROVIDER = {
   googledrive: ['googledrive-sync'],
   airtable: ['airtable-sync'],
   'google-chat': ['google-chat-sync'],
+  asana: ['asana-sync'],
 } as const satisfies Record<SyncProvider, readonly string[]>;
 
 export type SyncQueueName =

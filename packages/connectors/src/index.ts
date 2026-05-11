@@ -38,6 +38,15 @@ export type {
 } from './slack/index';
 export { createLinearSpec } from './linear/index';
 export type { LinearSpecOptions } from './linear/index';
+export { createAsanaSpec } from './asana/index';
+export type {
+  AsanaSpecOptions,
+  AsanaEnvelope,
+  AsanaProject,
+  AsanaTask,
+  AsanaUserMe,
+  AsanaWorkspace,
+} from './asana/index';
 export {
   createGoogleDriveSpec,
   GOOGLEDRIVE_FILE_KIND,
