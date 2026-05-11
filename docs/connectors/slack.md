@@ -14,12 +14,24 @@ Both flows share one Client ID / Client Secret pair.
 3. Paste the manifest below. Replace `https://your-domain.com` with your `BETTER_AUTH_URL`.
 
 ```yaml
+_metadata:
+  major_version: 1
+  minor_version: 0
 display_information:
   name: Holo Dev
 features:
+  app_home:
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
   bot_user:
     display_name: Holo
     always_online: false
+  slash_commands:
+    - command: /holo
+      url: https://your-gateway-domain.com/slack/commands
+      description: Ask holo for context
+      usage_hint: "[--public] your question"
+      should_escape: false
 oauth_config:
   redirect_urls:
     - https://your-domain.com/api/connectors/slack/callback
@@ -54,16 +66,31 @@ settings:
       - app_uninstalled
   interactivity:
     is_enabled: false
-  slash_commands:
-    - command: /holo
-      url: https://your-gateway-domain.com/slack/commands
-      description: Ask holo for context
-      usage_hint: "[--public] your question"
-      should_escape: false
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false
 ```
+
+> **What changed vs. the previous manifest.** Only two additions, both
+> safe and code-backed:
+>
+> - **`_metadata`** — required version block on Slack's current schema.
+> - **`features.app_home.messages_tab_enabled`** — surfaces the Messages tab
+>   in Slack so users can DM `@holo`. The `message.im` event path is already
+>   handled in [`apps/gateway/src/slack/events.ts`](../../apps/gateway/src/slack/events.ts).
+>
+> **Intentionally NOT added** (despite being current Slack features) — these
+> would change Slack-side behavior in ways the code does not yet support:
+>
+> - `assistant_view` / `assistant:write` / `assistant_thread_started` — Slack's
+>   AI Assistant container surface. The bot only calls `chat.postMessage`, not
+>   `assistant.threads.*`, so the container would render but never be driven.
+>   Tracked as a future migration.
+> - `home_tab_enabled` — no `views.publish` handler exists for
+>   `app_home_opened`, so this would render an empty Home tab.
+> - `oauth_config.pkce_enabled: true` — the Slack OAuth callbacks do not
+>   persist a `code_verifier`. Enabling PKCE in the manifest would break the
+>   install flow.
 
 4. Click **Create**, then **Install to Workspace** to authorize the bot.
 
