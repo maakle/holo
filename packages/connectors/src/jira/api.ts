@@ -96,5 +96,16 @@ export function normalizeSiteUrl(raw: string): string {
       fix: 'Use the form https://yourcompany.atlassian.net (paste from your browser address bar on any Jira page).',
     });
   }
-  return `https://${parsed.host.toLowerCase()}`;
+  const host = parsed.host.toLowerCase();
+  // Restrict to Atlassian Cloud — the connect route probes this host before
+  // saving, so accepting arbitrary URLs would let any signed-in user fan
+  // outbound HTTPS at internal services. Jira Server / DC are out of scope.
+  if (!host.endsWith('.atlassian.net')) {
+    throw holoError({
+      code: ErrorCode.HOLO_INVALID_INPUT,
+      problem: `"${raw}" is not an Atlassian Cloud site URL`,
+      fix: 'Use the form https://yourcompany.atlassian.net. Jira Server / Data Center are not supported.',
+    });
+  }
+  return `https://${host}`;
 }

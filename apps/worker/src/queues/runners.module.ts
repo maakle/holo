@@ -199,7 +199,7 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     // the connect route and loaded from connector_credentials.
     setSyncRunner(QUEUE_NAMES.ASANA_SYNC, createGenericRunner(createAsanaSpec(), deps));
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat, asana',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat, asana, jira',
     );
   }
 }

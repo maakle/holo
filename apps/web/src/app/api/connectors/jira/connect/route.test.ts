@@ -170,4 +170,56 @@ describe('POST /api/connectors/jira/connect', () => {
     );
     expect(fetchCalls.every((u) => u.startsWith('https://acme.atlassian.net/'))).toBe(true);
   });
+
+  it('400s on a non-Atlassian site URL (SSRF guard)', async () => {
+    getServerContextMock.mockResolvedValue({ auth: makeAuth(), db: makeDb() });
+    const res = await POST(
+      makeRequest({
+        siteUrl: 'https://evil.example.com',
+        email: 'a@b.com',
+        token: 't',
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; problem: string };
+    expect(body.code).toBe('HOLO_INVALID_INPUT');
+    expect(body.problem.toLowerCase()).toContain('atlassian');
+  });
+
+  it('reconnect path: updates the existing credential row instead of inserting a duplicate', async () => {
+    // makeDb returns [] from select by default — override to return a row so
+    // the route takes the update branch.
+    const updateSet = vi.fn(() => ({ where: async () => undefined }));
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: async () => [{ id: 'existing-cred-1' }],
+        }),
+      }),
+      insert: vi.fn(() => ({
+        values: () => ({
+          onConflictDoUpdate: async () => undefined,
+          returning: async () => [],
+        }),
+      })),
+      update: vi.fn(() => ({ set: updateSet })),
+    };
+    const insertSpy = db.insert;
+    const updateSpy = db.update;
+    getServerContextMock.mockResolvedValue({ auth: makeAuth(), db });
+
+    const res = await POST(
+      makeRequest({
+        siteUrl: 'https://acme.atlassian.net',
+        email: 'jane@acme.test',
+        token: 'rotated-token',
+      }),
+    );
+    expect(res.status).toBe(200);
+    // update was called on the credential row; insert was only called for sources.
+    expect(updateSpy).toHaveBeenCalled();
+    expect(updateSet).toHaveBeenCalled();
+    // Insert is still called once for the sources upsert, but never for credentials.
+    expect(insertSpy.mock.calls.length).toBe(1);
+  });
 });

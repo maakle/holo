@@ -167,7 +167,7 @@ describe('createJiraSpec', () => {
     expect(upserts.map((u) => u.metadata.key)).toEqual(['ENG', 'OPS']);
   });
 
-  it('throws HOLO_INVALID_INPUT if sources.metadata.siteUrl is missing', async () => {
+  it('throws HOLO_INVALID_INPUT if sources.metadata.siteUrl is missing (issues)', async () => {
     const spec = createJiraSpec({ fetchImpl: async () => jsonResponse({}) });
     const issuesResource = spec.resources.find((r) => r.id === 'issues')!;
     const ctx = {
@@ -186,6 +186,65 @@ describe('createJiraSpec', () => {
     await expect(issuesResource.sync(ctx)).rejects.toMatchObject({
       code: 'HOLO_INVALID_INPUT',
     });
+  });
+
+  it('throws HOLO_INVALID_INPUT if sources.metadata.siteUrl is missing (projects)', async () => {
+    const spec = createJiraSpec({ fetchImpl: async () => jsonResponse({}) });
+    const projectsResource = spec.resources.find((r) => r.id === 'projects')!;
+    const ctx = {
+      organizationId: 'org-1',
+      sourceId: 'src-1',
+      tokens: { accessToken: 'x' },
+      api: {} as ResourceSyncContext<unknown>['api'],
+      paginate: {} as ResourceSyncContext<unknown>['paginate'],
+      cursor: {},
+      allowlist: [],
+      sourceMetadata: {},
+      async upsert() {},
+      async flushCursor() {},
+    } as ResourceSyncContext<unknown>;
+
+    await expect(projectsResource.sync(ctx)).rejects.toMatchObject({
+      code: 'HOLO_INVALID_INPUT',
+    });
+  });
+
+  it('aborts mid-page when ctx.signal fires', async () => {
+    const page1 = await loadFixture('issues-page-1.json');
+    const { fetchImpl } = makeMockFetch([
+      async (url) => {
+        if (!url.endsWith('/rest/api/3/search/jql')) return null;
+        return jsonResponse(page1);
+      },
+    ]);
+    const spec = createJiraSpec({ fetchImpl });
+    const issuesResource = spec.resources.find((r) => r.id === 'issues')!;
+    const controller = new AbortController();
+    // Abort as soon as the first chunk is upserted — we should not see
+    // the second issue processed.
+    let upsertCount = 0;
+    const ctx: ResourceSyncContext<{ updatedAt?: string }> = {
+      organizationId: 'org-1',
+      sourceId: 'src-1',
+      tokens: { accessToken: 'x' },
+      api: {} as ResourceSyncContext<unknown>['api'],
+      paginate: {} as ResourceSyncContext<unknown>['paginate'],
+      cursor: {},
+      allowlist: [],
+      sourceMetadata: { siteUrl: 'https://acme.atlassian.net' },
+      signal: controller.signal,
+      async upsert() {
+        upsertCount += 1;
+        controller.abort();
+      },
+      async flushCursor() {},
+    };
+
+    await expect(issuesResource.sync(ctx)).rejects.toThrow();
+    // First issue's upsert ran (issue chunk), then abort fired, then the
+    // loop's throwIfAborted halted the rest. Comment + second issue should
+    // not have been processed.
+    expect(upsertCount).toBeLessThan(3);
   });
 
   it('testConnection issues GET /rest/api/3/myself and returns accountId as externalId', async () => {
