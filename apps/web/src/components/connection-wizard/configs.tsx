@@ -18,6 +18,7 @@ import type { ConnectorMeta } from '@/lib/connector-registry';
 import type { ConnectorWizardConfig } from './types';
 import { oauthInstallStep } from './steps/oauth-install-step';
 import { apiKeyStep } from './steps/api-key-step';
+import { jiraCredentialsStep } from './steps/jira-credentials-step';
 import { serviceAccountStep } from './steps/service-account-step';
 import { firstSyncStep } from './steps/first-sync-step';
 // Imported from @holo/sync-providers (client-safe constants module) rather
@@ -369,6 +370,28 @@ const zendeskConfig: ConnectorWizardConfig = {
   ],
 };
 
+const jiraConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'credentials',
+      label: 'Connect',
+      render: (ctx) =>
+        jiraCredentialsStep(ctx, {
+          helpText:
+            'Holo authenticates via Atlassian basic auth: your email + an API token. Connect from a workspace admin (or service-style user) to mirror the full workspace.',
+          helpUrl: 'https://id.atlassian.com/manage-profile/security/api-tokens',
+          instructions: [
+            'Open id.atlassian.com/manage-profile/security/api-tokens, click "Create API token", label it "Holo", and copy the value (you can\'t see it again after closing the dialog).',
+            'Paste your Jira site URL (e.g. https://yourcompany.atlassian.net), the email of the Atlassian account that owns the token, and the token below.',
+            'Holo validates the credentials by calling /rest/api/3/myself before saving.',
+          ],
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 // Registry holds heterogeneous configs (each connector has its own state
 // shape). Consumers don't introspect the state from the outside — they hand
 // the config to <ConnectionWizard> which threads the type through.
@@ -393,6 +416,7 @@ const REGISTRY: Partial<Record<ConnectorMeta['id'], ConnectorWizardConfig<any>>>
   airtable: airtableConfig,
   'google-chat': googleChatConfig,
   asana: asanaConfig,
+  jira: jiraConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
