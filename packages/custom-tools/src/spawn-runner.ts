@@ -1,4 +1,5 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcessByStdio } from 'node:child_process';
+import type { Readable } from 'node:stream';
 import type { RunResult } from './types';
 
 export interface RunCommandInput {
@@ -13,11 +14,22 @@ export function runCommand(input: RunCommandInput): Promise<RunResult> {
   const { command, argv, env, timeoutMs, maxOutputBytes } = input;
   return new Promise((resolveP) => {
     const start = Date.now();
-    const child = spawn(command, argv, {
-      env: { ...env, PATH: process.env.PATH ?? '' }, // PATH is needed to resolve binaries
-      shell: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    // Explicit annotation: under apps/web's typecheck (DOM lib + Next's
+    // ProcessEnv augmentation requiring NODE_ENV), spawn's overload union
+    // collapses to `never`. The stdio tuple here pipes stdout+stderr and
+    // ignores stdin, so the result is ChildProcessByStdio<null, Readable, Readable>.
+    const child: ChildProcessByStdio<null, Readable, Readable> = spawn(
+      command,
+      argv,
+      {
+        // PATH needs to be present so the OS can resolve `command`.
+        // Cast through ProcessEnv because Next augments it to require NODE_ENV,
+        // which our caller-provided env intentionally doesn't carry.
+        env: { ...env, PATH: process.env.PATH ?? '' } as unknown as NodeJS.ProcessEnv,
+        shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
 
     let stdout = '';
     let stderr = '';
