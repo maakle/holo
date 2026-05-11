@@ -20,6 +20,7 @@ import {
   createGoogleDriveSpec,
   createAirtableSpec,
   createGoogleChatSpec,
+  createAsanaSpec,
   githubAppConfigFromEnv,
 } from '@holo/connectors';
 import { setSyncRunner, markRegistrationComplete } from './sync-runner-registry';
@@ -188,8 +189,12 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
       QUEUE_NAMES.GOOGLE_CHAT_SYNC,
       createGenericRunner(createGoogleChatSpec(), deps),
     );
+    // Asana: personal access token auth, same shape as Linear/Airtable. No
+    // env credentials required at boot; the token is collected per-org via
+    // the connect route and loaded from connector_credentials.
+    setSyncRunner(QUEUE_NAMES.ASANA_SYNC, createGenericRunner(createAsanaSpec(), deps));
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat, asana',
     );
   }
 }

@@ -14,6 +14,7 @@ import { ZendeskSyncModule } from './zendesk';
 import { GoogleDriveSyncModule } from './googledrive';
 import { AirtableSyncModule } from './airtable';
 import { GoogleChatSyncModule } from './google-chat';
+import { AsanaSyncModule } from './asana';
 import { SyncSchedulerService } from './sync-scheduler.service';
 
 @Module({
@@ -33,6 +34,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
     GoogleDriveSyncModule,
     AirtableSyncModule,
     GoogleChatSyncModule,
+    AsanaSyncModule,
   ],
   providers: [SyncSchedulerService],
 })

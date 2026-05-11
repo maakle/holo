@@ -17,6 +17,7 @@ import { ZendeskSyncModule } from './queues/zendesk';
 import { GoogleDriveSyncModule } from './queues/googledrive';
 import { AirtableSyncModule } from './queues/airtable';
 import { GoogleChatSyncModule } from './queues/google-chat';
+import { AsanaSyncModule } from './queues/asana';
 import { EmbedModule } from './queues/embed';
 import { EmbedBackfillModule } from './queues/embed-backfill';
 import { DisconnectCleanupModule } from './queues/disconnect-cleanup';
@@ -72,6 +73,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
     GoogleDriveSyncModule,
     AirtableSyncModule,
     GoogleChatSyncModule,
+    AsanaSyncModule,
     EmbedModule,
     EmbedBackfillModule,
     DisconnectCleanupModule,
