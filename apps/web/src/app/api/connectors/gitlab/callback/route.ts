@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
-import { eq, and } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { shared, createGitlabSpec } from '@holo/connectors';
 import { createHttpClient } from '@holo/connector-framework';
-import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
-import { enqueueInitialSync } from '@/lib/sync-queue';
+
+const PENDING_GRANT_TTL_MS = 2 * 60 * 1000;
 
 /**
- * GitLab OAuth callback. Mirrors the Linear callback shape — token
- * exchange + testConnection through the framework spec primitives,
- * upsert into `connector_credentials` + `sources`, then redirect to
- * the generic /connections/oauth-complete sink that postMessages back
- * to the opener window.
+ * GitLab OAuth callback. Mirrors the slack callback shape: exchange the
+ * code on this (WEB_PUBLIC_URL) origin, stash the encrypted tokens in a
+ * single-use `oauth_pending_grants` row, then redirect to /finalize on
+ * BETTER_AUTH_URL where the better-auth session is checkable. The
+ * session-bind check there is the defense against confused-deputy
+ * replays of the state JWT.
  */
 export async function GET(req: Request) {
   try {
@@ -64,85 +64,32 @@ export async function GET(req: Request) {
     });
     const ident = await spec.testConnection({ api, tokens });
 
-    const orgId = claims.organization_id;
-    const userId = claims.user_id;
-
-    const existing = await db
-      .select({ id: schema.connectorCredentials.id })
-      .from(schema.connectorCredentials)
-      .where(
-        and(
-          eq(schema.connectorCredentials.organizationId, orgId),
-          eq(schema.connectorCredentials.userId, userId),
-          eq(schema.connectorCredentials.provider, 'gitlab'),
-        ),
-      );
-    if (existing[0]) {
-      await db
-        .update(schema.connectorCredentials)
-        .set({
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken ?? null,
-          scope: tokens.scope ?? null,
-          // GitLab.com access tokens live 2h. Without expiresAt the framework's
-          // shouldRefresh() returns false and the token is never rotated, so
-          // sync starts 401-ing the moment the first window closes.
-          expiresAt: tokens.expiresAt ?? null,
-          status: 'active',
-          lastRefreshedAt: new Date(),
-        })
-        .where(eq(schema.connectorCredentials.id, existing[0].id));
-    } else {
-      await db.insert(schema.connectorCredentials).values({
-        organizationId: orgId,
-        userId,
-        provider: 'gitlab',
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken ?? null,
-        scope: tokens.scope ?? null,
-        expiresAt: tokens.expiresAt ?? null,
-        status: 'active',
-      });
-    }
-
-    await db
-      .insert(schema.sources)
-      .values({
-        organizationId: orgId,
-        provider: 'gitlab',
-        externalId: ident.externalId,
-        name: ident.name,
-        metadata: { gitlab_singleton: true },
-      })
-      .onConflictDoUpdate({
-        target: [
-          schema.sources.organizationId,
-          schema.sources.provider,
-          schema.sources.externalId,
-        ],
-        set: {
-          name: ident.name,
-          metadata: { gitlab_singleton: true },
-          updatedAt: new Date(),
-        },
-      });
-
-    await enqueueInitialSync(db, orgId, 'gitlab').catch(() => {});
-
-    emitAuditEvent({
-      db,
-      organizationId: orgId,
-      userId,
-      eventType: 'connector.connected',
-      resourceType: 'connector',
-      resourceId: 'gitlab',
-      meta: { provider: 'gitlab', externalId: ident.externalId, name: ident.name },
+    const payload = JSON.stringify({
+      provider: 'gitlab',
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken ?? null,
+      scope: tokens.scope ?? null,
+      // Serialise to ISO string so the JSON round-trip preserves it; the
+      // finalize handler converts back to Date when committing.
+      expiresAtIso: tokens.expiresAt ? new Date(tokens.expiresAt).toISOString() : null,
+      ident: { externalId: ident.externalId, name: ident.name },
     });
 
-    const ok = new URL('/connections/oauth-complete', env.BETTER_AUTH_URL);
-    ok.searchParams.set('provider', 'gitlab');
-    ok.searchParams.set('status', 'ok');
-    return NextResponse.redirect(ok);
+    const inserted = await db
+      .insert(schema.oauthPendingGrants)
+      .values({
+        provider: 'gitlab',
+        claimedUserId: claims.user_id,
+        claimedOrganizationId: claims.organization_id,
+        payload,
+        expiresAt: new Date(Date.now() + PENDING_GRANT_TTL_MS),
+      })
+      .returning({ id: schema.oauthPendingGrants.id });
+    const grantId = inserted[0]!.id;
+
+    const finalize = new URL('/api/connectors/finalize', env.BETTER_AUTH_URL);
+    finalize.searchParams.set('grant', grantId);
+    return NextResponse.redirect(finalize);
   } catch (e) {
     let appOrigin: string;
     try {

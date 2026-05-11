@@ -6,9 +6,9 @@ import {
   githubAppConfigFromEnv,
   mintAppJwt,
 } from '@holo/connectors';
-import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
-import { enqueueInitialSync } from '@/lib/sync-queue';
+
+const PENDING_GRANT_TTL_MS = 2 * 60 * 1000;
 
 interface InstallationResponse {
   id: number;
@@ -45,16 +45,17 @@ export async function GET(req: Request) {
     }
 
     const { env, db } = await getServerContext();
-    // Trust the signed state JWT alone — see slack/callback/route.ts for
-    // the rationale. Cookie/session binding can't survive the WEB_PUBLIC_URL
-    // ↔ BETTER_AUTH_URL origin split.
+    // Two-step bind: the JWT proves the state was issued by us; the real
+    // session-bind check (claims.user_id === current session.user.id)
+    // happens at /api/connectors/finalize on BETTER_AUTH_URL where the
+    // better-auth cookie is readable. Without that downstream check, an
+    // attacker could send their JWT-bearing install URL to a victim and
+    // land the victim's installation under the attacker's org.
     const claims = await shared.verifyState(state, env.BETTER_AUTH_SECRET);
 
-    const orgId = claims.organization_id;
-    const userId = claims.user_id;
-
-    // Fetch installation metadata so we can store account_login / type / etc.
-    // Uses an App-level JWT — we don't have an installation token yet.
+    // Fetch installation metadata so finalize can persist account_login /
+    // type / etc. Uses an App-level JWT — we don't have an installation
+    // token yet.
     const config = githubAppConfigFromEnv(env);
     const appJwt = await mintAppJwt(config);
     const ghRes = await fetch(
@@ -79,98 +80,32 @@ export async function GET(req: Request) {
     }
     const installation = (await ghRes.json()) as InstallationResponse;
 
-    // Upsert the github_installations row.
-    await db
-      .insert(schema.githubInstallations)
-      .values({
-        organizationId: orgId,
-        installationId: installation.id,
-        accountLogin: installation.account.login,
-        accountType: installation.account.type,
-        accountId: installation.account.id,
-        repositorySelection: installation.repository_selection,
-        installedByUserId: userId,
-        suspendedAt: installation.suspended_at ? new Date(installation.suspended_at) : null,
-      })
-      .onConflictDoUpdate({
-        target: [
-          schema.githubInstallations.organizationId,
-          schema.githubInstallations.installationId,
-        ],
-        set: {
-          accountLogin: installation.account.login,
-          accountType: installation.account.type,
-          accountId: installation.account.id,
-          repositorySelection: installation.repository_selection,
-          suspendedAt: installation.suspended_at
-            ? new Date(installation.suspended_at)
-            : null,
-        },
-      });
-
-    // Upsert the sources row used by the worker. We key by external_id =
-    // <installation_id> so a re-install with a new id creates a new source
-    // (rare) rather than colliding with the old one.
-    await db
-      .insert(schema.sources)
-      .values({
-        organizationId: orgId,
-        provider: 'github',
-        externalId: String(installation.id),
-        name: installation.account.login,
-        metadata: {
-          installation_id: installation.id,
-          account_login: installation.account.login,
-          account_type: installation.account.type,
-        },
-      })
-      .onConflictDoUpdate({
-        target: [
-          schema.sources.organizationId,
-          schema.sources.provider,
-          schema.sources.externalId,
-        ],
-        set: {
-          name: installation.account.login,
-          metadata: {
-            installation_id: installation.id,
-            account_login: installation.account.login,
-            account_type: installation.account.type,
-          },
-          updatedAt: new Date(),
-        },
-      });
-
-    // Mark the side-effect that an initial sync should fire. We deliberately
-    // let GitHub's "select repos" UI act as the allowlist — Phase 3 wires the
-    // worker to skip if no repos are reachable, and GitHub's webhook for
-    // installation_repositories will keep us synced.
-    if (setupAction !== 'update') {
-      await enqueueInitialSync(db, orgId, 'github').catch(() => {
-        // Best-effort. The 6h scheduler will catch it next tick.
-      });
-    }
-
-    emitAuditEvent({
-      db,
-      organizationId: orgId,
-      userId,
-      eventType: 'connector.connected',
-      resourceType: 'connector',
-      resourceId: 'github',
-      meta: {
-        provider: 'github',
-        installationId: installation.id,
-        accountLogin: installation.account.login,
-        accountType: installation.account.type,
-        setupAction,
-      },
+    const payload = JSON.stringify({
+      provider: 'github',
+      installationId: installation.id,
+      accountLogin: installation.account.login,
+      accountType: installation.account.type,
+      accountId: installation.account.id,
+      repositorySelection: installation.repository_selection,
+      suspendedAtIso: installation.suspended_at,
+      setupAction,
     });
 
-    const ok = new URL('/connections/oauth-complete', env.BETTER_AUTH_URL);
-    ok.searchParams.set('provider', 'github');
-    ok.searchParams.set('status', 'ok');
-    return NextResponse.redirect(ok);
+    const inserted = await db
+      .insert(schema.oauthPendingGrants)
+      .values({
+        provider: 'github',
+        claimedUserId: claims.user_id,
+        claimedOrganizationId: claims.organization_id,
+        payload,
+        expiresAt: new Date(Date.now() + PENDING_GRANT_TTL_MS),
+      })
+      .returning({ id: schema.oauthPendingGrants.id });
+    const grantId = inserted[0]!.id;
+
+    const finalize = new URL('/api/connectors/finalize', env.BETTER_AUTH_URL);
+    finalize.searchParams.set('grant', grantId);
+    return NextResponse.redirect(finalize);
   } catch (e) {
     const { env: errEnv } = await getServerContext();
     const u = new URL('/connections/oauth-complete', errEnv.BETTER_AUTH_URL);
