@@ -1,8 +1,7 @@
-'use server';
-
 // Barrel re-export so existing call sites `from './actions'` continue to work
 // after the per-domain split. Each underlying file carries its own
-// `'use server'` directive.
+// `'use server'` directive — this barrel must NOT, since re-exporting types
+// is disallowed in a "use server" module.
 export { updateWorkspace, type UpdateWorkspaceState } from './workspace';
 export { updateOrgPreferences, type UpdateOrgPreferencesState } from './preferences';
 export {
