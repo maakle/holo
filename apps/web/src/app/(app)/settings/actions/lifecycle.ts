@@ -9,14 +9,7 @@ import { holoError, ErrorCode } from '@holo/errors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
-import {
-  deleteWorkspaceSchema,
-  leaveWorkspaceSchema,
-  updateOrgPreferencesSchema,
-  updateWorkspaceSchema,
-  workspaceNameSchema,
-  workspaceSlugSchema,
-} from './schemas';
+import { deleteWorkspaceSchema, leaveWorkspaceSchema } from '../schemas';
 
 export type DeleteWorkspaceState = {
   ok: boolean;
@@ -27,188 +20,6 @@ export type LeaveWorkspaceState = {
   ok: boolean;
   error?: string;
 };
-
-export type UpdateWorkspaceState = {
-  ok: boolean;
-  error?: string;
-  field?: 'name' | 'slug';
-  value?: string;
-};
-
-export type UpdateOrgPreferencesState = {
-  ok: boolean;
-  error?: string;
-};
-
-export async function updateWorkspace(
-  _prev: UpdateWorkspaceState,
-  formData: FormData,
-): Promise<UpdateWorkspaceState> {
-  const parsed = updateWorkspaceSchema.safeParse({
-    organizationId: formData.get('organizationId'),
-    field: formData.get('field'),
-    value: formData.get('value'),
-  });
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid input.' };
-  }
-  const { organizationId, field, value } = parsed.data;
-
-  const valueParsed =
-    field === 'name'
-      ? workspaceNameSchema.safeParse(value)
-      : workspaceSlugSchema.safeParse(value);
-  if (!valueParsed.success) {
-    return {
-      ok: false,
-      field,
-      error: valueParsed.error.issues[0]?.message ?? 'Invalid value.',
-    };
-  }
-  const cleanValue = valueParsed.data;
-
-  const { auth, db, defaultOrgId } = await getServerContext();
-  const reqHeaders = await headers();
-  const session = await auth.api.getSession({ headers: reqHeaders });
-  if (!session) {
-    throw holoError({
-      code: ErrorCode.HOLO_AUTH_NO_SESSION,
-      problem: 'must be signed in',
-      fix: 'Sign in and try again.',
-    });
-  }
-  const userId = session.user.id;
-  const activeOrgId = resolveActiveOrgId(session);
-  if (organizationId !== activeOrgId) {
-    return { ok: false, field, error: 'Workspace mismatch. Refresh and try again.' };
-  }
-
-  const [me] = await db
-    .select({ role: schema.member.role })
-    .from(schema.member)
-    .where(
-      and(eq(schema.member.organizationId, organizationId), eq(schema.member.userId, userId)),
-    )
-    .limit(1);
-  if (!me || me.role !== 'owner') {
-    return { ok: false, field, error: 'Only owners can edit workspace details.' };
-  }
-
-  if (field === 'slug' && organizationId === defaultOrgId) {
-    return {
-      ok: false,
-      field,
-      error: 'The default workspace slug cannot be changed.',
-    };
-  }
-
-  if (field === 'slug') {
-    const [conflict] = await db
-      .select({ id: schema.organization.id })
-      .from(schema.organization)
-      .where(
-        and(
-          eq(schema.organization.slug, cleanValue),
-          ne(schema.organization.id, organizationId),
-        ),
-      )
-      .limit(1);
-    if (conflict) {
-      return { ok: false, field, error: 'That slug is already taken.' };
-    }
-  }
-
-  await db
-    .update(schema.organization)
-    .set(field === 'name' ? { name: cleanValue } : { slug: cleanValue })
-    .where(eq(schema.organization.id, organizationId));
-
-  emitAuditEvent({
-    db,
-    organizationId,
-    userId,
-    eventType: 'workspace.updated',
-    resourceType: 'organization',
-    resourceId: organizationId,
-    meta: { field, value: cleanValue },
-  });
-
-  // 'layout' invalidates the (app) layout that fetches memberOrgs for the
-  // sidebar OrgSwitcher; without it, the trigger keeps the old name until
-  // a full page reload.
-  revalidatePath('/settings', 'layout');
-  return { ok: true, field, value: cleanValue };
-}
-
-export async function updateOrgPreferences(input: {
-  organizationId: string;
-  hideSampleData: boolean;
-}): Promise<UpdateOrgPreferencesState> {
-  const parsed = updateOrgPreferencesSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid input.' };
-  }
-  const { organizationId, hideSampleData } = parsed.data;
-
-  const { auth, db } = await getServerContext();
-  const reqHeaders = await headers();
-  const session = await auth.api.getSession({ headers: reqHeaders });
-  if (!session) {
-    throw holoError({
-      code: ErrorCode.HOLO_AUTH_NO_SESSION,
-      problem: 'must be signed in',
-      fix: 'Sign in and try again.',
-    });
-  }
-  const userId = session.user.id;
-  const activeOrgId = resolveActiveOrgId(session);
-  if (organizationId !== activeOrgId) {
-    return { ok: false, error: 'Workspace mismatch. Refresh and try again.' };
-  }
-
-  const [me] = await db
-    .select({ role: schema.member.role })
-    .from(schema.member)
-    .where(
-      and(eq(schema.member.organizationId, organizationId), eq(schema.member.userId, userId)),
-    )
-    .limit(1);
-  if (!me || me.role !== 'owner') {
-    return { ok: false, error: 'Only owners can edit workspace preferences.' };
-  }
-
-  const [org] = await db
-    .select({ metadata: schema.organization.metadata })
-    .from(schema.organization)
-    .where(eq(schema.organization.id, organizationId))
-    .limit(1);
-  if (!org) {
-    return { ok: false, error: 'Workspace not found.' };
-  }
-  const nextMetadata = {
-    ...((org.metadata ?? {}) as Record<string, unknown>),
-    hideSampleData,
-  };
-
-  await db
-    .update(schema.organization)
-    .set({ metadata: nextMetadata })
-    .where(eq(schema.organization.id, organizationId));
-
-  emitAuditEvent({
-    db,
-    organizationId,
-    userId,
-    eventType: 'workspace.preferences.updated',
-    resourceType: 'organization',
-    resourceId: organizationId,
-    meta: { hideSampleData },
-  });
-
-  revalidatePath('/settings');
-  revalidatePath('/connections');
-  return { ok: true };
-}
 
 export async function deleteWorkspace(
   _prev: DeleteWorkspaceState,
@@ -257,9 +68,7 @@ export async function deleteWorkspace(
   const [me] = await db
     .select({ role: schema.member.role })
     .from(schema.member)
-    .where(
-      and(eq(schema.member.organizationId, organizationId), eq(schema.member.userId, userId)),
-    )
+    .where(and(eq(schema.member.organizationId, organizationId), eq(schema.member.userId, userId)))
     .limit(1);
   if (!me || me.role !== 'owner') {
     return { ok: false, error: 'Only owners can delete a workspace.' };
@@ -304,9 +113,7 @@ export async function deleteWorkspace(
     await tx
       .delete(schema.procedureEpisodes)
       .where(eq(schema.procedureEpisodes.organizationId, organizationId));
-    await tx
-      .delete(schema.skillRuns)
-      .where(eq(schema.skillRuns.organizationId, organizationId));
+    await tx.delete(schema.skillRuns).where(eq(schema.skillRuns.organizationId, organizationId));
     await tx
       .delete(schema.skillLabels)
       .where(eq(schema.skillLabels.organizationId, organizationId));
@@ -314,9 +121,7 @@ export async function deleteWorkspace(
       .delete(schema.publishedSkills)
       .where(eq(schema.publishedSkills.organizationId, organizationId));
     await tx.delete(schema.skills).where(eq(schema.skills.organizationId, organizationId));
-    await tx
-      .delete(schema.chunks)
-      .where(eq(schema.chunks.organizationId, organizationId));
+    await tx.delete(schema.chunks).where(eq(schema.chunks.organizationId, organizationId));
     await tx
       .delete(schema.sourceArtifacts)
       .where(eq(schema.sourceArtifacts.organizationId, organizationId));
@@ -336,9 +141,7 @@ export async function deleteWorkspace(
     await tx
       .delete(schema.mcpInvocations)
       .where(eq(schema.mcpInvocations.organizationId, organizationId));
-    await tx
-      .delete(schema.apiTokens)
-      .where(eq(schema.apiTokens.organizationId, organizationId));
+    await tx.delete(schema.apiTokens).where(eq(schema.apiTokens.organizationId, organizationId));
     await tx
       .delete(schema.auditEvents)
       .where(eq(schema.auditEvents.organizationId, organizationId));
@@ -360,15 +163,13 @@ export async function deleteWorkspace(
     // Remaining tables (member, invitation, sync_runs, github_installations,
     // oauth tokens/codes, slack_user_credentials, user_subjects_cache) all
     // cascade on organization delete.
-    await tx
-      .delete(schema.organization)
-      .where(
-        and(
-          eq(schema.organization.id, organizationId),
-          // Defensive: ensure we never wipe the default org by id reuse.
-          ne(schema.organization.id, defaultOrgId),
-        ),
-      );
+    await tx.delete(schema.organization).where(
+      and(
+        eq(schema.organization.id, organizationId),
+        // Defensive: ensure we never wipe the default org by id reuse.
+        ne(schema.organization.id, defaultOrgId),
+      ),
+    );
   });
 
   revalidatePath('/');
@@ -406,9 +207,7 @@ export async function leaveWorkspace(
   const [me] = await db
     .select({ id: schema.member.id, role: schema.member.role })
     .from(schema.member)
-    .where(
-      and(eq(schema.member.organizationId, organizationId), eq(schema.member.userId, userId)),
-    )
+    .where(and(eq(schema.member.organizationId, organizationId), eq(schema.member.userId, userId)))
     .limit(1);
   if (!me) {
     return { ok: false, error: 'You are not a member of this workspace.' };
