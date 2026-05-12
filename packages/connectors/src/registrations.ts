@@ -34,6 +34,7 @@ import { createJiraSpec } from './jira/spec';
 import { createLinearSpec } from './linear/spec';
 import { createMintlifySpec } from './mintlify/spec';
 import { createNotionSpec } from './notion/spec';
+import { createPrismicSpec } from './prismic/spec';
 import { createPylonSpec } from './pylon/spec';
 import { createSalesforceSpec, type SalesforceSpecOptions } from './salesforce/spec';
 import { createSlackSpec, type SlackSpecOptions } from './slack/spec';
@@ -149,6 +150,17 @@ const mintlify: NoOptRegistration = defineConnectorRegistration<ConnectorBootOpt
   createSpec: () => createMintlifySpec(),
 });
 
+const prismic: NoOptRegistration = defineConnectorRegistration<ConnectorBootOptions>({
+  providerId: 'prismic',
+  syncIntervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.prismic,
+  // Prismic public repos work without any credential; the optional PAT for
+  // private repos is stored on `sources.metadata.accessToken` rather than
+  // on connector_credentials so we keep auth: 'none' here (same shape as
+  // Mintlify). The token is per-source, not per-org-user.
+  auth: { kind: 'none' },
+  createSpec: () => createPrismicSpec(),
+});
+
 const googledrive: NoOptRegistration = defineConnectorRegistration<ConnectorBootOptions>({
   providerId: 'googledrive',
   syncIntervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.googledrive,
@@ -225,6 +237,7 @@ export const CONNECTOR_REGISTRATIONS: ReadonlyArray<ConnectorRegistration<Connec
   hubspot,
   linear,
   mintlify,
+  prismic,
   zendesk,
   googledrive,
   airtable,

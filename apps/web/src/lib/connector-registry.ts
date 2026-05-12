@@ -35,6 +35,7 @@ export interface ConnectorMeta {
     | 'hubspot'
     | 'linear'
     | 'mintlify'
+    | 'prismic'
     | 'zendesk'
     | 'googledrive'
     | 'airtable'
@@ -138,6 +139,15 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'mintlify',
     displayName: 'Mintlify Docs',
     description: 'Public Mintlify-hosted documentation: pages and OpenAPI reference.',
+    category: 'knowledge',
+    implemented: true,
+    flowType: 'apikey',
+  },
+  {
+    id: 'prismic',
+    displayName: 'Prismic',
+    description:
+      'Prismic CMS documents (FAQs, pages, blog posts); public repos work without a token.',
     category: 'knowledge',
     implemented: true,
     flowType: 'apikey',

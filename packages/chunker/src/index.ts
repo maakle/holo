@@ -30,6 +30,10 @@ export {
 } from './salesforce-record';
 export { mintlifyPageChunker, type MintlifyPageInput } from './mintlify-page';
 export {
+  prismicDocumentChunker,
+  type PrismicDocumentInput,
+} from './prismic-document';
+export {
   openapiEndpointChunker,
   type OpenApiEndpointInput,
   type OpenApiDocument,

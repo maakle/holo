@@ -16,6 +16,7 @@ import {
   createGithubSpec,
   createGitlabSpec,
   createMintlifySpec,
+  createPrismicSpec,
   createZendeskSpec,
   createGoogleDriveSpec,
   createAirtableSpec,
@@ -174,6 +175,13 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     setSyncRunner(
       QUEUE_NAMES.MINTLIFY_SYNC,
       createGenericRunner(createMintlifySpec(), deps),
+    );
+    // Prismic is public-by-default. Per-source state (`repo`, optional `accessToken`
+    // for private repos) lives on `sources.metadata`; the spec reads it via
+    // ctx.sourceMetadata, same shape as Mintlify and Zendesk.
+    setSyncRunner(
+      QUEUE_NAMES.PRISMIC_SYNC,
+      createGenericRunner(createPrismicSpec(), deps),
     );
     // Zendesk help centers, also fully public — same shape as Mintlify
     // (per-source baseUrl on sources.metadata, none() auth).

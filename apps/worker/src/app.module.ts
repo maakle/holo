@@ -13,6 +13,7 @@ import { PylonSyncModule } from './queues/pylon';
 import { HubspotSyncModule } from './queues/hubspot';
 import { LinearSyncModule } from './queues/linear';
 import { MintlifySyncModule } from './queues/mintlify';
+import { PrismicSyncModule } from './queues/prismic';
 import { ZendeskSyncModule } from './queues/zendesk';
 import { GoogleDriveSyncModule } from './queues/googledrive';
 import { AirtableSyncModule } from './queues/airtable';
@@ -67,6 +68,7 @@ import { ObservabilityModule } from './observability/observability.module';
     HubspotSyncModule,
     LinearSyncModule,
     MintlifySyncModule,
+    PrismicSyncModule,
     ZendeskSyncModule,
     GoogleDriveSyncModule,
     AirtableSyncModule,

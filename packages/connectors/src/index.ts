@@ -172,6 +172,22 @@ export {
 } from './mintlify/index';
 export type { MintlifySpecOptions, LlmsIndex, LlmsIndexEntry } from './mintlify/index';
 export {
+  createPrismicSpec,
+  fetchRepository as fetchPrismicRepository,
+  getMasterRef as getPrismicMasterRef,
+  iterateDocuments as iteratePrismicDocuments,
+  documentToMarkdown as prismicDocumentToMarkdown,
+  isValidRepoName as isValidPrismicRepoName,
+  parseRepoInput as parsePrismicRepoInput,
+  repoApiBase as prismicRepoApiBase,
+} from './prismic/index';
+export type {
+  PrismicSpecOptions,
+  PrismicDocument,
+  PrismicRepository,
+  PrismicSearchResponse,
+} from './prismic/index';
+export {
   createZendeskSpec,
   iterateArticlesIncremental,
   fetchAllSections as fetchAllZendeskSections,
