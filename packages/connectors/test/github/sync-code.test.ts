@@ -14,6 +14,7 @@ function mockShell(overrides: Partial<GitShell> = {}): GitShell {
     headSha: vi.fn().mockResolvedValue('new-sha-abc'),
     fetch: vi.fn().mockResolvedValue(undefined),
     diffNameStatus: vi.fn().mockResolvedValue([]),
+    hasClone: vi.fn().mockResolvedValue(true),
     ...overrides,
   };
 }
@@ -99,6 +100,31 @@ describe('runGithubCodeSync', () => {
     expect(shell.clone).not.toHaveBeenCalled();
     expect(shell.diffNameStatus).toHaveBeenCalledWith('/tmp/test-clone', 'old-sha', 'new-sha');
     // Only A and M files are indexed (not D)
+    expect(result.artifactCount).toBeGreaterThan(0);
+  });
+
+  it('incremental: falls back to clone when workDir was wiped between runs', async () => {
+    // The DB cursor (fromSha) outlives the worker's /tmp clone — when /tmp is
+    // cleaned (container restart, systemd-tmpfiles), a cursor-driven fetch
+    // would `git -C <missing-dir>` and fail. Self-heal by re-cloning instead
+    // of getting stuck on every cron until someone clears the cursor.
+    const enqueueEmbed = vi.fn().mockResolvedValue(undefined) as GithubCodeEmbedEnqueueFn;
+    const shell = mockShell({
+      hasClone: vi.fn().mockResolvedValue(false),
+      headSha: vi.fn().mockResolvedValue('new-sha'),
+      lsFiles: vi.fn().mockResolvedValue(['src/index.ts']),
+      readFile: vi.fn().mockResolvedValue(Buffer.from('export const x = 1;\n')),
+    });
+
+    const result = await runGithubCodeSync(
+      baseInput({ gitShell: shell, enqueueEmbed, fromSha: 'old-sha' }),
+    );
+
+    expect(shell.clone).toHaveBeenCalled();
+    expect(shell.fetch).not.toHaveBeenCalled();
+    // With no usable history we can't diff — fall through to a full walk.
+    expect(shell.diffNameStatus).not.toHaveBeenCalled();
+    expect(shell.lsFiles).toHaveBeenCalled();
     expect(result.artifactCount).toBeGreaterThan(0);
   });
 

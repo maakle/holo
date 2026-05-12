@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFile as fsReadFile } from 'node:fs/promises';
+import { readFile as fsReadFile, stat } from 'node:fs/promises';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { githubCodeChunker } from '@holo/chunker';
@@ -42,6 +42,8 @@ export interface GitShell {
   headSha(dir: string): Promise<string>;
   fetch(dir: string, repoUrl: string): Promise<void>;
   diffNameStatus(dir: string, fromSha: string, toSha: string): Promise<DiffEntry[]>;
+  /** True if `dir` contains a usable git checkout — `.git` exists. */
+  hasClone(dir: string): Promise<boolean>;
 }
 
 function redactUrl(url: string): string {
@@ -139,6 +141,21 @@ export const realGitShell: GitShell = {
     }
   },
 
+  async hasClone(dir) {
+    // workDir lives under os.tmpdir(), which is wiped on container restart,
+    // serverless cold boot, systemd-tmpfiles cleanup, and pod reschedules.
+    // The cursor (last_indexed_sha) lives in the DB and outlives /tmp, so
+    // probe the filesystem before assuming an incremental fetch will work —
+    // otherwise `git -C <missing-dir>` errors permanently until the cursor
+    // is manually cleared.
+    try {
+      const s = await stat(join(dir, '.git'));
+      return s.isDirectory() || s.isFile();
+    } catch {
+      return false;
+    }
+  },
+
   async diffNameStatus(dir, fromSha, toSha) {
     const { stdout } = await execFileAsync('git', [
       '-C', dir,
@@ -193,21 +210,27 @@ export async function runGithubCodeSync(
 
   // Clone or fetch — both need a fresh token-bearing URL because install
   // tokens expire after ~1 hour, so an incremental sync 6h after the initial
-  // clone can't reuse the URL git stored in `remote.origin.url`.
-  if (input.fromSha) {
+  // clone can't reuse the URL git stored in `remote.origin.url`. The cursor
+  // (`fromSha`) lives in the DB and outlives the worker's /tmp, so verify
+  // the clone is still on disk before taking the incremental path.
+  const canIncrement = Boolean(input.fromSha) && (await shell.hasClone(input.workDir));
+  if (canIncrement) {
     await shell.fetch(input.workDir, input.cloneUrl);
   } else {
     await shell.clone(input.cloneUrl, input.workDir);
   }
 
   const headSha = await shell.headSha(input.workDir);
-  if (input.fromSha && headSha === input.fromSha) {
+  if (canIncrement && headSha === input.fromSha) {
     return { artifactCount: 0, headSha };
   }
 
-  // Determine which files to process
+  // Determine which files to process. After a forced re-clone (cursor present
+  // but workDir gone) we don't have the `fromSha` commit locally, so fall
+  // through to a full walk and let downstream content-hash dedupe absorb the
+  // redundancy.
   let filePaths: string[];
-  if (input.fromSha) {
+  if (canIncrement && input.fromSha) {
     const diff = await shell.diffNameStatus(input.workDir, input.fromSha, headSha);
     filePaths = diff
       .filter((e) => e.status === 'A' || e.status === 'M')
