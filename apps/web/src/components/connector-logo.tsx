@@ -32,6 +32,8 @@ const FILE_BY_ID: Partial<Record<ConnectorMeta['id'], string>> = {
   intercom: '/connectors/intercom.webp',
   'microsoft-teams': '/connectors/teams.webp',
   'microsoft-365': '/connectors/office.webp',
+  salesforce: '/connectors/salesforce.webp',
+  stripe: '/connectors/stripe.webp',
 };
 
 export function ConnectorLogo({ id, className }: Props) {

@@ -12,6 +12,22 @@ interface Args {
   instructions?: string[];
 }
 
+function validateAtlassianSiteUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return 'Site URL is required.';
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  let parsed: URL;
+  try {
+    parsed = new URL(withScheme);
+  } catch {
+    return 'Enter a valid URL (e.g. https://yourcompany.atlassian.net).';
+  }
+  if (!parsed.host.toLowerCase().endsWith('.atlassian.net')) {
+    return 'Site URL must be an Atlassian Cloud host (…atlassian.net). Server / Data Center are not supported.';
+  }
+  return null;
+}
+
 export function jiraCredentialsStep<TState>(
   ctx: WizardContext<TState>,
   args: Args = {},
@@ -38,6 +54,11 @@ function JiraCredentialsStep<TState>({
   async function save() {
     if (siteUrl.trim().length === 0 || email.trim().length === 0 || token.trim().length === 0) {
       setError('Site URL, email, and API token are all required.');
+      return;
+    }
+    const urlError = validateAtlassianSiteUrl(siteUrl);
+    if (urlError) {
+      setError(urlError);
       return;
     }
     setBusy(true);
@@ -109,7 +130,7 @@ function JiraCredentialsStep<TState>({
           <label className="flex flex-col gap-1">
             <span className="text-[12px] text-text-muted">Site URL</span>
             <input
-              type="url"
+              type="text"
               inputMode="url"
               placeholder="https://yourcompany.atlassian.net"
               value={siteUrl}

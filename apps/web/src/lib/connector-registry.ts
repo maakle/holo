@@ -1,8 +1,11 @@
 export type ConnectorCategoryId =
   | 'source-control'
   | 'communication'
-  | 'productivity'
-  | 'customer'
+  | 'knowledge'
+  | 'project-management'
+  | 'meetings'
+  | 'crm'
+  | 'customer-support'
   | 'payments';
 
 export interface ConnectorCategory {
@@ -13,9 +16,12 @@ export interface ConnectorCategory {
 export const CONNECTOR_CATEGORIES: ConnectorCategory[] = [
   { id: 'source-control', label: 'Source Control' },
   { id: 'communication', label: 'Communication' },
-  { id: 'productivity', label: 'Productivity' },
-  { id: 'customer', label: 'Customer & CRM' },
-  { id: 'payments', label: 'Payments & Revenue' },
+  { id: 'knowledge', label: 'Knowledge & Docs' },
+  { id: 'project-management', label: 'Project Management' },
+  { id: 'meetings', label: 'Meetings' },
+  { id: 'crm', label: 'CRM' },
+  { id: 'customer-support', label: 'Customer Support' },
+  { id: 'payments', label: 'Payments' },
 ];
 
 export interface ConnectorMeta {
@@ -84,7 +90,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'notion',
     displayName: 'Notion',
     description: 'Pages and databases.',
-    category: 'productivity',
+    category: 'knowledge',
     implemented: true,
     flowType: 'apikey',
   },
@@ -92,7 +98,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'grain',
     displayName: 'Grain',
     description: 'Meeting recordings + transcripts.',
-    category: 'productivity',
+    category: 'meetings',
     implemented: true,
     flowType: 'apikey',
   },
@@ -100,7 +106,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'pylon',
     displayName: 'Pylon',
     description: 'Customer support tickets.',
-    category: 'customer',
+    category: 'customer-support',
     implemented: true,
     flowType: 'apikey',
   },
@@ -108,7 +114,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'hubspot',
     displayName: 'HubSpot',
     description: 'CRM contacts, deals, companies, and engagement timelines.',
-    category: 'customer',
+    category: 'crm',
     implemented: true,
     flowType: 'apikey',
   },
@@ -116,7 +122,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'salesforce',
     displayName: 'Salesforce',
     description: 'CRM accounts, contacts, opportunities, and activity timelines.',
-    category: 'customer',
+    category: 'crm',
     implemented: true,
     flowType: 'oauth',
   },
@@ -124,7 +130,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'linear',
     displayName: 'Linear',
     description: 'Issues with title, description, status, priority, team, and labels.',
-    category: 'productivity',
+    category: 'project-management',
     implemented: true,
     flowType: 'oauth',
   },
@@ -132,7 +138,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'mintlify',
     displayName: 'Mintlify Docs',
     description: 'Public Mintlify-hosted documentation: pages and OpenAPI reference.',
-    category: 'productivity',
+    category: 'knowledge',
     implemented: true,
     flowType: 'apikey',
   },
@@ -140,7 +146,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'zendesk',
     displayName: 'Zendesk Help Center',
     description: 'Public Zendesk help center articles, with section + category breadcrumb.',
-    category: 'customer',
+    category: 'customer-support',
     implemented: true,
     flowType: 'apikey',
   },
@@ -149,7 +155,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     displayName: 'Google Drive',
     description:
       'Google Docs, Sheets, Slides, and uploaded text/markdown files across My Drive and Shared Drives.',
-    category: 'productivity',
+    category: 'knowledge',
     implemented: true,
     flowType: 'service-account',
   },
@@ -157,7 +163,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'airtable',
     displayName: 'Airtable',
     description: 'Bases, tables, and records the personal access token can see.',
-    category: 'productivity',
+    category: 'knowledge',
     implemented: true,
     flowType: 'apikey',
   },
@@ -165,7 +171,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'asana',
     displayName: 'Asana',
     description: 'Tasks with name, notes, status, assignee, projects, and tags.',
-    category: 'productivity',
+    category: 'project-management',
     implemented: true,
     flowType: 'apikey',
   },
@@ -193,7 +199,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'confluence',
     displayName: 'Confluence',
     description: 'Spaces, pages, and inline comments from Confluence Cloud.',
-    category: 'productivity',
+    category: 'knowledge',
     implemented: true,
     flowType: 'apikey',
   },
@@ -201,7 +207,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'jira',
     displayName: 'Jira',
     description: 'Issues with inline comments and project metadata from Jira Cloud.',
-    category: 'productivity',
+    category: 'project-management',
     implemented: true,
     flowType: 'apikey',
   },
@@ -209,7 +215,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'intercom',
     displayName: 'Intercom',
     description: 'Conversations, contacts, and help center articles.',
-    category: 'customer',
+    category: 'customer-support',
     implemented: false,
     flowType: 'oauth',
   },
@@ -225,7 +231,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     id: 'microsoft-365',
     displayName: 'Microsoft 365',
     description: 'SharePoint sites, OneDrive files, and Office documents.',
-    category: 'productivity',
+    category: 'knowledge',
     implemented: false,
     flowType: 'oauth',
   },
