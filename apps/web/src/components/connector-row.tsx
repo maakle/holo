@@ -151,7 +151,11 @@ export function ConnectorRow({
             {!comingSoon && connected && !isDisconnecting ? (
               <SyncStatusBadge provider={meta.id} initialLastSyncedAt={lastSyncedAt ?? null} />
             ) : null}
-            {!comingSoon && connected && !isDisconnecting && lastSyncStatus === 'failed' ? (
+            {!comingSoon &&
+            connected &&
+            !isDisconnecting &&
+            !liveStatus.running &&
+            lastSyncStatus === 'failed' ? (
               <Badge variant="error">Sync failed</Badge>
             ) : null}
           </div>
