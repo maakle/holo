@@ -15,6 +15,13 @@ interface ToolCallTrace {
   durationMs?: number;
 }
 
+export interface PhaseEntry {
+  id: string;
+  label: string;
+  state: 'active' | 'done' | 'error';
+  durationMs?: number;
+}
+
 export interface ChatTurn {
   id: string;
   role: 'user' | 'assistant';
@@ -22,15 +29,53 @@ export interface ChatTurn {
   toolCalls?: ToolCallTrace[];
   modelCalls?: number;
   pending?: boolean;
+  phases?: PhaseEntry[];
   error?: string;
 }
 
-interface ChatApiResponse {
-  answer: string;
-  toolCalls: ToolCallTrace[];
-  modelCalls: number;
-  problem?: string;
-  code?: string;
+// NDJSON event shapes streamed from /api/chat. Kept in sync with the
+// ChatStreamEvent union in the route handler.
+type StreamEvent =
+  | { type: 'model_start'; modelCall: number }
+  | { type: 'model_end'; modelCall: number; stopReason: string }
+  | {
+      type: 'tool_start';
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+    }
+  | {
+      type: 'tool_end';
+      id: string;
+      name: string;
+      output: unknown;
+      isError?: boolean;
+      durationMs: number;
+    }
+  | {
+      type: 'done';
+      answer: string;
+      toolCalls: ToolCallTrace[];
+      modelCalls: number;
+    }
+  | { type: 'error'; problem: string; code: string };
+
+function phaseLabelForTool(name: string, input: Record<string, unknown>): string {
+  if (name === 'search') {
+    const q = typeof input.q === 'string' ? input.q : '';
+    return q ? `Searching your sources for "${truncateInline(q, 60)}"` : 'Searching your sources';
+  }
+  if (name === 'list_skills') return 'Listing skills';
+  if (name === 'get_skill') {
+    const slug = typeof input.slug === 'string' ? input.slug : null;
+    return slug ? `Reading skill "${slug}"` : 'Reading skill details';
+  }
+  return `Running ${name}`;
+}
+
+function truncateInline(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return `${s.slice(0, max - 1)}…`;
 }
 
 const SUGGESTIONS = [
@@ -81,11 +126,28 @@ export function ChatPanel({
       role: 'assistant',
       text: '',
       pending: true,
+      phases: [
+        {
+          id: 'thinking-initial',
+          label: 'Thinking',
+          state: 'active',
+        },
+      ],
     };
     const history = [...turns, userTurn];
     setTurns([...history, assistantTurn]);
     setInput('');
     setBusy(true);
+
+    const failTurn = (message: string) => {
+      setTurns((prev) =>
+        prev.map((t) =>
+          t.id === assistantTurn.id
+            ? { ...t, pending: false, error: message, text: '', phases: undefined }
+            : t,
+        ),
+      );
+    };
 
     let activeConversationId = conversationId;
     if (!activeConversationId) {
@@ -114,17 +176,95 @@ export function ChatPanel({
         createError = err instanceof Error ? err.message : 'Network error.';
       }
       if (createError !== null) {
-        setTurns((prev) =>
-          prev.map((t) =>
-            t.id === assistantTurn.id
-              ? { ...t, pending: false, error: createError ?? 'Could not create conversation.', text: '' }
-              : t,
-          ),
-        );
+        failTurn(createError ?? 'Could not create conversation.');
         setBusy(false);
         return;
       }
     }
+
+    const applyEvent = (event: StreamEvent) => {
+      setTurns((prev) =>
+        prev.map((t) => {
+          if (t.id !== assistantTurn.id) return t;
+          const phases = t.phases ? [...t.phases] : [];
+
+          if (event.type === 'model_start') {
+            // Replace any trailing active "thinking" phase rather than stacking
+            // duplicates each agent loop iteration.
+            const last = phases[phases.length - 1];
+            if (last && last.state === 'active' && last.label === 'Thinking') {
+              return t;
+            }
+            phases.push({
+              id: `model-${event.modelCall}`,
+              label: 'Thinking',
+              state: 'active',
+            });
+            return { ...t, phases };
+          }
+
+          if (event.type === 'model_end') {
+            const idx = phases.findIndex(
+              (p) => p.id === `model-${event.modelCall}` && p.state === 'active',
+            );
+            if (idx >= 0) {
+              phases[idx] = { ...phases[idx]!, state: 'done' };
+            }
+            return { ...t, phases };
+          }
+
+          if (event.type === 'tool_start') {
+            // Demote any trailing "Thinking" phase so the new tool phase is
+            // visually the active step.
+            const last = phases[phases.length - 1];
+            if (last && last.state === 'active' && last.label === 'Thinking') {
+              phases[phases.length - 1] = { ...last, state: 'done' };
+            }
+            phases.push({
+              id: `tool-${event.id}`,
+              label: phaseLabelForTool(event.name, event.input),
+              state: 'active',
+            });
+            return { ...t, phases };
+          }
+
+          if (event.type === 'tool_end') {
+            const idx = phases.findIndex((p) => p.id === `tool-${event.id}`);
+            if (idx >= 0) {
+              phases[idx] = {
+                ...phases[idx]!,
+                state: event.isError ? 'error' : 'done',
+                durationMs: event.durationMs,
+              };
+            }
+            return { ...t, phases };
+          }
+
+          if (event.type === 'done') {
+            return {
+              ...t,
+              pending: false,
+              text: event.answer,
+              toolCalls: event.toolCalls,
+              modelCalls: event.modelCalls,
+              phases: undefined,
+            };
+          }
+
+          if (event.type === 'error') {
+            return {
+              ...t,
+              pending: false,
+              error: event.problem,
+              text: '',
+              phases: undefined,
+            };
+          }
+
+          return t;
+        }),
+      );
+    };
 
     try {
       const res = await fetch('/api/chat', {
@@ -135,40 +275,48 @@ export function ChatPanel({
           conversationId: activeConversationId,
         }),
       });
-      const data = (await res.json()) as ChatApiResponse;
-      if (!res.ok) {
-        const message = data.problem ?? `Request failed (${res.status}).`;
-        setTurns((prev) =>
-          prev.map((t) =>
-            t.id === assistantTurn.id
-              ? { ...t, pending: false, error: message, text: '' }
-              : t,
-          ),
-        );
+      if (!res.ok || !res.body) {
+        const body = (await res.json().catch(() => null)) as
+          | { problem?: string }
+          | null;
+        failTurn(body?.problem ?? `Request failed (${res.status}).`);
         return;
       }
-      setTurns((prev) =>
-        prev.map((t) =>
-          t.id === assistantTurn.id
-            ? {
-                ...t,
-                pending: false,
-                text: data.answer,
-                toolCalls: data.toolCalls,
-                modelCalls: data.modelCalls,
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          let newlineIdx = buffer.indexOf('\n');
+          while (newlineIdx !== -1) {
+            const line = buffer.slice(0, newlineIdx).trim();
+            buffer = buffer.slice(newlineIdx + 1);
+            if (line) {
+              try {
+                applyEvent(JSON.parse(line) as StreamEvent);
+              } catch {
+                // Drop malformed lines; the stream may include partial
+                // frames at the chunk boundary which the next read covers.
               }
-            : t,
-        ),
-      );
+            }
+            newlineIdx = buffer.indexOf('\n');
+          }
+        }
+        if (done) break;
+      }
+      if (buffer.trim()) {
+        try {
+          applyEvent(JSON.parse(buffer.trim()) as StreamEvent);
+        } catch {
+          // ignore trailing partial line
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Network error.';
-      setTurns((prev) =>
-        prev.map((t) =>
-          t.id === assistantTurn.id
-            ? { ...t, pending: false, error: message, text: '' }
-            : t,
-        ),
-      );
+      failTurn(message);
     } finally {
       setBusy(false);
     }
@@ -313,7 +461,7 @@ function Turn({ turn }: { turn: ChatTurn }) {
       <span className="caption text-text-subtle">Agent</span>
       <div className="w-full max-w-[100%] space-y-2">
         {turn.pending ? (
-          <PendingDots />
+          <PhaseList phases={turn.phases ?? []} />
         ) : turn.error ? (
           <div className="rounded-md border border-error/40 bg-error/10 px-3 py-2 text-[13px] text-text">
             <span className="font-medium text-error">Error: </span>
@@ -338,15 +486,57 @@ function Turn({ turn }: { turn: ChatTurn }) {
   );
 }
 
-function PendingDots() {
+function PhaseList({ phases }: { phases: PhaseEntry[] }) {
+  if (phases.length === 0) {
+    return (
+      <div className="flex items-center gap-1.5 rounded-md border border-border bg-bg px-3 py-2 text-[13px] text-text-muted">
+        <ActiveDot />
+        Thinking…
+      </div>
+    );
+  }
   return (
-    <div className="flex items-center gap-1.5 rounded-md border border-border bg-bg px-3 py-2 text-[13px] text-text-muted">
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/50" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
-      </span>
-      Calling tools…
-    </div>
+    <ul className="space-y-1 rounded-md border border-border bg-bg px-3 py-2 text-[13px]">
+      {phases.map((p) => (
+        <li key={p.id} className="flex items-center gap-2 leading-5">
+          <span className="flex h-2 w-2 shrink-0 items-center justify-center">
+            {p.state === 'active' ? (
+              <ActiveDot />
+            ) : p.state === 'error' ? (
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-error" />
+            ) : (
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-text-subtle" />
+            )}
+          </span>
+          <span
+            className={
+              p.state === 'active'
+                ? 'text-text'
+                : p.state === 'error'
+                  ? 'text-error'
+                  : 'text-text-muted'
+            }
+          >
+            {p.label}
+            {p.state === 'active' ? '…' : null}
+          </span>
+          {typeof p.durationMs === 'number' && p.state !== 'active' ? (
+            <span className="ml-auto text-[11px] tabular-nums text-text-subtle">
+              {p.durationMs}ms
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ActiveDot() {
+  return (
+    <span className="relative flex h-2 w-2">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/50" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+    </span>
   );
 }
 

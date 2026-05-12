@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { LLMClient, LLMRequest, LLMResponse } from '@holo/llm';
 import {
   runChatAgentLoop,
+  type ChatAgentEvent,
   type ChatLocalTool,
   type ChatToolContext,
 } from '../src/chat-orchestrator';
@@ -232,6 +233,82 @@ describe('runChatAgentLoop', () => {
     if (result.kind !== 'tool_cap_exceeded') throw new Error('unreachable');
     expect(result.maxToolCalls).toBe(2);
     expect(result.toolCalls).toHaveLength(2);
+  });
+
+  it('emits model and tool lifecycle events via onEvent in order', async () => {
+    const { client } = scriptedLLM([
+      {
+        stopReason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'call-1',
+            name: 'echo',
+            input: { value: 'hi' },
+          },
+        ],
+      },
+      {
+        stopReason: 'end_turn',
+        content: [{ type: 'text', text: 'done.' }],
+      },
+    ]);
+
+    const events: ChatAgentEvent[] = [];
+    await runChatAgentLoop({
+      llm: client,
+      model: 'test-model',
+      toolCtx: baseCtx,
+      initialMessages: [{ role: 'user', content: 'echo it' }],
+      tools: [echoTool],
+      onEvent: (e) => events.push(e),
+    });
+
+    const kinds = events.map((e) => e.type);
+    expect(kinds).toEqual([
+      'model_start',
+      'model_end',
+      'tool_start',
+      'tool_end',
+      'model_start',
+      'model_end',
+    ]);
+    const toolStart = events[2];
+    expect(toolStart).toMatchObject({
+      type: 'tool_start',
+      name: 'echo',
+      input: { value: 'hi' },
+    });
+    const toolEnd = events[3];
+    expect(toolEnd).toMatchObject({
+      type: 'tool_end',
+      name: 'echo',
+      output: { echoed: { value: 'hi' } },
+    });
+  });
+
+  it('swallows onEvent callback errors so the loop still completes', async () => {
+    const { client } = scriptedLLM([
+      {
+        stopReason: 'end_turn',
+        content: [{ type: 'text', text: 'ok' }],
+      },
+    ]);
+
+    const result = await runChatAgentLoop({
+      llm: client,
+      model: 'test-model',
+      toolCtx: baseCtx,
+      initialMessages: [{ role: 'user', content: 'hi' }],
+      tools: [echoTool],
+      onEvent: () => {
+        throw new Error('transport broke');
+      },
+    });
+
+    expect(result.kind).toBe('answer');
+    if (result.kind !== 'answer') throw new Error('unreachable');
+    expect(result.answer).toBe('ok');
   });
 
   it('returns wall_clock_exceeded when the budget is blown before the next LLM call', async () => {

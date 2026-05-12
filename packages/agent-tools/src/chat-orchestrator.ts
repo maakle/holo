@@ -14,7 +14,7 @@ import { and, eq } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import { search } from '@holo/retrieval-core';
 import { parseSkill } from '@holo/skills';
-import type { LLMClient, LLMMessage, LLMTool } from '@holo/llm';
+import type { LLMClient, LLMMessage, LLMStopReason, LLMTool } from '@holo/llm';
 
 export interface ChatToolContext {
   db: DB;
@@ -206,6 +206,24 @@ export const CHAT_TOOLS: ChatLocalTool[] = [
   },
 ];
 
+export type ChatAgentEvent =
+  | { type: 'model_start'; modelCall: number }
+  | { type: 'model_end'; modelCall: number; stopReason: LLMStopReason }
+  | {
+      type: 'tool_start';
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+    }
+  | {
+      type: 'tool_end';
+      id: string;
+      name: string;
+      output: unknown;
+      isError?: boolean;
+      durationMs: number;
+    };
+
 export interface ChatAgentLoopOptions {
   llm: LLMClient;
   model: string;
@@ -216,6 +234,13 @@ export interface ChatAgentLoopOptions {
   wallClockMs?: number;
   /** Override for tests; defaults to Date.now. */
   now?: () => number;
+  /**
+   * Fired as the loop progresses (model call boundaries, tool start/end).
+   * Used by the web transport to stream live status to the client. Errors
+   * thrown by the callback are swallowed so a flaky transport never aborts
+   * the agent run.
+   */
+  onEvent?: (event: ChatAgentEvent) => void;
 }
 
 export type ChatAgentLoopResult =
@@ -252,6 +277,14 @@ export async function runChatAgentLoop(
   const maxToolCalls = opts.maxToolCalls ?? 12;
   const wallClockMs = opts.wallClockMs ?? 55_000;
   const now = opts.now ?? (() => Date.now());
+  const emit = (event: ChatAgentEvent) => {
+    if (!opts.onEvent) return;
+    try {
+      opts.onEvent(event);
+    } catch {
+      // Transport errors must not abort the agent loop.
+    }
+  };
 
   const toolByName = new Map<string, ChatLocalTool>(tools.map((t) => [t.name, t]));
   const llmTools: LLMTool[] = tools.map((t) => ({
@@ -276,6 +309,8 @@ export async function runChatAgentLoop(
       };
     }
 
+    modelCalls += 1;
+    emit({ type: 'model_start', modelCall: modelCalls });
     const response = await opts.llm.complete({
       model: opts.model,
       maxTokens: 4096,
@@ -283,7 +318,7 @@ export async function runChatAgentLoop(
       messages,
       tools: llmTools,
     });
-    modelCalls += 1;
+    emit({ type: 'model_end', modelCall: modelCalls, stopReason: response.stopReason });
 
     messages.push({ role: 'assistant', content: response.content });
 
@@ -314,6 +349,7 @@ export async function runChatAgentLoop(
       }
       const tool = toolByName.get(use.name);
       const callStart = now();
+      emit({ type: 'tool_start', id: use.id, name: use.name, input: use.input });
       if (!tool) {
         const trace: ChatToolCallTrace = {
           id: use.id,
@@ -324,6 +360,14 @@ export async function runChatAgentLoop(
           durationMs: now() - callStart,
         };
         traces.push(trace);
+        emit({
+          type: 'tool_end',
+          id: trace.id,
+          name: trace.name,
+          output: trace.output,
+          isError: true,
+          durationMs: trace.durationMs ?? 0,
+        });
         toolResults.push({
           type: 'tool_result' as const,
           toolUseId: use.id,
@@ -342,6 +386,13 @@ export async function runChatAgentLoop(
           durationMs: now() - callStart,
         };
         traces.push(trace);
+        emit({
+          type: 'tool_end',
+          id: trace.id,
+          name: trace.name,
+          output: trace.output,
+          durationMs: trace.durationMs ?? 0,
+        });
         toolResults.push({
           type: 'tool_result' as const,
           toolUseId: use.id,
@@ -358,6 +409,14 @@ export async function runChatAgentLoop(
           durationMs: now() - callStart,
         };
         traces.push(trace);
+        emit({
+          type: 'tool_end',
+          id: trace.id,
+          name: trace.name,
+          output: trace.output,
+          isError: true,
+          durationMs: trace.durationMs ?? 0,
+        });
         toolResults.push({
           type: 'tool_result' as const,
           toolUseId: use.id,

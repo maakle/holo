@@ -13,6 +13,7 @@ export {
   runChatAgentLoop,
   CHAT_SYSTEM_PROMPT,
   CHAT_TOOLS,
+  type ChatAgentEvent,
   type ChatAgentLoopOptions,
   type ChatAgentLoopResult,
   type ChatLocalTool,

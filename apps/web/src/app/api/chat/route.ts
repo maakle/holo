@@ -1,10 +1,13 @@
-import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { AnthropicLLMClient, type LLMMessage } from '@holo/llm';
 import { getSubjectsForUser } from '@holo/user-subjects';
-import { runChatAgentLoop, type ChatToolContext } from '@holo/agent-tools/chat';
+import {
+  runChatAgentLoop,
+  type ChatAgentEvent,
+  type ChatToolContext,
+} from '@holo/agent-tools/chat';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { CHAT_MODEL_ID } from '@/lib/chat-model';
@@ -25,7 +28,47 @@ const bodySchema = z.object({
   conversationId: z.string().uuid().optional(),
 });
 
+// Server-sent stream event written to the client as newline-delimited JSON.
+// Mirrors the shape the ChatPanel expects when it parses each NDJSON line.
+type ChatStreamEvent =
+  | ChatAgentEvent
+  | {
+      type: 'done';
+      answer: string;
+      toolCalls: unknown[];
+      modelCalls: number;
+    }
+  | {
+      type: 'error';
+      problem: string;
+      code: string;
+    };
+
+function errorResponse(e: HoloError): Response {
+  const status =
+    e.code === 'HOLO_AUTH_NO_SESSION'
+      ? 401
+      : e.code === 'HOLO_INVALID_INPUT'
+        ? 400
+        : e.code === 'HOLO_ENV_INVALID'
+          ? 503
+          : 400;
+  return new Response(JSON.stringify(e.toJSON()), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
 export async function POST(req: Request) {
+  let setup: {
+    db: Awaited<ReturnType<typeof getServerContext>>['db'];
+    env: Awaited<ReturnType<typeof getServerContext>>['env'];
+    orgId: string;
+    userId: string;
+    conversationId: string | null;
+    initialMessages: LLMMessage[];
+    extraSubjects: string[];
+  };
   try {
     const { auth, db, env } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
@@ -55,13 +98,6 @@ export async function POST(req: Request) {
 
     const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
-    const extraSubjects = await getSubjectsForUser(db, userId);
-    const toolCtx: ChatToolContext = {
-      db,
-      organizationId: orgId,
-      userSubjects: [`org:${orgId}`, `user:${userId}`, ...extraSubjects],
-    };
-
     const conversationId = await attachUserTurnToConversation({
       db,
       organizationId: orgId,
@@ -70,94 +106,111 @@ export async function POST(req: Request) {
       messages: parsed.data.messages,
     });
     if (conversationId === 'not_found') {
-      return NextResponse.json(
-        { code: 'HOLO_NOT_FOUND', problem: 'conversation not found' },
-        { status: 404 },
+      return new Response(
+        JSON.stringify({ code: 'HOLO_NOT_FOUND', problem: 'conversation not found' }),
+        { status: 404, headers: { 'content-type': 'application/json' } },
       );
     }
 
-    const initialMessages: LLMMessage[] = parsed.data.messages.map((m) => ({
-      role: m.role,
-      content: m.text,
-    }));
-
-    const result = await runChatAgentLoop({
-      llm: new AnthropicLLMClient({ apiKey: env.ANTHROPIC_API_KEY }),
-      model: CHAT_MODEL_ID,
-      toolCtx,
-      initialMessages,
-    });
-
-    if (result.kind === 'wall_clock_exceeded') {
-      const problem = `agent exceeded wall clock budget (${result.wallClockMs}ms)`;
-      await persistAssistantTurn({
-        db,
-        conversationId,
-        text: `[error] ${problem}`,
-        toolCalls: result.toolCalls,
-        modelCalls: result.modelCalls,
-      });
-      return NextResponse.json(
-        {
-          answer: '',
-          toolCalls: result.toolCalls,
-          modelCalls: result.modelCalls,
-          problem,
-          code: 'HOLO_AGENT_WALLCLOCK',
-        },
-        { status: 504 },
-      );
-    }
-
-    if (result.kind === 'tool_cap_exceeded') {
-      const problem = `agent exceeded max tool calls (${result.maxToolCalls})`;
-      await persistAssistantTurn({
-        db,
-        conversationId,
-        text: `[error] ${problem}`,
-        toolCalls: result.toolCalls,
-        modelCalls: result.modelCalls,
-      });
-      return NextResponse.json(
-        {
-          answer: '',
-          toolCalls: result.toolCalls,
-          modelCalls: result.modelCalls,
-          problem,
-          code: 'HOLO_AGENT_TOOL_CAP',
-        },
-        { status: 429 },
-      );
-    }
-
-    await persistAssistantTurn({
+    const extraSubjects = await getSubjectsForUser(db, userId);
+    setup = {
       db,
+      env,
+      orgId,
+      userId,
       conversationId,
-      text: result.answer,
-      toolCalls: result.toolCalls,
-      modelCalls: result.modelCalls,
-    });
-    return NextResponse.json({
-      answer: result.answer,
-      toolCalls: result.toolCalls,
-      modelCalls: result.modelCalls,
-    });
+      initialMessages: parsed.data.messages.map((m) => ({
+        role: m.role,
+        content: m.text,
+      })),
+      extraSubjects,
+    };
   } catch (e) {
-    if (e instanceof HoloError) {
-      const status =
-        e.code === 'HOLO_AUTH_NO_SESSION'
-          ? 401
-          : e.code === 'HOLO_INVALID_INPUT'
-            ? 400
-            : e.code === 'HOLO_ENV_INVALID'
-              ? 503
-              : 400;
-      return NextResponse.json(e.toJSON(), { status });
-    }
-    console.error('[api/chat] unexpected error', e);
-    return NextResponse.json(
-      { code: 'HOLO_INTERNAL', problem: 'unexpected error' },
-      { status: 500 },
+    if (e instanceof HoloError) return errorResponse(e);
+    console.error('[api/chat] unexpected setup error', e);
+    return new Response(
+      JSON.stringify({ code: 'HOLO_INTERNAL', problem: 'unexpected error' }),
+      { status: 500, headers: { 'content-type': 'application/json' } },
     );
   }
+
+  const { db, env, orgId, userId, conversationId, initialMessages, extraSubjects } = setup;
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const send = (event: ChatStreamEvent) => {
+        controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
+      };
+
+      try {
+        const toolCtx: ChatToolContext = {
+          db,
+          organizationId: orgId,
+          userSubjects: [`org:${orgId}`, `user:${userId}`, ...extraSubjects],
+        };
+
+        const result = await runChatAgentLoop({
+          llm: new AnthropicLLMClient({ apiKey: env.ANTHROPIC_API_KEY! }),
+          model: CHAT_MODEL_ID,
+          toolCtx,
+          initialMessages,
+          onEvent: (event) => {
+            send(event);
+          },
+        });
+
+        if (result.kind === 'wall_clock_exceeded') {
+          const problem = `agent exceeded wall clock budget (${result.wallClockMs}ms)`;
+          await persistAssistantTurn({
+            db,
+            conversationId,
+            text: `[error] ${problem}`,
+            toolCalls: result.toolCalls,
+            modelCalls: result.modelCalls,
+          });
+          send({ type: 'error', problem, code: 'HOLO_AGENT_WALLCLOCK' });
+        } else if (result.kind === 'tool_cap_exceeded') {
+          const problem = `agent exceeded max tool calls (${result.maxToolCalls})`;
+          await persistAssistantTurn({
+            db,
+            conversationId,
+            text: `[error] ${problem}`,
+            toolCalls: result.toolCalls,
+            modelCalls: result.modelCalls,
+          });
+          send({ type: 'error', problem, code: 'HOLO_AGENT_TOOL_CAP' });
+        } else {
+          await persistAssistantTurn({
+            db,
+            conversationId,
+            text: result.answer,
+            toolCalls: result.toolCalls,
+            modelCalls: result.modelCalls,
+          });
+          send({
+            type: 'done',
+            answer: result.answer,
+            toolCalls: result.toolCalls,
+            modelCalls: result.modelCalls,
+          });
+        }
+      } catch (e) {
+        console.error('[api/chat] stream error', e);
+        const problem = e instanceof Error ? e.message : 'unexpected error';
+        send({ type: 'error', problem, code: 'HOLO_INTERNAL' });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'content-type': 'application/x-ndjson',
+      'cache-control': 'no-cache, no-transform',
+      'x-accel-buffering': 'no',
+    },
+  });
 }

@@ -9,16 +9,15 @@ on:
 #   in the "secrets" step below so no literal base64 keys live in this file.
 # - Postgres credentials are also generated per-run; the postgres service env
 #   pulls them from $GITHUB_ENV.
-# - The four GITHUB_* fixture values are intentionally non-secret test placeholders
-#   (test-login-cid etc.) — apps require them to be non-empty at boot but no
-#   real OAuth flow is exercised in unit tests; the e2e job mocks GitHub.
+# - GITHUB_LOGIN_* fixture values are intentionally non-secret test placeholders —
+#   apps require them to be non-empty at boot but no real OAuth flow is
+#   exercised in unit tests; the e2e job mocks GitHub. The GitHub App connector
+#   uses GITHUB_APP_* env vars, which are optional in the schema and unset here.
 
 env:
   BETTER_AUTH_URL: http://localhost:3000
   GITHUB_LOGIN_CLIENT_ID: test-login-cid
   GITHUB_LOGIN_CLIENT_SECRET: test-login-csec
-  GITHUB_CONNECTOR_CLIENT_ID: test-conn-cid
-  GITHUB_CONNECTOR_CLIENT_SECRET: test-conn-csec
   EMAIL_PROVIDER: console
   NODE_ENV: test
 
