@@ -65,6 +65,7 @@ function phaseLabelForTool(name: string, input: Record<string, unknown>): string
     const q = typeof input.q === 'string' ? input.q : '';
     return q ? `Searching your sources for "${truncateInline(q, 60)}"` : 'Searching your sources';
   }
+  if (name === 'list_connections') return 'Checking connected sources';
   if (name === 'list_skills') return 'Listing skills';
   if (name === 'get_skill') {
     const slug = typeof input.slug === 'string' ? input.slug : null;
@@ -79,7 +80,7 @@ function truncateInline(s: string, max: number): string {
 }
 
 const SUGGESTIONS = [
-  'What sources are connected to my workspace?',
+  'Which connectors are set up and when did they last sync?',
   'List all skills available to me.',
   'Summarize the most recent content I have indexed.',
   'What can you do? Show me your tools.',

@@ -10,7 +10,7 @@
 // shift those bounds.
 
 import { z } from 'zod';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import { search } from '@holo/retrieval-core';
 import { parseSkill } from '@holo/skills';
@@ -38,10 +38,11 @@ export interface ChatLocalTool {
   run: (ctx: ChatToolContext, args: unknown) => Promise<unknown>;
 }
 
-export const CHAT_SYSTEM_PROMPT = `You are holo, a knowledge assistant. You have a small set of read-only tools to search and inspect this organization's indexed content and registered skills. Use them to ground your answer; do not speculate.
+export const CHAT_SYSTEM_PROMPT = `You are holo, a knowledge assistant. You have a small set of read-only tools to search and inspect this organization's indexed content, registered skills, and configured connections. Use them to ground your answer; do not speculate.
 
 Rules:
 - Ground every claim in a tool result. Do not invent facts.
+- For questions about which sources / connectors / integrations are connected, call list_connections — never infer connections from search results, that misses providers whose content hasn't matched a query.
 - Keep answers concise. Use plain markdown if formatting helps.
 - If you cannot find an answer, say so directly.
 - This is an interactive web chat used to test the holo agent surface; explaining which tools you used is welcome when relevant.`;
@@ -113,6 +114,102 @@ export const CHAT_TOOLS: ChatLocalTool[] = [
           ...(r.snippetUrl ? { snippet_url: r.snippetUrl } : {}),
         })),
       };
+    },
+  },
+  {
+    name: 'list_connections',
+    description:
+      'List every provider with at least one configured source in this organization, with per-provider source count and last sync time. Use this for any question about which sources / connectors / integrations are connected — search results only cover providers whose content matched a query and will under-report.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+    async run(ctx) {
+      const sourceRows = await ctx.db
+        .select({
+          provider: schema.sources.provider,
+          id: schema.sources.id,
+          name: schema.sources.name,
+        })
+        .from(schema.sources)
+        .where(eq(schema.sources.organizationId, ctx.organizationId));
+
+      if (sourceRows.length === 0) {
+        return { connections: [] };
+      }
+
+      const sourceIds = sourceRows.map((s) => s.id);
+      const cursorRows = await ctx.db
+        .select({
+          sourceId: schema.connectorCursors.sourceId,
+          lastRunAt: schema.connectorCursors.lastRunAt,
+          lastStatus: schema.connectorCursors.lastStatus,
+        })
+        .from(schema.connectorCursors)
+        .where(
+          and(
+            eq(schema.connectorCursors.organizationId, ctx.organizationId),
+            inArray(schema.connectorCursors.sourceId, sourceIds),
+          ),
+        );
+      const cursorBySource = new Map(
+        cursorRows.map((c) => [c.sourceId, c]),
+      );
+
+      const chunkCounts = await ctx.db
+        .select({
+          provider: schema.chunks.provider,
+          c: sql<number>`count(*)::int`,
+        })
+        .from(schema.chunks)
+        .where(eq(schema.chunks.organizationId, ctx.organizationId))
+        .groupBy(schema.chunks.provider);
+      const chunksByProvider = new Map<string, number>(
+        chunkCounts.map((r) => [r.provider, r.c]),
+      );
+
+      const byProvider = new Map<
+        string,
+        {
+          provider: string;
+          source_count: number;
+          last_synced_at: string | null;
+          last_status: string | null;
+          chunks_indexed: number;
+          source_names: string[];
+        }
+      >();
+      for (const s of sourceRows) {
+        const entry = byProvider.get(s.provider) ?? {
+          provider: s.provider,
+          source_count: 0,
+          last_synced_at: null as string | null,
+          last_status: null as string | null,
+          chunks_indexed: chunksByProvider.get(s.provider) ?? 0,
+          source_names: [] as string[],
+        };
+        entry.source_count += 1;
+        entry.source_names.push(s.name);
+        const cursor = cursorBySource.get(s.id);
+        if (cursor?.lastRunAt) {
+          const iso = cursor.lastRunAt.toISOString();
+          if (!entry.last_synced_at || iso > entry.last_synced_at) {
+            entry.last_synced_at = iso;
+            entry.last_status = cursor.lastStatus;
+          }
+        }
+        byProvider.set(s.provider, entry);
+      }
+
+      // Cap names per provider so the tool result stays small for chatty orgs.
+      const connections = [...byProvider.values()]
+        .map((c) => ({
+          ...c,
+          source_names: c.source_names.slice(0, 10),
+          source_names_truncated: c.source_names.length > 10,
+        }))
+        .sort((a, b) => a.provider.localeCompare(b.provider));
+      return { connections };
     },
   },
   {
