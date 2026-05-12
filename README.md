@@ -4,13 +4,13 @@
 >
 > **Bring your own agent. Layer today. Agent OS tomorrow.**
 
-**Status:** Pre-alpha. 9/9 connectors live (Slack, GitHub, Notion, Grain, Pylon, HubSpot, Linear, Mintlify Docs, Zendesk Help Center), hybrid RRF search, MCP + REST/OpenAPI, DCR OAuth provider, observability + audit + skill marketplace shipped. Not yet ready for production traffic; internal dogfood underway.
+**Status:** Pre-alpha. **20 connectors live** (GitHub, GitLab, Slack, Notion, Grain, Pylon, HubSpot, Linear, Mintlify Docs, Prismic CMS, Zendesk Help Center, Webcrawl/Firecrawl, Google Drive, Airtable, Google Chat, Asana, Jira, Confluence, Stripe, Salesforce), hybrid RRF search, MCP + REST/OpenAPI, DCR OAuth provider, observability + audit + skill marketplace shipped. Not yet ready for production traffic; internal dogfood underway.
 
 ---
 
 ## How it works
 
-1. **Connect** the tools your work lives in (Slack, GitHub, Notion, Grain, Pylon, HubSpot, Linear, Mintlify Docs, Zendesk Help Center — more on the roadmap). One OAuth per source, allowlist-scoped at ingestion.
+1. **Connect** the tools your work lives in — 20 connectors today across code & PM (GitHub, GitLab, Linear, Jira, Asana), chat (Slack, Google Chat), docs & knowledge (Notion, Confluence, Mintlify Docs, Prismic CMS, Webcrawl/Firecrawl), files (Google Drive, Airtable), GTM (HubSpot, Salesforce, Stripe), support (Zendesk, Pylon), and meetings (Grain). One OAuth or API key per source, allowlist-scoped at ingestion.
 2. **Unify.** Holo ingests, chunks, embeds, and indexes. Hybrid retrieval (pgvector + tsvector fused with RRF) over a single ACL-aware index.
 3. **Expose.** A small set of MCP tools and a parallel REST/OpenAPI surface let any agent — internal or external — search, fetch, and invoke learned procedures.
 4. **Observe.** Every agent call is logged, attributable, and replayable. Today: ingestion-time allowlists bound which channels, repos, and pages enter Holo at all. Next: per-agent tool allowlists and row-level data scopes finish the personas model.
@@ -69,7 +69,7 @@ search("Acme Corp") → get_call(recording_id) → get_ticket(ticket_id) → dig
 
 ### 4. One search box across every system *(everyone else)*
 
-A dashboard search box, a Slack `/ask` command, or an internal Retool app calls the REST surface directly. Ops, design, PM, and revops get ranked results across all nine connectors with deep links back to the source — no agent required, no MCP client, no LLM in the path. The same retrieval primitive that powers the agents above is also the one humans hit when they just want to find something.
+A dashboard search box, a Slack `/ask` command, or an internal Retool app calls the REST surface directly. Ops, design, PM, and revops get ranked results across all 20 connectors with deep links back to the source — no agent required, no MCP client, no LLM in the path. The same retrieval primitive that powers the agents above is also the one humans hit when they just want to find something.
 
 ```
 POST /v1/search { query, limit } → ranked chunks with snippet_url back to source
@@ -79,7 +79,7 @@ POST /v1/search { query, limit } → ranked chunks with snippet_url back to sour
 
 ## Architecture
 
-Three apps. 19 packages. AGPL-3.0.
+Three apps. 21 packages. 20 connectors. AGPL-3.0.
 
 ```mermaid
 flowchart LR
@@ -99,14 +99,14 @@ flowchart LR
       RD[("Redis 7<br/>BullMQ queue")]
     end
 
-    subgraph S["Sources"]
+    subgraph S["Sources (20 connectors)"]
       direction TB
-      S1["Slack"]
-      S2["GitHub"]
-      S3["Notion"]
-      S4["Grain"]
-      S5["Pylon"]
-      S6["HubSpot"]
+      S1["Code & PM<br/>GitHub · GitLab · Linear<br/>Jira · Asana"]
+      S2["Chat & Meetings<br/>Slack · Google Chat · Grain"]
+      S3["Docs & Knowledge<br/>Notion · Confluence · Mintlify<br/>Prismic · Webcrawl"]
+      S4["Files<br/>Google Drive · Airtable"]
+      S5["GTM<br/>HubSpot · Salesforce · Stripe"]
+      S6["Support<br/>Zendesk · Pylon"]
     end
 
     A1 -->|"search · fetch · invoke"| GW
@@ -115,10 +115,10 @@ flowchart LR
     GW --> PG
     GW --> RD
     WEB --> PG
-    WEB -. "OAuth grant" .-> S3
+    WEB -. "OAuth / API key" .-> S
     WK --> PG
     WK --> RD
-    WK -->|"sync · webhook"| S3
+    WK -->|"sync · webhook"| S
 ```
 
 | Layer | Choice |
@@ -130,7 +130,7 @@ flowchart LR
 | Cache / Queue | Redis 7 (`maxmemory-policy=noeviction`) |
 | Auth | Better Auth 1.6 — GitHub OAuth + email OTP (Resend); multi-tenant `organization` plugin; OAuth-provider routes for MCP DCR (RFC 7591 / 9728 / 8414). |
 | Search | `packages/retrieval-core` — pgvector + tsvector fused with RRF in a single SQL CTE; dual-model embedding fallback (OpenAI + Voyage); `acl_subjects && user_subjects` filter. |
-| Connectors | `packages/connectors` — Slack, GitHub, Notion, Grain, Pylon, HubSpot, Linear, Mintlify Docs, Zendesk Help Center. Allowlist enforcement via the `connector_allowlists` table (glob or exact-id, audit-trailed). |
+| Connectors | `packages/connectors` — 20 connectors: GitHub, GitLab, Slack, Notion, Grain, Pylon, HubSpot, Linear, Mintlify Docs, Prismic, Zendesk, Webcrawl (Firecrawl-backed), Google Drive, Airtable, Google Chat, Asana, Jira, Confluence, Stripe, Salesforce. Mix of OAuth (refreshable & non), API key, service account, and no-auth. Allowlist enforcement via the `connector_allowlists` table (glob or exact-id, audit-trailed). |
 | Skills | `packages/skills` — Anthropic skill format, golden-set + ROUGE-L eval harness, marketplace publish flow with redaction. MCP exposes `list_skills`, `get_skill`, `execute_skill`. |
 | Custom tools | `packages/custom-tools` — CLI-as-tool registration (e.g. `bq query`, `psql -c …`) without writing a connector. |
 | CLI | `packages/cli` — `npx @holo/cli init`. |
@@ -193,7 +193,7 @@ Three categories, three different mechanisms:
 | **You generate (secrets)** | `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `HOLO_TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32` for each. Paste into the project's env panel before the first deploy. `POSTGRES_PASSWORD` must match what `DATABASE_URL` references. |
 | **You provide (public URLs + OAuth)** | `BETTER_AUTH_URL`, `WEB_PUBLIC_URL`, `MCP_PUBLIC_URL`, `GITHUB_LOGIN_CLIENT_ID`/`_SECRET`, `ANTHROPIC_API_KEY` | Set after the first deploy gives you the public hostnames. `BETTER_AUTH_URL` and `WEB_PUBLIC_URL` point at `holo-web`'s public URL; `MCP_PUBLIC_URL` points at `holo-gateway`'s. The GitHub OAuth app's callback must be `${BETTER_AUTH_URL}/api/auth/callback/github`. |
 
-Connector credentials (Slack, GitHub App, HubSpot, Pylon, Notion, Grain) are **not** required at boot — leave them blank, deploy, then add them per-connector in the Holo dashboard once `apps/web` is reachable.
+Connector credentials (Slack, GitHub App, GitLab, HubSpot, Salesforce, Pylon, Notion, Grain, Linear, Airtable, Asana, Jira, Confluence, Stripe, Zendesk, Google Drive / Chat service account, Prismic, Mintlify, Webcrawl/Firecrawl) are **not** required at boot — leave them blank, deploy, then add them per-connector in the Holo dashboard once `apps/web` is reachable. The only worker-side env that gates a connector at boot is `FIRECRAWL_API_KEY` (powers the Webcrawl connector, since it's Holo-team-operated rather than per-org).
 
 Full env reference: [`.env.example`](./.env.example).
 
