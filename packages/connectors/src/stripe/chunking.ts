@@ -15,7 +15,9 @@ import { stripeRecordChunker, type StripeRecordInput } from '@holo/chunker';
 import type { ResourceSyncContext } from '@holo/connector-framework';
 import type {
   StripeCharge,
+  StripeCoupon,
   StripeCustomer,
+  StripeDiscount,
   StripeInvoice,
   StripeObjectType,
   StripeSubscription,
@@ -65,6 +67,54 @@ function refId(ref: string | { id: string } | null | undefined): string | undefi
   return ref.id;
 }
 
+/**
+ * Per-source FX configuration, read from `sources.metadata`. Operators set
+ * this at connection time (or later, via the manage sheet) so revenue
+ * dashboards can sum across currencies. Shape:
+ *
+ *   {
+ *     "baseCurrency": "usd",
+ *     "fxRates": { "eur": 1.08, "gbp": 1.25, "usd": 1 }
+ *   }
+ *
+ * `fxRates[c]` is "how many units of baseCurrency one unit of c is worth".
+ * When `baseCurrency` is missing or there's no rate for the record's
+ * currency, the connector falls back to native-only output (no `*_base`
+ * fields emitted) — never silently sums dollars and yen.
+ */
+interface FxConfig {
+  baseCurrency: string;
+  fxRates: Record<string, number>;
+}
+
+function parseFxConfig(sourceMetadata: Record<string, unknown>): FxConfig | null {
+  const base = sourceMetadata['baseCurrency'];
+  const rates = sourceMetadata['fxRates'];
+  if (typeof base !== 'string' || base.length === 0) return null;
+  if (!rates || typeof rates !== 'object') return null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(rates as Record<string, unknown>)) {
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) {
+      out[k.toLowerCase()] = v;
+    }
+  }
+  if (Object.keys(out).length === 0) return null;
+  return { baseCurrency: base.toLowerCase(), fxRates: out };
+}
+
+function toBase(
+  amount: number | null | undefined,
+  currency: string | null | undefined,
+  fx: FxConfig | null,
+): { amount_base: number; currency_base: string } | null {
+  if (!fx) return null;
+  if (amount === null || amount === undefined) return null;
+  if (!currency) return null;
+  const rate = fx.fxRates[currency.toLowerCase()];
+  if (rate === undefined) return null;
+  return { amount_base: Number((amount * rate).toFixed(2)), currency_base: fx.baseCurrency };
+}
+
 function planLabel(item: StripeSubscriptionItem): string | undefined {
   const price = item.price;
   if (!price) return undefined;
@@ -72,6 +122,93 @@ function planLabel(item: StripeSubscriptionItem): string | undefined {
   const product = price.product;
   if (product && typeof product !== 'string' && product.name) return product.name;
   return price.id;
+}
+
+/**
+ * Pull the first usable discount object off a subscription. Stripe returns
+ * either a legacy `discount` (object) or a modern `discounts` array (ids
+ * by default, expanded to objects via api.ts). Subscription-level discounts
+ * stack, but for MRR adjustment we apply the first one — multi-coupon stacks
+ * are vanishingly rare and Stripe's own UI shows them serially.
+ */
+function pickDiscount(s: StripeSubscription): StripeDiscount | null {
+  if (s.discount?.coupon) return s.discount;
+  for (const d of s.discounts ?? []) {
+    if (typeof d === 'object' && d?.coupon) return d;
+  }
+  return null;
+}
+
+interface DiscountApplication {
+  effectiveMrr: number;
+  metadata: {
+    discount_kind: 'percent' | 'amount';
+    discount_value: number;
+    discount_coupon?: string;
+  };
+  /** Prose line describing the discount, appended to the chunk body. */
+  line: string;
+}
+
+/**
+ * Apply a coupon to a gross MRR figure. Percent-off subtracts a flat
+ * fraction. Amount-off subtracts the coupon's per-billing amount, normalized
+ * to monthly using the same conversion as `itemMrr` (so a $10/month-off
+ * coupon and a $120/year-off coupon both reduce MRR by $10).
+ *
+ * Returns null when the discount has no usable shape (e.g. an unexpanded id,
+ * a coupon with neither percent_off nor amount_off, or an amount_off in a
+ * different currency than the subscription's). In those cases we leave MRR
+ * unchanged and skip the metadata fields rather than silently mis-reporting.
+ */
+function applyDiscount(
+  grossMrr: number,
+  subscriptionCurrency: string,
+  discount: StripeDiscount,
+): DiscountApplication | null {
+  const coupon = discount.coupon as StripeCoupon | null | undefined;
+  if (!coupon) return null;
+
+  const couponName = coupon.name ?? coupon.id;
+
+  if (coupon.percent_off !== null && coupon.percent_off !== undefined) {
+    const pct = coupon.percent_off;
+    const effective = grossMrr * (1 - pct / 100);
+    return {
+      effectiveMrr: Math.max(0, effective),
+      metadata: { discount_kind: 'percent', discount_value: pct, discount_coupon: couponName },
+      line: `Discount: ${pct}% off${couponName ? ` (${couponName})` : ''}`,
+    };
+  }
+
+  if (coupon.amount_off !== null && coupon.amount_off !== undefined) {
+    const couponCurrency = coupon.currency?.toLowerCase();
+    if (couponCurrency && couponCurrency !== subscriptionCurrency.toLowerCase()) {
+      // Mismatched-currency coupon: refuse to convert. Stripe itself surfaces
+      // this case as an account-config error, but we may still see it in
+      // historical data.
+      return null;
+    }
+    const offDecimal = toDecimal(coupon.amount_off, couponCurrency ?? subscriptionCurrency);
+    // Coupon amount_off applies per billing cycle. We approximate it as a
+    // monthly figure: callers don't have per-item interval visibility here,
+    // so we treat the coupon as if it were monthly. This matches Stripe's
+    // own MRR helper for the common case (monthly billing) and slightly
+    // over-counts the discount for yearly subscriptions — surfaced via
+    // `discount_kind=amount` so the agent knows the math.
+    const effective = grossMrr - offDecimal;
+    return {
+      effectiveMrr: Math.max(0, effective),
+      metadata: {
+        discount_kind: 'amount',
+        discount_value: Number(offDecimal.toFixed(2)),
+        discount_coupon: couponName,
+      },
+      line: `Discount: ${formatMoney(coupon.amount_off, couponCurrency ?? subscriptionCurrency)} off${couponName ? ` (${couponName})` : ''}`,
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -129,19 +266,39 @@ function buildCustomerChunk(c: StripeCustomer): StripeRecordInput {
   };
 }
 
-function buildSubscriptionChunk(s: StripeSubscription): StripeRecordInput {
+function buildSubscriptionChunk(s: StripeSubscription, fx: FxConfig | null): StripeRecordInput {
   const items = s.items?.data ?? [];
   const plans = items.map(planLabel).filter((p): p is string => !!p);
   const mrrParts = items.map(itemMrr).filter((m): m is number => m !== null);
-  const mrr = mrrParts.length > 0 ? mrrParts.reduce((a, b) => a + b, 0) : null;
+  const grossMrr = mrrParts.length > 0 ? mrrParts.reduce((a, b) => a + b, 0) : null;
   const customerId = refId(s.customer);
+
+  // Apply subscription-level discount. Coupons attached to subscription
+  // items are out of scope — Stripe charges fewer than 1% of accounts use
+  // item-level coupons, and they require a separate API expansion.
+  let effectiveMrr = grossMrr;
+  let discountApplied: DiscountApplication | null = null;
+  if (grossMrr !== null && s.currency) {
+    const discount = pickDiscount(s);
+    if (discount) {
+      discountApplied = applyDiscount(grossMrr, s.currency, discount);
+      if (discountApplied) effectiveMrr = discountApplied.effectiveMrr;
+    }
+  }
 
   const lines: string[] = [];
   lines.push(`Status: ${s.status}`);
   if (plans.length > 0) lines.push(`Plan: ${plans.join(', ')}`);
-  if (mrr !== null && s.currency) {
-    lines.push(`MRR: ${s.currency.toUpperCase()} ${mrr.toFixed(2)}`);
+  if (effectiveMrr !== null && s.currency) {
+    if (discountApplied && grossMrr !== null && grossMrr !== effectiveMrr) {
+      lines.push(
+        `MRR: ${s.currency.toUpperCase()} ${effectiveMrr.toFixed(2)} (gross ${s.currency.toUpperCase()} ${grossMrr.toFixed(2)})`,
+      );
+    } else {
+      lines.push(`MRR: ${s.currency.toUpperCase()} ${effectiveMrr.toFixed(2)}`);
+    }
   }
+  if (discountApplied) lines.push(discountApplied.line);
   if (customerId) lines.push(`Customer: ${customerId}`);
   if (s.current_period_start && s.current_period_end) {
     lines.push(
@@ -173,6 +330,14 @@ function buildSubscriptionChunk(s: StripeSubscription): StripeRecordInput {
     );
   }
 
+  const baseConversion =
+    effectiveMrr !== null ? toBase(effectiveMrr, s.currency, fx) : null;
+  if (baseConversion) {
+    lines.push(
+      `MRR (${baseConversion.currency_base.toUpperCase()}): ${baseConversion.currency_base.toUpperCase()} ${baseConversion.amount_base.toFixed(2)}`,
+    );
+  }
+
   const firstInterval = items[0]?.price?.recurring?.interval;
   const displayName = plans.length > 0 ? `Subscription · ${plans.join(', ')}` : `Subscription ${s.id}`;
 
@@ -185,17 +350,23 @@ function buildSubscriptionChunk(s: StripeSubscription): StripeRecordInput {
       customer_id: customerId,
       status: s.status,
       currency: s.currency ?? undefined,
-      mrr: mrr !== null ? Number(mrr.toFixed(2)) : undefined,
+      mrr: effectiveMrr !== null ? Number(effectiveMrr.toFixed(2)) : undefined,
+      mrr_gross:
+        discountApplied && grossMrr !== null ? Number(grossMrr.toFixed(2)) : undefined,
       plan: plans.length > 0 ? plans.join(', ') : undefined,
       plan_interval: firstInterval,
       canceled_at: s.canceled_at ? unixToDate(s.canceled_at).toISOString() : undefined,
+      ...(discountApplied?.metadata ?? {}),
+      ...(baseConversion
+        ? { mrr_base: baseConversion.amount_base, currency_base: baseConversion.currency_base }
+        : {}),
     },
     createdAt: unixToDate(s.created),
     livemode: s.livemode,
   };
 }
 
-function buildInvoiceChunk(inv: StripeInvoice): StripeRecordInput {
+function buildInvoiceChunk(inv: StripeInvoice, fx: FxConfig | null): StripeRecordInput {
   const customerId = refId(inv.customer);
   const subscriptionId = refId(inv.subscription);
   const lines: string[] = [];
@@ -221,13 +392,22 @@ function buildInvoiceChunk(inv: StripeInvoice): StripeRecordInput {
   if (inv.hosted_invoice_url) lines.push(`URL: ${inv.hosted_invoice_url}`);
 
   // Amount used for the strongly-typed metadata is the paid amount (revenue
-  // realized) when the invoice is paid, otherwise the amount_due.
+  // realized) when the invoice is paid, otherwise the amount_due. Invoices
+  // are already post-discount via `amount_paid`, so we don't double-apply
+  // subscription-level coupons here.
   const amountMinor =
     inv.paid && inv.amount_paid !== null && inv.amount_paid !== undefined
       ? inv.amount_paid
       : (inv.amount_due ?? null);
   const amount =
     amountMinor !== null && inv.currency ? toDecimal(amountMinor, inv.currency) : undefined;
+
+  const baseConversion = toBase(amount, inv.currency, fx);
+  if (baseConversion) {
+    lines.push(
+      `Amount (${baseConversion.currency_base.toUpperCase()}): ${baseConversion.currency_base.toUpperCase()} ${baseConversion.amount_base.toFixed(2)}`,
+    );
+  }
 
   return {
     recordType: 'invoice',
@@ -243,13 +423,19 @@ function buildInvoiceChunk(inv: StripeInvoice): StripeRecordInput {
       invoice_number: inv.number ?? undefined,
       period_start: inv.period_start ? unixToDate(inv.period_start).toISOString() : undefined,
       period_end: inv.period_end ? unixToDate(inv.period_end).toISOString() : undefined,
+      ...(baseConversion
+        ? {
+            amount_base: baseConversion.amount_base,
+            currency_base: baseConversion.currency_base,
+          }
+        : {}),
     },
     createdAt: unixToDate(inv.created),
     livemode: inv.livemode,
   };
 }
 
-function buildChargeChunk(ch: StripeCharge): StripeRecordInput {
+function buildChargeChunk(ch: StripeCharge, fx: FxConfig | null): StripeRecordInput {
   const customerId = refId(ch.customer);
   const invoiceId = refId(ch.invoice);
   const lines: string[] = [];
@@ -268,6 +454,15 @@ function buildChargeChunk(ch: StripeCharge): StripeRecordInput {
   if (ch.failure_message) lines.push(`Failure: ${ch.failure_message}`);
 
   const netAmount = ch.amount - (ch.amount_refunded ?? 0);
+  const amount = Number(toDecimal(netAmount, ch.currency).toFixed(2));
+
+  const baseConversion = toBase(amount, ch.currency, fx);
+  if (baseConversion) {
+    lines.push(
+      `Amount (${baseConversion.currency_base.toUpperCase()}): ${baseConversion.currency_base.toUpperCase()} ${baseConversion.amount_base.toFixed(2)}`,
+    );
+  }
+
   return {
     recordType: 'charge',
     recordId: ch.id,
@@ -277,7 +472,13 @@ function buildChargeChunk(ch: StripeCharge): StripeRecordInput {
       customer_id: customerId,
       status: ch.status ?? undefined,
       currency: ch.currency,
-      amount: Number(toDecimal(netAmount, ch.currency).toFixed(2)),
+      amount,
+      ...(baseConversion
+        ? {
+            amount_base: baseConversion.amount_base,
+            currency_base: baseConversion.currency_base,
+          }
+        : {}),
     },
     createdAt: unixToDate(ch.created),
     livemode: ch.livemode,
@@ -294,19 +495,21 @@ export async function processStripeRecord(
   recordType: StripeObjectType,
   raw: StripeCustomer | StripeSubscription | StripeInvoice | StripeCharge,
 ): Promise<void> {
+  const fx = parseFxConfig(ctx.sourceMetadata);
+
   let input: StripeRecordInput;
   switch (recordType) {
     case 'customer':
       input = buildCustomerChunk(raw as StripeCustomer);
       break;
     case 'subscription':
-      input = buildSubscriptionChunk(raw as StripeSubscription);
+      input = buildSubscriptionChunk(raw as StripeSubscription, fx);
       break;
     case 'invoice':
-      input = buildInvoiceChunk(raw as StripeInvoice);
+      input = buildInvoiceChunk(raw as StripeInvoice, fx);
       break;
     case 'charge':
-      input = buildChargeChunk(raw as StripeCharge);
+      input = buildChargeChunk(raw as StripeCharge, fx);
       break;
   }
 

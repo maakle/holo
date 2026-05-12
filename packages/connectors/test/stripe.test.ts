@@ -9,7 +9,11 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   });
 }
 
-function makeStores(initial?: { existingHashes?: string[]; cursors?: Record<string, unknown> }): {
+function makeStores(initial?: {
+  existingHashes?: string[];
+  cursors?: Record<string, unknown>;
+  sourceMetadata?: Record<string, unknown>;
+}): {
   stores: RuntimeStores;
   enqueued: ChunkRecord[];
   savedCursors: Array<{ resourceId: string; cursor: unknown }>;
@@ -17,6 +21,7 @@ function makeStores(initial?: { existingHashes?: string[]; cursors?: Record<stri
   const enqueued: ChunkRecord[] = [];
   const savedCursors: Array<{ resourceId: string; cursor: unknown }> = [];
   const cursors = { ...(initial?.cursors ?? {}) };
+  const sourceMetadata = initial?.sourceMetadata ?? {};
   return {
     enqueued,
     savedCursors,
@@ -36,6 +41,9 @@ function makeStores(initial?: { existingHashes?: string[]; cursors?: Record<stri
       },
       async enqueueChunks({ chunks }) {
         enqueued.push(...chunks);
+      },
+      async loadSourceMetadata() {
+        return sourceMetadata;
       },
     },
   };
@@ -377,6 +385,327 @@ describe('Stripe sync (full)', () => {
     const ch = enqueued.find((c) => c.kind === 'stripe-charge')!;
     expect(ch.content).toContain('JPY 12000');
     expect(ch.metadata['amount']).toBe(12000);
+  });
+});
+
+describe('Stripe discounts on subscriptions', () => {
+  function subscriptionWith(discount: unknown, discounts?: unknown): unknown {
+    return {
+      id: 'sub_disc',
+      object: 'subscription',
+      created: 1_704_067_200,
+      status: 'active',
+      customer: 'cus_1',
+      livemode: true,
+      currency: 'usd',
+      ...(discount !== undefined ? { discount } : {}),
+      ...(discounts !== undefined ? { discounts } : {}),
+      items: {
+        data: [
+          {
+            id: 'si_1',
+            quantity: 1,
+            price: {
+              id: 'price_1',
+              unit_amount: 10000, // $100
+              currency: 'usd',
+              nickname: 'Pro',
+              recurring: { interval: 'month', interval_count: 1 },
+            },
+          },
+        ],
+      },
+    };
+  }
+
+  function subscriptionsResponder(sub: unknown): (req: CapturedRequest) => Response {
+    return (req) => {
+      if (routeForUrl(req.url) === 'subscriptions') {
+        return jsonResponse({ object: 'list', has_more: false, data: [sub] });
+      }
+      return emptyList();
+    };
+  }
+
+  it('applies a percent_off coupon to MRR and emits mrr_gross + discount metadata', async () => {
+    const sub = subscriptionWith({
+      coupon: { id: 'COMMIT2026', name: 'Commit 2026', percent_off: 20 },
+    });
+    const { fetchImpl } = makeFetch(subscriptionsResponder(sub));
+    const spec = createStripeSpec();
+    const { stores, enqueued } = makeStores();
+    await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+    const s = enqueued.find((c) => c.kind === 'stripe-subscription')!;
+    expect(s.metadata['mrr']).toBeCloseTo(80, 2);
+    expect(s.metadata['mrr_gross']).toBeCloseTo(100, 2);
+    expect(s.metadata['discount_kind']).toBe('percent');
+    expect(s.metadata['discount_value']).toBe(20);
+    expect(s.metadata['discount_coupon']).toBe('Commit 2026');
+    expect(s.content).toContain('Discount: 20% off (Commit 2026)');
+    expect(s.content).toMatch(/MRR: USD 80\.00 \(gross USD 100\.00\)/);
+  });
+
+  it('applies an amount_off coupon, normalized to monthly', async () => {
+    const sub = subscriptionWith({
+      coupon: { id: 'TENOFF', amount_off: 1500, currency: 'usd' },
+    });
+    const { fetchImpl } = makeFetch(subscriptionsResponder(sub));
+    const spec = createStripeSpec();
+    const { stores, enqueued } = makeStores();
+    await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+    const s = enqueued.find((c) => c.kind === 'stripe-subscription')!;
+    // $100 - $15 = $85
+    expect(s.metadata['mrr']).toBeCloseTo(85, 2);
+    expect(s.metadata['discount_kind']).toBe('amount');
+    expect(s.metadata['discount_value']).toBeCloseTo(15, 2);
+  });
+
+  it('reads the modern discounts[] array form when discount is absent', async () => {
+    const sub = subscriptionWith(undefined, [
+      { id: 'di_1', coupon: { id: 'X', percent_off: 10 } },
+    ]);
+    const { fetchImpl } = makeFetch(subscriptionsResponder(sub));
+    const spec = createStripeSpec();
+    const { stores, enqueued } = makeStores();
+    await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+    const s = enqueued.find((c) => c.kind === 'stripe-subscription')!;
+    expect(s.metadata['mrr']).toBeCloseTo(90, 2);
+    expect(s.metadata['mrr_gross']).toBeCloseTo(100, 2);
+  });
+
+  it('does not adjust MRR or emit discount fields when the coupon is unusable', async () => {
+    // Coupon with neither percent_off nor amount_off — Stripe will sometimes
+    // surface partial coupons during migration. We must not silently mangle MRR.
+    const sub = subscriptionWith({ coupon: { id: 'BROKEN' } });
+    const { fetchImpl } = makeFetch(subscriptionsResponder(sub));
+    const spec = createStripeSpec();
+    const { stores, enqueued } = makeStores();
+    await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+    const s = enqueued.find((c) => c.kind === 'stripe-subscription')!;
+    expect(s.metadata['mrr']).toBeCloseTo(100, 2);
+    expect(s.metadata['mrr_gross']).toBeUndefined();
+    expect(s.metadata['discount_kind']).toBeUndefined();
+  });
+
+  it('expands data.discount.coupon and data.discounts.coupon in the list call', async () => {
+    const { fetchImpl, calls } = makeFetch((req) => {
+      if (routeForUrl(req.url) === 'subscriptions') {
+        return jsonResponse({ object: 'list', has_more: false, data: [] });
+      }
+      return emptyList();
+    });
+    const spec = createStripeSpec();
+    const { stores } = makeStores();
+    await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+    const subCall = calls.find((c) => routeForUrl(c.url) === 'subscriptions')!;
+    expect(subCall.url).toContain('expand%5B%5D=data.discount.coupon');
+    expect(subCall.url).toContain('expand%5B%5D=data.discounts.coupon');
+  });
+});
+
+describe('Stripe multi-currency normalization', () => {
+  it('emits amount_base + currency_base on records when sources.metadata has fxRates', async () => {
+    const { fetchImpl } = makeFetch((req) => {
+      const route = routeForUrl(req.url);
+      if (route === 'subscriptions') {
+        return jsonResponse({
+          object: 'list',
+          has_more: false,
+          data: [
+            {
+              id: 'sub_eu',
+              object: 'subscription',
+              created: 1_704_067_200,
+              status: 'active',
+              customer: 'cus_1',
+              livemode: true,
+              currency: 'eur',
+              items: {
+                data: [
+                  {
+                    id: 'si_1',
+                    quantity: 1,
+                    price: {
+                      id: 'price_eu',
+                      unit_amount: 5000, // €50
+                      currency: 'eur',
+                      recurring: { interval: 'month', interval_count: 1 },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        });
+      }
+      if (route === 'invoices') {
+        return jsonResponse({
+          object: 'list',
+          has_more: false,
+          data: [
+            {
+              id: 'in_eu',
+              object: 'invoice',
+              created: 1_704_067_200,
+              status: 'paid',
+              customer: 'cus_1',
+              amount_due: 5000,
+              amount_paid: 5000,
+              currency: 'eur',
+              paid: true,
+              livemode: true,
+            },
+          ],
+        });
+      }
+      if (route === 'charges') {
+        return jsonResponse({
+          object: 'list',
+          has_more: false,
+          data: [
+            {
+              id: 'ch_eu',
+              object: 'charge',
+              created: 1_704_067_200,
+              amount: 5000,
+              currency: 'eur',
+              status: 'succeeded',
+              livemode: true,
+            },
+          ],
+        });
+      }
+      return emptyList();
+    });
+
+    const spec = createStripeSpec();
+    const { stores, enqueued } = makeStores({
+      sourceMetadata: {
+        baseCurrency: 'usd',
+        fxRates: { eur: 1.1, usd: 1 },
+      },
+    });
+    await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+
+    const sub = enqueued.find((c) => c.kind === 'stripe-subscription')!;
+    expect(sub.metadata['mrr']).toBeCloseTo(50, 2);
+    expect(sub.metadata['mrr_base']).toBeCloseTo(55, 2);
+    expect(sub.metadata['currency_base']).toBe('usd');
+    expect(sub.content).toContain('MRR (USD): USD 55.00');
+
+    const inv = enqueued.find((c) => c.kind === 'stripe-invoice')!;
+    expect(inv.metadata['amount']).toBeCloseTo(50, 2);
+    expect(inv.metadata['amount_base']).toBeCloseTo(55, 2);
+
+    const ch = enqueued.find((c) => c.kind === 'stripe-charge')!;
+    expect(ch.metadata['amount_base']).toBeCloseTo(55, 2);
+  });
+
+  it('skips the _base fields when no FX rate exists for the record currency', async () => {
+    const { fetchImpl } = makeFetch((req) => {
+      if (routeForUrl(req.url) !== 'charges') return emptyList();
+      return jsonResponse({
+        object: 'list',
+        has_more: false,
+        data: [
+          {
+            id: 'ch_jpy',
+            object: 'charge',
+            created: 1_704_067_200,
+            amount: 12000,
+            currency: 'jpy',
+            status: 'succeeded',
+            livemode: true,
+          },
+        ],
+      });
+    });
+    const spec = createStripeSpec();
+    const { stores, enqueued } = makeStores({
+      // baseCurrency set, but no JPY rate — don't silently equate JPY 1 ↔ USD 1.
+      sourceMetadata: { baseCurrency: 'usd', fxRates: { eur: 1.1 } },
+    });
+    await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+    const ch = enqueued.find((c) => c.kind === 'stripe-charge')!;
+    expect(ch.metadata['amount_base']).toBeUndefined();
+    expect(ch.metadata['currency_base']).toBeUndefined();
+  });
+
+  it('ignores partial / malformed fx config', async () => {
+    const { fetchImpl } = makeFetch((req) => {
+      if (routeForUrl(req.url) !== 'charges') return emptyList();
+      return jsonResponse({
+        object: 'list',
+        has_more: false,
+        data: [
+          {
+            id: 'ch',
+            object: 'charge',
+            created: 1_704_067_200,
+            amount: 1000,
+            currency: 'usd',
+            status: 'succeeded',
+            livemode: true,
+          },
+        ],
+      });
+    });
+    const spec = createStripeSpec();
+    const { stores, enqueued } = makeStores({
+      // Missing baseCurrency — must NOT emit _base fields.
+      sourceMetadata: { fxRates: { usd: 1 } },
+    });
+    await runConnectorSync({
+      spec,
+      stores,
+      organizationId: 'o',
+      sourceId: 's',
+      fetchImpl,
+    });
+    const ch = enqueued.find((c) => c.kind === 'stripe-charge')!;
+    expect(ch.metadata['amount_base']).toBeUndefined();
   });
 });
 

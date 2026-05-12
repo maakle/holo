@@ -37,11 +37,29 @@ export interface StripeRecordMetadata {
   currency?: string;
   /** Total monetary amount in the record's currency, as decimal units (e.g. 49.00). */
   amount?: number;
-  /** For subscriptions: normalized monthly recurring revenue in the record's currency. */
+  /**
+   * For subscriptions: normalized monthly recurring revenue in the record's
+   * currency, **after** any subscription-level discount has been applied.
+   * Pair with `mrr_gross` to see how much the discount removed.
+   */
   mrr?: number;
+  /** Gross MRR before discounts. Only emitted when a discount is present. */
+  mrr_gross?: number;
   plan_interval?: 'day' | 'week' | 'month' | 'year';
   /** Comma-joined plan/product nicknames for subscriptions. */
   plan?: string;
+  /** 'percent' when coupon.percent_off is set, 'amount' for coupon.amount_off. */
+  discount_kind?: 'percent' | 'amount';
+  /** Percent (0-100) or decimal-currency amount, depending on `discount_kind`. */
+  discount_value?: number;
+  /** Coupon id / name surfaced for retrieval ("which subs have COMMIT2026 applied"). */
+  discount_coupon?: string;
+  /** ISO 4217 base currency (lowercase) when FX normalization is configured. */
+  currency_base?: string;
+  /** `amount` converted into `currency_base` using the source's FX table. */
+  amount_base?: number;
+  /** Subscription MRR converted into `currency_base`. */
+  mrr_base?: number;
   invoice_number?: string;
   period_start?: string;
   period_end?: string;

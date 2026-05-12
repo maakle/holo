@@ -57,9 +57,17 @@ export async function listSubscriptions(
   opts: ListPageOptions,
 ): Promise<StripeList<StripeSubscription>> {
   // status=all surfaces canceled subscriptions too, which we need for churn
-  // analytics. expand[]=data.items.data.price.product lets the chunker
-  // render plan nicknames without a per-record fetch.
-  const extra = 'status=all&expand%5B%5D=data.items.data.price.product';
+  // analytics. The expands let the chunker render plan nicknames and apply
+  // discounts to MRR without a per-record fetch:
+  //   - data.items.data.price.product → plan nickname
+  //   - data.discount.coupon → legacy singular discount (still returned on
+  //     some accounts)
+  //   - data.discounts.coupon → modern array form (default returns ids only)
+  const extra =
+    'status=all' +
+    '&expand%5B%5D=data.items.data.price.product' +
+    '&expand%5B%5D=data.discount.coupon' +
+    '&expand%5B%5D=data.discounts.coupon';
   return api.get<StripeList<StripeSubscription>>(`/v1/subscriptions?${buildQuery(opts, extra)}`);
 }
 

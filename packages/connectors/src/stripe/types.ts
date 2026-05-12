@@ -53,6 +53,26 @@ export interface StripeSubscriptionItem {
   price?: StripePrice | null;
 }
 
+export interface StripeCoupon {
+  id: string;
+  object?: 'coupon';
+  name?: string | null;
+  /** 0-100 (Stripe sends integer percentages). Mutually exclusive with `amount_off`. */
+  percent_off?: number | null;
+  /** Minor units of `coupon.currency`. Mutually exclusive with `percent_off`. */
+  amount_off?: number | null;
+  currency?: string | null;
+  /** 'forever' | 'once' | 'repeating'. */
+  duration?: string | null;
+  duration_in_months?: number | null;
+}
+
+export interface StripeDiscount {
+  id?: string;
+  object?: 'discount';
+  coupon?: StripeCoupon | null;
+}
+
 export interface StripeSubscription {
   id: string;
   object: 'subscription';
@@ -68,6 +88,13 @@ export interface StripeSubscription {
   trial_end?: number | null;
   currency?: string | null;
   items?: { data?: StripeSubscriptionItem[] } | null;
+  /** Deprecated singular discount; some accounts still return it. */
+  discount?: StripeDiscount | null;
+  /**
+   * Modern array form. Returned as ids by default; expanded to objects when
+   * the request asks for `expand[]=data.discounts`.
+   */
+  discounts?: Array<string | StripeDiscount> | null;
   metadata?: Record<string, string> | null;
 }
 
