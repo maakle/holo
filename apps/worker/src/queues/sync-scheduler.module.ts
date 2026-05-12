@@ -16,6 +16,7 @@ import { AirtableSyncModule } from './airtable';
 import { GoogleChatSyncModule } from './google-chat';
 import { AsanaSyncModule } from './asana';
 import { JiraSyncModule } from './jira';
+import { ConfluenceSyncModule } from './confluence';
 import { SyncSchedulerService } from './sync-scheduler.service';
 
 @Module({
@@ -37,6 +38,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
     GoogleChatSyncModule,
     AsanaSyncModule,
     JiraSyncModule,
+    ConfluenceSyncModule,
   ],
   providers: [SyncSchedulerService],
 })

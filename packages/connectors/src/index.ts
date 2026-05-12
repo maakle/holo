@@ -177,6 +177,22 @@ export type {
   JiraMyself,
   JiraServerInfo,
 } from './jira/index';
+export {
+  createConfluenceSpec,
+  normalizeSiteUrl as normalizeConfluenceSiteUrl,
+  fetchTenantInfo as fetchConfluenceTenantInfo,
+  fetchCurrentUser as fetchConfluenceCurrentUser,
+} from './confluence/index';
+export type {
+  ConfluenceSpecOptions,
+  ConfluencePage,
+  ConfluenceContentSearchResponse,
+  ConfluenceSpace,
+  ConfluenceSpacesPage,
+  ConfluenceCurrentUser,
+  ConfluenceTenantInfo,
+  ConfluenceComment,
+} from './confluence/index';
 
 // GitHub (framework-native spec + retained helpers for the bot, gateway,
 // install/uninstall flow, and the webhook receiver). All re-exported via

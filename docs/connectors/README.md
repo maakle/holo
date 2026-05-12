@@ -16,6 +16,8 @@ Per-connector setup guides for developers running Holo locally or configuring a 
 | Google Drive | OAuth | [googledrive.md](./googledrive.md) |
 | Google Chat | Service account (DWD) | [google-chat.md](./google-chat.md) |
 | Airtable | API key (personal access token) | [airtable.md](./airtable.md) |
+| Jira | Atlassian basic auth (email + API token) | [jira.md](./jira.md) |
+| Confluence | Atlassian basic auth (email + API token) | [confluence.md](./confluence.md) |
 
 ## Conventions
 

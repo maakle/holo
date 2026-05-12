@@ -145,7 +145,7 @@ function JiraCredentialsStep<TState>({
             <div className="relative">
               <input
                 type={revealed ? 'text' : 'password'}
-                placeholder="Jira API token"
+                placeholder={`${meta.displayName} API token`}
                 value={token}
                 onChange={(e) => {
                   setToken(e.target.value);

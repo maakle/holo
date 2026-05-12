@@ -1,0 +1,78 @@
+{
+  "results": [
+    {
+      "id": "p-100",
+      "type": "page",
+      "title": "Onboarding runbook",
+      "status": "current",
+      "space": { "id": "s-1", "key": "ENG", "name": "Engineering" },
+      "body": {
+        "atlas_doc_format": {
+          "value": "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"Welcome to the eng team.\"}]}]}",
+          "representation": "atlas_doc_format"
+        }
+      },
+      "version": {
+        "number": 4,
+        "when": "2026-05-09T15:22:00.000Z",
+        "by": { "accountId": "u-jane", "displayName": "Jane Doe" }
+      },
+      "history": {
+        "createdDate": "2026-05-01T09:00:00.000Z",
+        "createdBy": { "accountId": "u-mike", "displayName": "Mike Smith" }
+      },
+      "ancestors": [
+        { "id": "p-1", "title": "Engineering" },
+        { "id": "p-50", "title": "Handbooks" }
+      ],
+      "children": {
+        "comment": {
+          "results": [
+            {
+              "id": "c-200",
+              "type": "comment",
+              "body": {
+                "atlas_doc_format": {
+                  "value": "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"Should we add the on-call rota link here?\"}]}]}",
+                  "representation": "atlas_doc_format"
+                }
+              },
+              "version": { "number": 1, "when": "2026-05-09T14:00:00.000Z" },
+              "history": {
+                "createdDate": "2026-05-09T14:00:00.000Z",
+                "createdBy": { "accountId": "u-jane", "displayName": "Jane Doe" }
+              },
+              "extensions": { "location": "inline" }
+            }
+          ]
+        }
+      },
+      "_links": { "webui": "/spaces/ENG/pages/p-100/Onboarding-runbook" }
+    },
+    {
+      "id": "p-101",
+      "type": "page",
+      "title": "Release checklist",
+      "status": "current",
+      "space": { "id": "s-1", "key": "ENG", "name": "Engineering" },
+      "body": {
+        "atlas_doc_format": {
+          "value": "{\"type\":\"doc\",\"content\":[]}",
+          "representation": "atlas_doc_format"
+        }
+      },
+      "version": { "number": 1, "when": "2026-05-08T12:00:00.000Z" },
+      "history": {
+        "createdDate": "2026-05-02T09:00:00.000Z",
+        "createdBy": { "accountId": "u-mike", "displayName": "Mike Smith" }
+      },
+      "ancestors": [],
+      "children": { "comment": { "results": [] } },
+      "_links": { "webui": "/spaces/ENG/pages/p-101/Release-checklist" }
+    }
+  ],
+  "start": 0,
+  "limit": 25,
+  "size": 2,
+  "_links": { "next": "/rest/api/content/search?start=25" }
+}
