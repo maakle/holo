@@ -132,6 +132,16 @@ export type {
   StripeObjectType,
   StripeSubscription,
 } from './stripe/index';
+export { createSalesforceSpec, SALESFORCE_SCOPES } from './salesforce/index';
+export type {
+  SalesforceSpecOptions,
+  SalesforceObjectType,
+  SalesforceResourceId,
+  SalesforceRecord,
+  SalesforceQueryResponse,
+  SalesforceTokenInfo,
+  SalesforceIdentity,
+} from './salesforce/index';
 export { createNotionSpec } from './notion/index';
 export type { NotionSpecOptions } from './notion/index';
 export { createAirtableSpec } from './airtable/index';

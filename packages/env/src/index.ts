@@ -48,6 +48,13 @@ const EnvSchema = z.object({
   // dev environments don't have to register an app.
   GITLAB_CONNECTOR_CLIENT_ID: z.string().optional(),
   GITLAB_CONNECTOR_CLIENT_SECRET: z.string().optional(),
+  // Salesforce Connected App OAuth credentials. Register at
+  // Setup → App Manager → New Connected App with redirect URI
+  // `${WEB_PUBLIC_URL}/api/connectors/salesforce/callback` and OAuth scopes
+  // `api`, `refresh_token`, `offline_access`. Optional so unrelated dev
+  // environments don't have to register a Connected App.
+  SALESFORCE_CONNECTOR_CLIENT_ID: z.string().optional(),
+  SALESFORCE_CONNECTOR_CLIENT_SECRET: z.string().optional(),
   EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().optional(),
   /**

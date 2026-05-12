@@ -24,6 +24,7 @@ import {
   createJiraSpec,
   createConfluenceSpec,
   createStripeSpec,
+  createSalesforceSpec,
   githubAppConfigFromEnv,
 } from '@holo/connectors';
 import { setSyncRunner, markRegistrationComplete } from './sync-runner-registry';
@@ -209,8 +210,23 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     // Stripe: secret-key auth, same shape as HubSpot. The key is collected
     // per-org via the connect route and loaded from connector_credentials.
     setSyncRunner(QUEUE_NAMES.STRIPE_SYNC, createGenericRunner(createStripeSpec(), deps));
+    // Salesforce: OAuth (refreshable). Same shape as GitLab — env credentials
+    // are present at boot only when the Connected App is registered, but the
+    // spec is registered unconditionally so the queue exists. A sync job
+    // without env credentials fails with NOT_IMPLEMENTED at exchangeCode /
+    // refresh time, which only matters when the user actually connects.
+    setSyncRunner(
+      QUEUE_NAMES.SALESFORCE_SYNC,
+      createGenericRunner(
+        createSalesforceSpec({
+          clientId: process.env.SALESFORCE_CONNECTOR_CLIENT_ID ?? '',
+          clientSecret: process.env.SALESFORCE_CONNECTOR_CLIENT_SECRET ?? '',
+        }),
+        deps,
+      ),
+    );
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat, asana, jira, confluence, stripe',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat, asana, jira, confluence, stripe, salesforce',
     );
   }
 }

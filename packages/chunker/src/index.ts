@@ -21,6 +21,13 @@ export {
   type HubspotEngagementType,
   type HubspotRecordType,
 } from './hubspot-record';
+export {
+  salesforceRecordChunker,
+  type SalesforceRecordInput,
+  type SalesforceActivity,
+  type SalesforceActivityType,
+  type SalesforceRecordType,
+} from './salesforce-record';
 export { mintlifyPageChunker, type MintlifyPageInput } from './mintlify-page';
 export {
   openapiEndpointChunker,

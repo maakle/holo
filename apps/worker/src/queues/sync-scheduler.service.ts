@@ -75,6 +75,7 @@ export class SyncSchedulerService implements OnModuleInit {
     @InjectQueue(QUEUE_NAMES.JIRA_SYNC) jira: Queue,
     @InjectQueue(QUEUE_NAMES.CONFLUENCE_SYNC) confluence: Queue,
     @InjectQueue(QUEUE_NAMES.STRIPE_SYNC) stripe: Queue,
+    @InjectQueue(QUEUE_NAMES.SALESFORCE_SYNC) salesforce: Queue,
   ) {
     this.queueMap = {
       github: [QUEUE_NAMES.GITHUB_CODE_SYNC, QUEUE_NAMES.GITHUB_PROSE_SYNC],
@@ -94,6 +95,7 @@ export class SyncSchedulerService implements OnModuleInit {
       jira: [QUEUE_NAMES.JIRA_SYNC],
       confluence: [QUEUE_NAMES.CONFLUENCE_SYNC],
       stripe: [QUEUE_NAMES.STRIPE_SYNC],
+      salesforce: [QUEUE_NAMES.SALESFORCE_SYNC],
     };
     this.queuesByName = {
       [QUEUE_NAMES.GITHUB_CODE_SYNC]: ghCode,
@@ -115,6 +117,7 @@ export class SyncSchedulerService implements OnModuleInit {
       [QUEUE_NAMES.JIRA_SYNC]: jira,
       [QUEUE_NAMES.CONFLUENCE_SYNC]: confluence,
       [QUEUE_NAMES.STRIPE_SYNC]: stripe,
+      [QUEUE_NAMES.SALESFORCE_SYNC]: salesforce,
     };
   }
 

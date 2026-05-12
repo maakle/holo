@@ -39,7 +39,8 @@ export interface ConnectorMeta {
     | 'microsoft-teams'
     | 'microsoft-365'
     | 'asana'
-    | 'stripe';
+    | 'stripe'
+    | 'salesforce';
   displayName: string;
   description: string;
   category: ConnectorCategoryId;
@@ -110,6 +111,14 @@ export const CONNECTORS: ConnectorMeta[] = [
     category: 'customer',
     implemented: true,
     flowType: 'apikey',
+  },
+  {
+    id: 'salesforce',
+    displayName: 'Salesforce',
+    description: 'CRM accounts, contacts, opportunities, and activity timelines.',
+    category: 'customer',
+    implemented: true,
+    flowType: 'oauth',
   },
   {
     id: 'linear',
