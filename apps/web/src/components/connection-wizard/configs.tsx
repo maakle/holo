@@ -244,6 +244,29 @@ const pylonConfig: ConnectorWizardConfig = {
   ],
 };
 
+const stripeConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'apikey',
+      label: 'Secret key',
+      render: (ctx) =>
+        apiKeyStep(ctx, {
+          placeholder: 'Stripe restricted key (rk_live_… or sk_live_…)',
+          helpText:
+            'Use a restricted key with read-only access to Customers, Subscriptions, Invoices, and Charges. Secret keys also work but grant full account access — restricted is preferred.',
+          helpUrl: 'https://dashboard.stripe.com/apikeys/create',
+          instructions: [
+            'Open the Stripe dashboard → Developers → API keys → "Create restricted key".',
+            'Name it "Holo" and grant Read access to Customers, Subscriptions, Invoices, and Charges. Leave everything else None.',
+            'Copy the key (it\'s only shown once) and paste it below.',
+          ],
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 const mintlifyConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
@@ -444,6 +467,7 @@ const REGISTRY: Partial<Record<ConnectorMeta['id'], ConnectorWizardConfig<any>>>
   asana: asanaConfig,
   jira: jiraConfig,
   confluence: confluenceConfig,
+  stripe: stripeConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

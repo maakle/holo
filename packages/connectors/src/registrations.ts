@@ -36,6 +36,7 @@ import { createMintlifySpec } from './mintlify/spec';
 import { createNotionSpec } from './notion/spec';
 import { createPylonSpec } from './pylon/spec';
 import { createSlackSpec, type SlackSpecOptions } from './slack/spec';
+import { createStripeSpec } from './stripe/spec';
 import { createZendeskSpec } from './zendesk/spec';
 import { SYNC_INTERVAL_MS_BY_PROVIDER } from './sync-intervals';
 
@@ -188,6 +189,13 @@ const confluence: NoOptRegistration = defineConnectorRegistration<ConnectorBootO
   createSpec: () => createConfluenceSpec(),
 });
 
+const stripe: NoOptRegistration = defineConnectorRegistration<ConnectorBootOptions>({
+  providerId: 'stripe',
+  syncIntervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.stripe,
+  auth: { kind: 'apiKey' },
+  createSpec: () => createStripeSpec(),
+});
+
 /**
  * Canonical registration list. The order is purely cosmetic — the
  * `indexRegistrations` invariant tolerates any permutation, but it
@@ -210,6 +218,7 @@ export const CONNECTOR_REGISTRATIONS: ReadonlyArray<ConnectorRegistration<Connec
   asana,
   jira,
   confluence,
+  stripe,
 ];
 
 /**

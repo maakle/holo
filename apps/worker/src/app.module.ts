@@ -18,6 +18,7 @@ import { GoogleDriveSyncModule } from './queues/googledrive';
 import { AirtableSyncModule } from './queues/airtable';
 import { GoogleChatSyncModule } from './queues/google-chat';
 import { AsanaSyncModule } from './queues/asana';
+import { StripeSyncModule } from './queues/stripe';
 import { EmbedModule } from './queues/embed';
 import { EmbedBackfillModule } from './queues/embed-backfill';
 import { DisconnectCleanupModule } from './queues/disconnect-cleanup';
@@ -70,6 +71,7 @@ import { ObservabilityModule } from './observability/observability.module';
     AirtableSyncModule,
     GoogleChatSyncModule,
     AsanaSyncModule,
+    StripeSyncModule,
     EmbedModule,
     EmbedBackfillModule,
     DisconnectCleanupModule,

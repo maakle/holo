@@ -32,6 +32,10 @@ const KIND_LABELS: Record<string, { singular: string; plural: string }> = {
   'mintlify-page': { singular: 'page', plural: 'pages' },
   'mintlify-openapi-endpoint': { singular: 'OpenAPI endpoint', plural: 'OpenAPI endpoints' },
   'zendesk-article': { singular: 'article', plural: 'articles' },
+  'stripe-customer': { singular: 'customer', plural: 'customers' },
+  'stripe-subscription': { singular: 'subscription', plural: 'subscriptions' },
+  'stripe-invoice': { singular: 'invoice', plural: 'invoices' },
+  'stripe-charge': { singular: 'charge', plural: 'charges' },
 };
 
 function labelFor(kind: string, count: number): string {

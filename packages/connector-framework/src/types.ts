@@ -96,7 +96,16 @@ export interface ResourceSpec<TCursor = unknown> {
 
 export interface UiSpec {
   description?: string;
-  category?: 'communication' | 'docs' | 'crm' | 'support' | 'meetings' | 'vcs' | 'project' | 'other';
+  category?:
+    | 'communication'
+    | 'docs'
+    | 'crm'
+    | 'support'
+    | 'meetings'
+    | 'vcs'
+    | 'project'
+    | 'payments'
+    | 'other';
   /**
    * Names of extra wizard steps the spec contributes (e.g. 'channels' for
    * Slack, 'repos' for GitHub). The web app maps these names to step
