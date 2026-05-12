@@ -66,10 +66,16 @@ export function createNotionSpec(_opts: NotionSpecOptions = {}): ConnectorSpec {
         'Notion-Version': NOTION_VERSION_HEADER,
         Accept: 'application/json',
       },
-      // Notion publishes ~3 rps per integration; keep slightly under to
-      // leave headroom and let the framework's 429 + Retry-After absorb
-      // bursts.
-      rateLimit: { rps: 2.5, burst: 5 },
+      // Notion publishes ~3 rps per integration but tightens dynamically
+      // when a workspace is hammered, so stay further under the steady-state
+      // ceiling and let bursts absorb spikes.
+      rateLimit: { rps: 2.0, burst: 3 },
+      // Notion's 429 body asks callers to "try again in a few minutes."
+      // The framework default (4 attempts, 30s cap) exhausts inside that
+      // window. Raise both so we ride out the cooldown instead of failing
+      // the whole sync — block-children walks on large workspaces are not
+      // resumable cheaply.
+      retry: { maxAttempts: 6, maxDelayMs: 120_000 },
     },
 
     async testConnection(ctx: TestConnectionContext): Promise<TestConnectionResult> {
