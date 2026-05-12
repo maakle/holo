@@ -67,11 +67,16 @@ export async function POST(req: Request) {
     const spec = createConfluenceSpec();
     try {
       await spec.testConnection({ api: probeClient, tokens: { accessToken: encoded } });
-    } catch {
+    } catch (err) {
+      console.error('[confluence/connect] testConnection failed', err);
+      const detail =
+        err instanceof HoloError
+          ? ` (${err.problem}${err.cause ? `; body starts: ${err.cause.slice(0, 200)}` : ''})`
+          : '';
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
         problem: 'Confluence rejected the credentials',
-        fix: 'Check that the email matches the Atlassian account that owns the API token, and that the token is valid (https://id.atlassian.com/manage-profile/security/api-tokens). The account also needs view permission on at least one space.',
+        fix: `Check that the email matches the Atlassian account that owns the API token, and that the token is valid (https://id.atlassian.com/manage-profile/security/api-tokens). The account also needs view permission on at least one space.${detail}`,
       });
     }
 

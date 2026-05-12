@@ -190,7 +190,7 @@ function JiraCredentialsStep<TState>({
               onClick={save}
               disabled={busy || !siteUrl.trim() || !email.trim() || !token.trim()}
             >
-              {busy ? 'Connecting…' : 'Connect Jira'}
+              {busy ? 'Connecting…' : `Connect ${meta.displayName}`}
             </Button>
           </>
         )}
