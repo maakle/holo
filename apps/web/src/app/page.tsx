@@ -22,8 +22,8 @@ export default async function Home() {
       <SiteHeader isAuthed={isAuthed} />
       <Hero isAuthed={isAuthed} />
       <ToolsAgentGraph />
-      <PillarsBand />
       <UseCasesBand />
+      <PillarsBand />
       <CodeShowcase />
       <ObservabilityBand />
       <TrustBand />
@@ -86,8 +86,7 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
           for your company.
         </h1>
         <p className="mx-auto mt-6 max-w-[560px] text-balance text-[15px] leading-6 text-text-muted">
-          Connect your tools once. Holo ingests everything your company knows and serves it
-          to every agent over MCP or OpenAPI.
+          Connect your tools once. Serve every agent over MCP or OpenAPI.
           <span className="text-text"> The knowledge layer every agent in your company relies on.</span>
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -104,9 +103,16 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
             View on GitHub
           </a>
         </div>
-        <p className="mt-6 text-[12px] text-text-subtle">
-          Pre-alpha — not yet ready for production traffic.
-        </p>
+        <div className="mt-7 flex flex-col items-center gap-2">
+          <code className="font-mono text-[13px] leading-5 text-text-muted">
+            <span className="text-text-subtle">$</span> docker compose up{' '}
+            <span className="text-text-subtle">→</span>{' '}
+            <span className="text-text-subtle">localhost:3000 in 60 seconds</span>
+          </code>
+          <p className="text-[12px] text-text-subtle">
+            Pre-alpha — not yet ready for production traffic.
+          </p>
+        </div>
       </div>
     </section>
   );
