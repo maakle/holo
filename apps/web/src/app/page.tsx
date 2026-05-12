@@ -26,6 +26,7 @@ export default async function Home() {
       <UseCasesBand />
       <CodeShowcase />
       <ObservabilityBand />
+      <TrustBand />
       <VisionBand />
       <FinalCTA isAuthed={isAuthed} />
       <SiteFooter />
@@ -87,7 +88,7 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
         <p className="mx-auto mt-6 max-w-[560px] text-balance text-[15px] leading-6 text-text-muted">
           Connect your tools once. Holo ingests everything your company knows and serves it
           to every agent over MCP or OpenAPI.
-          <span className="text-text"> Layer today. Agent OS tomorrow.</span>
+          <span className="text-text"> The knowledge layer every agent in your company relies on.</span>
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
@@ -175,6 +176,55 @@ function CodeShowcase() {
   topK: 5,
 });`}
         />
+      </div>
+    </section>
+  );
+}
+
+// ── Trust band ────────────────────────────────────────────────────────────
+const TRUST_ITEMS = [
+  {
+    title: 'Runs in your VPC',
+    body: 'Self-hostable from day one. Your data and your agents stay on infrastructure you control.',
+  },
+  {
+    title: 'ACL-aware ingestion',
+    body: 'Source-system permissions carry through. An agent only sees what the asking user is allowed to see.',
+  },
+  {
+    title: 'Per-call audit log',
+    body: 'Every tool invocation is attributable and replayable. Agent, user, records touched, result.',
+  },
+  {
+    title: 'AGPL-3.0 licensed',
+    body: 'Open source. Inspectable, forkable, no vendor lock-in. Built to outlive any single sponsor.',
+  },
+] as const;
+
+function TrustBand() {
+  return (
+    <section className="border-b border-border">
+      <div className="mx-auto max-w-[1280px] px-6 py-20">
+        <div className="mx-auto max-w-[760px] text-center">
+          <p className="caption text-text-subtle">Security & trust</p>
+          <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
+            Built for teams that can&apos;t hand their data to a black box.
+          </h2>
+          <p className="mx-auto mt-4 max-w-[560px] text-balance text-[15px] leading-6 text-text-muted">
+            Holo is the boring kind of infrastructure: predictable, inspectable,
+            and yours to run.
+          </p>
+        </div>
+        <div className="mt-12 grid gap-6 sm:grid-cols-2 md:grid-cols-4">
+          {TRUST_ITEMS.map((it) => (
+            <div key={it.title} className="rounded-lg border border-border bg-surface p-5">
+              <h3 className="font-display text-[15px] font-semibold tracking-tight text-text">
+                {it.title}
+              </h3>
+              <p className="mt-2 text-[13px] leading-5 text-text-muted">{it.body}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

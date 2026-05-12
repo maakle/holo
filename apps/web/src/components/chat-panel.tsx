@@ -150,6 +150,7 @@ export function ChatPanel({
     };
 
     let activeConversationId = conversationId;
+    let createdNewConversation = false;
     if (!activeConversationId) {
       let createError: string | null = null;
       try {
@@ -169,8 +170,14 @@ export function ChatPanel({
           };
           activeConversationId = created.conversation.id;
           setConversationId(activeConversationId);
+          // Update the URL bar so the user can refresh into the persisted
+          // conversation, but DO NOT call router.refresh() yet — refreshing
+          // mid-stream re-runs the parent layout/page and resets ChatPanel
+          // local state, dropping the pending assistant turn before the
+          // `done` event can populate it. Defer the refresh until after the
+          // stream completes (see the finally block below).
           window.history.replaceState(null, '', `/chat/${activeConversationId}`);
-          router.refresh();
+          createdNewConversation = true;
         }
       } catch (err) {
         createError = err instanceof Error ? err.message : 'Network error.';
@@ -319,6 +326,10 @@ export function ChatPanel({
       failTurn(message);
     } finally {
       setBusy(false);
+      // Refresh now that the stream is fully drained — this updates the
+      // sidebar's conversation list (and any other server-rendered state)
+      // without racing against the in-flight stream.
+      if (createdNewConversation) router.refresh();
     }
   }
 
