@@ -182,21 +182,28 @@ function CodeShowcase() {
 }
 
 // ── Trust band ────────────────────────────────────────────────────────────
+// Spec-sheet treatment — deliberately different from ObservabilityBand's
+// 4-card grid. Asymmetric heading-left, manifest-right; mono row keys signal
+// "config file, not marketing page."
 const TRUST_ITEMS = [
   {
-    title: 'Runs in your VPC',
+    key: 'vpc',
+    title: 'Runs in your VPC.',
     body: 'Self-hostable from day one. Your data and your agents stay on infrastructure you control.',
   },
   {
-    title: 'ACL-aware ingestion',
+    key: 'acl',
+    title: 'ACL-aware ingestion.',
     body: 'Source-system permissions carry through. An agent only sees what the asking user is allowed to see.',
   },
   {
-    title: 'Per-call audit log',
+    key: 'audit',
+    title: 'Per-call audit log.',
     body: 'Every tool invocation is attributable and replayable. Agent, user, records touched, result.',
   },
   {
-    title: 'AGPL-3.0 licensed',
+    key: 'license',
+    title: 'AGPL-3.0 licensed.',
     body: 'Open source. Inspectable, forkable, no vendor lock-in. Built to outlive any single sponsor.',
   },
 ] as const;
@@ -204,27 +211,35 @@ const TRUST_ITEMS = [
 function TrustBand() {
   return (
     <section className="border-b border-border">
-      <div className="mx-auto max-w-[1280px] px-6 py-20">
-        <div className="mx-auto max-w-[760px] text-center">
-          <p className="caption text-text-subtle">Security & trust</p>
+      <div className="mx-auto grid max-w-[1024px] gap-12 px-6 py-20 md:grid-cols-[1fr_1.4fr] md:gap-16">
+        <div className="md:sticky md:top-24 md:self-start">
+          <p className="caption text-text-subtle">Security &amp; trust</p>
           <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
             Built for teams that can&apos;t hand their data to a black box.
           </h2>
-          <p className="mx-auto mt-4 max-w-[560px] text-balance text-[15px] leading-6 text-text-muted">
+          <p className="mt-4 max-w-[420px] text-[15px] leading-6 text-text-muted">
             Holo is the boring kind of infrastructure: predictable, inspectable,
             and yours to run.
           </p>
         </div>
-        <div className="mt-12 grid gap-6 sm:grid-cols-2 md:grid-cols-4">
+        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
           {TRUST_ITEMS.map((it) => (
-            <div key={it.title} className="rounded-lg border border-border bg-surface p-5">
-              <h3 className="font-display text-[15px] font-semibold tracking-tight text-text">
-                {it.title}
-              </h3>
-              <p className="mt-2 text-[13px] leading-5 text-text-muted">{it.body}</p>
-            </div>
+            <li
+              key={it.key}
+              className="grid grid-cols-[72px_1fr] items-baseline gap-4 px-5 py-5 md:grid-cols-[96px_1fr] md:gap-6 md:px-6 md:py-6"
+            >
+              <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-subtle">
+                {it.key}
+              </span>
+              <div>
+                <h3 className="font-display text-[16px] font-semibold leading-snug tracking-tight text-text">
+                  {it.title}
+                </h3>
+                <p className="mt-1.5 text-[14px] leading-6 text-text-muted">{it.body}</p>
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );
