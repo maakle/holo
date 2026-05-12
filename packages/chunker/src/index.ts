@@ -33,6 +33,7 @@ export {
   prismicDocumentChunker,
   type PrismicDocumentInput,
 } from './prismic-document';
+export { webcrawlPageChunker, type WebcrawlPageInput } from './webcrawl-page';
 export {
   openapiEndpointChunker,
   type OpenApiEndpointInput,

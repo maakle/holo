@@ -12,6 +12,7 @@ import { LinearSyncModule } from './linear';
 import { MintlifySyncModule } from './mintlify';
 import { PrismicSyncModule } from './prismic';
 import { ZendeskSyncModule } from './zendesk';
+import { WebcrawlSyncModule } from './webcrawl';
 import { GoogleDriveSyncModule } from './googledrive';
 import { AirtableSyncModule } from './airtable';
 import { GoogleChatSyncModule } from './google-chat';
@@ -37,6 +38,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
     MintlifySyncModule,
     PrismicSyncModule,
     ZendeskSyncModule,
+    WebcrawlSyncModule,
     GoogleDriveSyncModule,
     AirtableSyncModule,
     GoogleChatSyncModule,

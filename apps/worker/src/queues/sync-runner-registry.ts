@@ -63,6 +63,7 @@ const registry: Record<string, SyncRunner> = {
   'mintlify-sync': stubRunner('mintlify'),
   'prismic-sync': stubRunner('prismic'),
   'zendesk-sync': stubRunner('zendesk'),
+  'webcrawl-sync': stubRunner('webcrawl'),
   'googledrive-sync': stubRunner('googledrive'),
   'airtable-sync': stubRunner('airtable'),
   'stripe-sync': stubRunner('stripe'),

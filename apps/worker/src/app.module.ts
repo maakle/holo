@@ -15,6 +15,7 @@ import { LinearSyncModule } from './queues/linear';
 import { MintlifySyncModule } from './queues/mintlify';
 import { PrismicSyncModule } from './queues/prismic';
 import { ZendeskSyncModule } from './queues/zendesk';
+import { WebcrawlSyncModule } from './queues/webcrawl';
 import { GoogleDriveSyncModule } from './queues/googledrive';
 import { AirtableSyncModule } from './queues/airtable';
 import { GoogleChatSyncModule } from './queues/google-chat';
@@ -70,6 +71,7 @@ import { ObservabilityModule } from './observability/observability.module';
     MintlifySyncModule,
     PrismicSyncModule,
     ZendeskSyncModule,
+    WebcrawlSyncModule,
     GoogleDriveSyncModule,
     AirtableSyncModule,
     GoogleChatSyncModule,

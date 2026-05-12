@@ -35,6 +35,11 @@ export const SYNC_INTERVAL_MS_BY_PROVIDER: Record<SyncProvider, number> = {
   // marketing-site / FAQ use case. 6h matches Zendesk articles — same
   // shape (CMS-published prose) and a similar publish cadence.
   prismic: 6 * HOUR_MS,
+  // Webcrawl: once per day, per the product brief. The crawled sites are
+  // typically marketing / FAQ pages that churn slowly, and each crawl run
+  // burns Firecrawl credits — 24h keeps spend low while still catching
+  // weekly publishes.
+  webcrawl: 24 * HOUR_MS,
   googledrive: 6 * HOUR_MS,
   airtable: 6 * HOUR_MS,
   'google-chat': 4 * HOUR_MS,

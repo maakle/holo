@@ -124,10 +124,11 @@ describe('ConnectorRegistration contract', () => {
     // clientId/secret because the worker registers them at boot before
     // env is read in tests.
     for (const reg of CONNECTOR_REGISTRATIONS) {
-      if (reg.providerId === 'github') {
-        // GitHub registration requires GithubSpecOptions; constructing
-        // its spec here would fail without env — verified via dedicated
-        // test below.
+      if (reg.providerId === 'github' || reg.providerId === 'webcrawl') {
+        // These registrations require env-supplied boot options
+        // (GithubSpecOptions / WebcrawlSpecOptions); constructing their
+        // specs here would fail without env — verified via dedicated
+        // tests below.
         continue;
       }
       const spec = reg.createSpec({});
@@ -139,6 +140,11 @@ describe('ConnectorRegistration contract', () => {
   it('github registration createSpec throws without options', () => {
     const reg = CONNECTOR_REGISTRATIONS_BY_PROVIDER.github;
     expect(() => reg.createSpec({})).toThrow(/GithubSpecOptions/);
+  });
+
+  it('webcrawl registration createSpec throws without options', () => {
+    const reg = CONNECTOR_REGISTRATIONS_BY_PROVIDER.webcrawl;
+    expect(() => reg.createSpec({})).toThrow(/WebcrawlSpecOptions/);
   });
 });
 

@@ -36,6 +36,7 @@ import { createMintlifySpec } from './mintlify/spec';
 import { createNotionSpec } from './notion/spec';
 import { createPrismicSpec } from './prismic/spec';
 import { createPylonSpec } from './pylon/spec';
+import { createWebcrawlSpec, type WebcrawlSpecOptions } from './webcrawl/spec';
 import { createSalesforceSpec, type SalesforceSpecOptions } from './salesforce/spec';
 import { createSlackSpec, type SlackSpecOptions } from './slack/spec';
 import { createStripeSpec } from './stripe/spec';
@@ -52,6 +53,7 @@ export interface ConnectorBootOptions {
   gitlab?: GitlabSpecOptions;
   github?: GithubSpecOptions;
   salesforce?: SalesforceSpecOptions;
+  webcrawl?: WebcrawlSpecOptions;
 }
 
 /**
@@ -161,6 +163,25 @@ const prismic: NoOptRegistration = defineConnectorRegistration<ConnectorBootOpti
   createSpec: () => createPrismicSpec(),
 });
 
+const webcrawl: NoOptRegistration = defineConnectorRegistration<ConnectorBootOptions>({
+  providerId: 'webcrawl',
+  syncIntervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.webcrawl,
+  // Webcrawl is Holo-team-operated: the Firecrawl API key is supplied at
+  // worker boot from env (FIRECRAWL_API_KEY). Per-org credentials are not
+  // collected — the user just pastes URLs / seeds in the wizard.
+  auth: { kind: 'none' },
+  createSpec(opts): ConnectorSpec {
+    if (!opts.webcrawl) {
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+        problem: 'Webcrawl registration: missing WebcrawlSpecOptions',
+        fix: 'Pass { apiKey } from env (FIRECRAWL_API_KEY) at worker boot.',
+      });
+    }
+    return createWebcrawlSpec(opts.webcrawl);
+  },
+});
+
 const googledrive: NoOptRegistration = defineConnectorRegistration<ConnectorBootOptions>({
   providerId: 'googledrive',
   syncIntervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.googledrive,
@@ -239,6 +260,7 @@ export const CONNECTOR_REGISTRATIONS: ReadonlyArray<ConnectorRegistration<Connec
   mintlify,
   prismic,
   zendesk,
+  webcrawl,
   googledrive,
   airtable,
   googleChat,
