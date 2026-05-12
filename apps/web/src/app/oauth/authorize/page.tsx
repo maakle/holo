@@ -123,14 +123,48 @@ export default async function OAuthConsentPage({ searchParams }: Props) {
     );
   }
 
+  // Show the redirect host alongside the client name so a user noticing
+  // "Authorize GitHub" → redirect to attacker.example can spot the
+  // mismatch. Falls back to the raw URI if it doesn't parse.
+  let redirectHost = redirectUri;
+  try {
+    redirectHost = new URL(redirectUri).host;
+  } catch {
+    // keep the raw value
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div style={{ maxWidth: 480, width: '100%', padding: '2rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
+        {!client.isVerified && (
+          <div
+            role="alert"
+            style={{
+              marginBottom: 16,
+              padding: '10px 12px',
+              background: 'var(--warning-bg, #3a2a00)',
+              border: '1px solid var(--warning, #b07a00)',
+              borderRadius: 6,
+              fontSize: 13,
+              color: 'var(--warning-fg, #ffd581)',
+              lineHeight: 1.4,
+            }}
+          >
+            <strong>⚠ Unverified app.</strong> This client self-registered and
+            has not been verified by holo. Anyone can register a client with
+            any name. Only approve if you trust the redirect destination
+            shown below.
+          </div>
+        )}
         <h1 style={{ color: 'var(--text)', fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
           Authorize {client.clientName}
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 12 }}>
           <strong style={{ color: 'var(--text)' }}>{client.clientName}</strong> wants to connect to your holo context layer.
+        </p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 20 }}>
+          Tokens will be sent to{' '}
+          <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>{redirectHost}</code>
         </p>
         <div style={{ marginBottom: 24, padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6 }}>
           <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8, fontWeight: 500 }}>Permissions requested:</p>

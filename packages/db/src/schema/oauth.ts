@@ -3,6 +3,7 @@ import {
   text,
   timestamp,
   uuid,
+  boolean,
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -21,6 +22,14 @@ export const oauthClients = pgTable(
     clientName: text('client_name').notNull(),
     redirectUris: text('redirect_uris').array().notNull().default(sql`'{}'::text[]`),
     scopes: text('scopes').array().notNull().default(sql`'{}'::text[]`),
+    // Self-registered clients (RFC 7591 dynamic registration) start
+    // unverified — anyone can POST /api/oauth/register with `client_name:
+    // "GitHub"` and an attacker-controlled redirect URI. The consent page
+    // shows a prominent warning for unverified clients so users don't
+    // approve a token grant for a phishing client. Flip to true via an
+    // out-of-band admin process (currently manual) once a client is
+    // confirmed legitimate.
+    isVerified: boolean('is_verified').notNull().default(false),
     registeredAt: timestamp('registered_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
