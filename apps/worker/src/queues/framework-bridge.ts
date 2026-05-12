@@ -136,7 +136,8 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
                 | 'linear'
                 | 'googledrive'
                 | 'google-chat'
-                | 'jira',
+                | 'jira'
+                | 'stripe',
             ),
             eq(schema.connectorCredentials.status, 'active'),
           ),
@@ -194,7 +195,8 @@ export function createRuntimeStores(deps: GenericRunnerDeps): RuntimeStores {
                 | 'linear'
                 | 'googledrive'
                 | 'google-chat'
-                | 'jira',
+                | 'jira'
+                | 'stripe',
             ),
             eq(schema.connectorCredentials.status, 'active'),
           ),

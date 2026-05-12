@@ -32,3 +32,9 @@ export {
   stripHtmlToText,
   type ZendeskArticleInput,
 } from './zendesk-article';
+export {
+  stripeRecordChunker,
+  type StripeRecordInput,
+  type StripeRecordType,
+  type StripeRecordMetadata,
+} from './stripe-record';

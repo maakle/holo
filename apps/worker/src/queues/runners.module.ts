@@ -23,6 +23,7 @@ import {
   createAsanaSpec,
   createJiraSpec,
   createConfluenceSpec,
+  createStripeSpec,
   githubAppConfigFromEnv,
 } from '@holo/connectors';
 import { setSyncRunner, markRegistrationComplete } from './sync-runner-registry';
@@ -205,8 +206,11 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     // env credentials required at boot; the token is collected per-org via
     // the connect route and loaded from connector_credentials.
     setSyncRunner(QUEUE_NAMES.ASANA_SYNC, createGenericRunner(createAsanaSpec(), deps));
+    // Stripe: secret-key auth, same shape as HubSpot. The key is collected
+    // per-org via the connect route and loaded from connector_credentials.
+    setSyncRunner(QUEUE_NAMES.STRIPE_SYNC, createGenericRunner(createStripeSpec(), deps));
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat, asana, jira, confluence',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat, asana, jira, confluence, stripe',
     );
   }
 }

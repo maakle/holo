@@ -1,4 +1,9 @@
-export type ConnectorCategoryId = 'source-control' | 'communication' | 'productivity' | 'customer';
+export type ConnectorCategoryId =
+  | 'source-control'
+  | 'communication'
+  | 'productivity'
+  | 'customer'
+  | 'payments';
 
 export interface ConnectorCategory {
   id: ConnectorCategoryId;
@@ -10,6 +15,7 @@ export const CONNECTOR_CATEGORIES: ConnectorCategory[] = [
   { id: 'communication', label: 'Communication' },
   { id: 'productivity', label: 'Productivity' },
   { id: 'customer', label: 'Customer & CRM' },
+  { id: 'payments', label: 'Payments & Revenue' },
 ];
 
 export interface ConnectorMeta {
@@ -32,7 +38,8 @@ export interface ConnectorMeta {
     | 'intercom'
     | 'microsoft-teams'
     | 'microsoft-365'
-    | 'asana';
+    | 'asana'
+    | 'stripe';
   displayName: string;
   description: string;
   category: ConnectorCategoryId;
@@ -160,6 +167,15 @@ export const CONNECTORS: ConnectorMeta[] = [
     category: 'communication',
     implemented: true,
     flowType: 'service-account',
+  },
+  {
+    id: 'stripe',
+    displayName: 'Stripe',
+    description:
+      'Customers, subscriptions, invoices, and charges — for revenue, MRR, and growth metrics.',
+    category: 'payments',
+    implemented: true,
+    flowType: 'apikey',
   },
   // Coming soon — surfaced from docs/ROADMAP.md "Next connections to build".
   // Order here matches the visible category sort (alphabetical by display

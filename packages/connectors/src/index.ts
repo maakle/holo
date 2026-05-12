@@ -121,6 +121,17 @@ export { createPylonSpec } from './pylon/index';
 export type { PylonSpecOptions } from './pylon/index';
 export { createHubspotSpec } from './hubspot/index';
 export type { HubspotSpecOptions } from './hubspot/index';
+export { createStripeSpec } from './stripe/index';
+export type {
+  StripeSpecOptions,
+  StripeAccount,
+  StripeCharge,
+  StripeCustomer,
+  StripeInvoice,
+  StripeList,
+  StripeObjectType,
+  StripeSubscription,
+} from './stripe/index';
 export { createNotionSpec } from './notion/index';
 export type { NotionSpecOptions } from './notion/index';
 export { createAirtableSpec } from './airtable/index';

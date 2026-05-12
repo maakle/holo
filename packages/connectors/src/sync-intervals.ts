@@ -37,6 +37,11 @@ export const SYNC_INTERVAL_MS_BY_PROVIDER: Record<SyncProvider, number> = {
   asana: 4 * HOUR_MS,
   jira: 4 * HOUR_MS,
   confluence: 4 * HOUR_MS,
+  // Stripe: revenue and growth metrics are read several times a day during
+  // close week, but the underlying objects update slowly outside that window.
+  // 6h is the same cadence as HubSpot/Zendesk — responsive enough for daily
+  // dashboards without burning embedding spend on no-op syncs.
+  stripe: 6 * HOUR_MS,
 };
 
 export function getSyncIntervalMs(provider: SyncProvider): number {

@@ -64,6 +64,7 @@ const registry: Record<string, SyncRunner> = {
   'zendesk-sync': stubRunner('zendesk'),
   'googledrive-sync': stubRunner('googledrive'),
   'airtable-sync': stubRunner('airtable'),
+  'stripe-sync': stubRunner('stripe'),
 };
 
 export function getSyncRunner(queue: string): SyncRunner {
