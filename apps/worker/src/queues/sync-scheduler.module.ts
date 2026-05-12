@@ -10,6 +10,7 @@ import { PylonSyncModule } from './pylon';
 import { HubspotSyncModule } from './hubspot';
 import { LinearSyncModule } from './linear';
 import { MintlifySyncModule } from './mintlify';
+import { PrismicSyncModule } from './prismic';
 import { ZendeskSyncModule } from './zendesk';
 import { GoogleDriveSyncModule } from './googledrive';
 import { AirtableSyncModule } from './airtable';
@@ -34,6 +35,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
     HubspotSyncModule,
     LinearSyncModule,
     MintlifySyncModule,
+    PrismicSyncModule,
     ZendeskSyncModule,
     GoogleDriveSyncModule,
     AirtableSyncModule,

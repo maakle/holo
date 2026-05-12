@@ -31,6 +31,10 @@ export const SYNC_INTERVAL_MS_BY_PROVIDER: Record<SyncProvider, number> = {
   grain: 12 * HOUR_MS,
   notion: 24 * HOUR_MS,
   mintlify: 24 * HOUR_MS,
+  // Prismic publishes are bursty but not high-frequency for the typical
+  // marketing-site / FAQ use case. 6h matches Zendesk articles — same
+  // shape (CMS-published prose) and a similar publish cadence.
+  prismic: 6 * HOUR_MS,
   googledrive: 6 * HOUR_MS,
   airtable: 6 * HOUR_MS,
   'google-chat': 4 * HOUR_MS,
