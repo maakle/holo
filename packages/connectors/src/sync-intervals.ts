@@ -36,6 +36,7 @@ export const SYNC_INTERVAL_MS_BY_PROVIDER: Record<SyncProvider, number> = {
   'google-chat': 4 * HOUR_MS,
   asana: 4 * HOUR_MS,
   jira: 4 * HOUR_MS,
+  confluence: 4 * HOUR_MS,
 };
 
 export function getSyncIntervalMs(provider: SyncProvider): number {

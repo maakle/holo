@@ -23,6 +23,7 @@ import {
 } from './contract';
 import { createAirtableSpec } from './airtable/spec';
 import { createAsanaSpec } from './asana/spec';
+import { createConfluenceSpec } from './confluence/spec';
 import { createGithubSpec, type GithubSpecOptions } from './github/spec';
 import { createGitlabSpec, type GitlabSpecOptions } from './gitlab/spec';
 import { createGoogleChatSpec } from './google-chat/spec';
@@ -180,6 +181,13 @@ const jira: NoOptRegistration = defineConnectorRegistration<ConnectorBootOptions
   createSpec: () => createJiraSpec(),
 });
 
+const confluence: NoOptRegistration = defineConnectorRegistration<ConnectorBootOptions>({
+  providerId: 'confluence',
+  syncIntervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.confluence,
+  auth: { kind: 'apiKey' },
+  createSpec: () => createConfluenceSpec(),
+});
+
 /**
  * Canonical registration list. The order is purely cosmetic — the
  * `indexRegistrations` invariant tolerates any permutation, but it
@@ -201,6 +209,7 @@ export const CONNECTOR_REGISTRATIONS: ReadonlyArray<ConnectorRegistration<Connec
   googleChat,
   asana,
   jira,
+  confluence,
 ];
 
 /**

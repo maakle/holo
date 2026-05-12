@@ -169,8 +169,8 @@ export const CONNECTORS: ConnectorMeta[] = [
     displayName: 'Confluence',
     description: 'Spaces, pages, and inline comments from Confluence Cloud.',
     category: 'productivity',
-    implemented: false,
-    flowType: 'oauth',
+    implemented: true,
+    flowType: 'apikey',
   },
   {
     id: 'jira',

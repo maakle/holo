@@ -73,6 +73,7 @@ export class SyncSchedulerService implements OnModuleInit {
     @InjectQueue(QUEUE_NAMES.GOOGLE_CHAT_SYNC) googleChat: Queue,
     @InjectQueue(QUEUE_NAMES.ASANA_SYNC) asana: Queue,
     @InjectQueue(QUEUE_NAMES.JIRA_SYNC) jira: Queue,
+    @InjectQueue(QUEUE_NAMES.CONFLUENCE_SYNC) confluence: Queue,
   ) {
     this.queueMap = {
       github: [QUEUE_NAMES.GITHUB_CODE_SYNC, QUEUE_NAMES.GITHUB_PROSE_SYNC],
@@ -90,6 +91,7 @@ export class SyncSchedulerService implements OnModuleInit {
       'google-chat': [QUEUE_NAMES.GOOGLE_CHAT_SYNC],
       asana: [QUEUE_NAMES.ASANA_SYNC],
       jira: [QUEUE_NAMES.JIRA_SYNC],
+      confluence: [QUEUE_NAMES.CONFLUENCE_SYNC],
     };
     this.queuesByName = {
       [QUEUE_NAMES.GITHUB_CODE_SYNC]: ghCode,
@@ -109,6 +111,7 @@ export class SyncSchedulerService implements OnModuleInit {
       [QUEUE_NAMES.GOOGLE_CHAT_SYNC]: googleChat,
       [QUEUE_NAMES.ASANA_SYNC]: asana,
       [QUEUE_NAMES.JIRA_SYNC]: jira,
+      [QUEUE_NAMES.CONFLUENCE_SYNC]: confluence,
     };
   }
 

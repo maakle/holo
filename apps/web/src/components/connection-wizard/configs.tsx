@@ -392,6 +392,32 @@ const jiraConfig: ConnectorWizardConfig = {
   ],
 };
 
+// Confluence shares the Atlassian basic-auth shape with Jira — same site URL,
+// same email + API token. We reuse jiraCredentialsStep (which derives the
+// button label and placeholder from meta.displayName) and only the helper
+// copy + the connect route path differ.
+const confluenceConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'credentials',
+      label: 'Connect',
+      render: (ctx) =>
+        jiraCredentialsStep(ctx, {
+          helpText:
+            'Holo authenticates via Atlassian basic auth: your email + an API token. The same token works for both Jira and Confluence. Connect from a workspace admin (or service-style user) to mirror every space the account can view.',
+          helpUrl: 'https://id.atlassian.com/manage-profile/security/api-tokens',
+          instructions: [
+            'Open id.atlassian.com/manage-profile/security/api-tokens, click "Create API token", label it "Holo", and copy the value (you can\'t see it again after closing the dialog).',
+            'Paste your Atlassian site URL (e.g. https://yourcompany.atlassian.net), the email of the Atlassian account that owns the token, and the token below.',
+            'Holo validates the credentials by calling /wiki/rest/api/user/current before saving.',
+          ],
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 // Registry holds heterogeneous configs (each connector has its own state
 // shape). Consumers don't introspect the state from the outside — they hand
 // the config to <ConnectionWizard> which threads the type through.
@@ -417,6 +443,7 @@ const REGISTRY: Partial<Record<ConnectorMeta['id'], ConnectorWizardConfig<any>>>
   'google-chat': googleChatConfig,
   asana: asanaConfig,
   jira: jiraConfig,
+  confluence: confluenceConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

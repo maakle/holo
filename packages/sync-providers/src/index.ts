@@ -26,6 +26,7 @@ export const SYNC_PROVIDERS = [
   'google-chat',
   'asana',
   'jira',
+  'confluence',
 ] as const;
 
 export type SyncProvider = (typeof SYNC_PROVIDERS)[number];
@@ -59,6 +60,7 @@ export const QUEUE_NAMES_BY_PROVIDER = {
   'google-chat': ['google-chat-sync'],
   asana: ['asana-sync'],
   jira: ['jira-sync'],
+  confluence: ['confluence-sync'],
 } as const satisfies Record<SyncProvider, readonly string[]>;
 
 export type SyncQueueName =

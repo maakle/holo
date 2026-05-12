@@ -1,0 +1,176 @@
+import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
+import { eq, and } from 'drizzle-orm';
+import { schema } from '@holo/db';
+import { holoError, ErrorCode, HoloError } from '@holo/errors';
+import {
+  createConfluenceSpec,
+  normalizeConfluenceSiteUrl,
+  fetchConfluenceTenantInfo,
+} from '@holo/connectors';
+import { createHttpClient, apiKey } from '@holo/connector-framework';
+import { emitAuditEvent } from '@holo/audit';
+import { getServerContext } from '@/lib/server-context';
+import { resolveActiveOrgId } from '@/lib/active-org';
+import { enqueueInitialSync } from '@/lib/sync-queue';
+
+function requireString(value: unknown, field: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw holoError({
+      code: ErrorCode.HOLO_ENV_INVALID,
+      problem: `${field} is required`,
+      fix: `Provide a non-empty ${field} in the request body.`,
+    });
+  }
+  return value.trim();
+}
+
+export async function POST(req: Request) {
+  try {
+    const { auth, db } = await getServerContext();
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) {
+      throw holoError({
+        code: ErrorCode.HOLO_AUTH_NO_SESSION,
+        problem: 'must be signed in',
+        fix: 'Sign in first.',
+      });
+    }
+
+    const body = (await req.json().catch(() => null)) as
+      | { siteUrl?: string; email?: string; token?: string }
+      | null;
+    if (!body) {
+      throw holoError({
+        code: ErrorCode.HOLO_ENV_INVALID,
+        problem: 'request body must be JSON',
+        fix: 'POST { siteUrl, email, token } as JSON.',
+      });
+    }
+    const rawSiteUrl = requireString(body.siteUrl, 'siteUrl');
+    const email = requireString(body.email, 'email');
+    const token = requireString(body.token, 'token');
+
+    const siteUrl = normalizeConfluenceSiteUrl(rawSiteUrl);
+    const encoded = Buffer.from(`${email}:${token}`, 'utf-8').toString('base64');
+
+    const authStrategy = apiKey({ prefix: 'Basic ' });
+    const probeClient = createHttpClient({
+      config: {
+        baseUrl: siteUrl,
+        retry: { maxAttempts: 3, retryOn: [429, 502, 503, 504] },
+      },
+      auth: authStrategy,
+      tokens: { accessToken: encoded },
+    });
+
+    const spec = createConfluenceSpec();
+    try {
+      await spec.testConnection({ api: probeClient, tokens: { accessToken: encoded } });
+    } catch {
+      throw holoError({
+        code: ErrorCode.HOLO_INVALID_INPUT,
+        problem: 'Confluence rejected the credentials',
+        fix: 'Check that the email matches the Atlassian account that owns the API token, and that the token is valid (https://id.atlassian.com/manage-profile/security/api-tokens). The account also needs view permission on at least one space.',
+      });
+    }
+
+    let tenantInfo: { cloudId?: string; cloudName?: string };
+    try {
+      tenantInfo = await fetchConfluenceTenantInfo(probeClient);
+    } catch {
+      tenantInfo = {};
+    }
+
+    const orgId = resolveActiveOrgId(session);
+    const userId = session.user.id;
+
+    const existing = await db
+      .select({ id: schema.connectorCredentials.id })
+      .from(schema.connectorCredentials)
+      .where(
+        and(
+          eq(schema.connectorCredentials.organizationId, orgId),
+          eq(schema.connectorCredentials.userId, userId),
+          eq(
+            schema.connectorCredentials.provider,
+            'confluence' as const,
+          ),
+        ),
+      );
+    if (existing[0]) {
+      await db
+        .update(schema.connectorCredentials)
+        .set({
+          accessToken: encoded,
+          scope: siteUrl,
+          status: 'active',
+          lastRefreshedAt: new Date(),
+        })
+        .where(eq(schema.connectorCredentials.id, existing[0].id));
+    } else {
+      await db.insert(schema.connectorCredentials).values({
+        organizationId: orgId,
+        userId,
+        provider: 'confluence',
+        accessToken: encoded,
+        scope: siteUrl,
+        status: 'active',
+      });
+    }
+
+    const cloudId = tenantInfo.cloudId ?? `confluence-${new URL(siteUrl).host}`;
+    const workspaceName = tenantInfo.cloudName ?? new URL(siteUrl).host;
+
+    await db
+      .insert(schema.sources)
+      .values({
+        organizationId: orgId,
+        provider: 'confluence',
+        externalId: cloudId,
+        name: workspaceName,
+        metadata: { siteUrl, cloudId, confluence_singleton: true },
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.sources.organizationId,
+          schema.sources.provider,
+          schema.sources.externalId,
+        ],
+        set: {
+          name: workspaceName,
+          metadata: { siteUrl, cloudId, confluence_singleton: true },
+          updatedAt: new Date(),
+        },
+      });
+
+    await enqueueInitialSync(db, orgId, 'confluence').catch(() => {});
+
+    emitAuditEvent({
+      db,
+      organizationId: orgId,
+      userId,
+      eventType: 'connector.connected',
+      resourceType: 'connector',
+      resourceId: 'confluence',
+      meta: { provider: 'confluence', externalId: cloudId, name: workspaceName, siteUrl },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    if (e instanceof HoloError) {
+      const status =
+        e.code === 'HOLO_AUTH_NO_SESSION'
+          ? 401
+          : e.code === 'HOLO_ENV_INVALID' || e.code === 'HOLO_INVALID_INPUT'
+            ? 400
+            : 500;
+      return NextResponse.json(e.toJSON(), { status });
+    }
+    console.error(e);
+    return NextResponse.json(
+      { code: 'HOLO_INTERNAL', problem: 'unexpected error', fix: 'Check server logs.' },
+      { status: 500 },
+    );
+  }
+}
