@@ -71,6 +71,13 @@ const EnvSchema = z.object({
    * retention job prunes them. Set to 0 to disable retention.
    */
   OBSERVABILITY_TTL_DAYS: z.coerce.number().int().min(0).default(30),
+  /**
+   * Wall-clock cap (ms) for the in-dashboard chat agent loop. Bound to the
+   * web route's `maxDuration` minus a small safety margin so the orchestrator
+   * surfaces a clean `HOLO_AGENT_WALLCLOCK` error instead of the platform
+   * killing the request mid-stream.
+   */
+  HOLO_CHAT_WALL_CLOCK_MS: z.coerce.number().int().min(5_000).default(110_000),
 }).refine(
   (env) =>
     env.EMAIL_PROVIDER !== 'resend' ||

@@ -121,7 +121,7 @@ export function ConnectorBrowser({ items, showSampleNav }: Props) {
                   {catItems.map((item) => (
                     <div
                       key={item.meta.id}
-                      className="overflow-hidden rounded-md border border-border bg-surface"
+                      className="overflow-hidden rounded-md border border-border bg-surface transition-colors duration-micro hover:bg-surface-2/40"
                     >
                       <ConnectorRow
                         meta={item.meta}

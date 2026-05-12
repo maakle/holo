@@ -14,9 +14,11 @@ import { CHAT_MODEL_ID } from '@/lib/chat-model';
 import { attachUserTurnToConversation, persistAssistantTurn } from './conversation';
 
 export const runtime = 'nodejs';
-// The agent loop can take longer than the default serverless slice; raise it
-// to match the worker's wall-clock cap.
-export const maxDuration = 60;
+// Some serverless platforms (Vercel) enforce maxDuration; self-hosted Node
+// (Railway, Docker) ignores it. Keep this slightly above
+// HOLO_CHAT_WALL_CLOCK_MS so the orchestrator's own budget fires first and
+// the client gets a clean error event rather than a platform-killed stream.
+export const maxDuration = 120;
 
 const turnSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -155,6 +157,7 @@ export async function POST(req: Request) {
           model: CHAT_MODEL_ID,
           toolCtx,
           initialMessages,
+          wallClockMs: env.HOLO_CHAT_WALL_CLOCK_MS,
           onEvent: (event) => {
             send(event);
           },

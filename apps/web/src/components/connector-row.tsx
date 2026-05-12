@@ -128,7 +128,7 @@ export function ConnectorRow({
   }
 
   return (
-    <div className="flex flex-col gap-3 px-5 py-4 transition-colors duration-micro hover:bg-surface-2/40">
+    <div className="flex h-full flex-col gap-3 px-5 py-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md text-text-muted">
           <ConnectorLogo id={meta.id} className="h-full w-full object-contain" />
