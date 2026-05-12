@@ -14,6 +14,7 @@ export const QUEUE_NAMES = {
   MINTLIFY_SYNC: 'mintlify-sync',
   PRISMIC_SYNC: 'prismic-sync',
   ZENDESK_SYNC: 'zendesk-sync',
+  WEBCRAWL_SYNC: 'webcrawl-sync',
   GOOGLEDRIVE_SYNC: 'googledrive-sync',
   AIRTABLE_SYNC: 'airtable-sync',
   GOOGLE_CHAT_SYNC: 'google-chat-sync',
@@ -68,6 +69,10 @@ export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   'mintlify-sync': 2,
   'prismic-sync': 2,
   'zendesk-sync': 2,
+  // Webcrawl: serial. Each job may sit on Firecrawl polling for minutes;
+  // running them in parallel would multiply that wait against the worker's
+  // overall throughput. Most orgs add only a few seed URLs, so serial is fine.
+  'webcrawl-sync': 1,
   'googledrive-sync': 2,
   'airtable-sync': 2,
   'google-chat-sync': 3,

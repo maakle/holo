@@ -36,6 +36,7 @@ export interface ConnectorMeta {
     | 'linear'
     | 'mintlify'
     | 'prismic'
+    | 'webcrawl'
     | 'zendesk'
     | 'googledrive'
     | 'airtable'
@@ -148,6 +149,15 @@ export const CONNECTORS: ConnectorMeta[] = [
     displayName: 'Prismic',
     description:
       'Prismic CMS documents (FAQs, pages, blog posts); public repos work without a token.',
+    category: 'knowledge',
+    implemented: true,
+    flowType: 'apikey',
+  },
+  {
+    id: 'webcrawl',
+    displayName: 'Website',
+    description:
+      'Scrape a list of pages or crawl an entire website (Firecrawl-powered).',
     category: 'knowledge',
     implemented: true,
     flowType: 'apikey',

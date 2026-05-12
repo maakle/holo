@@ -17,6 +17,7 @@ import {
   createGitlabSpec,
   createMintlifySpec,
   createPrismicSpec,
+  createWebcrawlSpec,
   createZendeskSpec,
   createGoogleDriveSpec,
   createAirtableSpec,
@@ -188,6 +189,18 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
     setSyncRunner(
       QUEUE_NAMES.ZENDESK_SYNC,
       createGenericRunner(createZendeskSpec(), deps),
+    );
+    // Webcrawl runs via Firecrawl. The API key is a single team-owned
+    // secret (FIRECRAWL_API_KEY) — not per-org. We register the queue even
+    // when the env var is missing so the worker boots cleanly; the sync
+    // job throws HOLO_CONNECTOR_NOT_IMPLEMENTED at run time if the key
+    // isn't present, surfacing as a clear error in the dashboard.
+    setSyncRunner(
+      QUEUE_NAMES.WEBCRAWL_SYNC,
+      createGenericRunner(
+        createWebcrawlSpec({ apiKey: process.env.FIRECRAWL_API_KEY ?? '' }),
+        deps,
+      ),
     );
     // Google Drive runs against a per-org service account with domain-wide
     // delegation. The framework-bridge loads the SA from

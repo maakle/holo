@@ -188,6 +188,28 @@ export type {
   PrismicSearchResponse,
 } from './prismic/index';
 export {
+  createWebcrawlSpec,
+  scrapePage as firecrawlScrapePage,
+  startCrawl as firecrawlStartCrawl,
+  getCrawlStatus as firecrawlGetCrawlStatus,
+  cancelCrawl as firecrawlCancelCrawl,
+  iterateCrawlPages,
+  normalizeSeedUrl,
+  MAX_CRAWL_LIMIT,
+  CRAWL_DEADLINE_MS,
+  FIRECRAWL_API_BASE,
+} from './webcrawl/index';
+export type {
+  WebcrawlSpecOptions,
+  FirecrawlClientOptions,
+  StartCrawlInput,
+  FirecrawlPage,
+  WebcrawlMode,
+  WebcrawlMetadata,
+  WebcrawlScrapeMetadata,
+  WebcrawlCrawlMetadata,
+} from './webcrawl/index';
+export {
   createZendeskSpec,
   iterateArticlesIncremental,
   fetchAllSections as fetchAllZendeskSections,
