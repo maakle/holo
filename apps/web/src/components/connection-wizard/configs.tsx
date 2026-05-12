@@ -204,6 +204,26 @@ const hubspotConfig: ConnectorWizardConfig = {
   ],
 };
 
+const salesforceConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'install',
+      label: 'Authorize',
+      render: (ctx) =>
+        oauthInstallStep(ctx, {
+          installButtonLabel: 'Authorize Salesforce',
+          permissions: [
+            'Read accounts, contacts, and opportunities',
+            'Read tasks, events, and notes attached to those records',
+            'Stay connected via refresh token (no re-auth needed)',
+          ],
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 const notionConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
@@ -456,6 +476,7 @@ const REGISTRY: Partial<Record<ConnectorMeta['id'], ConnectorWizardConfig<any>>>
   gitlab: gitlabConfig,
   grain: grainConfig,
   hubspot: hubspotConfig,
+  salesforce: salesforceConfig,
   notion: notionConfig,
   pylon: pylonConfig,
   linear: linearConfig,

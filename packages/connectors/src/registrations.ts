@@ -35,6 +35,7 @@ import { createLinearSpec } from './linear/spec';
 import { createMintlifySpec } from './mintlify/spec';
 import { createNotionSpec } from './notion/spec';
 import { createPylonSpec } from './pylon/spec';
+import { createSalesforceSpec, type SalesforceSpecOptions } from './salesforce/spec';
 import { createSlackSpec, type SlackSpecOptions } from './slack/spec';
 import { createStripeSpec } from './stripe/spec';
 import { createZendeskSpec } from './zendesk/spec';
@@ -49,6 +50,7 @@ export interface ConnectorBootOptions {
   slack?: SlackSpecOptions;
   gitlab?: GitlabSpecOptions;
   github?: GithubSpecOptions;
+  salesforce?: SalesforceSpecOptions;
 }
 
 /**
@@ -196,6 +198,18 @@ const stripe: NoOptRegistration = defineConnectorRegistration<ConnectorBootOptio
   createSpec: () => createStripeSpec(),
 });
 
+const salesforce: NoOptRegistration = defineConnectorRegistration<ConnectorBootOptions>({
+  providerId: 'salesforce',
+  syncIntervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.salesforce,
+  auth: { kind: 'oauth', refreshable: true },
+  // Required by the type — its presence forces every Salesforce OAuth
+  // callback site to pass `expiresAt: Date`.
+  persistTokens: persistRefreshableOAuthTokens,
+  createSpec(opts): ConnectorSpec {
+    return createSalesforceSpec(opts.salesforce ?? { clientId: '', clientSecret: '' });
+  },
+});
+
 /**
  * Canonical registration list. The order is purely cosmetic — the
  * `indexRegistrations` invariant tolerates any permutation, but it
@@ -219,6 +233,7 @@ export const CONNECTOR_REGISTRATIONS: ReadonlyArray<ConnectorRegistration<Connec
   jira,
   confluence,
   stripe,
+  salesforce,
 ];
 
 /**

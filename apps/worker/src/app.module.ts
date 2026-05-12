@@ -19,6 +19,7 @@ import { AirtableSyncModule } from './queues/airtable';
 import { GoogleChatSyncModule } from './queues/google-chat';
 import { AsanaSyncModule } from './queues/asana';
 import { StripeSyncModule } from './queues/stripe';
+import { SalesforceSyncModule } from './queues/salesforce';
 import { EmbedModule } from './queues/embed';
 import { EmbedBackfillModule } from './queues/embed-backfill';
 import { DisconnectCleanupModule } from './queues/disconnect-cleanup';
@@ -72,6 +73,7 @@ import { ObservabilityModule } from './observability/observability.module';
     GoogleChatSyncModule,
     AsanaSyncModule,
     StripeSyncModule,
+    SalesforceSyncModule,
     EmbedModule,
     EmbedBackfillModule,
     DisconnectCleanupModule,

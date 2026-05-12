@@ -28,6 +28,7 @@ export const SYNC_PROVIDERS = [
   'jira',
   'confluence',
   'stripe',
+  'salesforce',
 ] as const;
 
 export type SyncProvider = (typeof SYNC_PROVIDERS)[number];
@@ -63,6 +64,7 @@ export const QUEUE_NAMES_BY_PROVIDER = {
   jira: ['jira-sync'],
   confluence: ['confluence-sync'],
   stripe: ['stripe-sync'],
+  salesforce: ['salesforce-sync'],
 } as const satisfies Record<SyncProvider, readonly string[]>;
 
 export type SyncQueueName =

@@ -42,6 +42,7 @@ export const SYNC_INTERVAL_MS_BY_PROVIDER: Record<SyncProvider, number> = {
   // 6h is the same cadence as HubSpot/Zendesk — responsive enough for daily
   // dashboards without burning embedding spend on no-op syncs.
   stripe: 6 * HOUR_MS,
+  salesforce: 6 * HOUR_MS,
 };
 
 export function getSyncIntervalMs(provider: SyncProvider): number {

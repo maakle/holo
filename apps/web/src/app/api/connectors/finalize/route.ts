@@ -50,7 +50,18 @@ type GithubPayload = {
   setupAction: string | null;
 };
 
-type GrantPayload = SlackPayload | GitlabPayload | GithubPayload;
+type SalesforcePayload = {
+  provider: 'salesforce';
+  accessToken: string;
+  refreshToken: string;
+  scope: string | null;
+  expiresAtIso: string;
+  instanceUrl: string;
+  idUrl: string;
+  ident: { externalId: string; name: string };
+};
+
+type GrantPayload = SlackPayload | GitlabPayload | GithubPayload | SalesforcePayload;
 
 export async function GET(req: Request) {
   let provider = 'unknown';
@@ -213,6 +224,49 @@ export async function GET(req: Request) {
           name: payload.ident.name,
         },
       });
+    } else if (payload.provider === 'salesforce') {
+      await commitOAuthCredential(db, {
+        orgId,
+        userId,
+        provider: 'salesforce',
+        accessToken: payload.accessToken,
+        refreshToken: payload.refreshToken,
+        scope: payload.scope,
+        // Salesforce access tokens expire (default 2h). Without expiresAt
+        // the framework's shouldRefresh() returns false and the token is
+        // never rotated, so sync starts 401-ing the moment the first
+        // window closes — same trap GitLab fell into pre-14737ad.
+        expiresAt: new Date(payload.expiresAtIso),
+      });
+      await upsertSource(db, {
+        orgId,
+        provider: 'salesforce',
+        externalId: payload.ident.externalId,
+        name: payload.ident.name,
+        // instanceUrl is per-org and used to build the per-tenant HttpClient
+        // on every sync — see packages/connectors/src/salesforce/spec.ts
+        // (requireInstanceUrl).
+        metadata: {
+          organization_id: payload.ident.externalId,
+          instanceUrl: payload.instanceUrl,
+          idUrl: payload.idUrl,
+        },
+      });
+      await enqueueInitialSync(db, orgId, 'salesforce').catch(() => {});
+      emitAuditEvent({
+        db,
+        organizationId: orgId,
+        userId,
+        eventType: 'connector.connected',
+        resourceType: 'connector',
+        resourceId: 'salesforce',
+        meta: {
+          provider: 'salesforce',
+          externalId: payload.ident.externalId,
+          name: payload.ident.name,
+          instanceUrl: payload.instanceUrl,
+        },
+      });
     } else if (payload.provider === 'github') {
       await db
         .insert(schema.githubInstallations)
@@ -296,7 +350,7 @@ async function commitOAuthCredential(
   opts: {
     orgId: string;
     userId: string;
-    provider: 'slack' | 'gitlab';
+    provider: 'slack' | 'gitlab' | 'salesforce';
     accessToken: string;
     refreshToken: string | null;
     scope: string | null;
@@ -343,7 +397,7 @@ async function upsertSource(
   db: Awaited<ReturnType<typeof getServerContext>>['db'],
   opts: {
     orgId: string;
-    provider: 'slack' | 'gitlab' | 'github';
+    provider: 'slack' | 'gitlab' | 'github' | 'salesforce';
     externalId: string;
     name: string;
     metadata: Record<string, unknown>;
