@@ -349,3 +349,37 @@ export const connectorDisconnectJobs = pgTable(
       .where(sql`${t.finishedAt} IS NULL`),
   }),
 );
+
+// Single-use grant rows that bridge an OAuth callback (which runs on
+// WEB_PUBLIC_URL where the better-auth session cookie isn't readable) to
+// a same-origin /connections/oauth-finalize page on BETTER_AUTH_URL where
+// the current user's session IS readable. The callback exchanges the OAuth
+// code, encrypts the resulting tokens + provider-specific payload into
+// `payload`, and writes a row keyed by the JWT-claimed (user, org). The
+// finalize page asserts `session.user.id === claimed_user_id` before
+// committing the credentials — this is the defense against an attacker
+// who replays their own state JWT against a victim's browser to land the
+// victim's tokens under the attacker's org. Rows are short-lived (~2 min)
+// and one-shot (consumed_at flips on the first successful finalize).
+export const oauthPendingGrants = pgTable(
+  'oauth_pending_grants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    provider: text('provider').notNull(),
+    claimedUserId: uuid('claimed_user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    claimedOrganizationId: uuid('claimed_organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    payload: encryptedText('payload').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  },
+  (t) => ({
+    expiresIdx: index('oauth_pending_grants_expires_idx')
+      .on(t.expiresAt)
+      .where(sql`${t.consumedAt} IS NULL`),
+  }),
+);
