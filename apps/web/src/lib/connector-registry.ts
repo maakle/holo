@@ -2,6 +2,7 @@ export type ConnectorCategoryId =
   | 'source-control'
   | 'communication'
   | 'knowledge'
+  | 'website'
   | 'project-management'
   | 'meetings'
   | 'crm'
@@ -17,6 +18,7 @@ export const CONNECTOR_CATEGORIES: ConnectorCategory[] = [
   { id: 'source-control', label: 'Source Control' },
   { id: 'communication', label: 'Communication' },
   { id: 'knowledge', label: 'Knowledge & Docs' },
+  { id: 'website', label: 'Website & CMS' },
   { id: 'project-management', label: 'Project Management' },
   { id: 'meetings', label: 'Meetings' },
   { id: 'crm', label: 'CRM' },
@@ -149,7 +151,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     displayName: 'Prismic',
     description:
       'Prismic CMS documents (FAQs, pages, blog posts); public repos work without a token.',
-    category: 'knowledge',
+    category: 'website',
     implemented: true,
     flowType: 'apikey',
   },
@@ -158,7 +160,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     displayName: 'Website',
     description:
       'Scrape a list of pages or crawl an entire website (Firecrawl-powered).',
-    category: 'knowledge',
+    category: 'website',
     implemented: true,
     flowType: 'apikey',
   },

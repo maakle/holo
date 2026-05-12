@@ -21,6 +21,7 @@ import { apiKeyStep } from './steps/api-key-step';
 import { jiraCredentialsStep } from './steps/jira-credentials-step';
 import { serviceAccountStep } from './steps/service-account-step';
 import { firstSyncStep } from './steps/first-sync-step';
+import { webcrawlStep } from './steps/webcrawl-step';
 // Imported from @holo/sync-providers (client-safe constants module) rather
 // than @holo/connectors — the connectors barrel pulls the chunker package,
 // which transitively requires tree-sitter (a native node module) and breaks
@@ -310,6 +311,14 @@ const mintlifyConfig: ConnectorWizardConfig = {
   ],
 };
 
+const webcrawlConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    { id: 'configure', label: 'Configure', render: (ctx) => webcrawlStep(ctx) },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 const prismicConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
@@ -506,6 +515,7 @@ const REGISTRY: Partial<Record<ConnectorMeta['id'], ConnectorWizardConfig<any>>>
   linear: linearConfig,
   mintlify: mintlifyConfig,
   prismic: prismicConfig,
+  webcrawl: webcrawlConfig,
   zendesk: zendeskConfig,
   googledrive: googleDriveConfig,
   airtable: airtableConfig,

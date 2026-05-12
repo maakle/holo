@@ -35,6 +35,7 @@ const FILE_BY_ID: Partial<Record<ConnectorMeta['id'], string>> = {
   salesforce: '/connectors/salesforce.webp',
   stripe: '/connectors/stripe.webp',
   prismic: '/connectors/prismic.webp',
+  webcrawl: '/connectors/website.webp',
 };
 
 export function ConnectorLogo({ id, className }: Props) {
