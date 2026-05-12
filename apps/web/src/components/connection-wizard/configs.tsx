@@ -310,6 +310,30 @@ const mintlifyConfig: ConnectorWizardConfig = {
   ],
 };
 
+const prismicConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    {
+      id: 'apikey',
+      label: 'Repository',
+      render: (ctx) =>
+        apiKeyStep(ctx, {
+          kind: 'url',
+          placeholder: 'beglaubigt or https://beglaubigt.cdn.prismic.io/api/v2',
+          helpText:
+            'Paste the Prismic repository slug (the part before .prismic.io) or its full /api/v2 URL. Public repositories sync without a token.',
+          helpUrl: 'https://prismic.io/docs/api',
+          instructions: [
+            'Find your Prismic repository — the slug appears in the dashboard URL, e.g. `beglaubigt` in `beglaubigt.prismic.io`.',
+            'Paste the slug (or the full *.prismic.io URL) below. Holo validates it by calling /api/v2 before saving.',
+            'Private repositories: generate a Personal Access Token in Prismic settings and append it via the API later (the wizard only needs the slug).',
+          ],
+        }),
+    },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 const asanaConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
@@ -481,6 +505,7 @@ const REGISTRY: Partial<Record<ConnectorMeta['id'], ConnectorWizardConfig<any>>>
   pylon: pylonConfig,
   linear: linearConfig,
   mintlify: mintlifyConfig,
+  prismic: prismicConfig,
   zendesk: zendeskConfig,
   googledrive: googleDriveConfig,
   airtable: airtableConfig,

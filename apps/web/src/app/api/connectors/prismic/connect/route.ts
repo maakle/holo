@@ -51,10 +51,11 @@ export async function POST(req: Request) {
       url?: string;
     } | null;
 
-    // The wizard's apiKeyStep posts `{ token }`; the canonical field for this
-    // connector is `repo`. Accept `url` too for the case where the user pastes
-    // a full Prismic URL. Reject empty after trim.
-    const rawRepo = (body?.repo ?? body?.url ?? '').trim();
+    // The wizard's apiKeyStep posts `{ token }` regardless of input kind; for
+    // this connector that single field carries the repo slug or URL, not a
+    // PAT. `repo`/`url` are accepted too for direct API callers. Reject empty
+    // after trim.
+    const rawRepo = (body?.repo ?? body?.url ?? body?.token ?? '').trim();
     if (!rawRepo) {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
@@ -72,10 +73,14 @@ export async function POST(req: Request) {
       });
     }
 
-    // Optional PAT for private repositories.
-    const accessToken = typeof body?.token === 'string' && body.token.trim().length > 0
-      ? body.token.trim()
-      : undefined;
+    // Optional PAT for private repositories. Only treat `token` as a PAT when
+    // the caller supplied `repo`/`url` explicitly — otherwise the wizard's
+    // single field is already being read into `rawRepo` above.
+    const tokenCarriesRepo = !body?.repo && !body?.url;
+    const accessToken =
+      !tokenCarriesRepo && typeof body?.token === 'string' && body.token.trim().length > 0
+        ? body.token.trim()
+        : undefined;
 
     // Probe /api/v2. If reachable + parseable, the repo exists and we can
     // read it. 401/403 surfaces as a typed setup error so the wizard can
