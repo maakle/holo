@@ -12,9 +12,11 @@
 import { z } from 'zod';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
-import { search } from '@holo/retrieval-core';
+import { searchWithCoverage } from '@holo/retrieval-core';
 import { parseSkill } from '@holo/skills';
 import type { LLMClient, LLMMessage, LLMStopReason, LLMTool } from '@holo/llm';
+import { citationToWire, toCitation, type WireCitation } from './citations';
+import { coverageToWire, type WireSearchCoverage } from './coverage-wire';
 
 export interface ChatToolContext {
   db: DB;
@@ -42,6 +44,7 @@ export const CHAT_SYSTEM_PROMPT = `You are holo, a knowledge assistant. You have
 
 Rules:
 - Ground every claim in a tool result. Do not invent facts.
+- Cite your sources. Each \`search\` tool result includes a \`citations\` array with 1-based \`index\` values. When you state a fact grounded in one of those results, append the matching bracket reference like \`[1]\` (or \`[2][3]\` for multiple). Do not invent indices and do not cite results you didn't use.
 - For questions about which sources / connectors / integrations are connected, call list_connections — never infer connections from search results, that misses providers whose content hasn't matched a query.
 - Keep answers concise. Use plain markdown if formatting helps.
 - If you cannot find an answer, say so directly.
@@ -93,7 +96,7 @@ export const CHAT_TOOLS: ChatLocalTool[] = [
     },
     async run(ctx, raw) {
       const input = searchInput.parse(raw);
-      const results = await search({
+      const { results, coverage } = await searchWithCoverage({
         db: ctx.db,
         organizationId: ctx.organizationId,
         q: input.q,
@@ -101,6 +104,10 @@ export const CHAT_TOOLS: ChatLocalTool[] = [
         provider: input.provider,
         userSubjects: ctx.userSubjects,
       });
+      // Per-call 1-based indices. The orchestrator renumbers them across
+      // multiple search calls in one turn so the model sees a single
+      // monotonic citation namespace and doesn't double-cite [1].
+      const citations = results.map((r, i) => citationToWire(toCitation(r, i + 1)));
       return {
         results: results.map((r) => ({
           chunk_id: r.chunkId,
@@ -113,6 +120,8 @@ export const CHAT_TOOLS: ChatLocalTool[] = [
           },
           ...(r.snippetUrl ? { snippet_url: r.snippetUrl } : {}),
         })),
+        citations,
+        coverage: coverageToWire(coverage),
       };
     },
   },
@@ -346,6 +355,15 @@ export type ChatAgentLoopResult =
       answer: string;
       toolCalls: ChatToolCallTrace[];
       modelCalls: number;
+      /** Renumbered citations across every `search` tool call in the turn,
+       * 1-based and monotonic. The model is told to reference them as
+       * `[1]`, `[2]`, ... in the answer text. Wire (snake_case) shape so
+       * the field is the same one the model saw in the tool output and the
+       * REST surface returns. */
+      citations: WireCitation[];
+      /** Coverage payloads from every `search` tool call in the turn, in
+       * call order. Surface as a "what I searched" footer in the UI. */
+      coverage: WireSearchCoverage[];
     }
   | {
       kind: 'wall_clock_exceeded';
@@ -392,6 +410,11 @@ export async function runChatAgentLoop(
 
   const messages: LLMMessage[] = [...opts.initialMessages];
   const traces: ChatToolCallTrace[] = [];
+  // Citations across every `search` tool call in the turn, renumbered to a
+  // single monotonic namespace before being shipped to the LLM. The model
+  // references them as [1], [2], ... in the answer text.
+  const citationsAcc: WireCitation[] = [];
+  const coverageAcc: WireSearchCoverage[] = [];
   const startedAt = now();
   let toolCallCount = 0;
   let modelCalls = 0;
@@ -425,7 +448,14 @@ export async function runChatAgentLoop(
         .map((b) => b.text)
         .join('\n')
         .trim();
-      return { kind: 'answer', answer: text, toolCalls: traces, modelCalls };
+      return {
+        kind: 'answer',
+        answer: text,
+        toolCalls: traces,
+        modelCalls,
+        citations: citationsAcc,
+        coverage: coverageAcc,
+      };
     }
 
     const toolUses = response.content.filter(
@@ -474,7 +504,14 @@ export async function runChatAgentLoop(
         continue;
       }
       try {
-        const output = await tool.run(opts.toolCtx, use.input);
+        const rawOutput = await tool.run(opts.toolCtx, use.input);
+        // For `search` tool calls, renumber the per-call citation indices
+        // into the turn-global namespace before the output reaches both the
+        // LLM (via JSON.stringify) and the trace consumer. This is the only
+        // tool-name special-case in the loop; it lives here rather than in
+        // the tool because the tool has no view of prior calls in the turn.
+        const output =
+          use.name === 'search' ? renumberSearchOutput(rawOutput, citationsAcc, coverageAcc) : rawOutput;
         const trace: ChatToolCallTrace = {
           id: use.id,
           name: use.name,
@@ -525,4 +562,38 @@ export async function runChatAgentLoop(
 
     messages.push({ role: 'user', content: toolResults });
   }
+}
+
+/**
+ * Rewrite the `citations[].index` field on a `search` tool's output so the
+ * indices count up from where the prior search call left off. Mutates the
+ * returned object's citations array but leaves everything else alone, and
+ * appends the (renumbered) citations + raw coverage to the loop's
+ * accumulators so the final `answer` result can carry them through to the
+ * caller / UI.
+ *
+ * Defensive against malformed tool outputs: if the shape doesn't match
+ * (e.g. a test stub returned something else under the `search` name), we
+ * pass the value through untouched. The orchestrator's contract is to not
+ * crash on tool output shape — only the tool itself owns that schema.
+ */
+function renumberSearchOutput(
+  rawOutput: unknown,
+  citationsAcc: WireCitation[],
+  coverageAcc: WireSearchCoverage[],
+): unknown {
+  if (!rawOutput || typeof rawOutput !== 'object') return rawOutput;
+  const out = rawOutput as { citations?: unknown; coverage?: unknown };
+  if (out.coverage && typeof out.coverage === 'object') {
+    coverageAcc.push(out.coverage as WireSearchCoverage);
+  }
+  if (!Array.isArray(out.citations)) return rawOutput;
+  const offset = citationsAcc.length;
+  const renumbered = out.citations.map((c, i) => {
+    const cit = c as WireCitation;
+    const renumberedCit: WireCitation = { ...cit, index: offset + i + 1 };
+    citationsAcc.push(renumberedCit);
+    return renumberedCit;
+  });
+  return { ...out, citations: renumbered };
 }

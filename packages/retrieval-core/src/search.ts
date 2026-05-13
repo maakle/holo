@@ -33,6 +33,59 @@ export interface SearchResult {
   snippetUrl?: string;
 }
 
+/**
+ * Telemetry returned alongside results so callers (chat orchestrator, REST
+ * `/v1/search`) can show users *what was actually searched* — the questions
+ * "did you check Slack?" and "is HubSpot up to date?" have answers in this
+ * shape, not in the results list.
+ *
+ * Field semantics:
+ * - `queries.vector.model` is the model the chunks were filtered by, not just
+ *   the model used to embed the query — the search SQL gates on both.
+ * - `branchCounts.vectorReturned` / `bm25Returned` count rows the SQL CTE
+ *   returned per branch (capped at 100 by `LIMIT 100`); `fusedReturned` is
+ *   after RRF fusion and `topK` truncation.
+ * - `fallbackUsed` is true when the primary embedding model came back with
+ *   fewer than `MIN_RESULTS_BEFORE_FALLBACK` results and we re-queried the
+ *   other family (voyage ↔ openai). Both passes' counts are recorded in
+ *   `passes`.
+ * - `timingsMs` is per-pass wall-clock from the caller's perspective — embed
+ *   + SQL together, since they're sequential and the split rarely matters.
+ */
+export interface SearchCoverage {
+  query: string;
+  filters: {
+    provider: string | null;
+    accountIds: ReadonlyArray<string> | null;
+    userSubjectsCount: number;
+    topK: number;
+  };
+  passes: ReadonlyArray<SearchCoveragePass>;
+  fallbackUsed: boolean;
+  totalReturned: number;
+  totalTimingsMs: number;
+}
+
+export interface SearchCoveragePass {
+  /** `'primary'` for the first embedding family tried; `'fallback'` for the
+   * second when the primary returned too few results. */
+  role: 'primary' | 'fallback';
+  embeddingModel: EmbeddingModel;
+  branchCounts: {
+    vectorReturned: number;
+    bm25Returned: number;
+    fusedReturned: number;
+  };
+  timingsMs: number;
+}
+
+/** Envelope returned by `searchWithCoverage`. `search()` exposes only
+ * `results` for callers that don't need telemetry. */
+export interface SearchEnvelope {
+  results: SearchResult[];
+  coverage: SearchCoverage;
+}
+
 const MIN_RESULTS_BEFORE_FALLBACK = 5;
 const RRF_K = 60;
 
@@ -78,9 +131,14 @@ interface ChunkRow {
   rrf_score: number;
 }
 
+interface SearchOnceOutput {
+  results: SearchResult[];
+  branchCounts: SearchCoveragePass['branchCounts'];
+}
+
 async function searchOnce(
   input: SearchInput & { embedding: number[]; model: EmbeddingModel; topK: number; userSubjects: string[] },
-): Promise<SearchResult[]> {
+): Promise<SearchOnceOutput> {
   const provider = input.provider ?? null;
 
   // Normalize accountId into a Postgres uuid[] literal. `null` here means "no
@@ -90,6 +148,12 @@ async function searchOnce(
 
   // Verbatim hybrid SQL CTE per spec — RRF constant 60, LIMIT 100 per branch.
   // pgvector accepts vector literals as JSON-style strings cast to vector.
+  //
+  // The coverage payload needs per-branch counts BEFORE fusion (so users can
+  // tell "vector found 80 things, BM25 found 3" — a strong signal that the
+  // query was semantically broad but had no keyword anchor). We capture them
+  // by surfacing extra columns from the per-branch CTEs and reading them off
+  // the first row.
   const vectorLiteral = `[${input.embedding.join(',')}]`;
 
   const result = await input.db.execute<ChunkRow & Record<string, unknown>>(sql`
@@ -129,16 +193,55 @@ async function searchOnce(
         GROUP BY id
         ORDER BY rrf_score DESC
         LIMIT ${input.topK}
+      ),
+      branch_counts AS (
+        SELECT
+          (SELECT COUNT(*)::int FROM vector_ranked) AS vector_total,
+          (SELECT COUNT(*)::int FROM bm25_ranked) AS bm25_total
       )
-    SELECT c.id, c.content, c.provider, c.source_artifact_id, c.metadata, f.rrf_score
-    FROM fused f JOIN chunks c ON c.id = f.id
+    SELECT c.id, c.content, c.provider, c.source_artifact_id, c.metadata, f.rrf_score,
+           b.vector_total, b.bm25_total
+    FROM fused f
+    JOIN chunks c ON c.id = f.id
+    CROSS JOIN branch_counts b
     ORDER BY f.rrf_score DESC
   `);
 
-  const rows = ((result as unknown as { rows?: ChunkRow[] }).rows
-    ?? (result as unknown as ChunkRow[])) ?? [];
+  const rows = ((result as unknown as { rows?: Array<ChunkRow & { vector_total: number | null; bm25_total: number | null }> }).rows
+    ?? (result as unknown as Array<ChunkRow & { vector_total: number | null; bm25_total: number | null }>)) ?? [];
 
-  return rows.map((r) => {
+  // When the fused CTE returns zero rows the CROSS JOIN produces nothing, so
+  // the branch counts have to be re-queried separately to stay non-null.
+  let vectorTotal = rows[0]?.vector_total ?? 0;
+  let bm25Total = rows[0]?.bm25_total ?? 0;
+  if (rows.length === 0) {
+    const fallback = await input.db.execute<{ vector_total: number; bm25_total: number }>(sql`
+      SELECT
+        (SELECT COUNT(*)::int FROM chunks
+          WHERE organization_id = ${input.organizationId}
+            AND embedding_model = ${input.model}
+            AND acl_subjects && ${formatTextArray(input.userSubjects)}::text[]
+            AND (${provider}::text IS NULL OR provider = ${provider})
+            AND (${accountIdLiteral}::uuid[] IS NULL OR account_id = ANY(${accountIdLiteral}::uuid[]))
+            AND embedding IS NOT NULL
+          LIMIT 100
+        ) AS vector_total,
+        (SELECT COUNT(*)::int FROM chunks
+          WHERE organization_id = ${input.organizationId}
+            AND content_tsvector @@ plainto_tsquery('english', ${input.q})
+            AND acl_subjects && ${formatTextArray(input.userSubjects)}::text[]
+            AND (${provider}::text IS NULL OR provider = ${provider})
+            AND (${accountIdLiteral}::uuid[] IS NULL OR account_id = ANY(${accountIdLiteral}::uuid[]))
+          LIMIT 100
+        ) AS bm25_total
+    `);
+    const counts = ((fallback as unknown as { rows?: Array<{ vector_total: number; bm25_total: number }> }).rows
+      ?? (fallback as unknown as Array<{ vector_total: number; bm25_total: number }>)) ?? [];
+    vectorTotal = counts[0]?.vector_total ?? 0;
+    bm25Total = counts[0]?.bm25_total ?? 0;
+  }
+
+  const results = rows.map((r): SearchResult => {
     const metadata = (r.metadata ?? {}) as Record<string, unknown>;
     const artifactKind = String(metadata['artifact_kind'] ?? metadata['kind'] ?? '');
     const snippetUrl =
@@ -159,6 +262,15 @@ async function searchOnce(
       ...(snippetUrl !== undefined ? { snippetUrl } : {}),
     };
   });
+
+  return {
+    results,
+    branchCounts: {
+      vectorReturned: vectorTotal,
+      bm25Returned: bm25Total,
+      fusedReturned: results.length,
+    },
+  };
 }
 
 function rrfFuse(sets: SearchResult[][], topK: number): SearchResult[] {
@@ -182,21 +294,57 @@ function rrfFuse(sets: SearchResult[][], topK: number): SearchResult[] {
     .map(({ score, result }) => ({ ...result, score }));
 }
 
+/**
+ * Backwards-compatible thin wrapper around `searchWithCoverage` for callers
+ * that don't need telemetry. New code should prefer `searchWithCoverage` so
+ * users can see what was actually searched.
+ */
 export async function search(input: SearchInput): Promise<SearchResult[]> {
+  const { results } = await searchWithCoverage(input);
+  return results;
+}
+
+/**
+ * Hybrid retrieval with attached coverage telemetry. The coverage payload
+ * is the substrate for the "what I searched" footer surfaced by the chat
+ * orchestrator and REST `/v1/search` — keep it cheap to compute and small
+ * enough to ship in every response.
+ */
+export async function searchWithCoverage(input: SearchInput): Promise<SearchEnvelope> {
   const topK = input.topK ?? 10;
   const userSubjects = input.userSubjects;
+  const t0 = Date.now();
 
+  const passes: SearchCoveragePass[] = [];
+
+  const primaryStart = Date.now();
   const primary = await embedQuery(input.q);
-  const firstResults = await searchOnce({
+  const firstOut = await searchOnce({
     ...input,
     embedding: primary.embedding,
     model: primary.model,
     topK,
     userSubjects,
   });
+  passes.push({
+    role: 'primary',
+    embeddingModel: primary.model,
+    branchCounts: firstOut.branchCounts,
+    timingsMs: Date.now() - primaryStart,
+  });
 
-  if (firstResults.length >= MIN_RESULTS_BEFORE_FALLBACK) {
-    return firstResults;
+  if (firstOut.results.length >= MIN_RESULTS_BEFORE_FALLBACK) {
+    return {
+      results: firstOut.results,
+      coverage: buildCoverage({
+        input,
+        topK,
+        passes,
+        fallbackUsed: false,
+        totalReturned: firstOut.results.length,
+        totalTimingsMs: Date.now() - t0,
+      }),
+    };
   }
 
   // Dual-model fallback: try the OTHER family (voyage ↔ openai) and
@@ -211,20 +359,73 @@ export async function search(input: SearchInput): Promise<SearchResult[]> {
     primary.model === 'voyage-code-3'
       ? resolveOpenAiModel().tag
       : 'voyage-code-3';
-  let secondaryResults: SearchResult[] = [];
+  let secondaryOut: SearchOnceOutput | null = null;
+  const fallbackStart = Date.now();
   try {
     const secondary = await embedQueryWith(input.q, otherModel);
-    secondaryResults = await searchOnce({
+    secondaryOut = await searchOnce({
       ...input,
       embedding: secondary.embedding,
       model: secondary.model,
       topK,
       userSubjects,
     });
+    passes.push({
+      role: 'fallback',
+      embeddingModel: secondary.model,
+      branchCounts: secondaryOut.branchCounts,
+      timingsMs: Date.now() - fallbackStart,
+    });
   } catch {
-    // If secondary embedder isn't configured (e.g., no Voyage key), just return primary.
-    return firstResults;
+    // If secondary embedder isn't configured (e.g., no Voyage key), just
+    // return primary. Coverage records this as "no fallback attempted".
+    return {
+      results: firstOut.results,
+      coverage: buildCoverage({
+        input,
+        topK,
+        passes,
+        fallbackUsed: false,
+        totalReturned: firstOut.results.length,
+        totalTimingsMs: Date.now() - t0,
+      }),
+    };
   }
 
-  return rrfFuse([firstResults, secondaryResults], topK);
+  const fused = rrfFuse([firstOut.results, secondaryOut.results], topK);
+  return {
+    results: fused,
+    coverage: buildCoverage({
+      input,
+      topK,
+      passes,
+      fallbackUsed: true,
+      totalReturned: fused.length,
+      totalTimingsMs: Date.now() - t0,
+    }),
+  };
+}
+
+function buildCoverage(args: {
+  input: SearchInput;
+  topK: number;
+  passes: SearchCoveragePass[];
+  fallbackUsed: boolean;
+  totalReturned: number;
+  totalTimingsMs: number;
+}): SearchCoverage {
+  const accountIds = normalizeAccountIds(args.input.accountId);
+  return {
+    query: args.input.q,
+    filters: {
+      provider: args.input.provider ?? null,
+      accountIds,
+      userSubjectsCount: args.input.userSubjects.length,
+      topK: args.topK,
+    },
+    passes: args.passes,
+    fallbackUsed: args.fallbackUsed,
+    totalReturned: args.totalReturned,
+    totalTimingsMs: args.totalTimingsMs,
+  };
 }

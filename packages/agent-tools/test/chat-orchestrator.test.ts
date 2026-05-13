@@ -349,4 +349,109 @@ describe('runChatAgentLoop', () => {
     if (result.kind !== 'wall_clock_exceeded') throw new Error('unreachable');
     expect(result.wallClockMs).toBe(1_000);
   });
+
+  it('renumbers citations across multiple search tool calls and exposes them on the answer', async () => {
+    // Fake `search` tool that returns two citations per call, both starting at
+    // index 1. The orchestrator must renumber the second call's indices to
+    // continue from where the first left off (3, 4) so the model sees a
+    // single monotonic namespace.
+    let callIndex = 0;
+    const fakeSearch: ChatLocalTool = {
+      name: 'search',
+      description: 'fake',
+      inputSchema: { type: 'object', properties: {} },
+      async run() {
+        callIndex += 1;
+        const prefix = callIndex === 1 ? 'a' : 'b';
+        return {
+          results: [],
+          citations: [
+            {
+              index: 1,
+              chunk_id: `${prefix}1`,
+              provider: 'github',
+              artifact_kind: 'pr',
+              label: `${prefix}1`,
+              snippet: '',
+            },
+            {
+              index: 2,
+              chunk_id: `${prefix}2`,
+              provider: 'github',
+              artifact_kind: 'pr',
+              label: `${prefix}2`,
+              snippet: '',
+            },
+          ],
+          coverage: {
+            query: `q${callIndex}`,
+            filters: {
+              provider: null,
+              account_ids: null,
+              user_subjects_count: 1,
+              top_k: 8,
+            },
+            passes: [],
+            fallback_used: false,
+            total_returned: 2,
+            total_timings_ms: 1,
+          },
+        };
+      },
+    };
+
+    const { client, calls } = scriptedLLM([
+      {
+        stopReason: 'tool_use',
+        content: [
+          { type: 'tool_use', id: 's1', name: 'search', input: { q: 'first' } },
+        ],
+      },
+      {
+        stopReason: 'tool_use',
+        content: [
+          { type: 'tool_use', id: 's2', name: 'search', input: { q: 'second' } },
+        ],
+      },
+      {
+        stopReason: 'end_turn',
+        content: [{ type: 'text', text: 'See [1] and [4].' }],
+      },
+    ]);
+
+    const result = await runChatAgentLoop({
+      llm: client,
+      model: 'test-model',
+      toolCtx: baseCtx,
+      initialMessages: [{ role: 'user', content: 'find stuff' }],
+      tools: [fakeSearch],
+    });
+
+    expect(result.kind).toBe('answer');
+    if (result.kind !== 'answer') throw new Error('unreachable');
+
+    // Four citations total, renumbered 1..4.
+    expect(result.citations.map((c) => c.index)).toEqual([1, 2, 3, 4]);
+    expect(result.citations.map((c) => c.chunk_id)).toEqual(['a1', 'a2', 'b1', 'b2']);
+
+    // Both coverage payloads preserved, in call order.
+    expect(result.coverage).toHaveLength(2);
+    expect(result.coverage[0]?.query).toBe('q1');
+    expect(result.coverage[1]?.query).toBe('q2');
+
+    // What the LLM saw on the SECOND search tool call: the renumbered indices
+    // must appear in the tool_result content so the model can cite them
+    // correctly. (calls[2] is the third LLM call; its last user message
+    // is the second search's tool_result block.)
+    const thirdCall = calls[2]!;
+    const lastUser = thirdCall.messages[thirdCall.messages.length - 1]!;
+    const blocks = lastUser.content as Array<{ type: string; content?: unknown }>;
+    const toolResult = blocks[0] as { content: string };
+    expect(toolResult.content).toContain('"index":3');
+    expect(toolResult.content).toContain('"index":4');
+    // And critically: the second call's payload no longer carries the
+    // tool-emitted "1" / "2" — that would alias with the first call's
+    // already-renumbered 1/2.
+    expect(toolResult.content).not.toContain('"index":1');
+  });
 });

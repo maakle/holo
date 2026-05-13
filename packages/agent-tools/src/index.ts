@@ -20,3 +20,18 @@ export {
   type ChatToolCallTrace,
   type ChatToolContext,
 } from './chat-orchestrator';
+
+export {
+  toCitation,
+  citationToWire,
+  buildCitationLabel,
+  buildCitationUrl,
+  buildCitationSnippet,
+  type Citation,
+  type WireCitation,
+} from './citations';
+export {
+  coverageToWire,
+  type WireSearchCoverage,
+  type WireSearchCoveragePass,
+} from './coverage-wire';

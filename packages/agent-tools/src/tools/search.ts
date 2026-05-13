@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { DB } from '@holo/db';
-import { search, type SearchResult } from '@holo/retrieval-core';
+import { searchWithCoverage, type SearchResult } from '@holo/retrieval-core';
+import { citationToWire, toCitation, type WireCitation } from '../citations';
+import { coverageToWire, type WireSearchCoverage } from '../coverage-wire';
 
 export const searchInputSchema = z.object({
   q: z.string().min(1),
@@ -14,6 +16,12 @@ export interface SearchToolContext {
   userSubjects: string[];
 }
 
+/**
+ * Legacy per-result snippet URL builder. `tools/search.ts` keeps emitting
+ * this on each result for backwards compatibility with already-deployed
+ * MCP/REST consumers; new consumers should prefer the parallel `citations`
+ * array, which carries the same URL plus a human label + snippet.
+ */
 function deriveSnippetUrl(result: SearchResult): string | undefined {
   if (result.snippetUrl) return result.snippetUrl;
   const m = result.source.metadata;
@@ -56,18 +64,30 @@ function deriveSnippetUrl(result: SearchResult): string | undefined {
   return undefined;
 }
 
+export interface SearchToolOutput {
+  results: Array<{
+    chunk_id: string;
+    content: string;
+    score: number;
+    source: { provider: string; artifact_kind: string; metadata: Record<string, unknown> };
+    snippet_url?: string;
+  }>;
+  /** Per-result citation projection (label, url, snippet, 1-based index) in
+   * the snake_case wire format that matches the rest of the response.
+   * Consumers building UI should use this rather than reconstructing labels
+   * from the raw `results` metadata. */
+  citations: WireCitation[];
+  /** Telemetry — what was queried, what was filtered, how many rows came
+   * back from each branch. Surfaced as the "what I searched" footer. */
+  coverage: WireSearchCoverage;
+}
+
 export async function runSearchTool(
   ctx: SearchToolContext,
   rawInput: unknown,
-): Promise<{ results: Array<{
-  chunk_id: string;
-  content: string;
-  score: number;
-  source: { provider: string; artifact_kind: string; metadata: Record<string, unknown> };
-  snippet_url?: string;
-}> }> {
+): Promise<SearchToolOutput> {
   const input = searchInputSchema.parse(rawInput);
-  const results = await search({
+  const { results, coverage } = await searchWithCoverage({
     db: ctx.db,
     organizationId: ctx.organizationId,
     q: input.q,
@@ -76,6 +96,7 @@ export async function runSearchTool(
     userSubjects: ctx.userSubjects,
   });
 
+  const citations = results.map((r, i) => citationToWire(toCitation(r, i + 1)));
   return {
     results: results.map((r) => {
       const snippet = deriveSnippetUrl(r);
@@ -91,5 +112,7 @@ export async function runSearchTool(
         ...(snippet !== undefined ? { snippet_url: snippet } : {}),
       };
     }),
+    citations,
+    coverage: coverageToWire(coverage),
   };
 }
