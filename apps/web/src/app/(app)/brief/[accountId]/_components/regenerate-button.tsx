@@ -35,7 +35,8 @@ export function RegenerateButton({
           // surface that string directly so users see "no access" vs
           // "connector offline" rather than a generic toast.
           const body = (await res.json().catch(() => ({}))) as { problem?: string };
-          throw new Error(body.problem ?? 'Regenerate failed');
+          setError(body.problem ?? 'Regenerate failed');
+          return;
         }
         router.refresh();
       } catch (e) {

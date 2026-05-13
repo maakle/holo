@@ -26,6 +26,12 @@ import {
 } from '../src';
 
 const url = process.env.DATABASE_URL ?? '';
+// Live embedder is required because `get_account_brief` calls
+// `searchWithCoverage`, which embeds the per-section queries via OpenAI.
+// CI doesn't set OPENAI_API_KEY, so the embedder is unreachable there —
+// skip these tests rather than failing on a 403 from the host allowlist.
+// Pure unit tests in `get-account-brief.test.ts` still pin the shape.
+const embedderReachable = Boolean(process.env.OPENAI_API_KEY);
 let dbReachable = false;
 const TEST_SLUG = 'test-account-brief';
 
@@ -52,7 +58,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (!dbReachable) return;
+  if (!dbReachable || !embedderReachable) return;
   await db.execute(sql`DELETE FROM organization WHERE slug = ${TEST_SLUG}`);
 });
 
@@ -63,7 +69,7 @@ async function cleanState(): Promise<void> {
 }
 
 afterEach(async () => {
-  if (!dbReachable) return;
+  if (!dbReachable || !embedderReachable) return;
   await cleanState();
 });
 
@@ -84,7 +90,7 @@ describe('get_account_brief — DB integration', () => {
   const today = () => FROZEN_TODAY;
 
   it('returns the five-section structure on a seeded account', async () => {
-    if (!dbReachable) return;
+    if (!dbReachable || !embedderReachable) return;
     const accountId = await seedAccount('Skello');
     const brief = await runGetAccountBriefTool(
       {
@@ -113,7 +119,7 @@ describe('get_account_brief — DB integration', () => {
   });
 
   it('writes to cache after synthesis; same-day read returns fromCache=true', async () => {
-    if (!dbReachable) return;
+    if (!dbReachable || !embedderReachable) return;
     const accountId = await seedAccount('CacheTest');
     const fresh = await runGetAccountBriefTool(
       {
@@ -153,7 +159,7 @@ describe('get_account_brief — DB integration', () => {
   });
 
   it('invalidateAccountBriefCache drops the row and forces re-synthesis', async () => {
-    if (!dbReachable) return;
+    if (!dbReachable || !embedderReachable) return;
     const accountId = await seedAccount('Regenerate');
     const first = await runGetAccountBriefTool(
       { db, organizationId: orgId, userSubjects: [`org:${orgId}`], today },
@@ -184,7 +190,7 @@ describe('get_account_brief — DB integration', () => {
   });
 
   it('returns an empty brief (atGlance.displayName === "") when the account is in a different org', async () => {
-    if (!dbReachable) return;
+    if (!dbReachable || !embedderReachable) return;
     // ACL gate: the tool only finds accounts inside ctx.organizationId.
     // A UUID belonging to a different org returns the empty shape, which
     // REST/web translate into 403.
