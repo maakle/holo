@@ -10,7 +10,7 @@ const GITHUB_URL = 'https://github.com/maakle/holo';
 const DOCS_URL = `${GITHUB_URL}#readme`;
 const ROADMAP_URL = `${GITHUB_URL}/blob/main/docs/ROADMAP.md`;
 const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/ARCHITECTURE.md`;
-const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
+const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSING.md`;
 
 export default async function Home() {
   const auth = await getServerAuth();
@@ -209,8 +209,8 @@ const TRUST_ITEMS = [
   },
   {
     key: 'license',
-    title: 'AGPL-3.0 licensed.',
-    body: 'Open source. Inspectable, forkable, no vendor lock-in. Built to outlive any single sponsor.',
+    title: 'MIT-licensed core. Enterprise add-ons.',
+    body: 'The Community Edition is MIT — always free to self-host, fork, and ship on. Optional Enterprise Edition (SSO, RBAC, query history, whitelabeling) for teams that need it.',
   },
 ] as const;
 
@@ -312,7 +312,7 @@ function SiteFooter() {
               holo
             </Link>
             <span className="text-[12px] text-text-subtle">
-              © {new Date().getFullYear()} · AGPL-3.0
+              © {new Date().getFullYear()} · Community Edition · MIT
             </span>
           </div>
           <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-text-muted">
@@ -320,7 +320,7 @@ function SiteFooter() {
             <a href={DOCS_URL} className="hover:text-text">Docs</a>
             <a href={ROADMAP_URL} className="hover:text-text">Roadmap</a>
             <a href={ARCHITECTURE_URL} className="hover:text-text">Architecture</a>
-            <a href={LICENSE_URL} className="hover:text-text">License</a>
+            <a href={LICENSE_URL} className="hover:text-text">Licensing</a>
           </nav>
           <span className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-text-subtle">
             <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />

@@ -105,4 +105,9 @@ Be kind. Be technical. Be specific. Disagreement is welcome; condescension is no
 
 ## License
 
-By submitting a PR you agree to license your contribution under AGPL-3.0-or-later.
+Holo ships in two editions. The file path determines the license:
+
+- **Community Edition (CE)** — everything **not** under a `**/ee/**` directory. Licensed under [MIT](./LICENSE). By submitting a PR that touches CE files, you agree to license your contribution under MIT.
+- **Enterprise Edition (EE)** — everything under a `**/ee/**` directory. Licensed under the [Enterprise License](./LICENSE-EE). By submitting a PR that touches EE files, you agree to the additional grant in `LICENSE-EE` § 3 — the maintainers retain the right to relicense your contribution (including under MIT) as part of the EE product.
+
+Full breakdown in [`LICENSING.md`](./LICENSING.md). If you're not sure which edition a file belongs to, check its path — there is no third tier.

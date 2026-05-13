@@ -77,7 +77,7 @@ Picked up after v0.1 ships and 3+ external CTOs are using holo.
 
 - [ ] `/skills` route — public registry browse, no auth to read.
 - [ ] "Publish anonymized" with two-stage redact-then-confirm flow (GitHub OAuth required to publish).
-- [ ] AGPL-3.0 contribution license; takedown email + 5-publishes/day rate limit.
+- [ ] MIT contribution license (skill marketplace publishes are CE); takedown email + 5-publishes/day rate limit.
 - [ ] Define "skill" = YAML doc + redacted example outputs.
 
 **Per-user OAuth fan-out — non-Slack:**
