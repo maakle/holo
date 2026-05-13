@@ -27,9 +27,10 @@ Two failure modes show up in early customer use:
 
 **Contract:**
 
-Every chat answer (when the caller opts in via `requireClaims: true`)
-carries a structured `claims[]` envelope alongside the answer text. Each
-claim is:
+Every agent answer — web chat **and** slack bot — carries a structured
+`claims[]` envelope alongside the answer text. The protocol is shared
+across both orchestrators via `packages/agent-tools/src/claims-protocol.ts`;
+no opt-in flag, no legacy path. Each claim is:
 
 ```ts
 interface AnswerClaim {
@@ -53,9 +54,16 @@ interface WireAnswerClaim {
 
 **Emission.** The model calls a local tool `emit_claims` with the final
 answer string + the claims array. This is treated as a terminal step by
-the orchestrator (similar to a "final answer" tool). The orchestrator
-appends a system-prompt suffix when `requireClaims` is true to instruct
-the model on the protocol.
+both orchestrators (similar to a "final answer" tool). The shared
+`CLAIMS_SUFFIX` system-prompt block is appended to each surface's base
+prompt to instruct the model on the protocol — web chat and slack bot
+both register the same tool and run the same enforcement.
+
+**Rendering.** Surfaces with structured UI (web chat) render confidence
+chips and a banner when any claim is `unverified`. Surfaces without that
+affordance (slack bot today; REST consumers) get the `appendUnverifiedNoteIfNeeded`
+textual fallback — a "Note: I couldn't verify N claims above against your
+indexed content." footer auto-appended to the answer text.
 
 **Server-side enforcement (mandatory).** After the model returns:
 

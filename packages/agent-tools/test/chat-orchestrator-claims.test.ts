@@ -44,8 +44,8 @@ const echoTool: ChatLocalTool = {
 };
 
 describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
-  describe('requireClaims unset (backwards compat)', () => {
-    it('does not advertise emit_claims and leaves claims undefined on the result', async () => {
+  describe('bare end_turn (model skipped emit_claims)', () => {
+    it('returns an empty claims array — the answer text still surfaces', async () => {
       const { client, calls } = scriptedLLM([
         {
           stopReason: 'end_turn',
@@ -64,14 +64,14 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
       expect(result.kind).toBe('answer');
       if (result.kind !== 'answer') throw new Error('unreachable');
       expect(result.answer).toBe('plain answer');
-      expect(result.claims).toBeUndefined();
-      // The synthetic emit_claims tool must not leak into the toolset.
+      expect(result.claims).toEqual([]);
+      // emit_claims is always advertised now — the loop is always claim-aware.
       const toolNames = calls[0]?.tools?.map((t) => t.name) ?? [];
-      expect(toolNames).not.toContain(EMIT_CLAIMS_TOOL_NAME);
+      expect(toolNames).toContain(EMIT_CLAIMS_TOOL_NAME);
     });
   });
 
-  describe('requireClaims true — happy path', () => {
+  describe('emit_claims happy path', () => {
     it('advertises emit_claims as a tool', async () => {
       const { client, calls } = scriptedLLM([
         {
@@ -98,7 +98,6 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
         toolCtx: baseCtx,
         initialMessages: [{ role: 'user', content: 'hi' }],
         tools: [echoTool],
-        requireClaims: true,
       });
 
       const toolNames = calls[0]?.tools?.map((t) => t.name) ?? [];
@@ -136,7 +135,6 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
         toolCtx: baseCtx,
         initialMessages: [{ role: 'user', content: 'how many notion sources' }],
         tools: [echoTool],
-        requireClaims: true,
       });
 
       expect(result.kind).toBe('answer');
@@ -179,7 +177,6 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
         toolCtx: baseCtx,
         initialMessages: [{ role: 'user', content: 'hi' }],
         tools: [echoTool],
-        requireClaims: true,
       });
 
       expect(result.kind).toBe('answer');
@@ -218,7 +215,6 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
         toolCtx: baseCtx,
         initialMessages: [{ role: 'user', content: 'standups?' }],
         tools: [echoTool],
-        requireClaims: true,
       });
 
       if (result.kind !== 'answer') throw new Error('unreachable');
@@ -262,7 +258,6 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
         toolCtx: baseCtx,
         initialMessages: [{ role: 'user', content: 'standups?' }],
         tools: [echoTool],
-        requireClaims: true,
       });
 
       if (result.kind !== 'answer') throw new Error('unreachable');
@@ -302,7 +297,6 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
         toolCtx: baseCtx,
         initialMessages: [{ role: 'user', content: 'how much does acme pay?' }],
         tools: [echoTool],
-        requireClaims: true,
       });
 
       if (result.kind !== 'answer') throw new Error('unreachable');
@@ -341,7 +335,6 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
         toolCtx: baseCtx,
         initialMessages: [{ role: 'user', content: 'seats?' }],
         tools: [echoTool],
-        requireClaims: true,
       });
 
       if (result.kind !== 'answer') throw new Error('unreachable');
@@ -378,7 +371,6 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
         toolCtx: baseCtx,
         initialMessages: [{ role: 'user', content: 'seats?' }],
         tools: [echoTool],
-        requireClaims: true,
       });
 
       if (result.kind !== 'answer') throw new Error('unreachable');
@@ -421,7 +413,6 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
         toolCtx: baseCtx,
         initialMessages: [{ role: 'user', content: 'hi' }],
         tools: [echoTool],
-        requireClaims: true,
       });
 
       if (result.kind !== 'answer') throw new Error('unreachable');

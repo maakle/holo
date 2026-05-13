@@ -161,9 +161,6 @@ export async function POST(req: Request) {
           toolCtx,
           initialMessages,
           wallClockMs: env.HOLO_CHAT_WALL_CLOCK_MS,
-          // RFC-0007: opt the web chat into the structured claims envelope.
-          // The slack bot / gateway agent stay on the legacy path.
-          requireClaims: true,
           onEvent: (event) => {
             send(event);
           },

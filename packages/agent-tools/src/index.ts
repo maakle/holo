@@ -49,6 +49,13 @@ export {
   type WireAnswerClaim,
 } from './claims';
 export {
+  CLAIMS_SUFFIX,
+  EMIT_CLAIMS_TOOL_DECL,
+  parseEmitClaimsInput,
+  applyClaimGuardrails,
+  appendUnverifiedNoteIfNeeded,
+} from './claims-protocol';
+export {
   requiresHardCitation,
   classifyClaim,
 } from './claims-classifier';

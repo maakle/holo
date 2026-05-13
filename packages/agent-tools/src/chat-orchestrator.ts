@@ -17,15 +17,14 @@ import { parseSkill } from '@holo/skills';
 import type { LLMClient, LLMMessage, LLMStopReason, LLMTool } from '@holo/llm';
 import { citationToWire, toCitation, type WireCitation } from './citations';
 import { coverageToWire, type WireSearchCoverage } from './coverage-wire';
+import { claimToWire, type WireAnswerClaim } from './claims';
 import {
-  EMIT_CLAIMS_INPUT_SCHEMA,
-  EMIT_CLAIMS_TOOL_NAME,
-  claimToWire,
-  type AnswerClaim,
-  type ClaimConfidence,
-  type WireAnswerClaim,
-} from './claims';
-import { requiresHardCitation } from './claims-classifier';
+  CLAIMS_SUFFIX,
+  EMIT_CLAIMS_TOOL_DECL,
+  appendUnverifiedNoteIfNeeded,
+  applyClaimGuardrails,
+  parseEmitClaimsInput,
+} from './claims-protocol';
 
 export interface ChatToolContext {
   db: DB;
@@ -60,30 +59,11 @@ Rules:
 - This is an interactive web chat used to test the holo agent surface; explaining which tools you used is welcome when relevant.`;
 
 /**
- * Suffix appended to {@link CHAT_SYSTEM_PROMPT} when the caller opts into the
- * structured-claims envelope (RFC-0007). The model is asked to terminate its
- * turn by calling the `emit_claims` tool with the final answer plus a
- * breakdown of every factual claim and its confidence.
- *
- * Kept as a suffix (rather than rewriting `CHAT_SYSTEM_PROMPT`) so callers
- * that don't pass `requireClaims: true` see no behavior change.
+ * Backwards-compat re-export. `CLAIMS_SUFFIX` lives in `claims-protocol.ts`
+ * so the slack bot can use the same wording; this alias keeps anything that
+ * imported `CHAT_CLAIMS_SUFFIX` working.
  */
-export const CHAT_CLAIMS_SUFFIX = `
-
-Claims protocol (REQUIRED):
-- Instead of ending your turn with plain text, call the \`emit_claims\` tool exactly once with the final answer string AND a \`claims\` array.
-- Each claim is a factual statement extracted from your answer. For each one:
-  - \`text\`: the substring of the answer the claim covers.
-  - \`confidence\`:
-    - \`high\` — directly supported by a cited search result you can point to.
-    - \`medium\` — inferred from cited material (combining two results, light reasoning).
-    - \`low\` — informed guess based on general knowledge, not the indexed content.
-    - \`unverified\` — you could not ground this in any indexed content; say so plainly in the answer too.
-  - \`citation_indices\`: 1-based references into the same \`citations\` array the \`search\` tool returned. Empty for \`unverified\` / \`low\`.
-  - \`reason\`: required for \`low\` / \`unverified\`; brief explanation.
-- A claim with \`high\` confidence MUST have at least one citation index. The server will downgrade uncited high-confidence claims.
-- Some claim types — quantitative customer facts (ARR/MRR/seat counts), product status ("X is shipped"), integration status ("Y is broken") — must be cited or marked \`unverified\`. The server enforces this.
-- Non-factual conversational filler ("Sure, here's what I found:") does not need to be claimed.`;
+export { CLAIMS_SUFFIX as CHAT_CLAIMS_SUFFIX } from './claims-protocol';
 
 const searchInput = z.object({
   q: z.string().min(1),
@@ -382,18 +362,6 @@ export interface ChatAgentLoopOptions {
    * the agent run.
    */
   onEvent?: (event: ChatAgentEvent) => void;
-  /**
-   * RFC-0007. When true, the orchestrator:
-   *   - appends {@link CHAT_CLAIMS_SUFFIX} to the system prompt,
-   *   - registers an internal `emit_claims` tool (terminal — calling it
-   *     ends the loop with an `answer` result),
-   *   - applies server-side downgrade + hard-gate rules to the model's
-   *     claims before returning them on the result.
-   *
-   * Defaults to false so existing callers (slack bot, gateway agent) are
-   * unaffected. The web chat surface opts in.
-   */
-  requireClaims?: boolean;
 }
 
 export type ChatAgentLoopResult =
@@ -411,11 +379,11 @@ export type ChatAgentLoopResult =
       /** Coverage payloads from every `search` tool call in the turn, in
        * call order. Surface as a "what I searched" footer in the UI. */
       coverage: WireSearchCoverage[];
-      /** Structured claims envelope (RFC-0007). Present when the caller
-       * passed `requireClaims: true` AND the model called `emit_claims`.
-       * Undefined for backwards-compat: with `requireClaims` unset, this
-       * field is always undefined. */
-      claims?: WireAnswerClaim[];
+      /** Structured claims envelope (RFC-0007). Always present — every
+       * answer goes through the `emit_claims` protocol and the server-side
+       * downgrade + hard-gate. An empty array means the model returned no
+       * factual claims (e.g. conversational filler). */
+      claims: WireAnswerClaim[];
     }
   | {
       kind: 'wall_clock_exceeded';
@@ -453,28 +421,20 @@ export async function runChatAgentLoop(
     }
   };
 
-  const requireClaims = opts.requireClaims === true;
   const toolByName = new Map<string, ChatLocalTool>(tools.map((t) => [t.name, t]));
-  const llmTools: LLMTool[] = tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: t.inputSchema,
-  }));
-  if (requireClaims) {
-    // emit_claims is a terminal "tool" — the model calls it instead of
-    // ending the turn with plain text. We advertise it to the LLM but
-    // intercept the dispatch in the loop below rather than running it
-    // through `toolByName`.
-    llmTools.push({
-      name: EMIT_CLAIMS_TOOL_NAME,
-      description:
-        'Terminate your turn with the final answer string and a structured array of claims (each with confidence and citation_indices). Call this exactly once instead of ending the turn with plain text.',
-      inputSchema: EMIT_CLAIMS_INPUT_SCHEMA as unknown as Record<string, unknown>,
-    });
-  }
-  const systemPrompt = requireClaims
-    ? `${CHAT_SYSTEM_PROMPT}${CHAT_CLAIMS_SUFFIX}`
-    : CHAT_SYSTEM_PROMPT;
+  // emit_claims is a terminal "tool" — the model calls it instead of ending
+  // the turn with plain text. We advertise it to the LLM but intercept the
+  // dispatch in the loop below rather than running it through `toolByName`.
+  // Always registered (RFC-0007 is on by default; see claims-protocol.ts).
+  const llmTools: LLMTool[] = [
+    ...tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+    })),
+    EMIT_CLAIMS_TOOL_DECL,
+  ];
+  const systemPrompt = `${CHAT_SYSTEM_PROMPT}${CLAIMS_SUFFIX}`;
 
   const messages: LLMMessage[] = [...opts.initialMessages];
   const traces: ChatToolCallTrace[] = [];
@@ -516,6 +476,11 @@ export async function runChatAgentLoop(
         .map((b) => b.text)
         .join('\n')
         .trim();
+      // Bare end_turn fallback: the model returned text without calling
+      // `emit_claims`. We don't get a structured claims envelope, but the
+      // answer text is still useful — return with an empty `claims` array
+      // (RFC-0007 treats this as "no factual claims to verify"). The UI
+      // renders no chips and no banner, same as a conversational answer.
       return {
         kind: 'answer',
         answer: text,
@@ -523,6 +488,7 @@ export async function runChatAgentLoop(
         modelCalls,
         citations: citationsAcc,
         coverage: coverageAcc,
+        claims: [],
       };
     }
 
@@ -537,22 +503,20 @@ export async function runChatAgentLoop(
     // server-side downgrade and hard-gate, and return. Any other tool
     // calls in the same response are ignored — the model has signaled
     // it's done.
-    if (requireClaims) {
-      const emit = toolUses.find((t) => t.name === EMIT_CLAIMS_TOOL_NAME);
-      if (emit) {
-        const { answerText, claims } = parseEmitClaimsInput(emit.input);
-        const enforced = applyClaimGuardrails(claims);
-        const finalAnswer = appendUnverifiedNoteIfNeeded(answerText, enforced);
-        return {
-          kind: 'answer',
-          answer: finalAnswer,
-          toolCalls: traces,
-          modelCalls,
-          citations: citationsAcc,
-          coverage: coverageAcc,
-          claims: enforced.map(claimToWire),
-        };
-      }
+    const emitClaimsUse = toolUses.find((t) => t.name === EMIT_CLAIMS_TOOL_DECL.name);
+    if (emitClaimsUse) {
+      const { answerText, claims } = parseEmitClaimsInput(emitClaimsUse.input);
+      const enforced = applyClaimGuardrails(claims);
+      const finalAnswer = appendUnverifiedNoteIfNeeded(answerText, enforced);
+      return {
+        kind: 'answer',
+        answer: finalAnswer,
+        toolCalls: traces,
+        modelCalls,
+        citations: citationsAcc,
+        coverage: coverageAcc,
+        claims: enforced.map(claimToWire),
+      };
     }
 
     const toolResults = [];
@@ -690,97 +654,3 @@ function renumberSearchOutput(
   return { ...out, citations: renumbered };
 }
 
-/**
- * Parse the model's `emit_claims` tool input into the orchestrator's
- * internal `AnswerClaim[]` shape. Defensive against missing/malformed
- * fields — a partially valid envelope is better than a hard failure
- * mid-stream. Anything we can't make sense of is dropped, not guessed.
- */
-function parseEmitClaimsInput(input: Record<string, unknown>): {
-  answerText: string;
-  claims: AnswerClaim[];
-} {
-  const answerText = typeof input['answer'] === 'string' ? input['answer'] : '';
-  const rawClaims = Array.isArray(input['claims']) ? input['claims'] : [];
-  const claims: AnswerClaim[] = [];
-  for (const raw of rawClaims) {
-    if (!raw || typeof raw !== 'object') continue;
-    const r = raw as Record<string, unknown>;
-    const text = typeof r['text'] === 'string' ? r['text'] : null;
-    if (!text) continue;
-    const conf = r['confidence'];
-    const confidence: ClaimConfidence =
-      conf === 'high' || conf === 'medium' || conf === 'low' || conf === 'unverified'
-        ? conf
-        : 'medium';
-    const idxRaw = r['citation_indices'];
-    const citationIndices: number[] = Array.isArray(idxRaw)
-      ? (idxRaw.filter(
-          (n): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1,
-        ) as number[])
-      : [];
-    const reason = typeof r['reason'] === 'string' ? r['reason'] : undefined;
-    claims.push({
-      text,
-      confidence,
-      citationIndices,
-      ...(reason !== undefined ? { reason } : {}),
-    });
-  }
-  return { answerText, claims };
-}
-
-/**
- * Apply the server-side guardrails to the model-emitted claims (RFC-0007):
- *
- *   1. A `high` claim with empty citations is downgraded to `medium` with
- *      `reason: 'no citation matched'`. (The model is fallible at the
- *      confidence step; we don't want one uncited "high" to pass.)
- *   2. A claim whose text matches {@link requiresHardCitation} and has
- *      empty citations is marked `unverified` with a stable reason. This
- *      is the hard-gate — refuse rather than guess.
- *
- * Order matters: hard-gate wins over downgrade, because hard-gated shapes
- * (revenue, product/integration status) are exactly where a silent
- * downgrade to `medium` would be most misleading.
- */
-function applyClaimGuardrails(claims: AnswerClaim[]): AnswerClaim[] {
-  return claims.map((c) => {
-    const uncited = c.citationIndices.length === 0;
-    if (uncited && requiresHardCitation(c.text)) {
-      return {
-        ...c,
-        confidence: 'unverified' as const,
-        reason: c.reason ?? "couldn't verify against indexed content",
-      };
-    }
-    if (uncited && c.confidence === 'high') {
-      return {
-        ...c,
-        confidence: 'medium' as const,
-        reason: c.reason ?? 'no citation matched',
-      };
-    }
-    return c;
-  });
-}
-
-const UNVERIFIED_NOTE_PREFIX = "Note: I couldn't verify";
-
-/**
- * If any claim ended up `unverified` and the answer doesn't already say
- * so, append a single explanatory line. We keep the wording mechanical
- * — the UI banner is the primary signal; this is the textual fallback
- * for surfaces (REST, slack) that don't render claim chips.
- */
-function appendUnverifiedNoteIfNeeded(
-  answer: string,
-  claims: AnswerClaim[],
-): string {
-  const unverifiedCount = claims.filter((c) => c.confidence === 'unverified').length;
-  if (unverifiedCount === 0) return answer;
-  if (answer.includes(UNVERIFIED_NOTE_PREFIX)) return answer;
-  const noun = unverifiedCount === 1 ? 'one claim' : `${unverifiedCount} claims`;
-  const suffix = `\n\n${UNVERIFIED_NOTE_PREFIX} ${noun} above against your indexed content.`;
-  return `${answer}${suffix}`;
-}
