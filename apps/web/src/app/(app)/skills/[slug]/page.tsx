@@ -14,6 +14,7 @@ import { ForkButton } from '../_components/fork-button';
 import { PromoteButton } from '../_components/promote-button';
 import { ArchiveButton } from '../_components/archive-button';
 import { CollapsibleBody } from '../_components/collapsible-body';
+import { RegressionPanel } from './regression-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,6 +90,37 @@ export default async function SkillDetailPage({
   const defaults = parsed?.frontmatter.defaults;
   const tools = parsed?.frontmatter.tools ?? [];
   const allowlist = skill.toolAllowlist ?? [];
+
+  // RFC-0008: feed the regression panel with the last 14 eval runs for this
+  // skill plus the count of active eval entries (so we can hide the panel
+  // when there's nothing to grade against yet).
+  const evalRuns = await db
+    .select({
+      id: schema.skillEvalRuns.id,
+      passRate: schema.skillEvalRuns.passRate,
+      total: schema.skillEvalRuns.total,
+      passed: schema.skillEvalRuns.passed,
+      ranAt: schema.skillEvalRuns.ranAt,
+    })
+    .from(schema.skillEvalRuns)
+    .where(
+      and(
+        eq(schema.skillEvalRuns.organizationId, orgId),
+        eq(schema.skillEvalRuns.skillSlug, skill.slug),
+      ),
+    )
+    .orderBy(desc(schema.skillEvalRuns.ranAt))
+    .limit(14);
+  const activeEvalEntries = await db
+    .select({ id: schema.evalEntries.id })
+    .from(schema.evalEntries)
+    .where(
+      and(
+        eq(schema.evalEntries.organizationId, orgId),
+        eq(schema.evalEntries.skillSlug, skill.slug),
+        eq(schema.evalEntries.status, 'active'),
+      ),
+    );
 
   return (
     <div className="max-w-3xl space-y-10">
@@ -240,6 +272,29 @@ export default async function SkillDetailPage({
             </table>
           </div>
         )}
+      </section>
+
+      {/* RFC-0008 regression panel — pass-rate sparkline + drop warnings.
+          Surfaces feedback that's been promoted into eval_entries. The
+          inbox link routes admins to the per-skill feedback queue. */}
+      <section className="border-t border-border pt-6 space-y-3">
+        <RegressionPanel
+          slug={skill.slug}
+          runs={evalRuns.map((r) => ({
+            id: r.id,
+            passRate: r.passRate,
+            total: r.total,
+            passed: r.passed,
+            ranAt: r.ranAt.toISOString(),
+          }))}
+          activeEntryCount={activeEvalEntries.length}
+        />
+        <Link
+          href={`/skills/${skill.slug}/feedback`}
+          className="text-accent hover:underline text-body-sm"
+        >
+          View feedback inbox →
+        </Link>
       </section>
     </div>
   );

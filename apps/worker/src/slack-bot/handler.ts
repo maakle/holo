@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { type DB } from '@holo/db';
+import { schema, type DB } from '@holo/db';
 import { createSlackApiClient } from '@holo/connectors';
 import { recordAgentEvent } from '@holo/audit';
 import { type AgentResult } from './agent.js';
@@ -13,6 +13,7 @@ import {
   postSlashResponse,
 } from './finalize.js';
 import { makeDefaultAgentRunner, type AgentImpl } from './agent-runner.js';
+import { handleFeedbackReaction } from './feedback-reaction.js';
 
 export type SlackBotJob =
   | {
@@ -38,6 +39,19 @@ export type SlackBotJob =
       asker: string;
       text: string;
       responseUrl: string;
+    }
+  | {
+      // RFC-0008 (slack extension). A reaction landed on a bot message that
+      // was previously indexed in `slack_answer_index`; emoji shorthand
+      // becomes a feedback row. `removed=true` means a reaction was taken
+      // back — we mirror that as a delete.
+      kind: 'reaction_added';
+      teamId: string;
+      channel: string;
+      messageTs: string;
+      asker: string;
+      reaction: string;
+      removed: boolean;
     };
 
 export interface SlackBotHandlerDeps {
@@ -65,8 +79,18 @@ export async function handleSlackBotJob(
     teamId: job.teamId,
     channel: job.channel,
     asker: job.asker,
-    textPreview: job.text.slice(0, 80),
+    textPreview: 'text' in job ? job.text.slice(0, 80) : undefined,
+    reaction: job.kind === 'reaction_added' ? job.reaction : undefined,
   });
+
+  // RFC-0008 (slack extension): reactions don't need a slack API client or
+  // the agent loop — they just need DB access to look up the indexed answer
+  // and write a feedback row. Short-circuit before workspace resolution so
+  // the path stays cheap even for high-traffic emoji.
+  if (job.kind === 'reaction_added') {
+    return handleFeedbackReaction(job, deps.db, logInfo);
+  }
+
   const workspace = await resolveWorkspace(deps.db, job.teamId);
   if (!workspace) {
     logInfo('slack-bot: workspace not connected', { teamId: job.teamId });
@@ -264,7 +288,7 @@ async function runMention(args: {
     return { ok: true };
   }
 
-  await finalizeAgentAnswer({
+  const finalReply = await finalizeAgentAnswer({
     client,
     channel: job.channel,
     threadTs,
@@ -272,6 +296,32 @@ async function runMention(args: {
     answer: agentResult.answer,
     sources: agentResult.sources,
   });
+
+  // RFC-0008 (slack extension): index the bot reply so a future reaction
+  // can be turned into a feedback row. Best-effort — if the slack API call
+  // didn't return a ts (rate limit, scope), the index row would have no
+  // anchor and would be unmatchable; skip silently.
+  if (finalReply?.ts && finalReply?.channel) {
+    try {
+      await deps.db
+        .insert(schema.slackAnswerIndex)
+        .values({
+          organizationId,
+          answerId: agentResult.answerId,
+          slackTeamId: job.teamId,
+          slackChannel: finalReply.channel,
+          slackTs: finalReply.ts,
+          question: query,
+          answer: agentResult.answer,
+          sourcesJsonb: agentResult.sources,
+        })
+        .onConflictDoNothing({ target: schema.slackAnswerIndex.answerId });
+    } catch (err) {
+      // Persistence failure can't be allowed to kill the slack reply UX.
+      // Log and move on — feedback for this turn will just be unattributable.
+      logError('slack-bot: slack_answer_index insert failed', err);
+    }
+  }
 
   recordAgentEvent({
     db: deps.db,
@@ -281,7 +331,12 @@ async function runMention(args: {
     agentIdentity,
     traceId,
     outputJson: { answer: agentResult.answer, sources: agentResult.sources },
-    metadata: { jobKind: job.kind, channel: job.channel, threadTs },
+    metadata: {
+      jobKind: job.kind,
+      channel: job.channel,
+      threadTs,
+      answerId: agentResult.answerId,
+    },
   });
 
   return { ok: true };

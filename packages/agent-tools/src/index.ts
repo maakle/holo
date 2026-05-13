@@ -25,6 +25,10 @@ export {
   type BriefLLMClient,
   type GetAccountBriefContext,
 } from './tools/get-account-brief';
+export {
+  runSubmitFeedbackTool,
+  submitFeedbackInputSchema,
+} from './tools/submit-feedback';
 
 export {
   runChatAgentLoop,

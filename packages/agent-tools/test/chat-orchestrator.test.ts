@@ -82,6 +82,11 @@ describe('runChatAgentLoop', () => {
     expect(result.answer).toBe('Hello there.');
     expect(result.toolCalls).toEqual([]);
     expect(result.modelCalls).toBe(1);
+    // RFC-0008: every answer carries a stable id the client uses to attach
+    // feedback. UUIDv4 from crypto.randomUUID() — assert shape, not value.
+    expect(result.answerId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
     // Tools were registered in the request despite not being used. The
     // synthetic `emit_claims` tool is always appended after the caller's
     // tools (RFC-0007 is on by default).

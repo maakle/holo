@@ -313,6 +313,9 @@ importers:
       '@holo/retrieval-core':
         specifier: workspace:*
         version: link:../../packages/retrieval-core
+      '@holo/skills':
+        specifier: workspace:*
+        version: link:../../packages/skills
       '@holo/sync-providers':
         specifier: workspace:*
         version: link:../../packages/sync-providers
@@ -807,12 +810,18 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.92.0
         version: 0.92.0(zod@4.4.2)
+      '@holo/db':
+        specifier: workspace:*
+        version: link:../db
       '@holo/errors':
         specifier: workspace:^
         version: link:../errors
       '@holo/llm':
         specifier: workspace:*
         version: link:../llm
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2(kysely@0.28.17)(postgres@3.4.9)
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3

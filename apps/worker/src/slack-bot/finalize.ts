@@ -6,6 +6,13 @@ import { type Source } from './agent.js';
  * Finalize an existing placeholder with the agent's answer + sources. If no
  * placeholder was successfully posted (rate limit, scope, etc.), fall back to
  * a direct chat.postMessage so the user isn't left hanging.
+ *
+ * Returns the slack channel + message ts of the final reply, so the caller
+ * can index it (RFC-0008: `slack_answer_index` rows). When chat.update is
+ * used (placeholder path), we already know the ts; when chat.postMessage is
+ * the fallback, we surface the response ts. Returns null when slack didn't
+ * give us a usable ts back (rate limit, scope) — feedback for that turn
+ * will just be unattributable.
  */
 export async function finalizeAgentAnswer(args: {
   client: SlackApiClient;
@@ -14,7 +21,7 @@ export async function finalizeAgentAnswer(args: {
   placeholder: { ts: string; channel: string } | null;
   answer: string;
   sources: Source[];
-}): Promise<void> {
+}): Promise<{ channel: string; ts: string } | null> {
   const blocks = buildAgentAnswerBlocks(args.answer, args.sources);
   const fallback = args.answer || 'holo answered your question.';
   if (args.placeholder) {
@@ -24,14 +31,18 @@ export async function finalizeAgentAnswer(args: {
       text: fallback,
       blocks,
     });
-    return;
+    return { channel: args.placeholder.channel, ts: args.placeholder.ts };
   }
-  await args.client.chatPostMessage({
+  const resp = await args.client.chatPostMessage({
     channel: args.channel,
     thread_ts: args.threadTs,
     text: fallback,
     blocks,
   });
+  if (resp?.ok && resp.ts && resp.channel) {
+    return { channel: resp.channel, ts: resp.ts };
+  }
+  return null;
 }
 
 /**

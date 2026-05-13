@@ -36,6 +36,12 @@ interface SlackEventEnvelope {
     bot_id?: string;
     channel_type?: string;
     subtype?: string;
+    /** Present on reaction_added / reaction_removed only. */
+    reaction?: string;
+    /** Present on reaction_added / reaction_removed only — the message the
+     * reaction landed on. `item.channel` is the channel, `item.ts` is the
+     * target message ts; we look both up in `slack_answer_index`. */
+    item?: { type: string; channel?: string; ts?: string };
   };
 }
 
@@ -196,6 +202,27 @@ async function handleSlackEvent(
         threadTs: event.thread_ts,
         asker: event.user,
         text: event.text,
+      });
+    } else if (
+      // RFC-0008 (slack extension). Users 👍/👎 the bot's reply; the worker
+      // maps the emoji to a feedback row. We enqueue both reaction_added and
+      // reaction_removed (un-vote) and let the worker distinguish via the
+      // `removed` field.
+      (event.type === 'reaction_added' || event.type === 'reaction_removed') &&
+      event.user &&
+      typeof event.reaction === 'string' &&
+      event.item?.type === 'message' &&
+      event.item.channel &&
+      event.item.ts
+    ) {
+      await enqueueSlackBotJob(opts.redisUrl, {
+        kind: 'reaction_added',
+        teamId: envelope.team_id,
+        channel: event.item.channel,
+        messageTs: event.item.ts,
+        asker: event.user,
+        reaction: event.reaction,
+        removed: event.type === 'reaction_removed',
       });
     }
     // app_uninstalled, member_joined_channel, etc. — fall through to ack.

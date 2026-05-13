@@ -36,6 +36,10 @@ type ChatStreamEvent =
   | ChatAgentEvent
   | {
       type: 'done';
+      /** Stable id minted by the orchestrator for this assistant turn;
+       * the client attaches it to POST /v1/feedback so feedback maps to
+       * the exact turn the user rated. Snake_case on the wire. */
+      answer_id: string;
       answer: string;
       toolCalls: unknown[];
       modelCalls: number;
@@ -196,6 +200,7 @@ export async function POST(req: Request) {
           });
           send({
             type: 'done',
+            answer_id: result.answerId,
             answer: result.answer,
             toolCalls: result.toolCalls,
             modelCalls: result.modelCalls,

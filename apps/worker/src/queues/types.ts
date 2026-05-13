@@ -31,6 +31,10 @@ export const QUEUE_NAMES = {
   // Async cleanup after Disconnect — see @holo/sync-providers
   // DISCONNECT_CLEANUP_QUEUE for why this is split off the request thread.
   DISCONNECT_CLEANUP: 'disconnect-cleanup',
+  // Nightly regression eval against active eval_entries (RFC-0008). One
+  // job fans out to every skill with active entries; the processor walks
+  // them and writes one skill_eval_runs row each.
+  SKILL_EVAL: 'skill-eval',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -44,7 +48,7 @@ type RegistrySyncQueueName =
   (typeof QUEUE_NAMES_BY_PROVIDER)[SyncProvider][number];
 type WorkerSyncQueueName = Exclude<
   QueueName,
-  'embed' | 'embed-backfill' | 'disconnect-cleanup'
+  'embed' | 'embed-backfill' | 'disconnect-cleanup' | 'skill-eval'
 >;
 type _RegistrySubsetOfWorker =
   RegistrySyncQueueName extends WorkerSyncQueueName ? true : never;
@@ -89,6 +93,9 @@ export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   // sources, which is itself heavy on the DB; running them in parallel
   // would just contend for the same locks.
   'disconnect-cleanup': 1,
+  // Skill eval: serial. Each run drives the live agent for every active
+  // entry; parallelism would just multiply Anthropic spend against itself.
+  'skill-eval': 1,
 };
 
 export type SyncJobPayload = {

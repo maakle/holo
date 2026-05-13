@@ -104,6 +104,7 @@ async function main() {
   app.use('/v1/skills', sessionMiddleware);
   app.use('/v1/skills/*', sessionMiddleware);
   app.use('/v1/search', sessionMiddleware);
+  app.use('/v1/feedback', sessionMiddleware);
 
   // Expose the auto-generated OpenAPI document and a Scalar-rendered docs UI.
   // Both are public (no auth) so OSS users can introspect the API surface.
