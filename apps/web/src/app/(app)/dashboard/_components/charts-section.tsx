@@ -149,28 +149,46 @@ function floorTo(ms: number, bucketHours: number): number {
   return d.getTime();
 }
 
+// Top-N + Other: the chart palette is 5 colors (DESIGN.md restraint), so
+// showing every provider when there are 20 makes the legend lie — identical
+// greys map to different names. Collapse the long tail into one neutral
+// bucket so each legend chip matches a distinguishable color.
+const MAX_PROVIDERS = 5;
+const OTHER_PROVIDER = 'other';
+
 function pivotSyncRows(
   rows: { bucket: Date; provider: string; records: number }[],
   since: Date,
 ): { buckets: SyncBucket[]; providers: string[] } {
-  const providerSet = new Set<string>();
+  const totals = new Map<string, number>();
   const map = new Map<number, Record<string, number>>();
   for (const r of rows) {
-    providerSet.add(r.provider);
+    totals.set(r.provider, (totals.get(r.provider) ?? 0) + (r.records ?? 0));
     const ts = new Date(r.bucket).getTime();
     const cur = map.get(ts) ?? {};
     cur[r.provider] = (cur[r.provider] ?? 0) + (r.records ?? 0);
     map.set(ts, cur);
   }
-  const providers = [...providerSet].sort();
+
+  const ranked = [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p);
+  const top = ranked.slice(0, MAX_PROVIDERS);
+  const tail = new Set(ranked.slice(MAX_PROVIDERS));
+  const providers = tail.size > 0 ? [...top, OTHER_PROVIDER] : top;
+
   const out: SyncBucket[] = [];
   const start = floorToDay(since.getTime());
   const end = floorToDay(Date.now());
   const step = 24 * 60 * 60 * 1000;
   for (let t = start; t <= end; t += step) {
     const row: SyncBucket = { bucket: new Date(t).toISOString() };
-    for (const p of providers) {
-      row[p] = map.get(t)?.[p] ?? 0;
+    for (const p of top) row[p] = map.get(t)?.[p] ?? 0;
+    if (tail.size > 0) {
+      let other = 0;
+      const day = map.get(t);
+      if (day) {
+        for (const p of tail) other += day[p] ?? 0;
+      }
+      row[OTHER_PROVIDER] = other;
     }
     out.push(row);
   }

@@ -12,7 +12,7 @@ export class HeartbeatProcessor extends WorkerHost {
   async process(_job: Job): Promise<{ counter: number; ts: string }> {
     HeartbeatProcessor.counter += 1;
     const payload = { counter: HeartbeatProcessor.counter, ts: new Date().toISOString() };
-    this.logger.log(`heartbeat tick ${JSON.stringify(payload)}`);
+    this.logger.debug(`heartbeat tick ${JSON.stringify(payload)}`);
     return payload;
   }
 }

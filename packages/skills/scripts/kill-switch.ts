@@ -21,7 +21,7 @@
  *
  * The founder-judgment half lives in `docs/launch/skill-kill-switch.md`.
  */
-import { loadGoldenSet, meanRougeL } from '../src/index';
+import { loadGoldenSet, meanRougeL } from '../src/server';
 
 interface CheckResult {
   name: string;

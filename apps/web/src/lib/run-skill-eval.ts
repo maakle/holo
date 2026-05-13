@@ -1,7 +1,7 @@
 import 'server-only';
 import { AnthropicLLMClient } from '@holo/llm';
 import { runChatAgentLoop } from '@holo/agent-tools/chat';
-import { runHarness, loadEvalEntries, type EvalEntry } from '@holo/skills';
+import { runHarness, loadEvalEntries, type EvalEntry } from '@holo/skills/server';
 import { schema, type DB } from '@holo/db';
 import { getSubjectsForUser } from '@holo/user-subjects';
 import { CHAT_MODEL_ID } from './chat-model';

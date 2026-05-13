@@ -2,7 +2,8 @@ import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import { getArtifact } from '@holo/retrieval-core';
-import { synthesizeSkill, fingerprintSkill, serializeSkill } from '@holo/skills';
+import { fingerprintSkill, serializeSkill } from '@holo/skills';
+import { synthesizeSkill } from '@holo/skills/server';
 import { holoError, ErrorCode } from '@holo/errors';
 
 export async function synthesizeAndPersist(opts: {

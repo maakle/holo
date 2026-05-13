@@ -1,15 +1,8 @@
+// Client-safe public API. Anything that touches the filesystem, the DB, or
+// the Anthropic SDK must be exported from `./server` instead — otherwise it
+// gets dragged into the browser bundle through this barrel.
 export * from './types';
 export * from './format';
 export { mergeSearchFilters } from './defaults';
 export type { SearchFilters, MergeOptions } from './defaults';
-export * from './golden/index';
 export * from './eval';
-export * from './synthesize';
-export * from './redact';
-export { executeSkill, runSkillStep } from './executor';
-export type { ExecuteSkillInput, ExecuteSkillResult, StepTrace, SkillStepResult } from './executor';
-export { autoExtractSkills, clusterInvocations } from './auto-extract';
-export type { AutoExtractInput, SkillProposal, InvocationRecord, InvocationCluster } from './auto-extract';
-export { loadTemplate, loadAllTemplates, TEMPLATE_FILES } from './templates';
-export type { SkillTemplate, TemplateFilename } from './templates';
-export * from './eval-harness';

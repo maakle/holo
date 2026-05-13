@@ -32,7 +32,10 @@ export function SyncThroughputChart({
   const config: ChartConfig = Object.fromEntries(
     providers.map((p, i) => [
       p,
-      { label: p, color: PROVIDER_COLORS[i % PROVIDER_COLORS.length] },
+      {
+        label: p === 'other' ? 'Other' : p,
+        color: p === 'other' ? '#52525B' : PROVIDER_COLORS[i % PROVIDER_COLORS.length],
+      },
     ]),
   );
 

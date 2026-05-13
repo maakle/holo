@@ -6,7 +6,7 @@ import { holoError, ErrorCode } from '@holo/errors';
 import { createDb, schema } from '@holo/db';
 import { AnthropicLLMClient } from '@holo/llm';
 import { runChatAgentLoop } from '@holo/agent-tools';
-import { runHarness, loadEvalEntries, type EvalEntry } from '@holo/skills';
+import { runHarness, loadEvalEntries, type EvalEntry } from '@holo/skills/server';
 import { getSubjectsForUser } from '@holo/user-subjects';
 import { QUEUE_NAMES, QUEUE_CONCURRENCY } from './types';
 

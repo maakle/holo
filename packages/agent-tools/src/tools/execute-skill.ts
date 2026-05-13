@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { eq, and, desc } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
-import { parseSkill, executeSkill } from '@holo/skills';
+import { parseSkill } from '@holo/skills';
+import { executeSkill } from '@holo/skills/server';
 import { holoError, ErrorCode } from '@holo/errors';
 
 export const executeSkillInputSchema = z.object({

@@ -62,7 +62,7 @@ export function makeDefaultAgentRunner(deps: {
       logEvent: (event, fields) => {
         deps.logInfo(`slack-bot: agent ${event}`, {
           organizationId: input.organizationId,
-          ...fields,
+          ...summarizeFieldsForLog(fields),
         });
         recordAgentEventForSlack({
           db: deps.db,
@@ -86,4 +86,34 @@ export function makeDefaultAgentRunner(deps: {
     });
     return result;
   };
+}
+
+/**
+ * Replace bulky tool `output` payloads with a small shape summary so log lines
+ * stay readable. The full payload is still persisted in the agent_events DB
+ * row by recordAgentEventForSlack.
+ */
+function summarizeFieldsForLog(
+  fields: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!('output' in fields)) return fields;
+  const { output, ...rest } = fields;
+  return { ...rest, outputSummary: summarizeOutput(output) };
+}
+
+function summarizeOutput(output: unknown): unknown {
+  if (output === null || output === undefined) return output;
+  if (typeof output !== 'object') return output;
+  if (Array.isArray(output)) return { array: true, length: output.length };
+  const obj = output as Record<string, unknown>;
+  if (Array.isArray(obj.results)) {
+    const results = obj.results as unknown[];
+    const topScore =
+      results.length > 0 && typeof (results[0] as { score?: unknown }).score === 'number'
+        ? (results[0] as { score: number }).score
+        : undefined;
+    return { resultCount: results.length, ...(topScore !== undefined ? { topScore } : {}) };
+  }
+  const keys = Object.keys(obj);
+  return { keys, keyCount: keys.length };
 }
