@@ -26,9 +26,10 @@ export interface ConnectorBrowserItem {
 interface Props {
   items: ConnectorBrowserItem[];
   showSampleNav: boolean;
+  sample?: React.ReactNode;
 }
 
-export function ConnectorBrowser({ items, showSampleNav }: Props) {
+export function ConnectorBrowser({ items, showSampleNav, sample }: Props) {
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
@@ -63,24 +64,26 @@ export function ConnectorBrowser({ items, showSampleNav }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      <label className="relative block">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-subtle"
-          aria-hidden
-        />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search tools…"
-          aria-label="Search tools"
-          className="w-full rounded-md border border-border bg-surface py-2 pl-9 pr-3 text-[14px] text-text placeholder:text-text-subtle focus:outline-hidden focus:focus-ring"
-        />
-      </label>
+      <div className="sticky top-0 z-10 -mx-6 bg-bg/90 px-6 pt-8 pb-3 backdrop-blur-md supports-backdrop-filter:bg-bg/70 lg:-mx-10 lg:px-10 lg:pt-10">
+        <label className="relative block">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-subtle"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search tools…"
+            aria-label="Search tools"
+            className="w-full rounded-md border border-border bg-surface py-2 pl-9 pr-3 text-[14px] text-text placeholder:text-text-subtle focus:outline-hidden focus:focus-ring"
+          />
+        </label>
+      </div>
 
       <div className="grid grid-cols-1 gap-8 md:grid-cols-[180px_1fr]">
         <nav className="hidden md:block">
-          <div className="sticky top-6 flex flex-col gap-1">
+          <div className="sticky top-24 flex flex-col gap-1">
             <span className="caption mb-2 text-text-subtle">Categories</span>
             {showSampleNav ? (
               <a
@@ -103,6 +106,7 @@ export function ConnectorBrowser({ items, showSampleNav }: Props) {
         </nav>
 
         <div className="flex flex-col gap-8">
+          {sample}
           {visibleCategories.length === 0 ? (
             <div className="rounded-md border border-border bg-surface px-5 py-8 text-center text-[13px] text-text-muted">
               No tools match &ldquo;{query}&rdquo;.

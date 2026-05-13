@@ -6,6 +6,7 @@ import { schema, SAMPLE_PROVIDER } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppTopbar } from '@/components/app-topbar';
+import { isEnterpriseEnabled } from '@/lib/ee/license';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,6 +74,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         orgs={memberOrgs}
         activeOrgId={activeOrgId}
         sampleDataActive={sampleDataActive}
+        eeEnabled={isEnterpriseEnabled()}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppTopbar />

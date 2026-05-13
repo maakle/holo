@@ -33,6 +33,18 @@ export default async function ConnectionsPage({
     (orgRow?.metadata as { hideSampleData?: boolean } | null)?.hideSampleData,
   );
 
+  const [me] = await db
+    .select({ role: schema.member.role })
+    .from(schema.member)
+    .where(
+      and(
+        eq(schema.member.organizationId, orgId),
+        eq(schema.member.userId, userId),
+      ),
+    )
+    .limit(1);
+  const isOwner = me?.role === 'owner';
+
   const credRows = await db
     .select({
       provider: schema.connectorCredentials.provider,
@@ -204,16 +216,20 @@ export default async function ConnectionsPage({
         slackAllowlistEmpty={(allowlistByProvider.get('slack') ?? []).length === 0}
         connectedAs={sourceName.get('slack')}
       />
-      {!hideSampleData ? (
-        <SampleConnectorRow
-          installed={sampleStatus.active}
-          artifactCount={sampleStatus.artifactCount}
-          installedAt={sampleStatus.installedAt}
-          kindBreakdown={sampleStatus.kindBreakdown}
-        />
-      ) : null}
       <ConnectorBrowser
         showSampleNav={!hideSampleData}
+        sample={
+          !hideSampleData ? (
+            <SampleConnectorRow
+              installed={sampleStatus.active}
+              artifactCount={sampleStatus.artifactCount}
+              installedAt={sampleStatus.installedAt}
+              kindBreakdown={sampleStatus.kindBreakdown}
+              organizationId={orgId}
+              canHide={isOwner}
+            />
+          ) : null
+        }
         items={CONNECTORS.map<ConnectorBrowserItem>((meta) => ({
           meta,
           status: connected.get(meta.id) ? 'connected' : 'disconnected',

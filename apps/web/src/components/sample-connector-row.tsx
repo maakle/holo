@@ -1,18 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SampleManageSheet } from '@/components/sample-manage-sheet';
 import { notifySampleDataChanged } from '@/lib/sample-data-events';
+import { updateOrgPreferences } from '@/app/(app)/settings/actions';
 
 interface Props {
   installed: boolean;
   artifactCount: number;
   installedAt: string | null;
   kindBreakdown: Array<{ kind: string; count: number }>;
+  organizationId: string;
+  canHide: boolean;
 }
 
 /**
@@ -25,11 +29,30 @@ export function SampleConnectorRow({
   artifactCount,
   installedAt,
   kindBreakdown,
+  organizationId,
+  canHide,
 }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState<'install' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showManage, setShowManage] = useState(false);
+  const [hidePending, startHideTransition] = useTransition();
+
+  function onHide() {
+    if (!canHide || hidePending) return;
+    startHideTransition(async () => {
+      const result = await updateOrgPreferences({
+        organizationId,
+        hideSampleData: true,
+      });
+      if (!result.ok) {
+        toast.error(result.error ?? 'Could not hide sample data.');
+        return;
+      }
+      notifySampleDataChanged(false);
+      router.refresh();
+    });
+  }
 
   async function install() {
     setBusy('install');
@@ -82,6 +105,17 @@ export function SampleConnectorRow({
               ) : null}
             </div>
             <div className="flex shrink-0 items-center justify-end gap-2 pt-0.5">
+              {canHide ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onHide}
+                  disabled={hidePending}
+                  aria-label="Hide sample data"
+                >
+                  {hidePending ? 'Hiding…' : 'Hide'}
+                </Button>
+              ) : null}
               {installed ? (
                 <Button
                   variant="secondary"
