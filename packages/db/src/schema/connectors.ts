@@ -2,6 +2,7 @@ import {
   pgTable,
   text,
   timestamp,
+  date,
   jsonb,
   uuid,
   vector,
@@ -174,6 +175,58 @@ export const customerAccounts = pgTable(
     orgSalesforceUniq: uniqueIndex('customer_accounts_org_salesforce_uniq')
       .on(t.organizationId, t.salesforceAccountId)
       .where(sql`${t.salesforceAccountId} IS NOT NULL`),
+  }),
+);
+
+/**
+ * Cached output of `get_account_brief` — RFC-0006. One row per
+ * (organization, account, context, cache_day); the day partition gives us a
+ * natural 24h TTL ("today's brief" vs "yesterday's") without a TTL job, and
+ * a regenerate is just an UPSERT replacing the row for the current day.
+ *
+ * `sections_jsonb` holds the typed five-section payload the UI renders;
+ * `citations_jsonb` is the flat citation list (wire format from
+ * `@holo/agent-tools`) duplicated for cross-brief analytics later. Both
+ * are stored as opaque jsonb because the synthesis path owns the shape
+ * and this table never queries inside them.
+ */
+export const accountBriefCache = pgTable(
+  'account_brief_cache',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => customerAccounts.id, { onDelete: 'cascade' }),
+    /** Named context preset — see `BRIEF_CONTEXTS` in @holo/agent-tools.
+     * Stored as plain text (not pg enum) because the set is owned by the
+     * application and shifts more often than the DB does. */
+    context: text('context').notNull(),
+    /** Free-form override appended to the synthesis prompt. NULL for named
+     * contexts called without a custom string; set when callers pass
+     * `customContext` (typically with `context = 'custom'`). */
+    customContext: text('custom_context'),
+    /** UTC day the row was generated. The (org, account, context, day) tuple
+     * is unique — same-day regenerates UPSERT this row in place. */
+    cacheDay: date('cache_day', { mode: 'string' }).notNull(),
+    sectionsJsonb: jsonb('sections_jsonb').$type<Record<string, unknown>>().notNull(),
+    citationsJsonb: jsonb('citations_jsonb').$type<Record<string, unknown>>().notNull(),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).notNull().defaultNow(),
+    generatedBy: uuid('generated_by').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+  },
+  (t) => ({
+    orgAccountContextDayUniq: uniqueIndex(
+      'account_brief_cache_org_account_context_day_uniq',
+    ).on(t.organizationId, t.accountId, t.context, t.cacheDay),
+    orgAccountGeneratedIdx: index('account_brief_cache_org_account_generated_idx').on(
+      t.organizationId,
+      t.accountId,
+      t.generatedAt,
+    ),
   }),
 );
 

@@ -16,9 +16,14 @@ import {
   runListSkillsTool,
   runGetSkillTool,
   runSearchTool,
+  runGetAccountBriefTool,
+  invalidateAccountBriefCache,
 } from '@holo/agent-tools';
 import { z } from '@hono/zod-openapi';
 import {
+  AccountBriefSchema,
+  AccountIdParamSchema,
+  BriefQuerySchema,
   ErrorSchema,
   GetSkillResponseSchema,
   HealthResponseSchema,
@@ -83,6 +88,64 @@ const getSkillRoute = createRoute({
     },
     404: {
       description: 'Skill not found',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+    401: {
+      description: 'Missing or invalid bearer token',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+  },
+});
+
+const getAccountBriefRoute = createRoute({
+  method: 'get',
+  path: '/v1/accounts/{accountId}/brief',
+  summary: 'Get the pre-call brief for an account',
+  description:
+    "RFC-0006 — five-section synthesis (at-a-glance, open issues, last conversation, product asks, context). Cached per (org, account, context, day); cache hits return `fromCache: true`. ACL'd via the same user-subject filter as `/v1/search`: callers must have at least one subject matching the account's chunks.",
+  tags: ['brief'],
+  security: [{ bearerAuth: [] }],
+  request: { params: AccountIdParamSchema, query: BriefQuerySchema },
+  responses: {
+    200: {
+      description: 'The structured brief.',
+      content: { 'application/json': { schema: AccountBriefSchema } },
+    },
+    403: {
+      description: 'Account not visible to this user (no matching subjects).',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+    404: {
+      description: 'Account not found in this organization.',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+    401: {
+      description: 'Missing or invalid bearer token',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+  },
+});
+
+const regenerateAccountBriefRoute = createRoute({
+  method: 'post',
+  path: '/v1/accounts/{accountId}/brief/regenerate',
+  summary: "Invalidate today's cached brief and re-synthesize",
+  description:
+    "Drops the cache row for (org, account, context, today) before re-running synthesis. Use this when an upstream connector just finished a sync and the user wants the brief refreshed before the meeting starts.",
+  tags: ['brief'],
+  security: [{ bearerAuth: [] }],
+  request: { params: AccountIdParamSchema, query: BriefQuerySchema },
+  responses: {
+    200: {
+      description: 'The freshly-synthesized brief.',
+      content: { 'application/json': { schema: AccountBriefSchema } },
+    },
+    403: {
+      description: 'Account not visible to this user.',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+    404: {
+      description: 'Account not found.',
       content: { 'application/json': { schema: ErrorSchema } },
     },
     401: {
@@ -194,6 +257,89 @@ export function createRestRouter(db: DB) {
       { q: query, top_k: limit },
     );
     return c.json(result, 200);
+  });
+
+  router.openapi(getAccountBriefRoute, async (c) => {
+    const user = c.get('user');
+    const { accountId } = c.req.valid('param');
+    const { context, customContext } = c.req.valid('query');
+
+    const extraSubjects = await getSubjectsForUser(db, user.userId);
+    const brief = await runGetAccountBriefTool(
+      {
+        db,
+        organizationId: user.organizationId,
+        userId: user.userId,
+        userSubjects: [
+          `org:${user.organizationId}`,
+          `user:${user.userId}`,
+          ...extraSubjects,
+        ],
+      },
+      {
+        account_id: accountId,
+        context,
+        ...(customContext ? { custom_context: customContext } : {}),
+      },
+    );
+    // `emptyBrief` returns an at-a-glance with `displayName === ''`. That's
+    // our signal that the account either doesn't exist in this org or isn't
+    // visible to the caller's subjects — surface a 403 rather than the empty
+    // payload so the UI doesn't render a ghost brief.
+    if (brief.sections.atGlance.displayName === '') {
+      return c.json(
+        {
+          code: 'HOLO_FORBIDDEN',
+          problem: 'Account not visible to this user',
+          fix: 'Verify the user has subjects matching at least one chunk on this account.',
+        },
+        403,
+      );
+    }
+    return c.json(brief, 200);
+  });
+
+  router.openapi(regenerateAccountBriefRoute, async (c) => {
+    const user = c.get('user');
+    const { accountId } = c.req.valid('param');
+    const { context, customContext } = c.req.valid('query');
+
+    await invalidateAccountBriefCache({
+      db,
+      organizationId: user.organizationId,
+      accountId,
+      context,
+    });
+
+    const extraSubjects = await getSubjectsForUser(db, user.userId);
+    const brief = await runGetAccountBriefTool(
+      {
+        db,
+        organizationId: user.organizationId,
+        userId: user.userId,
+        userSubjects: [
+          `org:${user.organizationId}`,
+          `user:${user.userId}`,
+          ...extraSubjects,
+        ],
+      },
+      {
+        account_id: accountId,
+        context,
+        ...(customContext ? { custom_context: customContext } : {}),
+      },
+    );
+    if (brief.sections.atGlance.displayName === '') {
+      return c.json(
+        {
+          code: 'HOLO_FORBIDDEN',
+          problem: 'Account not visible to this user',
+          fix: 'Verify the user has subjects matching at least one chunk on this account.',
+        },
+        403,
+      );
+    }
+    return c.json(brief, 200);
   });
 
   return router;

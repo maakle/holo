@@ -8,3 +8,5 @@ export { executeSkill, runSkillStep } from './executor';
 export type { ExecuteSkillInput, ExecuteSkillResult, StepTrace, SkillStepResult } from './executor';
 export { autoExtractSkills, clusterInvocations } from './auto-extract';
 export type { AutoExtractInput, SkillProposal, InvocationRecord, InvocationCluster } from './auto-extract';
+export { loadTemplate, loadAllTemplates, TEMPLATE_FILES } from './templates';
+export type { SkillTemplate, TemplateFilename } from './templates';
