@@ -226,3 +226,47 @@ export const BriefQuerySchema = z.object({
   context: BriefContextSchema,
   customContext: z.string().max(500).optional(),
 });
+
+// ── Feedback (RFC-0008) ─────────────────────────────────────────────────────
+
+/**
+ * POST /v1/feedback request body. The minimum-viable shape: identify the
+ * answer + rating, optional correction. `denorm` carries the question /
+ * answer / citations / coverage payload when the gateway has no trace
+ * store to look it up by `answer_id` — without that, promoting a row to
+ * an eval entry later would have no question to grade against.
+ */
+export const FeedbackBodySchema = z
+  .object({
+    answer_id: z.uuid().openapi({ example: '0d0e1f3a-...' }),
+    rating: z
+      .number()
+      .int()
+      .min(-1)
+      .max(1)
+      .openapi({ description: '-1 = 👎, 0 = neutral (correction only), 1 = 👍' }),
+    correction_text: z.string().max(8_000).optional(),
+    skill_slug: z.string().optional(),
+    /**
+     * Denormalized turn payload the client carries from its in-memory state.
+     * Required because the gateway does not persist orchestrator traces by
+     * `answer_id` (out of scope for the MVP); without these fields, eval
+     * promotion later would have nothing to grade against.
+     */
+    denorm: z.object({
+      question: z.string().min(1),
+      answer: z.string().min(1),
+      citations: z.array(z.unknown()).default([]),
+      coverage: z.array(z.unknown()).default([]),
+    }),
+  })
+  .openapi('FeedbackBody');
+
+export const FeedbackResponseSchema = z
+  .object({
+    id: z.uuid(),
+    answer_id: z.uuid(),
+    rating: z.number().int(),
+    created_at: z.string(),
+  })
+  .openapi('FeedbackResponse');

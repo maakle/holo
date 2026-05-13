@@ -25,6 +25,7 @@ import { SalesforceSyncModule } from './queues/salesforce';
 import { EmbedModule } from './queues/embed';
 import { EmbedBackfillModule } from './queues/embed-backfill';
 import { DisconnectCleanupModule } from './queues/disconnect-cleanup';
+import { SkillEvalModule } from './queues/skill-eval';
 import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 import { SyncRunnersModule } from './queues/runners.module';
 import { SlackSubjectsModule } from './slack-subjects/slack-subjects.module';
@@ -81,6 +82,7 @@ import { ObservabilityModule } from './observability/observability.module';
     EmbedModule,
     EmbedBackfillModule,
     DisconnectCleanupModule,
+    SkillEvalModule,
     SyncRunnersModule,
     SyncSchedulerModule,
   ],

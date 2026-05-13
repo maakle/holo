@@ -367,6 +367,16 @@ export interface ChatAgentLoopOptions {
 export type ChatAgentLoopResult =
   | {
       kind: 'answer';
+      /** Stable identifier for this assistant turn. Minted at the start of
+       * the loop and surfaced to the client so it can attach feedback
+       * (`POST /v1/feedback { answer_id, rating, correction_text? }`) without
+       * a separate lookup. NOT a database row id — the orchestrator does not
+       * persist; the chat route handler may store it alongside the turn if
+       * desired, but the contract here is "this string identifies this
+       * answer for the lifetime of the client's session." Wire is
+       * snake_case (`answer_id`); this in-process result uses camelCase to
+       * match the rest of the result envelope. */
+      answerId: string;
       answer: string;
       toolCalls: ChatToolCallTrace[];
       modelCalls: number;
@@ -420,6 +430,10 @@ export async function runChatAgentLoop(
       // Transport errors must not abort the agent loop.
     }
   };
+
+  // Stable per-turn identifier the web client uses to attach feedback to
+  // this specific assistant turn. See `ChatAgentLoopResult` for the contract.
+  const answerId = crypto.randomUUID();
 
   const toolByName = new Map<string, ChatLocalTool>(tools.map((t) => [t.name, t]));
   // emit_claims is a terminal "tool" — the model calls it instead of ending
@@ -483,6 +497,7 @@ export async function runChatAgentLoop(
       // renders no chips and no banner, same as a conversational answer.
       return {
         kind: 'answer',
+        answerId,
         answer: text,
         toolCalls: traces,
         modelCalls,

@@ -7,7 +7,7 @@
  */
 
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
-import type { DB } from '@holo/db';
+import { schema, type DB } from '@holo/db';
 import { getSubjectsForUser } from '@holo/user-subjects';
 import { holoError, ErrorCode } from '@holo/errors';
 import type { McpSessionVars } from '../middleware/session.js';
@@ -25,6 +25,8 @@ import {
   AccountIdParamSchema,
   BriefQuerySchema,
   ErrorSchema,
+  FeedbackBodySchema,
+  FeedbackResponseSchema,
   GetSkillResponseSchema,
   HealthResponseSchema,
   ListSkillsQuerySchema,
@@ -155,6 +157,36 @@ const regenerateAccountBriefRoute = createRoute({
   },
 });
 
+const feedbackRoute = createRoute({
+  method: 'post',
+  path: '/v1/feedback',
+  summary: 'Submit a 👍 / 👎 / correction on an assistant turn (RFC-0008).',
+  description:
+    'Idempotent on (answer_id, user_id) — re-submitting the same answer overwrites the prior rating/correction.',
+  tags: ['feedback'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { 'application/json': { schema: FeedbackBodySchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: 'Stored',
+      content: { 'application/json': { schema: FeedbackResponseSchema } },
+    },
+    400: {
+      description: 'Invalid input',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+    401: {
+      description: 'Missing or invalid bearer token',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+  },
+});
+
 const searchRoute = createRoute({
   method: 'post',
   path: '/v1/search',
@@ -220,6 +252,69 @@ export function createRestRouter(db: DB) {
       );
     }
     return c.json(result as GetSkillResponse, 200);
+  });
+
+  router.openapi(feedbackRoute, async (c) => {
+    const user = c.get('user');
+    const body = c.req.valid('json');
+
+    // UPSERT on (answer_id, user_id) — re-rating the same turn from the
+    // same user replaces the prior rating/correction rather than spamming
+    // the table. The denormalized question/answer/citations/coverage are
+    // taken from the client because the gateway does not maintain a trace
+    // store keyed by `answer_id`; that's deliberately out of scope.
+    const inserted = await db
+      .insert(schema.answerFeedback)
+      .values({
+        organizationId: user.organizationId,
+        userId: user.userId,
+        answerId: body.answer_id,
+        skillSlug: body.skill_slug ?? null,
+        rating: body.rating,
+        correctionText: body.correction_text ?? null,
+        question: body.denorm.question,
+        answer: body.denorm.answer,
+        citationsJsonb: body.denorm.citations,
+        coverageJsonb: body.denorm.coverage,
+      })
+      .onConflictDoUpdate({
+        target: [schema.answerFeedback.answerId, schema.answerFeedback.userId],
+        set: {
+          rating: body.rating,
+          correctionText: body.correction_text ?? null,
+          // Re-pin the latest snapshot so later edits don't drift from
+          // whatever the client most recently saw.
+          question: body.denorm.question,
+          answer: body.denorm.answer,
+          citationsJsonb: body.denorm.citations,
+          coverageJsonb: body.denorm.coverage,
+        },
+      })
+      .returning({
+        id: schema.answerFeedback.id,
+        answerId: schema.answerFeedback.answerId,
+        rating: schema.answerFeedback.rating,
+        createdAt: schema.answerFeedback.createdAt,
+      });
+
+    const row = inserted[0];
+    if (!row) {
+      // UPSERT with RETURNING always yields a row; this is defensive only.
+      throw holoError({
+        code: ErrorCode.HOLO_INTERNAL,
+        problem: 'feedback insert returned no row',
+        fix: 'Retry; if it persists, check answer_feedback table integrity.',
+      });
+    }
+    return c.json(
+      {
+        id: row.id,
+        answer_id: row.answerId,
+        rating: row.rating,
+        created_at: row.createdAt.toISOString(),
+      },
+      200,
+    );
   });
 
   router.openapi(searchRoute, async (c) => {

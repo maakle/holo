@@ -1,109 +1,93 @@
-# 0008 — RFC: Quality Feedback Loop
+# RFC-0008: Quality Feedback Loop
 
-**Status:** Draft — open for review
-**Updated:** 2026-05-13
-**Decides:** What data, surfaces, and feedback signals do we need to make every answer compound into the eval set — without burdening the user?
+**Status:** Implemented (initial cut)
+**Owner:** holo core
+**Last updated:** 2026-05-13
 
-## Context
+## Problem
 
-The dogfood team is already labeling. The export is full of *"rate 1/10"*, *"fix if no bueno"*, and free-text corrections delivered as follow-up prompts to the agent itself. They're paying the labeling cost in conversational overhead. Capturing that labor structurally costs us almost nothing and gives us a real eval set in weeks.
-
-This RFC is the smallest possible primitive that lets every answer carry a 👍/👎 + optional correction, and pipes the result into an eval-ready dataset that gates skill changes.
-
-## What we're solving (and what we're not)
-
-**We are:** building the data path. Per-answer ratings, optional corrections, eval seeding, per-skill regression check.
-
-**We are not:** building an RLHF training pipeline, doing online fine-tuning, or reweighting retrieval scores from feedback. Those are downstream.
-
-## Proposed shape
-
-### Data path
-
-Two new tables:
-
-```sql
-CREATE TABLE answer_feedback (
-  id                uuid PRIMARY KEY,
-  organization_id   uuid NOT NULL,
-  user_id           uuid NOT NULL,
-  -- Anchor — every answer has a unique id from the orchestrator trace
-  answer_id         uuid NOT NULL,
-  skill_slug        text,
-  rating            smallint NOT NULL,         -- -1 (👎) | 0 (neutral, no rating) | +1 (👍)
-  correction_text   text,                       -- optional free-text
-  -- Snapshot — denormalize because answer_id may point at a deleted trace
-  question          text NOT NULL,
-  answer            text NOT NULL,
-  citations_jsonb   jsonb NOT NULL,
-  coverage_jsonb    jsonb NOT NULL,
-  created_at        timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE eval_entries (
-  id                uuid PRIMARY KEY,
-  organization_id   uuid NOT NULL,
-  source_feedback_id uuid REFERENCES answer_feedback(id),
-  skill_slug        text,
-  question          text NOT NULL,
-  expected          jsonb NOT NULL,             -- { answer_substrings: [], must_cite: [], must_not_say: [] }
-  status            text NOT NULL DEFAULT 'pending',  -- pending | active | archived
-  created_at        timestamptz NOT NULL DEFAULT now()
-);
-```
-
-Feedback is captured directly. Eval entries are *promoted* from feedback by a human (the skill owner) — not all feedback is eval-worthy, but every eval entry traces back to a real moment of friction.
-
-### UI
-
-- **Inline rating** — every assistant turn renders a thin rating bar: 👍 / 👎 / "✏️ correct this." Click 👎 or "correct" opens a small textarea. Submission is one HTTP POST; no modal, no full-page reload.
-- **Skill owner inbox** — at `/skills/[slug]/feedback`, a list of recent feedback with one-click "Promote to eval" → opens a structured `expected` editor (substrings, must_cite, must_not_say) pre-filled from the correction.
-- **Per-skill regression panel** — at `/skills/[slug]`, a tile showing pass-rate against active eval entries. Re-runs nightly via the existing skill-eval harness; surfaces "Eval pass rate dropped 86% → 71% after last edit."
-
-### Pipe into the eval harness
-
-`packages/skills/eval` already exists. Eval entries promoted from feedback become inputs to the same harness. The harness gains:
-
-- A loader that pulls `eval_entries WHERE status='active' AND skill_slug=$slug`
-- A grader that checks `answer_substrings`, `must_cite` (chunk ids), `must_not_say` against the orchestrator output
-- A reporter that posts pass/fail to the per-skill regression panel
-
-Nothing in the harness contract changes; we just feed it richer entries.
-
-### MCP / REST surface
-
-POST `/v1/feedback` — accepts `{ answer_id, rating, correction_text? }`. Same auth as the rest of the gateway. MCP gets a parallel `submit_feedback` tool so agents calling holo programmatically can record their own quality ratings (useful for the cross-agent eval RFC-future).
-
-## Open questions
-
-1. **Anonymous-by-default or named?** Feedback within an org is named (we want to know which power user is rating); cross-org / marketplace feedback (when it lands) is anonymous. **Recommend:** named in org, with an opt-out at the user level. Aggregate displays anonymize anyway.
-2. **What gets denormalized in `answer_feedback`?** Hard schema decision — too little and we can't retrain after the trace expires; too much and the table balloons. **Recommend:** question + answer + citations + coverage (as JSONB) only. No tool-call traces, no model-call traces — those live in the existing orchestrator log and we can join when we need them.
-3. **Promotion gating.** Anyone can submit feedback; who can promote to an eval entry? **Recommend:** skill owners + admins. Members' feedback is welcome data; promotion is a deliberate "this is the bar we're holding ourselves to" act.
-4. **Eval re-run cadence.** Nightly is the safe default. **Recommend:** nightly, plus on-demand "run now" from the skill detail page, plus on every skill version bump (auto, before promotion). Don't run on every save — that's noisy and expensive.
-
-## Tradeoffs to lock down
-
-- **Capture vs. friction.** A 👎 with no required correction is one click. Many will be unactionable signal-without-substance. **Accept that.** The 👎-count alone is a usable trend metric; corrections sweeten when the user has the energy.
-- **Where the eval graders live.** Substring + must-cite is cheap and deterministic; must-not-say catches the "do not hallucinate" failure mode. We can layer LLM-judge graders later, but every grader adds cost on every eval run. **Recommend:** ship the three deterministic graders only.
-- **No public visibility.** Feedback is org-private. Marketplace skills publishing (v0.3) gets a redacted aggregate pass-rate, never per-feedback details.
-
-## Out of scope (initial PR)
-
-- LLM-judge eval graders
-- Cross-org / public eval datasets
-- Auto-promotion (model-suggested eval entries)
-- Per-user feedback dashboards
-- Retraining / fine-tuning anything
+Agent answers degrade silently. When a user notices a wrong or missing
+answer, that signal evaporates as soon as the chat panel scrolls. Skill
+owners have no way to lock the corrected behavior in against future
+regressions.
 
 ## Recommendation
 
-Ship the two tables, the inline rating UI, the `/v1/feedback` endpoint, the skill owner inbox, and the regression panel that runs against the existing eval harness with the three deterministic graders. Treat promotion-to-eval as a deliberate human action, not an automation.
+Three loosely-coupled surfaces sharing two tables and one harness:
 
-This RFC is the smallest of the six and the one with the highest compounding value — every answer this team rates becomes a guardrail against future regressions. Build it early.
+1. **Per-answer rating** (`👍` / `👎` / inline correction) under every
+   assistant turn in the chat panel. Submit POSTs `/v1/feedback`.
+2. **Promotion** of a feedback row into an `eval_entries` record with a
+   structured `expected` payload (substrings, must-cite chunk ids,
+   must-not-say strings). Skill owner / admin only.
+3. **Regression panel** on the skill detail page that surfaces the
+   latest pass-rate from a nightly run of the harness against
+   `eval_entries`. Drop-warning if the pass-rate falls > 10pp in 24h.
 
-Depends on:
+The harness has three deterministic graders:
+- `answerSubstringGrader` — every entry in `expected.answer_substrings`
+  must appear in the agent's answer.
+- `mustCiteGrader` — every chunk_id in `expected.must_cite` must appear
+  in the answer's citations.
+- `mustNotSayGrader` — every string in `expected.must_not_say` must NOT
+  appear in the answer.
 
-- Existing `packages/skills/eval` harness
-- PR #188 (✅) — `answer_id`, `citations`, `coverage` are the substrate
-- RFC-0005 — the skill detail page is where the regression panel lives
-- RFC-0007 — `must_cite` graders share the citation-required primitive
+A skill passes when every active eval entry passes every grader.
+
+## Data path
+
+```
+chat panel ──▶ POST /api/feedback ──▶ answer_feedback (denormalized)
+                                       │
+                              owner: "Promote" with structured expected
+                                       │
+                                       ▼
+                            eval_entries (status='active')
+                                       │
+                       nightly cron (BullMQ "skill-eval")
+                                       │
+                                       ▼
+                            skill_eval_runs (pass_rate roll-up)
+                                       │
+                                       ▼
+                        regression panel on /skills/[slug]
+```
+
+## Schema
+
+See migration `packages/db/migrations/0043_answer_feedback.sql`.
+
+Three tables: `answer_feedback`, `eval_entries`, `skill_eval_runs`.
+Uniqueness on `answer_feedback (answer_id, user_id)` — re-rating a turn
+upserts; the chat panel sending two requests for the same turn does
+not double-count.
+
+## API surface
+
+- `POST /v1/feedback` (gateway) — Bearer auth. Mirror at
+  `POST /api/feedback` (web, session cookie).
+- `POST /api/skills/[slug]/feedback/[id]/promote` (web, session) — owner /
+  admin only. Inserts an `eval_entries` row with `status='active'`.
+- `POST /api/skills/[slug]/eval/run` (web, session) — owner / admin only.
+  On-demand "run now" complement to the nightly cron.
+- MCP `submit_feedback` tool — server-side mirror for sub-agent use.
+
+## Out of scope (binding)
+
+- LLM-judge graders.
+- Cross-org / public eval datasets.
+- Auto-promotion (model-suggested eval entries).
+- Per-user feedback dashboards.
+- Retraining / fine-tuning of the underlying model.
+
+## Implementation pointers
+
+- Orchestrator change: `packages/agent-tools/src/chat-orchestrator.ts`
+  mints a `crypto.randomUUID()` at the top of `runChatAgentLoop` and
+  surfaces it as `answerId` on the answer result. Wire is snake_case
+  (`answer_id`) so the REST and stream events stay consistent.
+- Harness: `packages/skills/src/eval-harness/`.
+- Cron: `apps/worker/src/queues/skill-eval.ts` (BullMQ repeatable, 24h).
+- UI: `apps/web/src/components/chat-panel.tsx` (rating bar);
+  `apps/web/src/app/(app)/skills/[slug]/page.tsx` (regression panel);
+  `apps/web/src/app/(app)/skills/[slug]/feedback/page.tsx` (inbox).

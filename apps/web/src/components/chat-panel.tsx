@@ -43,6 +43,14 @@ export interface ChatTurn {
   /** RFC-0007 structured claims envelope. Optional — older turns and
    * surfaces that don't opt-in will leave this undefined. */
   claims?: ChatClaim[];
+  /** Stable orchestrator-minted id for this assistant turn — used by the
+   * inline 👍 / 👎 / correct bar to attach feedback. Absent on user turns
+   * and on assistant turns from before RFC-0008. */
+  answerId?: string;
+  /** Mirrors the user's question for this assistant turn, denormalized so
+   * the feedback POST carries the (question, answer) pair without us
+   * having to walk back through history. */
+  question?: string;
 }
 
 // NDJSON event shapes streamed from /api/chat. Kept in sync with the
@@ -66,6 +74,7 @@ type StreamEvent =
     }
   | {
       type: 'done';
+      answer_id: string;
       answer: string;
       toolCalls: ToolCallTrace[];
       modelCalls: number;
@@ -270,6 +279,8 @@ export function ChatPanel({
               modelCalls: event.modelCalls,
               claims: event.claims,
               phases: undefined,
+              answerId: event.answer_id,
+              question: userTurn.text,
             };
           }
 
@@ -511,6 +522,13 @@ function Turn({ turn }: { turn: ChatTurn }) {
             {turn.toolCalls && turn.toolCalls.length > 0 && (
               <ToolTrace calls={turn.toolCalls} modelCalls={turn.modelCalls} />
             )}
+            {turn.answerId && turn.text && turn.question ? (
+              <FeedbackBar
+                answerId={turn.answerId}
+                question={turn.question}
+                answer={turn.text}
+              />
+            ) : null}
           </>
         )}
       </div>
@@ -538,6 +556,146 @@ function UnverifiedBanner({ claims }: { claims: ChatClaim[] }) {
       <span className="text-error/80">
         Look for the red &ldquo;unverified&rdquo; chips below.
       </span>
+    </div>
+  );
+}
+
+/**
+ * Inline rating bar under each assistant turn (RFC-0008).
+ *
+ * Design (per DESIGN.md):
+ * - Three ghost icon-buttons, 12px caption-style labels, neutral text.
+ * - 👎 or "✏ Correct this" expands a textarea *inline* — no modal.
+ * - Submit POSTs /v1/feedback through the same-origin gateway proxy.
+ * - Accent color is reserved for active state (selected vote / focus ring);
+ *   we use at most one accent dot per bar so the per-screen budget is
+ *   respected even when many turns are visible.
+ */
+function FeedbackBar({
+  answerId,
+  question,
+  answer,
+}: {
+  answerId: string;
+  question: string;
+  answer: string;
+}) {
+  const [vote, setVote] = useState<-1 | 0 | 1 | null>(null);
+  const [showCorrection, setShowCorrection] = useState(false);
+  const [correction, setCorrection] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const post = async (rating: -1 | 0 | 1, text?: string) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          answer_id: answerId,
+          rating,
+          correction_text: text?.trim() ? text.trim() : undefined,
+          denorm: {
+            question,
+            answer,
+            citations: [],
+            coverage: [],
+          },
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { problem?: string } | null;
+        toast.error(body?.problem ?? `Could not save feedback (${res.status}).`);
+        return;
+      }
+      setVote(rating);
+      setSubmitted(true);
+      if (text?.trim()) setShowCorrection(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Network error.';
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1 text-[12px] text-text-subtle">
+        <button
+          type="button"
+          aria-label="Helpful"
+          disabled={submitting}
+          onClick={() => void post(1)}
+          className={`rounded-sm border px-2 py-1 transition-colors duration-micro disabled:opacity-50 ${
+            vote === 1
+              ? 'border-accent text-accent'
+              : 'border-border hover:border-border-strong hover:text-text'
+          }`}
+        >
+          {'\u{1F44D}'}
+        </button>
+        <button
+          type="button"
+          aria-label="Not helpful"
+          disabled={submitting}
+          onClick={() => {
+            setShowCorrection(true);
+            void post(-1);
+          }}
+          className={`rounded-sm border px-2 py-1 transition-colors duration-micro disabled:opacity-50 ${
+            vote === -1
+              ? 'border-accent text-accent'
+              : 'border-border hover:border-border-strong hover:text-text'
+          }`}
+        >
+          {'\u{1F44E}'}
+        </button>
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={() => setShowCorrection((v) => !v)}
+          className="rounded-sm border border-border px-2 py-1 text-text-muted transition-colors duration-micro hover:border-border-strong hover:text-text disabled:opacity-50"
+        >
+          {'✏️'} Correct this
+        </button>
+        {submitted ? (
+          <span className="ml-2 caption text-text-subtle">Thanks</span>
+        ) : null}
+      </div>
+      {showCorrection ? (
+        <div className="space-y-1.5">
+          <textarea
+            value={correction}
+            onChange={(e) => setCorrection(e.target.value)}
+            rows={3}
+            placeholder="What should the answer have said? Keep it specific."
+            className="w-full resize-none rounded-sm border border-border bg-transparent px-3 py-2 font-sans text-[13px] leading-5 text-text placeholder:text-text-subtle focus:outline focus:outline-2 focus:outline-accent focus:[outline-offset:-1px]"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={submitting || !correction.trim()}
+              onClick={() => void post(vote ?? 0, correction)}
+              className="rounded-md border border-border bg-surface px-3 py-1.5 text-[12px] font-medium text-text transition-colors duration-micro hover:border-border-strong disabled:opacity-50"
+            >
+              {submitting ? 'Saving…' : 'Send correction'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowCorrection(false);
+                setCorrection('');
+              }}
+              className="text-[12px] text-text-subtle hover:text-text"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

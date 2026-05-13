@@ -44,7 +44,7 @@ export function __setSchedulerSqlForTests(sql: Sql | null): void {
  */
 type SyncQueueName = Exclude<
   QueueName,
-  'embed' | 'embed-backfill' | 'disconnect-cleanup'
+  'embed' | 'embed-backfill' | 'disconnect-cleanup' | 'skill-eval'
 >;
 type QueueMap = Record<SyncProvider, ReadonlyArray<SyncQueueName>>;
 
