@@ -5,7 +5,12 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
 const inputClass =
-  'h-9 w-full rounded-md border border-border bg-transparent px-3 text-[13px] outline-hidden placeholder:text-text-subtle focus:border-transparent focus:outline-solid focus:outline-2 focus:outline-accent';
+  'h-9 w-full rounded-md border border-border bg-surface px-3 text-[13px] text-text outline-hidden placeholder:text-text-subtle focus:border-transparent focus:outline-solid focus:outline-2 focus:outline-accent';
+
+const inputErrorClass =
+  'h-9 w-full rounded-md border border-error bg-surface px-3 text-[13px] text-text outline-hidden placeholder:text-text-subtle focus:border-transparent focus:outline-solid focus:outline-2 focus:outline-error';
+
+type FieldKey = 'clientId' | 'clientSecret' | 'signingSecret';
 
 export interface ExistingConfig {
   id: string;
@@ -19,10 +24,12 @@ export function SlackAppConfigForm({
   existing,
   canEdit,
   ownerReason,
+  displayName,
 }: {
   existing: ExistingConfig | null;
   canEdit: boolean;
   ownerReason: string | null;
+  displayName: string;
 }) {
   const [appId, setAppId] = useState(existing?.appId ?? '');
   const [clientId, setClientId] = useState(existing?.clientId ?? '');
@@ -30,24 +37,39 @@ export function SlackAppConfigForm({
   // either empty (no change on edit) or a fresh value the owner just pasted.
   const [clientSecret, setClientSecret] = useState('');
   const [signingSecret, setSigningSecret] = useState('');
-  const [displayName, setDisplayName] = useState(existing?.displayName ?? '');
+  const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [pending, startTransition] = useTransition();
 
+  function clearError(field: FieldKey) {
+    if (!errors[field]) return;
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
   async function save() {
-    if (!clientId.trim()) {
-      toast.error('Client ID is required.');
-      return;
-    }
+    const nextErrors: Partial<Record<FieldKey, string>> = {};
+    if (!clientId.trim()) nextErrors.clientId = 'Required.';
     // When editing, blank secret fields keep the existing values intact
     // server-side only because the schema requires non-empty — so for an
     // edit-without-rotating, we re-PUT with the same secrets we don't know.
     // Force the owner to re-enter both secrets on every save. That's the
     // safe default: it's the only way the UI can guarantee the value
     // landing in the DB matches what's pasted on screen.
-    if (!clientSecret.trim() || !signingSecret.trim()) {
-      toast.error('Paste client_secret and signing_secret to save.');
+    if (!clientSecret.trim()) nextErrors.clientSecret = 'Required.';
+    if (!signingSecret.trim()) nextErrors.signingSecret = 'Required.';
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      const count = Object.keys(nextErrors).length;
+      toast.error(
+        count === 1 ? 'Fill in the highlighted field.' : `Fill in ${count} required fields.`,
+      );
       return;
     }
+    setErrors({});
 
     startTransition(async () => {
       try {
@@ -122,16 +144,7 @@ export function SlackAppConfigForm({
       )}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Field label="Display name (optional)">
-          <input
-            className={inputClass}
-            value={displayName}
-            placeholder="e.g. Acme Holo Bot"
-            onChange={(e) => setDisplayName(e.target.value)}
-            disabled={!canEdit || pending}
-          />
-        </Field>
-        <Field label="App ID (optional)">
+        <Field label="App ID" optional>
           <input
             className={`${inputClass} font-mono`}
             value={appId}
@@ -140,35 +153,47 @@ export function SlackAppConfigForm({
             disabled={!canEdit || pending}
           />
         </Field>
-        <Field label="Client ID">
+        <Field label="Client ID" required error={errors.clientId}>
           <input
-            className={`${inputClass} font-mono`}
+            className={`${(errors.clientId ? inputErrorClass : inputClass)} font-mono`}
             value={clientId}
             placeholder="1234567890.1234567890"
-            onChange={(e) => setClientId(e.target.value)}
+            onChange={(e) => {
+              setClientId(e.target.value);
+              clearError('clientId');
+            }}
             disabled={!canEdit || pending}
+            aria-invalid={Boolean(errors.clientId)}
           />
         </Field>
-        <Field label="Client Secret">
+        <Field label="Client Secret" required error={errors.clientSecret}>
           <input
             type="password"
-            className={`${inputClass} font-mono`}
+            className={`${(errors.clientSecret ? inputErrorClass : inputClass)} font-mono`}
             value={clientSecret}
             placeholder={existing ? '•••••• (re-enter to update)' : ''}
-            onChange={(e) => setClientSecret(e.target.value)}
+            onChange={(e) => {
+              setClientSecret(e.target.value);
+              clearError('clientSecret');
+            }}
             disabled={!canEdit || pending}
             autoComplete="new-password"
+            aria-invalid={Boolean(errors.clientSecret)}
           />
         </Field>
-        <Field label="Signing Secret" full>
+        <Field label="Signing Secret" required error={errors.signingSecret}>
           <input
             type="password"
-            className={`${inputClass} font-mono`}
+            className={`${(errors.signingSecret ? inputErrorClass : inputClass)} font-mono`}
             value={signingSecret}
             placeholder={existing ? '•••••• (re-enter to update)' : ''}
-            onChange={(e) => setSigningSecret(e.target.value)}
+            onChange={(e) => {
+              setSigningSecret(e.target.value);
+              clearError('signingSecret');
+            }}
             disabled={!canEdit || pending}
             autoComplete="new-password"
+            aria-invalid={Boolean(errors.signingSecret)}
           />
         </Field>
       </div>
@@ -208,15 +233,32 @@ function Field({
   label,
   children,
   full,
+  required,
+  optional,
+  error,
 }: {
   label: string;
   children: React.ReactNode;
   full?: boolean;
+  required?: boolean;
+  optional?: boolean;
+  error?: string;
 }) {
   return (
     <label className={`flex flex-col gap-1.5 ${full ? 'md:col-span-2' : ''}`}>
-      <span className="text-[12px] text-text-subtle">{label}</span>
+      <span className="flex items-center gap-1 text-[12px] text-text-subtle">
+        <span>{label}</span>
+        {required ? (
+          <span className="text-error" aria-hidden="true">
+            *
+          </span>
+        ) : null}
+        {optional ? (
+          <span className="text-text-subtle">(optional)</span>
+        ) : null}
+      </span>
       {children}
+      {error ? <span className="text-[11px] text-error">{error}</span> : null}
     </label>
   );
 }

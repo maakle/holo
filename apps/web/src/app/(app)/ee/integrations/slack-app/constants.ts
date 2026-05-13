@@ -1,0 +1,1 @@
+export const DISPLAY_NAME_PLACEHOLDER = '__HOLO_DISPLAY_NAME__';
