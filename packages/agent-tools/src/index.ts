@@ -29,6 +29,7 @@ export {
 export {
   runChatAgentLoop,
   CHAT_SYSTEM_PROMPT,
+  CHAT_CLAIMS_SUFFIX,
   CHAT_TOOLS,
   type ChatAgentEvent,
   type ChatAgentLoopOptions,
@@ -37,6 +38,20 @@ export {
   type ChatToolCallTrace,
   type ChatToolContext,
 } from './chat-orchestrator';
+
+export {
+  claimToWire,
+  claimFromWire,
+  EMIT_CLAIMS_INPUT_SCHEMA,
+  EMIT_CLAIMS_TOOL_NAME,
+  type AnswerClaim,
+  type ClaimConfidence,
+  type WireAnswerClaim,
+} from './claims';
+export {
+  requiresHardCitation,
+  classifyClaim,
+} from './claims-classifier';
 
 export {
   toCitation,

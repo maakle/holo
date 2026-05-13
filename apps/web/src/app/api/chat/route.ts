@@ -39,6 +39,9 @@ type ChatStreamEvent =
       answer: string;
       toolCalls: unknown[];
       modelCalls: number;
+      // Optional fields added for RFC-0007 (structured claims envelope).
+      // Older clients that ignore unknown fields keep working.
+      claims?: unknown[];
     }
   | {
       type: 'error';
@@ -158,6 +161,9 @@ export async function POST(req: Request) {
           toolCtx,
           initialMessages,
           wallClockMs: env.HOLO_CHAT_WALL_CLOCK_MS,
+          // RFC-0007: opt the web chat into the structured claims envelope.
+          // The slack bot / gateway agent stay on the legacy path.
+          requireClaims: true,
           onEvent: (event) => {
             send(event);
           },
@@ -196,6 +202,7 @@ export async function POST(req: Request) {
             answer: result.answer,
             toolCalls: result.toolCalls,
             modelCalls: result.modelCalls,
+            ...(result.claims !== undefined ? { claims: result.claims } : {}),
           });
         }
       } catch (e) {

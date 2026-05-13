@@ -15,6 +15,15 @@ interface ToolCallTrace {
   durationMs?: number;
 }
 
+// Wire-format claim from the server (RFC-0007). Matches WireAnswerClaim in
+// @holo/agent-tools/claims. Snake_case at the boundary.
+export interface ChatClaim {
+  text: string;
+  confidence: 'high' | 'medium' | 'low' | 'unverified';
+  citation_indices: number[];
+  reason?: string;
+}
+
 export interface PhaseEntry {
   id: string;
   label: string;
@@ -31,6 +40,9 @@ export interface ChatTurn {
   pending?: boolean;
   phases?: PhaseEntry[];
   error?: string;
+  /** RFC-0007 structured claims envelope. Optional — older turns and
+   * surfaces that don't opt-in will leave this undefined. */
+  claims?: ChatClaim[];
 }
 
 // NDJSON event shapes streamed from /api/chat. Kept in sync with the
@@ -57,6 +69,7 @@ type StreamEvent =
       answer: string;
       toolCalls: ToolCallTrace[];
       modelCalls: number;
+      claims?: ChatClaim[];
     }
   | { type: 'error'; problem: string; code: string };
 
@@ -255,6 +268,7 @@ export function ChatPanel({
               text: event.answer,
               toolCalls: event.toolCalls,
               modelCalls: event.modelCalls,
+              claims: event.claims,
               phases: undefined,
             };
           }
@@ -481,11 +495,17 @@ function Turn({ turn }: { turn: ChatTurn }) {
           </div>
         ) : (
           <>
+            {turn.claims && turn.claims.length > 0 && (
+              <UnverifiedBanner claims={turn.claims} />
+            )}
             <div className="rounded-md border border-border bg-bg px-3 py-2 text-[13px] leading-6 text-text">
               {turn.text ? (
                 <Markdown text={turn.text} />
               ) : (
                 <em className="text-text-subtle">No response.</em>
+              )}
+              {turn.claims && turn.claims.length > 0 && (
+                <ClaimChips claims={turn.claims} />
               )}
             </div>
             {turn.toolCalls && turn.toolCalls.length > 0 && (
@@ -495,6 +515,83 @@ function Turn({ turn }: { turn: ChatTurn }) {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Banner rendered above the answer when at least one claim is `unverified`
+ * (the hard-gate fired). Uses --error per DESIGN.md "Badges" pattern:
+ * 12%-transparent filled background + colored text. No new tokens introduced.
+ */
+function UnverifiedBanner({ claims }: { claims: ChatClaim[] }) {
+  const unverified = claims.filter((c) => c.confidence === 'unverified');
+  if (unverified.length === 0) return null;
+  const noun = unverified.length === 1 ? 'claim' : 'claims';
+  return (
+    <div
+      role="status"
+      className="rounded-sm border border-error/40 bg-error/[0.12] px-3 py-2 text-[12px] leading-5 text-error"
+    >
+      <span className="font-medium">
+        {unverified.length} {noun} couldn&apos;t be verified from your data.
+      </span>{' '}
+      <span className="text-error/80">
+        Look for the red &ldquo;unverified&rdquo; chips below.
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Footer chip list of every non-high claim. `high` is the default
+ * confidence and renders no chip (DESIGN.md restraint: don't draw the
+ * user's eye to the good case). `medium` is muted and only revealed on
+ * hover. `low` and `unverified` are always visible.
+ */
+function ClaimChips({ claims }: { claims: ChatClaim[] }) {
+  const visible = claims.filter((c) => c.confidence !== 'high');
+  if (visible.length === 0) return null;
+  return (
+    <ul className="mt-2 flex flex-wrap gap-1.5 border-t border-border pt-2">
+      {visible.map((c, i) => (
+        <li key={`${i}-${c.text.slice(0, 24)}`}>
+          <ClaimChip claim={c} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ClaimChip({ claim }: { claim: ChatClaim }) {
+  // Color mapping per DESIGN.md Badges pattern: filled-color (12%
+  // transparent background + colored text). No ad-hoc hex.
+  //   - medium: neutral metadata badge (surface-2 + muted text). Only
+  //     readable on hover so it doesn't shout.
+  //   - low: warning (amber)
+  //   - unverified: error (red)
+  let className: string;
+  let label: string;
+  if (claim.confidence === 'medium') {
+    className =
+      'border border-border bg-surface-2 text-text-subtle hover:text-text-muted';
+    label = 'uncertain';
+  } else if (claim.confidence === 'low') {
+    className = 'border border-warning/40 bg-warning/[0.12] text-warning';
+    label = 'low confidence';
+  } else {
+    // 'unverified' — high is filtered out by ClaimChips
+    className = 'border border-error/40 bg-error/[0.12] text-error';
+    label = 'unverified';
+  }
+  const tooltipParts = [claim.text];
+  if (claim.reason) tooltipParts.push(`— ${claim.reason}`);
+  return (
+    <span
+      title={tooltipParts.join(' ')}
+      className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-[11px] leading-4 ${className}`}
+    >
+      {label}
+    </span>
   );
 }
 
