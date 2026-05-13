@@ -31,9 +31,10 @@ Concretely:
 - **MCP gateway** (`POST /mcp`) and **REST/OpenAPI** (`/v1/*`).
 - **OAuth 2.1 + PKCE provider** with Dynamic Client Registration for MCP
   clients.
-- **Per-call audit log** — every tool invocation is attributable and
-  replayable from the dashboard. (CE ships the immutable event store; EE adds
-  the long-retention, exportable Query History surface — see below.)
+- **Per-call audit log** — every tool invocation is attributable via the
+  `@holo/audit` event store. CE ships the immutable event store and the API
+  to query it; the dashboard surface and long-retention, exportable Query
+  History live in EE.
 - **Skill synthesis + execution + marketplace publish** (`packages/skills`).
 - **`@holo/cli`** for one-command self-host.
 - **Single sign-in via email OTP and GitHub OAuth** (Better Auth).
@@ -77,6 +78,22 @@ sequencing):
 If a feature in the list above ever appears in `packages/`, `apps/`, or
 elsewhere **outside** an `ee/` directory, it is CE and MIT. The license is
 determined by the file path, not by the marketing position.
+
+### How EE is enforced
+
+EE features are gated by the `HOLO_EE_LICENSE_KEY` environment variable. Any
+non-empty value enables them; the runtime does not validate the key against a
+license server, check expiry, or count seats. This is intentional — the
+license is **contractual, not cryptographic**. Production use without a paid
+subscription violates the terms in `LICENSE-EE` regardless of what env vars
+you set, and the source is public, so any technical check could be patched
+out by a determined fork. Catching that is the job of the license agreement,
+not the binary.
+
+A signed-license-key system (Ed25519 JWTs with feature scopes, expiry, and
+seat counts) is planned for when the first paying EE customer's requirements
+warrant building it. Until then, the bar to enable EE in dev or evaluation is
+deliberately low so customers can self-serve a trial.
 
 ---
 

@@ -1,8 +1,9 @@
 import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { desc, eq, sql } from 'drizzle-orm';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { isEnterpriseEnabled } from '@/lib/ee/license';
 import { schema } from '@holo/db';
 import { AuditLogTable } from '@/components/ee/audit-log-table';
 
@@ -13,6 +14,10 @@ export default async function AuditPage({
 }: {
   searchParams: Promise<{ page?: string }>;
 }) {
+  if (!isEnterpriseEnabled()) {
+    notFound();
+  }
+
   const { auth, db} = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');

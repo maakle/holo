@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { and, eq } from 'drizzle-orm';
 import { schema, SAMPLE_PROVIDER } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
+import { isEnterpriseEnabled } from '@/lib/ee/license';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppTopbar } from '@/components/app-topbar';
 
@@ -73,6 +74,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         orgs={memberOrgs}
         activeOrgId={activeOrgId}
         sampleDataActive={sampleDataActive}
+        eeEnabled={isEnterpriseEnabled()}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppTopbar />

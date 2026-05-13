@@ -7,6 +7,10 @@ export {
 } from './spec';
 export type { SlackSpecOptions } from './spec';
 
+// App manifest builder — used by the EE custom-Slack-app settings page.
+export { buildSlackManifest } from './manifest';
+export type { SlackManifestOptions } from './manifest';
+
 // API clients (re-exported for the Slack bot, slack-personal callback, etc).
 export { createSlackApiClient } from './api';
 export type { SlackApiClient } from './api';

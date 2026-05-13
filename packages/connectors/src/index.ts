@@ -40,8 +40,9 @@ export {
   hasSlackBotScopes,
   SLACK_INGEST_SCOPES,
   SLACK_BOT_SCOPES,
+  buildSlackManifest,
 } from './slack/index';
-export type { SlackSpecOptions } from './slack/index';
+export type { SlackSpecOptions, SlackManifestOptions } from './slack/index';
 export { createSlackApiClient, createSlackUserApiClient } from './slack/index';
 export type { SlackApiClient, SlackUserApiClient } from './slack/index';
 export { verifySlackSignature, SLACK_REPLAY_WINDOW_SECONDS } from './slack/index';

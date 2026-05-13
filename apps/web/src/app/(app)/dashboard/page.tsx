@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { ArrowUpRight, Plug, Activity, Sparkles, ScrollText, type LucideIcon } from 'lucide-react';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { isEnterpriseEnabled } from '@/lib/ee/license';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatsSection, StatsSkeleton } from './_components/stats-section';
 import { RecentInvocations, RecentInvocationsSkeleton } from './_components/recent-invocations';
@@ -27,6 +28,7 @@ export default async function DashboardPage({
 
   const params = await searchParams;
   const range: '7d' | '30d' = params.range === '30d' ? '30d' : '7d';
+  const eeEnabled = isEnterpriseEnabled();
 
   return (
     <div className="space-y-4">
@@ -65,7 +67,9 @@ export default async function DashboardPage({
             <QuickAction href="/connections" icon={Plug} label="Connect a tool" hint="GitHub, Slack, Notion…" />
             <QuickAction href="/skills" icon={Sparkles} label="Label a skill" hint="Turn artifacts into procedures" />
             <QuickAction href="/connect-agent" icon={Activity} label="Connect your agent" hint="Point any MCP client at holo" />
-            <QuickAction href="/ee/audit" icon={ScrollText} label="Review audit log" hint="Security & data-access events" />
+            {eeEnabled ? (
+              <QuickAction href="/ee/audit" icon={ScrollText} label="Review audit log" hint="Security & data-access events" />
+            ) : null}
           </CardContent>
         </Card>
       </section>

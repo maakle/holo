@@ -8,9 +8,11 @@ import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { and, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
+import { buildSlackManifest } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { isEnterpriseEnabled } from '@/lib/ee/license';
+import { ManifestBlock } from './manifest-block';
 import { SlackAppConfigForm } from './slack-app-form';
 
 export const dynamic = 'force-dynamic';
@@ -56,6 +58,19 @@ export default async function CustomSlackAppPage() {
   const eventsRequestUrl = mcpOrigin ? `${mcpOrigin}/slack/events/${orgId}` : null;
   const slashCommandsUrl = mcpOrigin ? `${mcpOrigin}/slack/commands/${orgId}` : null;
 
+  // The manifest needs both gateway URLs. If MCP_PUBLIC_URL is unset we can't
+  // build a working manifest — fall back to showing the raw URLs and an
+  // operator-facing note instead of a half-manifest.
+  const manifest =
+    eventsRequestUrl && slashCommandsUrl
+      ? buildSlackManifest({
+          displayName: existing?.displayName?.trim() || 'Holo',
+          oauthRedirectUrl,
+          eventsRequestUrl,
+          slashCommandsUrl,
+        })
+      : null;
+
   return (
     <div className="max-w-3xl space-y-10">
       <header className="flex flex-col gap-2">
@@ -82,16 +97,31 @@ export default async function CustomSlackAppPage() {
           >
             api.slack.com/apps
           </a>{' '}
-          create a new app from manifest, then paste in the URLs below as the
-          OAuth redirect, Event Subscriptions Request URL, and slash-command
-          Request URL. Each URL is org-scoped so Slack delivers events to the
-          right tenant.
+          click <span className="font-mono text-text">Create New App</span> →{' '}
+          <span className="font-mono text-text">From a manifest</span>, pick
+          your workspace, and paste the YAML below. The manifest is
+          pre-filled with the right scopes, event subscriptions, and
+          org-scoped webhook URLs so Slack delivers events to this tenant.
         </p>
-        <div className="overflow-hidden rounded-lg border border-border">
-          <UrlRow label="OAuth redirect URL" value={oauthRedirectUrl} />
-          <UrlRow label="Events Request URL" value={eventsRequestUrl} />
-          <UrlRow label="Slash commands URL" value={slashCommandsUrl} />
-        </div>
+        {manifest ? (
+          <ManifestBlock manifest={manifest} />
+        ) : (
+          <div className="rounded-lg border border-border bg-surface px-4 py-3 text-[13px] text-text-muted">
+            Set <span className="font-mono text-text">MCP_PUBLIC_URL</span> on
+            the web deployment so the manifest can include the gateway event
+            and slash-command URLs.
+          </div>
+        )}
+        <details className="text-[12px] text-text-subtle">
+          <summary className="cursor-pointer select-none">
+            Or configure the URLs manually
+          </summary>
+          <div className="mt-2 overflow-hidden rounded-lg border border-border">
+            <UrlRow label="OAuth redirect URL" value={oauthRedirectUrl} />
+            <UrlRow label="Events Request URL" value={eventsRequestUrl} />
+            <UrlRow label="Slash commands URL" value={slashCommandsUrl} />
+          </div>
+        </details>
       </section>
 
       <section className="space-y-3">

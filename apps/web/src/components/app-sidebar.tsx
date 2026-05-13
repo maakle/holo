@@ -34,30 +34,34 @@ type NavSection = {
 // are deferred from the MVP. See README roadmap. Implementation lives in git history
 // (most recently on branch `feat/procedure-auto-discovery`) and in
 // packages/discovery/, packages/skills/, and apps/web/src/lib/synthesize-and-persist.ts.
-const sections: NavSection[] = [
-  {
-    items: [
-      { href: '/dashboard', label: 'Overview', icon: LayoutGrid },
-      { href: '/connections', label: 'Connections', icon: Plug },
-    ],
-  },
-  {
-    label: 'Agent runtime',
-    items: [
-      { href: '/observability', label: 'Observability', icon: Activity },
-      { href: '/connect-agent', label: 'Connect agent', icon: Terminal },
-      { href: '/chat', label: 'Chat', icon: MessageSquare },
-    ],
-  },
-  {
-    label: 'Workspace',
-    items: [
-      { href: '/dashboard/team', label: 'Team', icon: Users },
-      { href: '/ee/audit', label: 'Audit log', icon: ScrollText },
-      { href: '/settings', label: 'Settings', icon: Settings },
-    ],
-  },
-];
+function buildSections({ eeEnabled }: { eeEnabled: boolean }): NavSection[] {
+  return [
+    {
+      items: [
+        { href: '/dashboard', label: 'Overview', icon: LayoutGrid },
+        { href: '/connections', label: 'Connections', icon: Plug },
+      ],
+    },
+    {
+      label: 'Agent runtime',
+      items: [
+        { href: '/observability', label: 'Observability', icon: Activity },
+        { href: '/connect-agent', label: 'Connect agent', icon: Terminal },
+        { href: '/chat', label: 'Chat', icon: MessageSquare },
+      ],
+    },
+    {
+      label: 'Workspace',
+      items: [
+        { href: '/dashboard/team', label: 'Team', icon: Users },
+        ...(eeEnabled
+          ? [{ href: '/ee/audit', label: 'Audit log', icon: ScrollText }]
+          : []),
+        { href: '/settings', label: 'Settings', icon: Settings },
+      ],
+    },
+  ];
+}
 
 export function AppSidebar({
   userEmail,
@@ -65,14 +69,17 @@ export function AppSidebar({
   orgs,
   activeOrgId,
   sampleDataActive,
+  eeEnabled,
 }: {
   userEmail?: string | null;
   userName?: string | null;
   orgs: OrgSummary[];
   activeOrgId: string | null;
   sampleDataActive: boolean;
+  eeEnabled: boolean;
 }) {
   const pathname = usePathname();
+  const sections = buildSections({ eeEnabled });
 
   return (
     <aside
