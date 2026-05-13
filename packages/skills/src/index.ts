@@ -1,5 +1,7 @@
 export * from './types';
 export * from './format';
+export { mergeSearchFilters } from './defaults';
+export type { SearchFilters, MergeOptions } from './defaults';
 export * from './golden/index';
 export * from './eval';
 export * from './synthesize';

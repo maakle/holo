@@ -37,6 +37,12 @@ export const skills = pgTable(
       .references(() => user.id),
     toolAllowlist: text('tool_allowlist').array().notNull().default(sql`'{}'::text[]`),
     executable: boolean('executable').notNull().default(false),
+    // RFC-0005: self-serve skills (fork / promote / archive).
+    // Null parent = original; non-null = fork. updated_by tracks the last
+    // editor (separate from created_by which is set once on insert).
+    parentSkillId: uuid('parent_skill_id').references((): import('drizzle-orm/pg-core').AnyPgColumn => skills.id),
+    updatedBy: uuid('updated_by').references(() => user.id),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
   },
   (t) => ({
     orgStatusIdx: index('skills_org_status_idx').on(t.organizationId, t.status),
@@ -45,6 +51,7 @@ export const skills = pgTable(
       t.slug,
       t.version,
     ),
+    orgParentIdx: index('skills_org_parent_idx').on(t.organizationId, t.parentSkillId),
   }),
 );
 

@@ -295,6 +295,13 @@
       "when": 1779667200000,
       "tag": "0042_account_brief_cache",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1779753600000,
+      "tag": "0043_skills_self_serve",
+      "breakpoints": true
     }
   ]
 }

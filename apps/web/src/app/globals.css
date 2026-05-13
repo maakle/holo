@@ -124,6 +124,29 @@
   outline-offset: -1px;
 }
 
+/* Shared style for skill-editor form inputs. Matches DESIGN.md inputs spec:
+ * border, no background fill in dark mode; focus state uses focus-ring.
+ * Pulled out here so the editor's form/body/yaml modes share one look. */
+@utility form-input {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 100ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+    border-color: transparent;
+  }
+}
+
 /*
  * holo design tokens — see DESIGN.md
  * Brutally minimal + editorial discipline.

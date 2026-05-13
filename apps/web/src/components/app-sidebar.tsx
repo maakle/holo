@@ -9,6 +9,9 @@ import {
   Terminal,
   Settings,
   MessageSquare,
+  Sparkles,
+  Users,
+  ScrollText,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -44,6 +47,7 @@ function buildSections(): NavSection[] {
       label: 'Agent runtime',
       items: [
         { href: '/observability', label: 'Observability', icon: Activity },
+        { href: '/skills', label: 'Skills', icon: Sparkles },
         { href: '/connect-agent', label: 'Connect agent', icon: Terminal },
         { href: '/chat', label: 'Chat', icon: MessageSquare },
       ],
@@ -51,6 +55,8 @@ function buildSections(): NavSection[] {
     {
       label: 'Workspace',
       items: [
+        { href: '/dashboard/team', label: 'Team', icon: Users },
+        { href: '/ee/audit', label: 'Audit log', icon: ScrollText },
         { href: '/settings', label: 'Settings', icon: Settings },
       ],
     },
