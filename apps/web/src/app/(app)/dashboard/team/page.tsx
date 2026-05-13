@@ -132,9 +132,7 @@ export default async function TeamPage() {
                     </td>
                     {canManage ? (
                       <td className="px-4 py-3 text-right">
-                        {isSelf ? (
-                          <span className="text-text-subtle">—</span>
-                        ) : (
+                        {isSelf ? null : (
                           <RemoveMemberButton
                             memberId={m.memberId}
                             memberLabel={m.name || m.email}
