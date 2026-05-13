@@ -82,8 +82,10 @@ describe('runChatAgentLoop', () => {
     expect(result.answer).toBe('Hello there.');
     expect(result.toolCalls).toEqual([]);
     expect(result.modelCalls).toBe(1);
-    // Tools were registered in the request despite not being used.
-    expect(calls[0]?.tools?.map((t) => t.name)).toEqual(['echo']);
+    // Tools were registered in the request despite not being used. The
+    // synthetic `emit_claims` tool is always appended after the caller's
+    // tools (RFC-0007 is on by default).
+    expect(calls[0]?.tools?.map((t) => t.name)).toEqual(['echo', 'emit_claims']);
   });
 
   it('dispatches tool_use, feeds the result back, then returns the final answer', async () => {

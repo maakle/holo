@@ -1,6 +1,14 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { DB } from '@holo/db';
-import type { ToolDefinition } from '@holo/agent-tools';
+import type { ToolDefinition, WireAnswerClaim } from '@holo/agent-tools';
+import {
+  CLAIMS_SUFFIX,
+  EMIT_CLAIMS_TOOL_DECL,
+  appendUnverifiedNoteIfNeeded,
+  applyClaimGuardrails,
+  claimToWire,
+  parseEmitClaimsInput,
+} from '@holo/agent-tools';
 import { resolveAnthropicAgentModel } from '@holo/llm';
 
 export interface Source {
@@ -13,6 +21,16 @@ export interface Source {
 export interface AgentResult {
   answer: string;
   sources: Source[];
+  /**
+   * Structured claims envelope (RFC-0007). Empty when the model returned
+   * plain text without calling `emit_claims` (e.g. a conversational reply
+   * with no factual claims). The slack reply text already carries an
+   * appended "Note: I couldn't verify N claims" footer when any claim
+   * was hard-gated to `unverified`, so slack callers don't need to render
+   * `claims` — but the structured envelope is here for completeness and
+   * for feedback-loop persistence (RFC-0008).
+   */
+  claims: WireAnswerClaim[];
 }
 
 export interface RunAgentDeps {
@@ -167,12 +185,23 @@ function toAnthropicInputSchema(raw: unknown): Record<string, unknown> {
 }
 
 export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
-  const system = SYSTEM_PROMPT_TEMPLATE.replace('{org_name}', deps.orgName);
-  const anthropicTools: AnthropicTool[] = deps.tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    input_schema: toAnthropicInputSchema(t.inputSchema),
-  }));
+  // RFC-0007: the slack bot uses the same claims protocol as the web chat.
+  // Slack can't render confidence chips, so the user-visible signal is the
+  // "Note: I couldn't verify N claims" footer that `appendUnverifiedNoteIfNeeded`
+  // tacks onto the answer text below — same wording the REST surface uses.
+  const system = `${SYSTEM_PROMPT_TEMPLATE.replace('{org_name}', deps.orgName)}${CLAIMS_SUFFIX}`;
+  const anthropicTools: AnthropicTool[] = [
+    ...deps.tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: toAnthropicInputSchema(t.inputSchema),
+    })),
+    {
+      name: EMIT_CLAIMS_TOOL_DECL.name,
+      description: EMIT_CLAIMS_TOOL_DECL.description,
+      input_schema: toAnthropicInputSchema(EMIT_CLAIMS_TOOL_DECL.inputSchema),
+    },
+  ];
   const toolByName = new Map(deps.tools.map((t) => [t.name, t]));
 
   const ctx = {
@@ -242,13 +271,33 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
         .map((b) => b.text)
         .join('\n')
         .trim();
-      return { answer: text, sources: sources.toArray() };
+      // Bare end_turn fallback (no `emit_claims` call). The answer is still
+      // useful; we just have no structured claims to enforce. Return an
+      // empty `claims` array — slack reply renders normally without the
+      // "couldn't verify" footer.
+      return { answer: text, sources: sources.toArray(), claims: [] };
     }
 
     const toolUses = response.content.filter(
       (b): b is { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> } =>
         b.type === 'tool_use',
     );
+
+    // Terminal `emit_claims` (RFC-0007). The model calls this instead of
+    // ending with plain text; we apply the same server-side downgrade +
+    // hard-gate as the web orchestrator and append a "couldn't verify"
+    // footer to the answer text when any claim ended up `unverified`.
+    const emitClaimsUse = toolUses.find((t) => t.name === EMIT_CLAIMS_TOOL_DECL.name);
+    if (emitClaimsUse) {
+      const { answerText, claims: rawClaims } = parseEmitClaimsInput(emitClaimsUse.input);
+      const enforced = applyClaimGuardrails(rawClaims);
+      const finalAnswer = appendUnverifiedNoteIfNeeded(answerText, enforced);
+      return {
+        answer: finalAnswer,
+        sources: sources.toArray(),
+        claims: enforced.map(claimToWire),
+      };
+    }
 
     const toolResults: ToolResultBlock[] = [];
     for (const use of toolUses) {

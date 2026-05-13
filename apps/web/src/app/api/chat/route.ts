@@ -39,6 +39,9 @@ type ChatStreamEvent =
       answer: string;
       toolCalls: unknown[];
       modelCalls: number;
+      // Optional fields added for RFC-0007 (structured claims envelope).
+      // Older clients that ignore unknown fields keep working.
+      claims?: unknown[];
     }
   | {
       type: 'error';
@@ -196,6 +199,7 @@ export async function POST(req: Request) {
             answer: result.answer,
             toolCalls: result.toolCalls,
             modelCalls: result.modelCalls,
+            ...(result.claims !== undefined ? { claims: result.claims } : {}),
           });
         }
       } catch (e) {

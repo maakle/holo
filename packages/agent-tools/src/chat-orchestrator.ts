@@ -17,6 +17,14 @@ import { parseSkill } from '@holo/skills';
 import type { LLMClient, LLMMessage, LLMStopReason, LLMTool } from '@holo/llm';
 import { citationToWire, toCitation, type WireCitation } from './citations';
 import { coverageToWire, type WireSearchCoverage } from './coverage-wire';
+import { claimToWire, type WireAnswerClaim } from './claims';
+import {
+  CLAIMS_SUFFIX,
+  EMIT_CLAIMS_TOOL_DECL,
+  appendUnverifiedNoteIfNeeded,
+  applyClaimGuardrails,
+  parseEmitClaimsInput,
+} from './claims-protocol';
 
 export interface ChatToolContext {
   db: DB;
@@ -49,6 +57,13 @@ Rules:
 - Keep answers concise. Use plain markdown if formatting helps.
 - If you cannot find an answer, say so directly.
 - This is an interactive web chat used to test the holo agent surface; explaining which tools you used is welcome when relevant.`;
+
+/**
+ * Backwards-compat re-export. `CLAIMS_SUFFIX` lives in `claims-protocol.ts`
+ * so the slack bot can use the same wording; this alias keeps anything that
+ * imported `CHAT_CLAIMS_SUFFIX` working.
+ */
+export { CLAIMS_SUFFIX as CHAT_CLAIMS_SUFFIX } from './claims-protocol';
 
 const searchInput = z.object({
   q: z.string().min(1),
@@ -364,6 +379,11 @@ export type ChatAgentLoopResult =
       /** Coverage payloads from every `search` tool call in the turn, in
        * call order. Surface as a "what I searched" footer in the UI. */
       coverage: WireSearchCoverage[];
+      /** Structured claims envelope (RFC-0007). Always present — every
+       * answer goes through the `emit_claims` protocol and the server-side
+       * downgrade + hard-gate. An empty array means the model returned no
+       * factual claims (e.g. conversational filler). */
+      claims: WireAnswerClaim[];
     }
   | {
       kind: 'wall_clock_exceeded';
@@ -402,11 +422,19 @@ export async function runChatAgentLoop(
   };
 
   const toolByName = new Map<string, ChatLocalTool>(tools.map((t) => [t.name, t]));
-  const llmTools: LLMTool[] = tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: t.inputSchema,
-  }));
+  // emit_claims is a terminal "tool" — the model calls it instead of ending
+  // the turn with plain text. We advertise it to the LLM but intercept the
+  // dispatch in the loop below rather than running it through `toolByName`.
+  // Always registered (RFC-0007 is on by default; see claims-protocol.ts).
+  const llmTools: LLMTool[] = [
+    ...tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+    })),
+    EMIT_CLAIMS_TOOL_DECL,
+  ];
+  const systemPrompt = `${CHAT_SYSTEM_PROMPT}${CLAIMS_SUFFIX}`;
 
   const messages: LLMMessage[] = [...opts.initialMessages];
   const traces: ChatToolCallTrace[] = [];
@@ -434,7 +462,7 @@ export async function runChatAgentLoop(
     const response = await opts.llm.complete({
       model: opts.model,
       maxTokens: 4096,
-      system: CHAT_SYSTEM_PROMPT,
+      system: systemPrompt,
       messages,
       tools: llmTools,
     });
@@ -448,6 +476,11 @@ export async function runChatAgentLoop(
         .map((b) => b.text)
         .join('\n')
         .trim();
+      // Bare end_turn fallback: the model returned text without calling
+      // `emit_claims`. We don't get a structured claims envelope, but the
+      // answer text is still useful — return with an empty `claims` array
+      // (RFC-0007 treats this as "no factual claims to verify"). The UI
+      // renders no chips and no banner, same as a conversational answer.
       return {
         kind: 'answer',
         answer: text,
@@ -455,6 +488,7 @@ export async function runChatAgentLoop(
         modelCalls,
         citations: citationsAcc,
         coverage: coverageAcc,
+        claims: [],
       };
     }
 
@@ -462,6 +496,28 @@ export async function runChatAgentLoop(
       (b): b is { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> } =>
         b.type === 'tool_use',
     );
+
+    // Terminal `emit_claims`. If the model called it (alongside any other
+    // tools in the same turn — which would be a protocol violation, but
+    // tolerated), we honor it: extract the answer + claims, apply the
+    // server-side downgrade and hard-gate, and return. Any other tool
+    // calls in the same response are ignored — the model has signaled
+    // it's done.
+    const emitClaimsUse = toolUses.find((t) => t.name === EMIT_CLAIMS_TOOL_DECL.name);
+    if (emitClaimsUse) {
+      const { answerText, claims } = parseEmitClaimsInput(emitClaimsUse.input);
+      const enforced = applyClaimGuardrails(claims);
+      const finalAnswer = appendUnverifiedNoteIfNeeded(answerText, enforced);
+      return {
+        kind: 'answer',
+        answer: finalAnswer,
+        toolCalls: traces,
+        modelCalls,
+        citations: citationsAcc,
+        coverage: coverageAcc,
+        claims: enforced.map(claimToWire),
+      };
+    }
 
     const toolResults = [];
     for (const use of toolUses) {
@@ -597,3 +653,4 @@ function renumberSearchOutput(
   });
   return { ...out, citations: renumbered };
 }
+

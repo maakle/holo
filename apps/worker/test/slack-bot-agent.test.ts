@@ -102,12 +102,15 @@ describe('runAgent', () => {
     expect(toolResult.tool_use_id).toBe('toolu_1');
 
     const firstCall = create.mock.calls[0][0] as { tools: Array<{ name: string; input_schema: unknown }> };
-    expect(firstCall.tools).toHaveLength(1);
+    // Caller-supplied tools + the synthetic emit_claims terminal tool the
+    // slack runAgent always appends for the RFC-0007 claims protocol.
+    expect(firstCall.tools).toHaveLength(2);
     expect(firstCall.tools[0].name).toBe('search');
     expect(firstCall.tools[0].input_schema).toEqual({
       type: 'object',
       properties: { q: { type: 'string' } },
     });
+    expect(firstCall.tools[1].name).toBe('emit_claims');
   });
 
   it('flattens anyOf union schemas into a merged properties object for Anthropic', async () => {
@@ -370,5 +373,53 @@ describe('runAgent', () => {
     const urls = result.sources.map((s) => s.url);
     expect(new Set(urls).size).toBe(urls.length);
     expect(urls[0]).toBe(dupUrl);
+  });
+
+  it('honors emit_claims terminally: returns claims and annotates the answer when any are unverified (RFC-0007)', async () => {
+    // The slack bot uses the same claims protocol as the web chat. When the
+    // model hard-gates a quantitative customer claim (regex-matched in the
+    // shared classifier), the server-side enforcement downgrades it to
+    // `unverified` and `appendUnverifiedNoteIfNeeded` tacks a "Note: I
+    // couldn't verify…" footer onto the answer text — slack's user-visible
+    // surrogate for the web's confidence-chip banner.
+    const { client } = makeFakeAnthropic([
+      {
+        stop_reason: 'tool_use',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'ec',
+            name: 'emit_claims',
+            input: {
+              answer: 'Acme is at $50,000 ARR.',
+              claims: [
+                {
+                  // Hard-gated shape (currency-with-suffix near customer
+                  // mention). No citation → must be marked unverified.
+                  text: 'Acme is at $50,000 ARR',
+                  confidence: 'high',
+                  citation_indices: [],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+
+    const result = await runAgent({
+      db: fakeDb,
+      organizationId: 'org-1',
+      userSubjects: ['org:org-1'],
+      question: 'what is Acme at?',
+      client,
+      tools: [],
+      orgName: 'Acme',
+    });
+
+    expect(result.claims).toHaveLength(1);
+    expect(result.claims[0]!.confidence).toBe('unverified');
+    expect(result.claims[0]!.reason).toBeDefined();
+    expect(result.answer).toContain("Note: I couldn't verify");
   });
 });
