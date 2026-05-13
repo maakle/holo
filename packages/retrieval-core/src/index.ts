@@ -1,5 +1,11 @@
-export { search } from './search';
-export type { SearchInput, SearchResult } from './search';
+export { search, searchWithCoverage } from './search';
+export type {
+  SearchInput,
+  SearchResult,
+  SearchEnvelope,
+  SearchCoverage,
+  SearchCoveragePass,
+} from './search';
 export {
   embedQuery,
   embedQueryWith,

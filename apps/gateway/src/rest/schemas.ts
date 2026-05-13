@@ -51,6 +51,56 @@ export const SearchHitSchema = z
   })
   .openapi('SearchHit');
 
+/**
+ * Projected citation — one-per-result reading of `SearchHit` that pre-builds
+ * a human label, a deep link, and a short snippet. Clients building UI
+ * should prefer this over re-deriving the same fields from `SearchHit.metadata`.
+ * `index` is 1-based and stable within a response.
+ */
+export const CitationSchema = z
+  .object({
+    index: z.number().int().positive(),
+    chunk_id: z.string(),
+    provider: z.string(),
+    artifact_kind: z.string(),
+    label: z.string(),
+    url: z.url().optional(),
+    snippet: z.string(),
+  })
+  .openapi('Citation');
+
+/** One embedding-model pass within a search. The fallback pass only fires
+ * when the primary returns fewer than the minimum-results threshold. */
+export const SearchCoveragePassSchema = z
+  .object({
+    role: z.enum(['primary', 'fallback']),
+    embedding_model: z.string(),
+    branch_counts: z.object({
+      vector_returned: z.number().int().nonnegative(),
+      bm25_returned: z.number().int().nonnegative(),
+      fused_returned: z.number().int().nonnegative(),
+    }),
+    timings_ms: z.number().nonnegative(),
+  })
+  .openapi('SearchCoveragePass');
+
+/** Telemetry envelope — substrate for "what I searched" footers. */
+export const SearchCoverageSchema = z
+  .object({
+    query: z.string(),
+    filters: z.object({
+      provider: z.string().nullable(),
+      account_ids: z.array(z.string()).nullable(),
+      user_subjects_count: z.number().int().nonnegative(),
+      top_k: z.number().int().positive(),
+    }),
+    passes: z.array(SearchCoveragePassSchema),
+    fallback_used: z.boolean(),
+    total_returned: z.number().int().nonnegative(),
+    total_timings_ms: z.number().nonnegative(),
+  })
+  .openapi('SearchCoverage');
+
 // ── Errors ──────────────────────────────────────────────────────────────────
 
 export const ErrorSchema = z
@@ -87,7 +137,11 @@ export const GetSkillResponseSchema = z
   .openapi('GetSkillResponse');
 
 export const SearchResponseSchema = z
-  .object({ results: z.array(SearchHitSchema) })
+  .object({
+    results: z.array(SearchHitSchema),
+    citations: z.array(CitationSchema),
+    coverage: SearchCoverageSchema,
+  })
   .openapi('SearchResponse');
 
 export const HealthResponseSchema = z
