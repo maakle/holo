@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { DB } from '@holo/db';
 import type { ToolDefinition, WireAnswerClaim } from '@holo/agent-tools';
@@ -19,6 +20,13 @@ export interface Source {
 }
 
 export interface AgentResult {
+  /**
+   * Stable identifier minted at the top of every `runAgent`. Threaded into
+   * the slack reply via `slack_answer_index` (RFC-0008 extension) so a
+   * subsequent reaction_added webhook can attribute feedback back to the
+   * exact orchestrator turn that produced the answer.
+   */
+  answerId: string;
   answer: string;
   sources: Source[];
   /**
@@ -185,6 +193,10 @@ function toAnthropicInputSchema(raw: unknown): Record<string, unknown> {
 }
 
 export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
+  // RFC-0008: stable id minted at the top of every run so a slack reply can
+  // be indexed in `slack_answer_index` and a reaction_added event later can
+  // attribute feedback back to this exact turn.
+  const answerId = randomUUID();
   // RFC-0007: the slack bot uses the same claims protocol as the web chat.
   // Slack can't render confidence chips, so the user-visible signal is the
   // "Note: I couldn't verify N claims" footer that `appendUnverifiedNoteIfNeeded`
@@ -275,7 +287,7 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
       // useful; we just have no structured claims to enforce. Return an
       // empty `claims` array — slack reply renders normally without the
       // "couldn't verify" footer.
-      return { answer: text, sources: sources.toArray(), claims: [] };
+      return { answerId, answer: text, sources: sources.toArray(), claims: [] };
     }
 
     const toolUses = response.content.filter(
@@ -293,6 +305,7 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
       const enforced = applyClaimGuardrails(rawClaims);
       const finalAnswer = appendUnverifiedNoteIfNeeded(answerText, enforced);
       return {
+        answerId,
         answer: finalAnswer,
         sources: sources.toArray(),
         claims: enforced.map(claimToWire),

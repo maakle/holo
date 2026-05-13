@@ -128,3 +128,42 @@ export interface EvalExpected {
   must_cite: string[];
   must_not_say: string[];
 }
+
+/**
+ * Bridge from a slack bot reply (identified by its message ts) back to the
+ * orchestrator-minted `answer_id` and the denormalized question/answer/sources
+ * needed to compose an `answer_feedback` row when a slack reaction lands.
+ *
+ * Without this table, a `reaction_added` event would only know
+ * (team, channel, ts) — too little to attribute feedback to the originating
+ * agent turn. Storing it at reply-time (one row per bot answer) keeps the
+ * reaction handler dependency-free of slack API round-trips.
+ *
+ * Uniqueness: per-answer (an answer can only be in one place) and
+ * per-message (a single ts has at most one bot answer attached).
+ */
+export const slackAnswerIndex = pgTable(
+  'slack_answer_index',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    answerId: uuid('answer_id').notNull(),
+    slackTeamId: text('slack_team_id').notNull(),
+    slackChannel: text('slack_channel').notNull(),
+    slackTs: text('slack_ts').notNull(),
+    question: text('question').notNull(),
+    answer: text('answer').notNull(),
+    sourcesJsonb: jsonb('sources_jsonb').notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    answerIdUniq: uniqueIndex('slack_answer_index_answer_id_uniq').on(t.answerId),
+    teamChannelTsUniq: uniqueIndex('slack_answer_index_team_channel_ts_uniq').on(
+      t.slackTeamId,
+      t.slackChannel,
+      t.slackTs,
+    ),
+  }),
+);

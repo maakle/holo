@@ -96,6 +96,7 @@ export default async function SkillDetailPage({
   // when there's nothing to grade against yet).
   const evalRuns = await db
     .select({
+      id: schema.skillEvalRuns.id,
       passRate: schema.skillEvalRuns.passRate,
       total: schema.skillEvalRuns.total,
       passed: schema.skillEvalRuns.passed,
@@ -280,6 +281,7 @@ export default async function SkillDetailPage({
         <RegressionPanel
           slug={skill.slug}
           runs={evalRuns.map((r) => ({
+            id: r.id,
             passRate: r.passRate,
             total: r.total,
             passed: r.passed,

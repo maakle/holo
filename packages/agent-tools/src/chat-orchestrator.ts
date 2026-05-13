@@ -525,6 +525,7 @@ export async function runChatAgentLoop(
       const finalAnswer = appendUnverifiedNoteIfNeeded(answerText, enforced);
       return {
         kind: 'answer',
+        answerId,
         answer: finalAnswer,
         toolCalls: traces,
         modelCalls,

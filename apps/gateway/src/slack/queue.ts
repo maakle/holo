@@ -32,6 +32,18 @@ export type SlackBotJob =
       asker: string;
       text: string;
       responseUrl: string;
+    }
+  | {
+      // RFC-0008 (slack extension). The user reacted to a bot reply; the
+      // worker looks the message up in `slack_answer_index` and writes an
+      // `answer_feedback` row.
+      kind: 'reaction_added';
+      teamId: string;
+      channel: string;
+      messageTs: string;
+      asker: string;
+      reaction: string;
+      removed: boolean;
     };
 
 let queue: Queue<SlackBotJob> | null = null;
