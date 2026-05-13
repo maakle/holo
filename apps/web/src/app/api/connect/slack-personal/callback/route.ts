@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
+import { resolveSlackAppCreds } from '@/lib/slack-app-config';
 import { createSlackUserApiClient } from '@holo/connectors';
 import { runSlackSubjectsSync } from '@holo/user-subjects';
 
@@ -44,11 +45,32 @@ export async function GET(req: Request): Promise<Response> {
       return NextResponse.redirect(new URL('/sign-in', req.url));
     }
 
-    if (!env.SLACK_CONNECTOR_CLIENT_ID || !env.SLACK_CONNECTOR_CLIENT_SECRET) {
+    const sessionUser = session.user as { id: string; organizationId?: string };
+    let organizationId = sessionUser.organizationId;
+    if (!organizationId) {
+      const rows = await db
+        .select({ organizationId: schema.user.organizationId })
+        .from(schema.user)
+        .where(eq(schema.user.id, sessionUser.id))
+        .limit(1);
+      if (!rows[0]) {
+        throw holoError({
+          code: ErrorCode.HOLO_INTERNAL,
+          problem: 'Logged-in user has no organizationId',
+          fix: 'Re-run the user creation seed.',
+        });
+      }
+      organizationId = rows[0].organizationId;
+    }
+
+    // Use the same app credentials the user authorized against in /start.
+    // The org's custom app (EE) takes precedence over the shared env app.
+    const creds = await resolveSlackAppCreds(db, env, organizationId);
+    if (!creds) {
       throw holoError({
         code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
         problem: 'Slack connector credentials are not configured',
-        fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET.',
+        fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET, or register a custom Slack app under Settings → Integrations.',
       });
     }
 
@@ -59,8 +81,8 @@ export async function GET(req: Request): Promise<Response> {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: env.SLACK_CONNECTOR_CLIENT_ID,
-        client_secret: env.SLACK_CONNECTOR_CLIENT_SECRET,
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
         redirect_uri: redirectUri,
       }).toString(),
     });
@@ -83,24 +105,6 @@ export async function GET(req: Request): Promise<Response> {
     const userToken = tokenJson.authed_user.access_token;
     const slackUserId = tokenJson.authed_user.id;
     const scopes = (tokenJson.authed_user.scope ?? '').split(',').filter(Boolean);
-
-    const sessionUser = session.user as { id: string; organizationId?: string };
-    let organizationId = sessionUser.organizationId;
-    if (!organizationId) {
-      const rows = await db
-        .select({ organizationId: schema.user.organizationId })
-        .from(schema.user)
-        .where(eq(schema.user.id, sessionUser.id))
-        .limit(1);
-      if (!rows[0]) {
-        throw holoError({
-          code: ErrorCode.HOLO_INTERNAL,
-          problem: 'Logged-in user has no organizationId',
-          fix: 'Re-run the user creation seed.',
-        });
-      }
-      organizationId = rows[0].organizationId;
-    }
 
     await db
       .insert(schema.slackUserCredentials)

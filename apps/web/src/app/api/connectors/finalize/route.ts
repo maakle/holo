@@ -28,6 +28,8 @@ type SlackPayload = {
   refreshToken: string | null;
   scope: string | null;
   ident: { externalId: string; name: string };
+  /** Set when the install used the org's custom Slack app (EE BYO bot). */
+  slackAppConfigId: string | null;
 };
 
 type GitlabPayload = {
@@ -168,6 +170,7 @@ export async function GET(req: Request) {
         refreshToken: payload.refreshToken,
         scope: payload.scope,
         expiresAt: null,
+        slackAppConfigId: payload.slackAppConfigId,
       });
       await upsertSource(db, {
         orgId,
@@ -355,6 +358,8 @@ async function commitOAuthCredential(
     refreshToken: string | null;
     scope: string | null;
     expiresAt: Date | null;
+    /** Slack-only: records which app this install came from (EE BYO bot). */
+    slackAppConfigId?: string | null;
   },
 ) {
   const existing = await db
@@ -377,6 +382,7 @@ async function commitOAuthCredential(
         expiresAt: opts.expiresAt,
         status: 'active',
         lastRefreshedAt: new Date(),
+        slackAppConfigId: opts.slackAppConfigId ?? null,
       })
       .where(eq(schema.connectorCredentials.id, existing[0].id));
   } else {
@@ -389,6 +395,7 @@ async function commitOAuthCredential(
       scope: opts.scope,
       expiresAt: opts.expiresAt,
       status: 'active',
+      slackAppConfigId: opts.slackAppConfigId ?? null,
     });
   }
 }

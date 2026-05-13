@@ -11,6 +11,7 @@ import {
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { resolveSlackAppCreds } from '@/lib/slack-app-config';
 import {
   drainJobsForOrg,
   enqueueDisconnectCleanup,
@@ -189,35 +190,35 @@ export async function DELETE(
         );
 
       let slackRemoteUninstalled: boolean | null = null;
-      if (
-        provider === 'slack' &&
-        remaining.length === 0 &&
-        tokenToUninstall &&
-        env.SLACK_CONNECTOR_CLIENT_ID &&
-        env.SLACK_CONNECTOR_CLIENT_SECRET
-      ) {
-        try {
-          const params = new URLSearchParams({
-            client_id: env.SLACK_CONNECTOR_CLIENT_ID,
-            client_secret: env.SLACK_CONNECTOR_CLIENT_SECRET,
-          });
-          const res = await fetch(
-            `https://slack.com/api/apps.uninstall?${params.toString()}`,
-            {
-              method: 'GET',
-              headers: { Authorization: `Bearer ${tokenToUninstall}` },
-            },
-          );
-          const json = (await res.json()) as { ok: boolean; error?: string };
-          slackRemoteUninstalled = json.ok;
-          if (!json.ok) {
-            console.error(
-              `[disconnect/slack] apps.uninstall returned not-ok: ${json.error}`,
+      if (provider === 'slack' && remaining.length === 0 && tokenToUninstall) {
+        // apps.uninstall must use the credentials of whichever Slack app
+        // issued the token — using the env client_id against a custom-app
+        // token returns `invalid_client_id`.
+        const creds = await resolveSlackAppCreds(db, env, orgId);
+        if (creds) {
+          try {
+            const params = new URLSearchParams({
+              client_id: creds.clientId,
+              client_secret: creds.clientSecret,
+            });
+            const res = await fetch(
+              `https://slack.com/api/apps.uninstall?${params.toString()}`,
+              {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${tokenToUninstall}` },
+              },
             );
+            const json = (await res.json()) as { ok: boolean; error?: string };
+            slackRemoteUninstalled = json.ok;
+            if (!json.ok) {
+              console.error(
+                `[disconnect/slack] apps.uninstall returned not-ok: ${json.error}`,
+              );
+            }
+          } catch (err) {
+            console.error('[disconnect/slack] apps.uninstall failed:', err);
+            slackRemoteUninstalled = false;
           }
-        } catch (err) {
-          console.error('[disconnect/slack] apps.uninstall failed:', err);
-          slackRemoteUninstalled = false;
         }
       }
 
