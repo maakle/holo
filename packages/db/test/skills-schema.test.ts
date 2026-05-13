@@ -24,6 +24,8 @@ describe('skills schema', () => {
     const names = rows.map((r) => r.column_name).sort();
     expect(names).toEqual(
       [
+        // RFC-0005 (migration 0041) added parent_skill_id, updated_by, archived_at.
+        'archived_at',
         'content',
         'created_at',
         'created_by',
@@ -32,15 +34,24 @@ describe('skills schema', () => {
         'id',
         'name',
         'organization_id',
+        'parent_skill_id',
         'slug',
         'source_artifact_ids',
         'stale_at',
         'status',
         'tool_allowlist',
         'updated_at',
+        'updated_by',
         'version',
       ].sort(),
     );
+  });
+
+  it('has the org+parent index from RFC-0005 migration 0041', async () => {
+    const rows = await sql<{ indexname: string }[]>`
+      SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'skills'
+    `;
+    expect(rows.map((r) => r.indexname)).toContain('skills_org_parent_idx');
   });
 
   it('has the org+status index', async () => {
