@@ -78,7 +78,7 @@ export async function inviteMember(formData: FormData): Promise<{
     meta: { email, role },
   });
 
-  revalidatePath('/dashboard/team');
+  revalidatePath('/settings/team');
   return { ok: true };
 }
 
@@ -110,7 +110,7 @@ export async function cancelInvitation(formData: FormData): Promise<void> {
   } catch {
     // Silently swallow — revalidate will show whether it stuck.
   }
-  revalidatePath('/dashboard/team');
+  revalidatePath('/settings/team');
 }
 
 export async function removeMember(formData: FormData): Promise<{
@@ -158,7 +158,7 @@ export async function removeMember(formData: FormData): Promise<{
     resourceId: parsed.data.memberId,
   });
 
-  revalidatePath('/dashboard/team');
+  revalidatePath('/settings/team');
   return { ok: true };
 }
 
@@ -228,7 +228,7 @@ export async function regenerateInviteLink(): Promise<{
     resourceType: 'org_invite_link',
   });
 
-  revalidatePath('/dashboard/team');
+  revalidatePath('/settings/team');
   return { ok: true, token };
 }
 
@@ -262,7 +262,7 @@ export async function revokeInviteLink(): Promise<{
     resourceType: 'org_invite_link',
   });
 
-  revalidatePath('/dashboard/team');
+  revalidatePath('/settings/team');
   return { ok: true };
 }
 

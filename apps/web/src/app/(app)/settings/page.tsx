@@ -4,8 +4,6 @@ import { and, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
-import { isEnterpriseEnabled } from '@/lib/ee/license';
-import { ApiTokens } from './api-tokens';
 import { DangerZone } from './danger-zone';
 import { LeaveWorkspace } from './leave-workspace';
 import { Preferences } from './preferences';
@@ -13,7 +11,7 @@ import { WorkspaceDetails } from './workspace-details';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SettingsPage() {
+export default async function SettingsGeneralPage() {
   const { auth, db, defaultOrgId } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in?callbackURL=/settings');
@@ -52,15 +50,7 @@ export default async function SettingsPage() {
   const isDefaultOrg = orgId === defaultOrgId;
 
   return (
-    <div className="max-w-3xl space-y-10">
-      <header className="flex flex-col gap-2">
-        <span className="caption">Workspace</span>
-        <h1 className="font-display text-h1 font-semibold tracking-tight">Settings</h1>
-        <p className="text-[15px] leading-6 text-text-muted">
-          Manage your workspace. Destructive actions live in the Danger Zone below.
-        </p>
-      </header>
-
+    <div className="space-y-10">
       <section className="space-y-3">
         <h2 className="text-[15px] font-medium">Workspace details</h2>
         <WorkspaceDetails
@@ -81,30 +71,6 @@ export default async function SettingsPage() {
           isOwner={isOwner}
         />
       </section>
-
-      <ApiTokens />
-
-      {isEnterpriseEnabled() && isOwner ? (
-        <section className="space-y-3">
-          <h2 className="text-[15px] font-medium">
-            Integrations <span className="caption ml-2">Enterprise</span>
-          </h2>
-          <a
-            href="/ee/integrations/slack-app"
-            className="block rounded-lg border border-border px-4 py-3 hover:border-border-strong"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-[13px] font-medium">Custom Slack app</div>
-                <div className="text-[12px] text-text-subtle">
-                  Bring your own Slack app — control bot name, icon, scopes.
-                </div>
-              </div>
-              <span className="text-[13px] text-text-subtle">→</span>
-            </div>
-          </a>
-        </section>
-      ) : null}
 
       <LeaveWorkspace
         organizationId={org.id}

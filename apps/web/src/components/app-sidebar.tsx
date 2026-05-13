@@ -6,8 +6,6 @@ import {
   LayoutGrid,
   Plug,
   Activity,
-  ScrollText,
-  Users,
   Terminal,
   Settings,
   MessageSquare,
@@ -34,7 +32,7 @@ type NavSection = {
 // are deferred from the MVP. See README roadmap. Implementation lives in git history
 // (most recently on branch `feat/procedure-auto-discovery`) and in
 // packages/discovery/, packages/skills/, and apps/web/src/lib/synthesize-and-persist.ts.
-function buildSections({ eeEnabled }: { eeEnabled: boolean }): NavSection[] {
+function buildSections(): NavSection[] {
   return [
     {
       items: [
@@ -53,10 +51,6 @@ function buildSections({ eeEnabled }: { eeEnabled: boolean }): NavSection[] {
     {
       label: 'Workspace',
       items: [
-        { href: '/dashboard/team', label: 'Team', icon: Users },
-        ...(eeEnabled
-          ? [{ href: '/ee/audit', label: 'Audit log', icon: ScrollText }]
-          : []),
         { href: '/settings', label: 'Settings', icon: Settings },
       ],
     },
@@ -69,17 +63,15 @@ export function AppSidebar({
   orgs,
   activeOrgId,
   sampleDataActive,
-  eeEnabled,
 }: {
   userEmail?: string | null;
   userName?: string | null;
   orgs: OrgSummary[];
   activeOrgId: string | null;
   sampleDataActive: boolean;
-  eeEnabled: boolean;
 }) {
   const pathname = usePathname();
-  const sections = buildSections({ eeEnabled });
+  const sections = buildSections();
 
   return (
     <aside

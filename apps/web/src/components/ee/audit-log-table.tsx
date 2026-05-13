@@ -117,7 +117,7 @@ function PageLink({ page, disabled, children }: { page: number; disabled: boolea
     return <span style={style}>{children}</span>;
   }
   return (
-    <Link href={page === 1 ? '/ee/audit' : `/ee/audit?page=${page}`} style={style}>
+    <Link href={page === 1 ? '/settings/audit-log' : `/settings/audit-log?page=${page}`} style={style}>
       {children}
     </Link>
   );

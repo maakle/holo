@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export default async function TeamPage() {
   const { auth, db, env } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect('/sign-in?callbackURL=/dashboard/team');
+  if (!session) redirect('/sign-in?callbackURL=/settings/team');
 
   const sessionUser = session.user as unknown as {
     id: string;
@@ -78,17 +78,14 @@ export default async function TeamPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-10">
-      <header className="flex flex-col gap-2">
-        <span className="caption">Team</span>
-        <h1 className="font-display text-h1 font-semibold tracking-tight">
-          Members & invitations
-        </h1>
-        <p className="text-[15px] leading-6 text-text-muted">
+    <div className="space-y-8">
+      <section className="space-y-3">
+        <h2 className="text-[15px] font-medium">Members &amp; invitations</h2>
+        <p className="text-[13px] leading-5 text-text-muted">
           Invite teammates by email. They&apos;ll join this workspace and see the same
           connections, skills, and observability.
         </p>
-      </header>
+      </section>
 
       {canManage && <InviteForm />}
       {canManage && <InviteLinkCard initialUrl={inviteLinkUrl} />}

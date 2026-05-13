@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { InviteShell } from '@/components/invite-shell';
-import { joinViaInviteLink } from '@/app/(app)/dashboard/team/actions';
+import { joinViaInviteLink } from '@/app/(app)/settings/team/actions';
 
 export const dynamic = 'force-dynamic';
 
