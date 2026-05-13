@@ -10,6 +10,7 @@ import {
   customType,
   integer,
   bigint,
+  numeric,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { SYNC_PROVIDERS } from '@holo/sync-providers';
@@ -109,6 +110,67 @@ export const sourceArtifacts = pgTable(
   }),
 );
 
+/**
+ * Customer/end-customer entity from the POV of a Holo tenant. One row per
+ * HubSpot Company / Pylon Account / Salesforce Account, merged by per-source
+ * external id (organization-scoped). Stamped on chunks at ingest so retrieval
+ * can filter by customer without a dedicated UI surface. Resolution is
+ * implicit: connectors emit metadata hints (`customer_account_upsert` /
+ * `customer_account_hint`) and the worker's embed-insert path upserts/looks
+ * up the row before the bulk chunk insert.
+ *
+ * Distinct from `organization` (the Holo tenant — our paying customer) and
+ * from Better Auth's `account` table (the user's OAuth identity).
+ */
+export const customerAccounts = pgTable(
+  'customer_accounts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    displayName: text('display_name').notNull(),
+    /** Best-guess canonical domain (e.g. 'skello.io'). Used as the primary
+     * domain-inference key; secondary domains live in `domains`. */
+    primaryDomain: text('primary_domain'),
+    domains: text('domains').array().notNull().default(sql`'{}'::text[]`),
+    /** Free-form names this account is known by (e.g. ['Skello', 'Skello SA',
+     * 'cust-skello']). The resolver matches case-insensitively. */
+    aliases: text('aliases').array().notNull().default(sql`'{}'::text[]`),
+    hubspotCompanyId: text('hubspot_company_id'),
+    pylonAccountId: text('pylon_account_id'),
+    salesforceAccountId: text('salesforce_account_id'),
+    arrAmount: numeric('arr_amount', { precision: 14, scale: 2 }),
+    arrCurrency: text('arr_currency'),
+    tier: text('tier'),
+    ownerEmail: text('owner_email'),
+    lifecycleStage: text('lifecycle_stage'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index('customer_accounts_org_idx').on(t.organizationId),
+    orgPrimaryDomainIdx: index('customer_accounts_org_primary_domain_idx').on(
+      t.organizationId,
+      t.primaryDomain,
+    ),
+    domainsGinIdx: index('customer_accounts_domains_gin_idx').using('gin', t.domains),
+    aliasesGinIdx: index('customer_accounts_aliases_gin_idx').using('gin', t.aliases),
+    // Partial uniques: a HubSpot/Pylon/Salesforce id may be NULL on accounts
+    // that originated in the other CRMs, but when present it pins one row.
+    orgHubspotUniq: uniqueIndex('customer_accounts_org_hubspot_uniq')
+      .on(t.organizationId, t.hubspotCompanyId)
+      .where(sql`${t.hubspotCompanyId} IS NOT NULL`),
+    orgPylonUniq: uniqueIndex('customer_accounts_org_pylon_uniq')
+      .on(t.organizationId, t.pylonAccountId)
+      .where(sql`${t.pylonAccountId} IS NOT NULL`),
+    orgSalesforceUniq: uniqueIndex('customer_accounts_org_salesforce_uniq')
+      .on(t.organizationId, t.salesforceAccountId)
+      .where(sql`${t.salesforceAccountId} IS NOT NULL`),
+  }),
+);
+
 export const chunks = pgTable(
   'chunks',
   {
@@ -133,6 +195,14 @@ export const chunks = pgTable(
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
     provider: text('provider').notNull(),
     sourceId: uuid('source_id').notNull(),
+    /** Resolved customer account this chunk belongs to. Stamped at ingest by
+     * the embed-insert path from metadata hints; NULL when no hint matched
+     * (e.g. chunks from connectors that have no customer notion). ON DELETE
+     * SET NULL so deleting a customer_accounts row doesn't cascade-drop the
+     * chunks — they just become unassigned. */
+    accountId: uuid('account_id').references(() => customerAccounts.id, {
+      onDelete: 'set null',
+    }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -145,6 +215,9 @@ export const chunks = pgTable(
     orgIdx: index('chunks_org_idx').on(t.organizationId),
     contentHashIdx: uniqueIndex('chunks_content_hash_idx').on(t.organizationId, t.contentHash),
     metadataPrIdx: index('chunks_metadata_pr_idx').using('gin', sql`${t.metadata} jsonb_path_ops`),
+    orgAccountIdx: index('chunks_org_account_idx')
+      .on(t.organizationId, t.accountId)
+      .where(sql`${t.accountId} IS NOT NULL`),
   }),
 );
 

@@ -15,6 +15,12 @@ import {
 } from '@holo/chunker';
 import type { HttpClient, ResourceSyncContext } from '@holo/connector-framework';
 import {
+  CUSTOMER_ACCOUNT_HINT_KEY,
+  CUSTOMER_ACCOUNT_UPSERT_KEY,
+  type CustomerAccountResolveHint,
+  type CustomerAccountUpsertHint,
+} from '../shared/customer-accounts';
+import {
   fetchActivitiesForBatch,
   fetchNotesForBatch,
 } from './api';
@@ -106,6 +112,47 @@ function mapActivity(rec: SalesforceActivityRecord): SalesforceActivity | null {
   return a;
 }
 
+function normalizeDomain(raw: unknown): string | undefined {
+  if (typeof raw !== 'string' || !raw) return undefined;
+  return raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim().toLowerCase()
+    || undefined;
+}
+
+/**
+ * Customer-account hints for one Salesforce record. Accounts produce the
+ * canonical upsert; contacts and opportunities produce a resolve hint via
+ * their `AccountId` field (always present in SOQL responses we project).
+ */
+function buildCustomerAccountHints(
+  recordType: SalesforceRecordType,
+  record: SalesforceRecord,
+  displayName: string,
+): {
+  [CUSTOMER_ACCOUNT_UPSERT_KEY]?: CustomerAccountUpsertHint;
+  [CUSTOMER_ACCOUNT_HINT_KEY]?: CustomerAccountResolveHint;
+} {
+  if (recordType === 'account') {
+    const domain = normalizeDomain(record['Website']);
+    const industry = record['Industry'];
+    const owner = record['Owner'] as { Name?: string | null } | null | undefined;
+    const ownerName = owner && typeof owner.Name === 'string' ? owner.Name : undefined;
+    const upsert: CustomerAccountUpsertHint = {
+      source: 'salesforce',
+      externalId: record.Id,
+      displayName,
+      ...(domain ? { primaryDomain: domain, domains: [domain] } : {}),
+      ...(typeof industry === 'string' && industry ? { tier: industry } : {}),
+      ...(ownerName ? { ownerEmail: ownerName } : {}),
+    };
+    return { [CUSTOMER_ACCOUNT_UPSERT_KEY]: upsert };
+  }
+  const accountId = record['AccountId'];
+  if (typeof accountId === 'string' && accountId) {
+    return { [CUSTOMER_ACCOUNT_HINT_KEY]: { salesforceAccountId: accountId } };
+  }
+  return {};
+}
+
 function mapNote(rec: SalesforceContentNoteRecord): SalesforceActivity | null {
   const body = (rec.TextPreview ?? '').trim();
   if (!body) return null;
@@ -190,6 +237,12 @@ export async function processRecordBatch(
       sourceArtifactId,
     });
 
+    const accountHints = buildCustomerAccountHints(
+      recordType,
+      record,
+      recordInput.displayName,
+    );
+
     for (const c of rawChunks) {
       const role = c.metadata['chunk_role'];
       const kind:
@@ -208,7 +261,7 @@ export async function processRecordBatch(
         externalId: record.Id,
         kind,
         content: c.content,
-        metadata: c.metadata,
+        metadata: { ...c.metadata, ...accountHints },
         aclSubjects: c.aclSubjects,
         sourceArtifactId,
       });

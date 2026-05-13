@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { resolveOpenAiModel } from '@holo/embedder';
+import { holoError, ErrorCode } from '@holo/errors';
 import { embedQuery, embedQueryWith, type EmbeddingModel } from './query-router';
 
 export interface SearchInput {
@@ -10,6 +11,14 @@ export interface SearchInput {
   topK?: number;
   provider?: 'github' | 'slack' | 'notion' | 'grain' | 'pylon';
   userSubjects: string[];
+  /**
+   * Restrict results to chunks stamped with one of these `customer_accounts.id`s.
+   * Pass a single id for "everything about Skello" lookups; pass an array for
+   * "everything about my T0 accounts". Empty array is treated as no filter
+   * (same as omitting the field) — distinguish "no filter" from "no matches"
+   * at the call site.
+   */
+  accountId?: string | ReadonlyArray<string>;
 }
 
 export interface SearchResult {
@@ -33,6 +42,33 @@ function formatTextArray(values: string[]): string {
   return `{${escaped.join(',')}}`;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function formatUuidArray(values: ReadonlyArray<string>): string {
+  // uuid[] literal: '{uuid,uuid}'. Validate each value to keep this filter
+  // from leaking into a free-form string injection — the rest of the WHERE
+  // clause is parameter-bound but this array is interpolated as a literal.
+  for (const v of values) {
+    if (!UUID_RE.test(v)) {
+      throw holoError({
+        code: ErrorCode.HOLO_INVALID_INPUT,
+        problem: `Invalid uuid in accountId filter: ${v}`,
+        fix: 'Pass a valid customer_accounts.id from the caller.',
+      });
+    }
+  }
+  return `{${values.join(',')}}`;
+}
+
+function normalizeAccountIds(
+  input: string | ReadonlyArray<string> | undefined,
+): string[] | null {
+  if (input === undefined) return null;
+  if (typeof input === 'string') return [input];
+  if (input.length === 0) return null; // empty array = no filter
+  return [...input];
+}
+
 interface ChunkRow {
   id: string;
   content: string;
@@ -46,6 +82,11 @@ async function searchOnce(
   input: SearchInput & { embedding: number[]; model: EmbeddingModel; topK: number; userSubjects: string[] },
 ): Promise<SearchResult[]> {
   const provider = input.provider ?? null;
+
+  // Normalize accountId into a Postgres uuid[] literal. `null` here means "no
+  // filter" — both branches accept that via `IS NULL OR account_id = ANY(...)`.
+  const accountIds = normalizeAccountIds(input.accountId);
+  const accountIdLiteral = accountIds === null ? null : formatUuidArray(accountIds);
 
   // Verbatim hybrid SQL CTE per spec — RRF constant 60, LIMIT 100 per branch.
   // pgvector accepts vector literals as JSON-style strings cast to vector.
@@ -61,6 +102,7 @@ async function searchOnce(
           AND embedding_model = ${input.model}
           AND acl_subjects && ${formatTextArray(input.userSubjects)}::text[]
           AND (${provider}::text IS NULL OR provider = ${provider})
+          AND (${accountIdLiteral}::uuid[] IS NULL OR account_id = ANY(${accountIdLiteral}::uuid[]))
         ORDER BY embedding <=> (SELECT v FROM query_vec)
         LIMIT 100
       ),
@@ -73,6 +115,7 @@ async function searchOnce(
           AND content_tsvector @@ plainto_tsquery('english', ${input.q})
           AND acl_subjects && ${formatTextArray(input.userSubjects)}::text[]
           AND (${provider}::text IS NULL OR provider = ${provider})
+          AND (${accountIdLiteral}::uuid[] IS NULL OR account_id = ANY(${accountIdLiteral}::uuid[]))
         ORDER BY ts_rank(content_tsvector, plainto_tsquery('english', ${input.q})) DESC
         LIMIT 100
       ),
