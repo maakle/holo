@@ -1,0 +1,90 @@
+# RFC-0006 — Pre-Call Account Brief skill template.
+#
+# Loaded by the skill template loader so chat users can invoke
+# "Brief me on Skello for the renewal call Friday" and get the structured
+# artifact rendered inline. The skill resolves an account (via the shared
+# fuzzy resolver from packages/connectors/src/shared/account-resolver.ts),
+# infers `context` from the user message via a cheap classifier call, and
+# then invokes `get_account_brief` — never duplicating the synthesis path.
+name: pre-call-brief
+description: >
+  Generate a structured pre-call brief for a named customer. Five sections
+  (at-a-glance, open issues, last conversation, product asks, context-aware
+  synthesis), each citation-anchored and freshness-stamped.
+tools:
+  - get_account_brief
+  - search
+when_to_use: >
+  Use when the user asks for context on a specific customer ahead of a
+  meeting — "Brief me on X for the renewal", "Tell me everything on Y",
+  "Context on Z for tomorrow's call".
+executable: true
+tool_allowlist:
+  - get_account_brief
+  - search
+
+procedure: |
+  Step 1 — Resolve the account.
+    The user message names a customer in free text (e.g. "Skello",
+    "BetterWorks", "Skello SA"). Resolve it to a `customer_accounts.id`:
+
+      • If the message contains a UUID, treat that as the account_id directly.
+      • Otherwise call the fuzzy resolver from
+        `@holo/connectors/shared` → `resolveCustomerAccount({ organizationId,
+        query })`. The resolver returns a `match` plus alternate
+        `candidates`.
+      • If `candidates.length > 1`, ask the user to disambiguate before
+        proceeding. Show display_name + primary_domain for each candidate.
+      • If `match` is null, run `search` with the raw user query as a final
+        fallback to find a citable surface mentioning the customer, then
+        tell the user we couldn't pin a CRM record.
+
+  Step 2 — Infer the meeting context.
+    Map the user message to one of the five named contexts (renewal,
+    upsell, check-in, objection, first-meeting) using these heuristics:
+
+      • "renewal" / "contract" / "expansion off the table" → renewal
+      • "upsell" / "add seats" / "expand" → upsell
+      • "check-in" / "how are they doing" / "vibes" → check-in
+      • "objection" / "concern" / "they pushed back on X" → objection
+      • "first meeting" / "intro call" / "first time" → first-meeting
+      • Otherwise: check-in (the safe default).
+
+    If the user mentions a specific objection ("they keep pushing back on
+    pricing"), set `custom_context` to the objection text and `context` to
+    "objection". A one-shot classifier call is fine here — keep it cheap.
+
+  Step 3 — Call `get_account_brief`.
+    Invoke with `{ account_id, context, custom_context? }`. The response is
+    the structured five-section payload. If `fromCache: true`, mention that
+    in your reply ("Loaded today's cached brief — say 'regenerate' for a
+    fresh one.").
+
+  Step 4 — Render inline.
+    Render each section as a markdown block in the order returned by the
+    tool's `sectionOrder` (driven by the chosen `context`). Cite claims as
+    `[1]` `[2]` etc., reusing the section-local citation indices from the
+    payload. For empty sections, render "No signal in the last 30 days"
+    verbatim — do not invent content.
+
+examples:
+  - user: "Brief me on Skello for the renewal call Friday"
+    expected: >
+      Resolve "Skello" → account_id. context = renewal. Call
+      `get_account_brief`. Render five sections in the renewal order
+      (at-a-glance → context → issues → product asks → last conversation),
+      with citations.
+  - user: "Give me everything on BetterWorks"
+    expected: >
+      Resolve "BetterWorks" → account_id. context = check-in (default,
+      no explicit framing). Render five sections in the check-in order.
+  - user: "Context on atwork for tomorrow's intro call"
+    expected: >
+      Resolve "atwork" → account_id. context = first-meeting. Render
+      sections in the first-meeting order.
+  - user: "Brief me on EGYM — they keep pushing back on the security review"
+    expected: >
+      Resolve "EGYM" → account_id. context = objection,
+      custom_context = "security review pushback". Render sections in the
+      objection order; the contextSection summarises every prior mention
+      of the security-review concern.

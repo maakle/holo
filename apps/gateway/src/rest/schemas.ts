@@ -147,3 +147,82 @@ export const SearchResponseSchema = z
 export const HealthResponseSchema = z
   .object({ status: z.literal('ok'), version: z.string() })
   .openapi('Health');
+
+// ── Account brief (RFC-0006) ────────────────────────────────────────────────
+
+export const BriefContextSchema = z
+  .enum(['renewal', 'upsell', 'check-in', 'objection', 'first-meeting', 'custom'])
+  .openapi('BriefContext');
+
+export const BriefFreshnessSchema = z
+  .object({
+    lastSyncedAt: z.string().nullable(),
+    perProvider: z.object({
+      pylon: z.string().nullable(),
+      grain: z.string().nullable(),
+      hubspot: z.string().nullable(),
+      notion: z.string().nullable(),
+      github: z.string().nullable(),
+    }),
+  })
+  .openapi('BriefFreshness');
+
+export const BriefClaimSchema = z
+  .object({
+    text: z.string(),
+    citationRefs: z.array(z.number().int().nonnegative()),
+  })
+  .openapi('BriefClaim');
+
+export const BriefSectionSchema = z
+  .object({
+    citations: z.array(CitationSchema),
+    claims: z.array(BriefClaimSchema),
+    freshness: BriefFreshnessSchema,
+  })
+  .openapi('BriefSection');
+
+export const BriefAtGlanceSchema = z
+  .object({
+    citations: z.array(CitationSchema),
+    claims: z.array(BriefClaimSchema),
+    freshness: BriefFreshnessSchema,
+    displayName: z.string(),
+    tier: z.string().nullable(),
+    arr: z.object({ amount: z.string(), currency: z.string() }).nullable(),
+    owner: z.string().nullable(),
+    accountAgeDays: z.number().int().nullable(),
+    lastContactAt: z.string().nullable(),
+  })
+  .openapi('BriefAtGlance');
+
+export const BriefSectionsSchema = z
+  .object({
+    atGlance: BriefAtGlanceSchema,
+    issues: BriefSectionSchema,
+    lastConversation: BriefSectionSchema,
+    productAsks: BriefSectionSchema,
+    contextSection: BriefSectionSchema,
+  })
+  .openapi('BriefSections');
+
+export const AccountBriefSchema = z
+  .object({
+    accountId: z.uuid(),
+    context: BriefContextSchema,
+    customContext: z.string().nullable(),
+    sections: BriefSectionsSchema,
+    freshness: BriefFreshnessSchema,
+    generatedAt: z.string(),
+    fromCache: z.boolean(),
+  })
+  .openapi('AccountBrief');
+
+export const AccountIdParamSchema = z.object({
+  accountId: z.uuid(),
+});
+
+export const BriefQuerySchema = z.object({
+  context: BriefContextSchema,
+  customContext: z.string().max(500).optional(),
+});
