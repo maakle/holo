@@ -21,6 +21,17 @@ export { resolveAllowlist } from './shared/allowlist';
 export type { ResolveAllowlistInput, AllowlistResult, AllowlistRow } from './shared/allowlist';
 export { chunkHash, dedupeAgainstDb } from './shared/content-hash';
 export type { DedupeAgainstDbInput } from './shared/content-hash';
+export {
+  resolveCustomerAccountsForBatch,
+  stripCustomerAccountHints,
+  CUSTOMER_ACCOUNT_HINT_KEY,
+  CUSTOMER_ACCOUNT_UPSERT_KEY,
+} from './shared/customer-accounts';
+export type {
+  CustomerAccountSource,
+  CustomerAccountUpsertHint,
+  CustomerAccountResolveHint,
+} from './shared/customer-accounts';
 // GitHub uses GitHub App auth, not OAuth — there is no Connector facade.
 // Worker dispatches directly to runGithubProseSync / runGithubCodeSync below.
 // Framework-native specs (new shape — no legacy Connector facade).

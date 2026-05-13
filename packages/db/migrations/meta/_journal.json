@@ -274,6 +274,13 @@
       "when": 1779408000000,
       "tag": "0038_oauth_clients_is_verified",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1779494400000,
+      "tag": "0039_customer_accounts",
+      "breakpoints": true
     }
   ]
 }

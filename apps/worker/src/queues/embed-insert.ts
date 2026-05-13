@@ -1,4 +1,8 @@
 import { holoError, ErrorCode } from '@holo/errors';
+import {
+  resolveCustomerAccountsForBatch,
+  stripCustomerAccountHints,
+} from '@holo/connectors';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sql = any;
@@ -88,8 +92,24 @@ export async function insertEmbeddedChunks(
     artifactIdByKey.set(`${row.source_id}:${row.external_id}`, row.id);
   }
 
-  // 2. Insert chunks with the real source_artifacts UUID.
-  const rows = embedded.map((e) => {
+  // 2. Resolve customer_account stamps for every chunk. Connectors emit
+  //    `customer_account_upsert` / `customer_account_hint` keys on metadata;
+  //    the resolver upserts canonical rows (HubSpot company / Salesforce
+  //    account / Pylon account) and looks up references from non-canonical
+  //    chunks (deal, opportunity, ticket). One round-trip per identity kind
+  //    across the whole batch — not per chunk.
+  const accountResolutions = await resolveCustomerAccountsForBatch(
+    sql,
+    embedded.map((e) => ({
+      organizationId: e.chunk.organizationId,
+      metadata: e.chunk.metadata ?? null,
+    })),
+  );
+
+  // 3. Insert chunks with the real source_artifacts UUID + resolved
+  //    account_id. Hint keys are stripped from metadata — they're a
+  //    transport convention, not durable data.
+  const rows = embedded.map((e, i) => {
     const artifactId = artifactIdByKey.get(`${e.chunk.sourceId}:${e.chunk.sourceArtifactId}`);
     if (!artifactId) {
       // Should never happen: every embedded chunk had its key inserted above.
@@ -99,6 +119,7 @@ export async function insertEmbeddedChunks(
         fix: 'This is a worker bug — please report.',
       });
     }
+    const cleanedMetadata = stripCustomerAccountHints(e.chunk.metadata ?? {});
     return {
       organization_id: e.chunk.organizationId,
       source_artifact_id: artifactId,
@@ -110,7 +131,8 @@ export async function insertEmbeddedChunks(
       embedding_model: e.embeddingModel,
       embedding: toPgVector(e.embedding),
       acl_subjects: e.chunk.aclSubjects ?? [],
-      metadata: JSON.stringify(e.chunk.metadata ?? {}),
+      metadata: JSON.stringify(cleanedMetadata),
+      account_id: accountResolutions[i]?.accountId ?? null,
     };
   });
   const inserted = await sql<{ id: string }[]>`
@@ -127,6 +149,7 @@ export async function insertEmbeddedChunks(
       'embedding',
       'acl_subjects',
       'metadata',
+      'account_id',
     )}
     ON CONFLICT (organization_id, content_hash) DO NOTHING
     RETURNING id

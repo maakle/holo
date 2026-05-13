@@ -12,6 +12,12 @@ import {
   type HubspotRecordType,
 } from '@holo/chunker';
 import type { ResourceSyncContext } from '@holo/connector-framework';
+import {
+  CUSTOMER_ACCOUNT_HINT_KEY,
+  CUSTOMER_ACCOUNT_UPSERT_KEY,
+  type CustomerAccountResolveHint,
+  type CustomerAccountUpsertHint,
+} from '../shared/customer-accounts';
 import { fetchEngagementsForRecord } from './api';
 import type { HubspotEngagement, HubspotObjectType, HubspotRecord } from './types';
 
@@ -45,6 +51,67 @@ function nonEmptyProps(
     out[k] = v;
   }
   return out;
+}
+
+function emailDomain(email: string | null | undefined): string | undefined {
+  if (!email) return undefined;
+  const at = email.lastIndexOf('@');
+  if (at < 0 || at === email.length - 1) return undefined;
+  const domain = email.slice(at + 1).trim().toLowerCase();
+  return domain || undefined;
+}
+
+function parseArr(raw: string | null | undefined): number | undefined {
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Build the customer-account hint(s) that apply to every chunk produced for
+ * one HubSpot record. Companies get an upsert hint (canonical source); deals
+ * and contacts get a resolve hint when we can derive one without an extra
+ * association API call. HubSpot company<->deal/contact associations are an
+ * extra API hop per record — punted to a follow-up; for v1 we resolve deal /
+ * contact chunks by domain when their email/website is populated.
+ */
+function buildCustomerAccountHints(
+  recordType: HubspotRecordType,
+  record: HubspotRecord,
+  displayName: string,
+): {
+  [CUSTOMER_ACCOUNT_UPSERT_KEY]?: CustomerAccountUpsertHint;
+  [CUSTOMER_ACCOUNT_HINT_KEY]?: CustomerAccountResolveHint;
+} {
+  const props = record.properties ?? {};
+  if (recordType === 'company') {
+    const domain = (props['domain'] ?? props['website'] ?? '')
+      .replace(/^https?:\/\//, '')
+      .replace(/\/.*$/, '')
+      .trim()
+      .toLowerCase();
+    const upsert: CustomerAccountUpsertHint = {
+      source: 'hubspot',
+      externalId: record.id,
+      displayName,
+      ...(domain ? { primaryDomain: domain, domains: [domain] } : {}),
+      ...(props['hubspot_owner_id'] ? { ownerEmail: props['hubspot_owner_id'] } : {}),
+      ...(props['lifecyclestage'] ? { lifecycleStage: props['lifecyclestage'] } : {}),
+      ...(parseArr(props['annualrevenue']) !== undefined
+        ? { arrAmount: parseArr(props['annualrevenue']) }
+        : {}),
+    };
+    return { [CUSTOMER_ACCOUNT_UPSERT_KEY]: upsert };
+  }
+  if (recordType === 'contact') {
+    const domain = emailDomain(props['email']);
+    if (!domain) return {};
+    return { [CUSTOMER_ACCOUNT_HINT_KEY]: { domain } };
+  }
+  // Deals: no domain/email property is reliably populated. Skipped for v1;
+  // proper resolution needs the company-association API which we don't fetch
+  // today. Engagement chunks inherit whatever the parent record produced.
+  return {};
 }
 
 function mapEngagement(e: HubspotEngagement): HubspotRecordInput['engagements'][number] {
@@ -98,6 +165,12 @@ export async function processRecord(
     sourceArtifactId,
   });
 
+  const accountHints = buildCustomerAccountHints(
+    recordType,
+    record,
+    recordInput.displayName,
+  );
+
   for (const c of rawChunks) {
     // The chunker tags engagement chunks via metadata.chunk_role. Engagements
     // get their own kind so retrieval can filter by activity type, but they
@@ -115,7 +188,7 @@ export async function processRecord(
       externalId: record.id,
       kind,
       content: c.content,
-      metadata: c.metadata,
+      metadata: { ...c.metadata, ...accountHints },
       aclSubjects: c.aclSubjects,
       sourceArtifactId,
     });

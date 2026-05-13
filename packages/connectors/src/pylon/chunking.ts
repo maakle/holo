@@ -5,8 +5,20 @@
  */
 import { pylonTicketChunker } from '@holo/chunker';
 import type { ResourceSyncContext } from '@holo/connector-framework';
+import {
+  CUSTOMER_ACCOUNT_HINT_KEY,
+  type CustomerAccountResolveHint,
+} from '../shared/customer-accounts';
 import { listAllMessages } from './api';
 import type { PylonIssue, PylonMessage } from './types';
+
+function emailDomain(email: string | null | undefined): string | undefined {
+  if (!email) return undefined;
+  const at = email.lastIndexOf('@');
+  if (at < 0 || at === email.length - 1) return undefined;
+  const domain = email.slice(at + 1).trim().toLowerCase();
+  return domain || undefined;
+}
 
 function deriveAuthorType(
   author: PylonMessage['author'],
@@ -61,12 +73,22 @@ export async function processTicket(
     sourceArtifactId,
   });
 
+  // Pylon doesn't expose accounts as a separate sync resource yet, so we
+  // can't upsert a canonical customer_accounts row from this connector.
+  // We do the next-best thing: emit a domain hint derived from the
+  // requester's email, which the resolver will match against any
+  // customer_accounts row already populated from HubSpot/Salesforce.
+  const domain = emailDomain(issue.requester?.email);
+  const accountHint: { [CUSTOMER_ACCOUNT_HINT_KEY]?: CustomerAccountResolveHint } = domain
+    ? { [CUSTOMER_ACCOUNT_HINT_KEY]: { domain } }
+    : {};
+
   for (const c of rawChunks) {
     await ctx.upsert({
       externalId: issue.id,
       kind: 'pylon-ticket',
       content: c.content,
-      metadata: c.metadata,
+      metadata: { ...c.metadata, ...accountHint },
       aclSubjects: c.aclSubjects,
     });
   }
