@@ -3,6 +3,9 @@ import { headers } from 'next/headers';
 import { getServerAuth } from '@/lib/server-context';
 import { HoloLogo } from '@/components/logo';
 import { ToolsAgentGraph } from '@/components/tools-agent-graph';
+import { InstallPill } from '@/components/install-pill';
+import { BenchmarkBand } from '@/components/benchmark-band';
+import { SecurityPanel } from '@/components/security-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,8 +28,9 @@ export default async function Home() {
       <UseCasesBand />
       <PillarsBand />
       <CodeShowcase />
+      <BenchmarkBand />
       <ObservabilityBand />
-      <TrustBand />
+      <SecurityPanel />
       <VisionBand />
       <FinalCTA isAuthed={isAuthed} />
       <SiteFooter />
@@ -103,14 +107,10 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
             View on GitHub
           </a>
         </div>
-        <div className="mt-7 flex flex-col items-center gap-2">
-          <code className="font-mono text-[13px] leading-5 text-text-muted">
-            <span className="text-text-subtle">$</span> docker compose up{' '}
-            <span className="text-text-subtle">→</span>{' '}
-            <span className="text-text-subtle">localhost:3000 in 60 seconds</span>
-          </code>
+        <div className="mt-7 flex flex-col items-center gap-3">
+          <InstallPill command="docker compose up" />
           <p className="text-[12px] text-text-subtle">
-            Pre-alpha — not yet ready for production traffic.
+            localhost:3000 in 60 seconds · pre-alpha
           </p>
         </div>
       </div>
@@ -182,70 +182,6 @@ function CodeShowcase() {
   topK: 5,
 });`}
         />
-      </div>
-    </section>
-  );
-}
-
-// ── Trust band ────────────────────────────────────────────────────────────
-// Spec-sheet treatment — deliberately different from ObservabilityBand's
-// 4-card grid. Asymmetric heading-left, manifest-right; mono row keys signal
-// "config file, not marketing page."
-const TRUST_ITEMS = [
-  {
-    key: 'vpc',
-    title: 'Runs in your VPC.',
-    body: 'Self-hostable from day one. Your data and your agents stay on infrastructure you control.',
-  },
-  {
-    key: 'acl',
-    title: 'ACL-aware ingestion.',
-    body: 'Source-system permissions carry through. An agent only sees what the asking user is allowed to see.',
-  },
-  {
-    key: 'audit',
-    title: 'Per-call audit log.',
-    body: 'Every tool invocation is attributable and replayable. Agent, user, records touched, result.',
-  },
-  {
-    key: 'license',
-    title: 'MIT-licensed core. Enterprise add-ons.',
-    body: 'The Community Edition is MIT — always free to self-host, fork, and ship on. Optional Enterprise Edition (SSO, RBAC, query history, whitelabeling) for teams that need it.',
-  },
-] as const;
-
-function TrustBand() {
-  return (
-    <section className="border-b border-border">
-      <div className="mx-auto grid max-w-[1024px] gap-12 px-6 py-20 md:grid-cols-[1fr_1.4fr] md:gap-16">
-        <div className="md:sticky md:top-24 md:self-start">
-          <p className="caption text-text-subtle">Security &amp; trust</p>
-          <h2 className="mt-3 text-balance font-display text-[28px] font-semibold leading-tight tracking-tight md:text-[34px]">
-            Built for teams that can&apos;t hand their data to a black box.
-          </h2>
-          <p className="mt-4 max-w-[420px] text-[15px] leading-6 text-text-muted">
-            Holo is the boring kind of infrastructure: predictable, inspectable,
-            and yours to run.
-          </p>
-        </div>
-        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
-          {TRUST_ITEMS.map((it) => (
-            <li
-              key={it.key}
-              className="grid grid-cols-[72px_1fr] items-baseline gap-4 px-5 py-5 md:grid-cols-[96px_1fr] md:gap-6 md:px-6 md:py-6"
-            >
-              <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-text-subtle">
-                {it.key}
-              </span>
-              <div>
-                <h3 className="font-display text-[16px] font-semibold leading-snug tracking-tight text-text">
-                  {it.title}
-                </h3>
-                <p className="mt-1.5 text-[14px] leading-6 text-text-muted">{it.body}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
       </div>
     </section>
   );
