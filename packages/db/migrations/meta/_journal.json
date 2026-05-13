@@ -281,6 +281,13 @@
       "when": 1779494400000,
       "tag": "0039_customer_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1779580800000,
+      "tag": "0040_slack_app_configs",
+      "breakpoints": true
     }
   ]
 }

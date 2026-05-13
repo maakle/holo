@@ -43,6 +43,12 @@ export const connectorCredentials = pgTable(
       .default('active'),
     connectedAt: timestamp('connected_at', { withTimezone: true }).notNull().defaultNow(),
     lastRefreshedAt: timestamp('last_refreshed_at', { withTimezone: true }),
+    // Set when an org installs Slack via their own custom Slack app instead of
+    // the shared Holo app. Null = installed via the shared app (env-var
+    // credentials). When set, OAuth refresh and webhook signature
+    // verification must use the matching slack_app_configs row's
+    // client_secret / signing_secret rather than the global env vars.
+    slackAppConfigId: uuid('slack_app_config_id'),
   },
   (t) => ({
     orgProviderIdx: index('connector_credentials_org_provider_idx').on(
@@ -420,6 +426,46 @@ export const connectorDisconnectJobs = pgTable(
     )
       .on(t.organizationId, t.provider)
       .where(sql`${t.finishedAt} IS NULL`),
+  }),
+);
+
+/**
+ * Per-organization custom Slack app credentials — the "bring your own Slack
+ * bot" path. EE only. When a row exists for an org, all Slack OAuth installs
+ * for that org go against this app's client_id/secret (so the bot's name,
+ * icon, scopes, and manifest are owned by the customer), and inbound events
+ * arrive at /slack/events/<organizationId> where they're HMAC-verified with
+ * this signing_secret. One app per org (uniq on organizationId) — multiple
+ * Slack workspaces installed under the same org share the same custom app,
+ * which matches Slack's "distribute to multiple workspaces" model.
+ *
+ * Orgs without a row continue to use the shared Holo Slack app sourced from
+ * SLACK_CONNECTOR_* env vars; the new column on connector_credentials
+ * records which path each install used so we can route refresh and signing
+ * lookups correctly.
+ */
+export const slackAppConfigs = pgTable(
+  'slack_app_configs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    /** Slack-issued App ID (Axxxx…) — surfaced in admin UI so customers can confirm they pasted the right credentials. */
+    appId: text('app_id'),
+    clientId: text('client_id').notNull(),
+    clientSecret: encryptedText('client_secret').notNull(),
+    signingSecret: encryptedText('signing_secret').notNull(),
+    /** Display label shown on the connections page when this app is active. Defaults to the org name on create. */
+    displayName: text('display_name'),
+    createdByUserId: uuid('created_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgUniq: uniqueIndex('slack_app_configs_org_uniq').on(t.organizationId),
   }),
 );
 

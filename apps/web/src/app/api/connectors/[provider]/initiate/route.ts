@@ -9,11 +9,12 @@ import {
 } from '@holo/connectors';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { resolveSlackAppCreds } from '@/lib/slack-app-config';
 
 export async function POST(req: Request, { params }: { params: Promise<{ provider: string }> }) {
   try {
     const { provider } = await params;
-    const { auth, env } = await getServerContext();
+    const { auth, db, env } = await getServerContext();
     const hdrs = await headers();
     // OAuth redirect_uri must be a publicly reachable URL the IdP can hit.
     // In dev with a tunnel, set WEB_PUBLIC_URL to the tunnel; BETTER_AUTH_URL
@@ -59,17 +60,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
     }
 
     if (provider === 'slack') {
-      if (!env.SLACK_CONNECTOR_CLIENT_ID || !env.SLACK_CONNECTOR_CLIENT_SECRET) {
+      // EE custom Slack apps are resolved per-org; orgs without one fall back
+      // to the shared Holo app from env. The redirect_uri is org-scoped when a
+      // custom app is in use so its Slack manifest can be configured to point
+      // at the org's tenant URL only.
+      const creds = await resolveSlackAppCreds(db, env, orgId);
+      if (!creds) {
         throw holoError({
           code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
           problem: 'Slack connector credentials are not configured',
-          fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET in the environment.',
+          fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET in the environment, or register a custom Slack app for this organization under Settings → Integrations.',
         });
       }
       const redirectUri = `${publicOrigin}/api/connectors/slack/callback`;
       const spec = createSlackSpec({
-        clientId: env.SLACK_CONNECTOR_CLIENT_ID,
-        clientSecret: env.SLACK_CONNECTOR_CLIENT_SECRET,
+        clientId: creds.clientId,
+        clientSecret: creds.clientSecret,
       });
       const csrfNonce = shared.generateCsrfNonce();
       const state = await shared.signState(

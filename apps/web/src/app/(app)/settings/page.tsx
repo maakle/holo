@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { isEnterpriseEnabled } from '@/lib/ee/license';
 import { ApiTokens } from './api-tokens';
 import { DangerZone } from './danger-zone';
 import { LeaveWorkspace } from './leave-workspace';
@@ -82,6 +83,28 @@ export default async function SettingsPage() {
       </section>
 
       <ApiTokens />
+
+      {isEnterpriseEnabled() && isOwner ? (
+        <section className="space-y-3">
+          <h2 className="text-[15px] font-medium">
+            Integrations <span className="caption ml-2">Enterprise</span>
+          </h2>
+          <a
+            href="/ee/integrations/slack-app"
+            className="block rounded-lg border border-border px-4 py-3 hover:border-border-strong"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[13px] font-medium">Custom Slack app</div>
+                <div className="text-[12px] text-text-subtle">
+                  Bring your own Slack app — control bot name, icon, scopes.
+                </div>
+              </div>
+              <span className="text-[13px] text-text-subtle">→</span>
+            </div>
+          </a>
+        </section>
+      ) : null}
 
       <LeaveWorkspace
         organizationId={org.id}

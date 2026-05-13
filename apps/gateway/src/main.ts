@@ -121,6 +121,7 @@ async function main() {
     redisUrl: env.REDIS_URL,
   });
   mountSlackCommands(app, {
+    db,
     signingSecret: env.SLACK_CONNECTOR_SIGNING_SECRET,
     redisUrl: env.REDIS_URL,
   });

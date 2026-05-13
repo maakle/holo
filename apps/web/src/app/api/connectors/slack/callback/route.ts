@@ -4,6 +4,7 @@ import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { shared, createSlackSpec } from '@holo/connectors';
 import { createHttpClient } from '@holo/connector-framework';
 import { getServerContext } from '@/lib/server-context';
+import { resolveSlackAppCreds } from '@/lib/slack-app-config';
 
 const PENDING_GRANT_TTL_MS = 2 * 60 * 1000;
 
@@ -31,14 +32,6 @@ export async function GET(req: Request) {
 
     const { env, db } = await getServerContext();
 
-    if (!env.SLACK_CONNECTOR_CLIENT_ID || !env.SLACK_CONNECTOR_CLIENT_SECRET) {
-      throw holoError({
-        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
-        problem: 'Slack connector credentials are not configured',
-        fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET in the environment.',
-      });
-    }
-
     // The signed JWT is the *first* of two checks; the second (and load-bearing
     // one for the confused-deputy threat) happens at /api/connectors/finalize
     // on BETTER_AUTH_URL where the better-auth session cookie is readable.
@@ -48,11 +41,25 @@ export async function GET(req: Request) {
     // the flow.
     const claims = await shared.verifyState(state, env.BETTER_AUTH_SECRET);
 
+    // Resolve which Slack app this install belongs to (custom-per-org or
+    // shared Holo). MUST use the same credentials the user authorized
+    // against in /initiate, otherwise Slack rejects the code exchange. We
+    // also pin slackAppConfigId on the pending grant so finalize records
+    // which app the resulting bot token came from.
+    const creds = await resolveSlackAppCreds(db, env, claims.organization_id);
+    if (!creds) {
+      throw holoError({
+        code: ErrorCode.HOLO_CONNECTOR_NOT_IMPLEMENTED,
+        problem: 'Slack connector credentials are not configured',
+        fix: 'Set SLACK_CONNECTOR_CLIENT_ID and SLACK_CONNECTOR_CLIENT_SECRET in the environment, or register a custom Slack app under Settings → Integrations.',
+      });
+    }
+
     const publicOrigin = (env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL).replace(/\/+$/, '');
     const redirectUri = `${publicOrigin}/api/connectors/slack/callback`;
     const spec = createSlackSpec({
-      clientId: env.SLACK_CONNECTOR_CLIENT_ID,
-      clientSecret: env.SLACK_CONNECTOR_CLIENT_SECRET,
+      clientId: creds.clientId,
+      clientSecret: creds.clientSecret,
     });
     const tokens = await spec.auth.exchangeCode!({ code, redirectUri });
     const api = createHttpClient({ config: spec.http!, auth: spec.auth, tokens });
@@ -64,6 +71,7 @@ export async function GET(req: Request) {
       refreshToken: tokens.refreshToken ?? null,
       scope: tokens.scope ?? null,
       ident: { externalId: ident.externalId, name: ident.name },
+      slackAppConfigId: creds.configId,
     });
 
     const inserted = await db
