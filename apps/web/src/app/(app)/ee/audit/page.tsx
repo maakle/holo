@@ -4,7 +4,7 @@ import { desc, eq, sql } from 'drizzle-orm';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { schema } from '@holo/db';
-import { AuditLogTable } from '@/components/audit-log-table';
+import { AuditLogTable } from '@/components/ee/audit-log-table';
 
 const PAGE_SIZE = 50;
 

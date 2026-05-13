@@ -53,7 +53,7 @@ const sections: NavSection[] = [
     label: 'Workspace',
     items: [
       { href: '/dashboard/team', label: 'Team', icon: Users },
-      { href: '/audit', label: 'Audit log', icon: ScrollText },
+      { href: '/ee/audit', label: 'Audit log', icon: ScrollText },
       { href: '/settings', label: 'Settings', icon: Settings },
     ],
   },
