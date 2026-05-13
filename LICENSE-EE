@@ -1,0 +1,77 @@
+                       HOLO ENTERPRISE EDITION LICENSE
+                              Version 1.0, 2026
+
+Copyright (c) 2026 Holo contributors. All rights reserved.
+
+1. SCOPE
+
+   This license ("EE License") governs the use of the source code, binaries,
+   and accompanying documentation located in any directory named "ee" (or any
+   path matching the glob "**/ee/**") within the Holo source repository, and
+   any other files in this repository explicitly marked as Enterprise Edition
+   (collectively, the "EE Software").
+
+   All other code in this repository is licensed under the MIT License — see
+   `LICENSE` and `LICENSING.md` for details. The EE Software is **not**
+   licensed under MIT.
+
+2. COMMERCIAL LICENSE REQUIRED
+
+   Use of the EE Software in production requires a valid, paid Enterprise
+   Edition subscription from the copyright holder. Without an active
+   subscription, you may:
+
+   (a) read, fork, and inspect the EE Software for the sole purpose of
+       evaluating it, contributing patches, or developing against its public
+       interfaces in a non-production environment;
+
+   (b) build and run the EE Software in a development, staging, CI, or
+       evaluation environment, provided that the deployment is not used to
+       serve production traffic or production users; and
+
+   (c) modify the EE Software and submit those modifications back to the
+       upstream repository.
+
+   You may NOT, without a valid Enterprise Edition subscription:
+
+   (i)   deploy or run the EE Software for production use, internal or
+         external, paid or unpaid;
+
+   (ii)  offer the EE Software (modified or unmodified) as a hosted or managed
+         service to third parties;
+
+   (iii) sublicense, sell, or redistribute the EE Software or derivative works
+         of it under terms inconsistent with this EE License; or
+
+   (iv)  remove, obscure, or alter any copyright, trademark, or license notice
+         contained in the EE Software.
+
+3. CONTRIBUTIONS
+
+   By submitting a contribution to the EE Software, you grant the copyright
+   holder a perpetual, worldwide, non-exclusive, royalty-free, irrevocable
+   license to use, reproduce, modify, distribute, sublicense, and relicense
+   your contribution as part of the EE Software, including the right to
+   distribute it under different license terms (including the MIT License).
+   This is in addition to any contributor license agreement (CLA) you sign.
+
+4. NO WARRANTY
+
+   THE EE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE EE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE EE SOFTWARE.
+
+5. TERMINATION
+
+   This EE License terminates automatically upon any breach of its terms. On
+   termination, you must cease all use of the EE Software and destroy all
+   copies in your possession or control.
+
+6. CONTACT
+
+   To purchase an Enterprise Edition subscription or ask licensing questions:
+   open an issue at https://github.com/maakle/holo or email the maintainers.

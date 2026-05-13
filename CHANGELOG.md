@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased — Dual-edition relicense (CE: MIT · EE: commercial)
+
+Branch: `claude/add-licensing-editions-TRMkp`.
+
+### Changed (breaking)
+
+- **License is now dual: MIT for the Community Edition, commercial for the Enterprise Edition.** The whole repo was previously AGPL-3.0-or-later. CE — everything **not** under a `**/ee/**` directory — is now [MIT](./LICENSE), the permissive license used by the closest OSS analog (Onyx). EE — everything under `**/ee/**` — is governed by [`LICENSE-EE`](./LICENSE-EE), a paid commercial license for production use. Full breakdown in [`LICENSING.md`](./LICENSING.md).
+- **Contributor terms updated.** PRs to CE files are licensed under MIT. PRs to EE files grant the maintainer the additional relicensing rights spelled out in `LICENSE-EE` § 3. The CLA flow in `CONTRIBUTING.md` is unchanged.
+
+### Added
+
+- **`LICENSE-EE`** — Holo Enterprise Edition License v1.0. Permits read/fork/development/evaluation use; production use requires a paid Enterprise subscription.
+- **`LICENSING.md`** — single source of truth for what's CE vs EE today, what's planned for EE, and the contribution rules per edition.
+- **EE feature roadmap** documented in `README.md` and `LICENSING.md`: collaboration (shared chats and agents), SSO (Google OAuth, OIDC, SAML, SCIM), RBAC, analytics (per team/LLM/agent), query history (long-retention auditable trail), custom code (PII redaction, sensitive-query rejection, custom analyses), and whitelabeling (name, logo, banners, brand color, custom domain). Each ships under `**/ee/**` as it lands.
+
+### Migration notes
+
+- **No code moves in this commit.** Every file currently in the repo stays where it is and becomes MIT — the EE directories don't exist yet. As EE features land they'll be authored under `apps/<app>/src/.../ee/` and `packages/<pkg>/ee/` paths.
+- Downstream forks that previously relied on AGPL copyleft propagation should review whether MIT changes their obligations (it does — MIT does not require derivatives to remain open source). If you forked the project specifically *because* of AGPL, open an issue and let us know.
+- Audit log retention, exports, and SIEM hooks ("Query History" in EE marketing) build on the CE per-call audit log that already ships today. The CE audit log itself stays in CE.
+- The skill marketplace contribution license changes from AGPL-3.0 to MIT in line with the rest of CE — see [`docs/ROADMAP.md`](./docs/ROADMAP.md) v0.3.
+
+### Files touched
+
+- `LICENSE` (replaced AGPL-3.0 with MIT)
+- `LICENSE-EE` (new)
+- `LICENSING.md` (new)
+- `README.md`, `CONTRIBUTING.md`, `DESIGN.md`, `CHANGELOG.md`
+- `apps/web/src/app/page.tsx` (Trust band + footer copyright + Licensing link)
+- `docs/ROADMAP.md`, `docs/launch/show-hn-draft.md`, `docs/designs/holo-v01-yc-prep.md`, `docs/decisions/0001-connector-port-interface.md`
+
 ## v0.3 — Per-user OAuth ACL fan-out (unreleased)
 
 Branch: `claude/holo-v0.3-per-user-oauth`. Companion slice: `claude/holo-v0.3-cli-as-tool` (CLI-as-tool registration; ships separately).

@@ -1,7 +1,7 @@
 # Design System — holo
 
 ## Product Context
-- **What this is:** Open-source, self-hostable MCP context layer for AI agents. AGPL-3.0.
+- **What this is:** Open-source, self-hostable MCP context layer for AI agents. Community Edition is MIT; Enterprise Edition (collaboration, SSO, RBAC, analytics, query history, custom code, whitelabeling) is commercial — see [`LICENSING.md`](./LICENSING.md).
 - **Who it's for:** Engineering teams maintaining one or more custom AI agents in production and tired of re-implementing the context layer per agent.
 - **Space/industry:** Developer infrastructure. Adjacent to Onyx, Dust, PipesHub (OSS); Linear, Vercel, Stripe (dev-tools UX leaders); Glean, Notion AI (closed-source competition).
 - **Project type:** Hybrid — dashboard for self-hosters (Connections, observability, marketplace) + marketing site for OSS adoption + public skills registry.

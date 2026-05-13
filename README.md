@@ -79,7 +79,7 @@ POST /v1/search { query, limit } → ranked chunks with snippet_url back to sour
 
 ## Architecture
 
-Three apps. 21 packages. 20 connectors. AGPL-3.0.
+Three apps. 21 packages. 20 connectors. MIT (Community Edition).
 
 ```mermaid
 flowchart LR
@@ -242,6 +242,25 @@ The implementation is preserved in the repo (`packages/skills/`, `packages/disco
 
 Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) before opening a PR. First-time contributors will be prompted to sign the [`CLA`](./CLA.md). Good first issues tagged `good-first-issue`.
 
+## Editions
+
+Holo ships in two editions in this same repo:
+
+- **Community Edition (CE)** — **[MIT](./LICENSE)**. Always free to self-host. Covers the entire core: all 20 connectors, hybrid search, MCP + REST gateway, OAuth provider, dashboard, worker, per-call audit log, skill synthesis + execution + marketplace, multi-tenant orgs, the CLI. If a file's path doesn't contain `/ee/`, it's CE and it's MIT.
+- **Enterprise Edition (EE)** — **[commercial license](./LICENSE-EE)**. Lives under `**/ee/**`. Free to read, fork, and run in development; production use requires a paid subscription. EE surfaces (rolled out incrementally):
+  - 👥 **Collaboration** — share chats and agents with members of your organization.
+  - 🔐 **Single Sign-On** — Google OAuth, OIDC, SAML; SCIM for group sync and user provisioning.
+  - 🛡️ **Role-Based Access Control** — RBAC over agents, actions, skills, and connectors.
+  - 📊 **Analytics** — usage broken down by team, LLM, agent, skill, and connector.
+  - 🕵️ **Query History** — long-retention, exportable audit of every agent and human query.
+  - 💻 **Custom code** — pre/post-processing hooks to strip PII, reject sensitive queries, or run custom analysis.
+  - 🎨 **Whitelabeling** — custom name, logo, banners, brand color, and domain.
+
+Full edition breakdown, what's CE vs EE today, and the contribution rules for each: [`LICENSING.md`](./LICENSING.md).
+
 ## License
 
-[AGPL-3.0-or-later](./LICENSE).
+- **Community Edition** — [MIT](./LICENSE)
+- **Enterprise Edition** — [commercial](./LICENSE-EE)
+
+See [`LICENSING.md`](./LICENSING.md) for the breakdown.
