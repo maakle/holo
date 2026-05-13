@@ -13,7 +13,7 @@ const APP_PREFIXES = [
   '/skills',
   '/connections',
   '/observability',
-  '/audit',
+  '/ee',
   '/profile',
 ];
 

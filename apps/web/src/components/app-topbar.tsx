@@ -8,7 +8,7 @@ const TITLES: Record<string, string> = {
   '/observability': 'Observability',
   '/connect-agent': 'Connect agent',
   '/dashboard/team': 'Team',
-  '/audit': 'Audit log',
+  '/ee/audit': 'Audit log',
   '/profile': 'Profile',
 };
 
