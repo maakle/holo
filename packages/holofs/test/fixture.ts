@@ -86,6 +86,8 @@ export async function seedFixture(db: DB, prefix: string): Promise<Fixture> {
       metadata: Record<string, unknown>;
     }> = [
       {
+        // Public Slack thread: any org member (org subject) OR channel
+        // member (channel subject) can see it.
         path: `/slack/#general/2026-05-14/thread-${orgSlug}-1.md`,
         kind: 'slack-thread',
         externalId: `slack-thread:CGEN:${orgSlug}-1`,
@@ -94,18 +96,25 @@ export async function seedFixture(db: DB, prefix: string): Promise<Fixture> {
         metadata: { channel_name: 'general', thread_ts: '1715000000.000100' },
       },
       {
+        // Private channel: ONLY users with the channel subject can see it.
+        // The `org:${orgId}` subject is intentionally omitted so the
+        // adversarial ACL tests (restricted user with org-only subjects
+        // shouldn't see this) hold.
         path: `/slack/#exec-pay/2026-05-14/thread-${orgSlug}-2.md`,
         kind: 'slack-thread',
         externalId: `slack-thread:CEXEC:${orgSlug}-2`,
-        acl: [`org:${orgId}`, `slack-channel:CEXEC-${orgSlug}`],
+        acl: [`slack-channel:CEXEC-${orgSlug}`],
         content: `[fixture] ${orgSlug} exec-pay thread (restricted)`,
         metadata: { channel_name: 'exec-pay', thread_ts: '1715000001.000200' },
       },
       {
+        // Tree-restricted Notion page: ONLY users with the tree subject.
+        // Same rationale — keeps the "restricted user (no tree) doesn't
+        // see /notion" test invariant honest.
         path: `/notion/sales/playbook-${orgSlug}.md`,
         kind: 'notion-page',
         externalId: `notion-page:${orgSlug}-pb`,
-        acl: [`org:${orgId}`, `notion-page-tree:tree-${orgSlug}-sales`],
+        acl: [`notion-page-tree:tree-${orgSlug}-sales`],
         content: `[fixture] ${orgSlug} sales playbook`,
         metadata: { notion_page_id: `pg-${orgSlug}-pb`, breadcrumb: 'Sales' },
       },
