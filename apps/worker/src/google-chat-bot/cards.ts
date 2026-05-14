@@ -12,6 +12,13 @@ import type { Source } from '../slack-bot/agent.js';
  * The `text` field is always populated as a fallback — Chat uses it for
  * push-notification previews and email digest snippets where cards aren't
  * rendered.
+ *
+ * TODO(reactions): once the Workspace Events reaction subscription lands
+ * (post-launch step 11 in docs/designs/google-chat-app.md), append a
+ * "React 👍/👎 to rate this answer" prompt to `answerCard` — mirroring
+ * the slack-bot/blocks.ts FEEDBACK_PROMPT block that nudges users into
+ * RFC-0008. Not adding it now: reactions don't yet produce feedback
+ * rows on Chat, so the prompt would be a UX promise we can't keep.
  */
 
 const ERROR_MESSAGE =

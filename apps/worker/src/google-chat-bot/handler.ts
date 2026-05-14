@@ -164,6 +164,7 @@ export async function handleGoogleChatBotJob(
     client,
     spaceName: job.spaceName,
     threadName,
+    logError: (msg) => logError(msg),
   });
   const progress = placeholder
     ? makeChatPlaceholderProgress({ client, messageName: placeholder.messageName })
@@ -189,6 +190,7 @@ export async function handleGoogleChatBotJob(
       spaceName: job.spaceName,
       threadName,
       placeholder,
+      logError: (msg) => logError(msg),
     });
     return { ok: true };
   }
@@ -200,6 +202,7 @@ export async function handleGoogleChatBotJob(
     placeholder,
     answer: agentResult.answer,
     sources: agentResult.sources,
+    logError: (msg) => logError(msg),
   });
 
   // RFC-0008 anchor: index the bot reply so a future reaction can be
