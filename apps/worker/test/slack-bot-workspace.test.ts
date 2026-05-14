@@ -8,6 +8,7 @@ const D = (iso: string) => new Date(iso);
 
 function row(opts: Partial<CredentialRow>): CredentialRow {
   return {
+    organizationId: 'org-default',
     accessToken: 'xoxb-default',
     slackAppConfigId: null,
     lastRefreshedAt: null,
@@ -29,36 +30,50 @@ describe('pickCredentials', () => {
     // based purely on recency. Custom is newer here but the inbound event is
     // for the shared app — we must not cross the streams.
     const shared = row({
+      organizationId: 'org-shared',
       accessToken: 'xoxb-shared',
       slackAppConfigId: null,
       lastRefreshedAt: D('2026-01-01T00:00:00Z'),
     });
     const custom = row({
+      organizationId: 'org-custom',
       accessToken: 'xoxb-custom',
       slackAppConfigId: 'cfg-1',
       lastRefreshedAt: D('2026-05-01T00:00:00Z'),
     });
-    expect(pickCredentials([shared, custom], null)).toBe('xoxb-shared');
+    expect(pickCredentials([shared, custom], null)).toEqual({
+      organizationId: 'org-shared',
+      accessToken: 'xoxb-shared',
+    });
   });
 
-  it('picks the custom-app row when hint matches its config id', () => {
+  it('picks the custom-app row when hint matches its config id, even in a different org', () => {
+    // Real failure mode: the same Slack workspace is installed twice — once as
+    // the shared app under org A, once as the EE custom app under org B. The
+    // worker must use the custom-app credentials (org B), not whichever
+    // sources row was older.
     const shared = row({
+      organizationId: 'org-A',
       accessToken: 'xoxb-shared',
       slackAppConfigId: null,
       lastRefreshedAt: D('2026-05-01T00:00:00Z'),
     });
     const custom = row({
+      organizationId: 'org-B',
       accessToken: 'xoxb-custom',
       slackAppConfigId: 'cfg-1',
       lastRefreshedAt: D('2026-01-01T00:00:00Z'),
     });
-    expect(pickCredentials([shared, custom], 'cfg-1')).toBe('xoxb-custom');
+    expect(pickCredentials([shared, custom], 'cfg-1')).toEqual({
+      organizationId: 'org-B',
+      accessToken: 'xoxb-custom',
+    });
   });
 
   it('returns null when hint asks for a config id no row has', () => {
     // Fail closed — never post with the wrong app's token just because some
-    // row matched the org. The user sees no reply (which is observable) rather
-    // than a reply from the wrong bot (which is confusing).
+    // row matched the team. The user sees no reply (which is observable)
+    // rather than a reply from the wrong bot (which is confusing).
     const rows = [
       row({ accessToken: 'xoxb-shared', slackAppConfigId: null }),
       row({ accessToken: 'xoxb-other', slackAppConfigId: 'cfg-2' }),
@@ -75,7 +90,7 @@ describe('pickCredentials', () => {
       accessToken: 'xoxb-newer',
       lastRefreshedAt: D('2026-05-01T00:00:00Z'),
     });
-    expect(pickCredentials([older, newer], undefined)).toBe('xoxb-newer');
+    expect(pickCredentials([older, newer], undefined)?.accessToken).toBe('xoxb-newer');
   });
 
   it('within a matching set, prefers the most recently refreshed row', () => {
@@ -92,7 +107,7 @@ describe('pickCredentials', () => {
       slackAppConfigId: 'cfg-1',
       lastRefreshedAt: D('2026-05-01T00:00:00Z'),
     });
-    expect(pickCredentials([a, b], 'cfg-1')).toBe('xoxb-userB');
+    expect(pickCredentials([a, b], 'cfg-1')?.accessToken).toBe('xoxb-userB');
   });
 
   it('falls back to connectedAt when lastRefreshedAt is null', () => {
@@ -106,6 +121,6 @@ describe('pickCredentials', () => {
       lastRefreshedAt: null,
       connectedAt: D('2026-05-01T00:00:00Z'),
     });
-    expect(pickCredentials([older, newer], null)).toBe('xoxb-newer');
+    expect(pickCredentials([older, newer], null)?.accessToken).toBe('xoxb-newer');
   });
 });

@@ -7,6 +7,7 @@ export interface WorkspaceCreds {
 }
 
 export interface CredentialRow {
+  organizationId: string;
   accessToken: string | null;
   slackAppConfigId: string | null;
   lastRefreshedAt: Date | null;
@@ -31,7 +32,7 @@ export interface CredentialRow {
 export function pickCredentials(
   rows: CredentialRow[],
   slackAppConfigId: string | null | undefined,
-): WorkspaceCreds['accessToken'] | null {
+): WorkspaceCreds | null {
   const usable = rows.filter(
     (r): r is CredentialRow & { accessToken: string } =>
       typeof r.accessToken === 'string' && r.accessToken.length > 0,
@@ -46,57 +47,60 @@ export function pickCredentials(
     const tb = (b.lastRefreshedAt ?? b.connectedAt).getTime();
     return tb - ta;
   });
-  return filtered[0]!.accessToken;
+  const top = filtered[0]!;
+  return { organizationId: top.organizationId, accessToken: top.accessToken };
 }
 
 /**
  * Resolve which workspace this Slack team_id maps to, and which token to
- * post with. We trust whichever connector_credentials row was registered with
- * this team (the install path upserts a `sources` row keyed by team_id), and
- * pick the matching `slackAppConfigId` so we don't post with the wrong app's
- * token when one workspace has both the shared Holo app AND an EE custom app.
+ * post with.
+ *
+ * The naive approach — `team_id → sources → org_id → credentials` — breaks
+ * down when a single Slack workspace is installed under multiple Holo orgs
+ * (e.g. once via the shared app under org A, then again via an EE custom app
+ * under org B). Both orgs have a `sources` row keyed by the same team_id, and
+ * picking one with LIMIT 1 routes events to the wrong org's credentials.
+ *
+ * Instead we join sources → credentials in one query and require both the
+ * team_id match AND the slack_app_config_id match (NULL for shared, specific
+ * UUID for custom). That uniquely identifies the install regardless of how
+ * many orgs have a sources row for this team.
  */
 export async function resolveWorkspace(
   db: DB,
   teamId: string,
   slackAppConfigId: string | null | undefined,
 ): Promise<WorkspaceCreds | null> {
-  const sourceRow = await db
-    .select({ organizationId: schema.sources.organizationId })
-    .from(schema.sources)
-    .where(
-      and(eq(schema.sources.provider, 'slack'), eq(schema.sources.externalId, teamId)),
-    )
-    .limit(1);
-  if (!sourceRow[0]) return null;
-  const orgId = sourceRow[0].organizationId;
-
   const whereParts: SQL[] = [
-    eq(schema.connectorCredentials.organizationId, orgId),
+    eq(schema.sources.provider, 'slack'),
+    eq(schema.sources.externalId, teamId),
     eq(schema.connectorCredentials.provider, 'slack'),
     eq(schema.connectorCredentials.status, 'active'),
   ];
-  // Push the filter into SQL when we have a hint — there's no point pulling
-  // every Slack credential into memory just to drop it. `undefined` keeps the
-  // pre-hint behavior for in-flight legacy jobs.
   if (slackAppConfigId === null) {
     whereParts.push(isNull(schema.connectorCredentials.slackAppConfigId));
   } else if (typeof slackAppConfigId === 'string') {
     whereParts.push(eq(schema.connectorCredentials.slackAppConfigId, slackAppConfigId));
   }
+  // `undefined` keeps the pre-hint behavior for in-flight legacy jobs: no
+  // slack_app_config_id filter at all, fall back to recency in pickCredentials.
+
   const credRows = await db
     .select({
+      organizationId: schema.connectorCredentials.organizationId,
       accessToken: schema.connectorCredentials.accessToken,
       slackAppConfigId: schema.connectorCredentials.slackAppConfigId,
       lastRefreshedAt: schema.connectorCredentials.lastRefreshedAt,
       connectedAt: schema.connectorCredentials.connectedAt,
     })
     .from(schema.connectorCredentials)
+    .innerJoin(
+      schema.sources,
+      eq(schema.sources.organizationId, schema.connectorCredentials.organizationId),
+    )
     .where(and(...whereParts));
 
-  const token = pickCredentials(credRows, slackAppConfigId);
-  if (!token) return null;
-  return { organizationId: orgId, accessToken: token };
+  return pickCredentials(credRows, slackAppConfigId);
 }
 
 export async function fetchOrgName(db: DB, organizationId: string): Promise<string> {

@@ -2,30 +2,34 @@ import { describe, it, expect, vi } from 'vitest';
 import { handleSlackBotJob, type SlackBotJob } from '../src/slack-bot/handler';
 import { ERROR_FALLBACK_TEXT } from '../src/slack-bot/blocks';
 
-// Fake DB with chainable .select().from().where().limit() returning canned rows.
-// Drizzle's actual chain is rich; we mimic just enough surface area for the
-// queries handler.ts makes (sources lookup, then connectorCredentials, then
-// optionally organization for the org-name fetch). Anything beyond the
-// configured slots returns [], which is fine for downstream listTools.
+// Fake DB with chainable .select().from()(.innerJoin?).where().limit?()
+// returning canned rows. Drizzle's actual chain is rich; we mimic just enough
+// surface area for the queries handler.ts makes:
+//   1. resolveWorkspace's join: connector_credentials ⋈ sources
+//   2. fetchOrgName: organization
+// Anything beyond the configured slots returns [], which is fine for
+// downstream listTools.
 function makeFakeDb(opts: {
-  sources?: Array<{ organizationId: string }>;
   credentials?: Array<{
+    organizationId: string;
     accessToken: string | null;
+    slackAppConfigId?: string | null;
     lastRefreshedAt: Date | null;
     connectedAt: Date;
   }>;
   organizations?: Array<{ name: string }>;
 }) {
-  const queries: unknown[] = [];
   let queryIdx = -1;
   const rowsForCall = [
-    opts.sources ?? [],
     opts.credentials ?? [],
     opts.organizations ?? [{ name: 'Test Org' }],
   ];
 
   const chain = {
     from() {
+      return chain;
+    },
+    innerJoin() {
       return chain;
     },
     where() {
@@ -42,15 +46,14 @@ function makeFakeDb(opts: {
   return {
     select() {
       queryIdx += 1;
-      queries.push(queryIdx);
       return chain;
     },
   } as unknown as Parameters<typeof handleSlackBotJob>[1]['db'];
 }
 
 describe('handleSlackBotJob', () => {
-  it('returns workspace_not_connected when team_id has no source row', async () => {
-    const db = makeFakeDb({ sources: [], credentials: [] });
+  it('returns workspace_not_connected when the join finds no credentials for this team', async () => {
+    const db = makeFakeDb({ credentials: [] });
     const result = await handleSlackBotJob(
       {
         kind: 'app_mention',
@@ -65,30 +68,11 @@ describe('handleSlackBotJob', () => {
     expect(result).toEqual({ ok: false, reason: 'workspace_not_connected' });
   });
 
-  it('returns workspace_not_connected when no active credentials exist', async () => {
-    const db = makeFakeDb({
-      sources: [{ organizationId: 'org-1' }],
-      credentials: [],
-    });
-    const result = await handleSlackBotJob(
-      {
-        kind: 'app_mention',
-        teamId: 'TGOOD',
-        channel: 'C1',
-        threadTs: '1.2',
-        asker: 'U1',
-        text: '<@UBOT> hello',
-      },
-      { db, agentImpl: async () => ({ answer: '', sources: [] }) },
-    );
-    expect(result).toEqual({ ok: false, reason: 'workspace_not_connected' });
-  });
-
   it('posts an ephemeral slash response and does not call agent for empty queries', async () => {
     const db = makeFakeDb({
-      sources: [{ organizationId: 'org-1' }],
       credentials: [
         {
+          organizationId: 'org-1',
           accessToken: 'xoxb-test',
           lastRefreshedAt: null,
           connectedAt: new Date('2026-01-01'),
@@ -120,9 +104,9 @@ describe('handleSlackBotJob', () => {
 
   it('makes slash response in_channel when --public flag is set', async () => {
     const db = makeFakeDb({
-      sources: [{ organizationId: 'org-1' }],
       credentials: [
         {
+          organizationId: 'org-1',
           accessToken: 'xoxb-test',
           lastRefreshedAt: null,
           connectedAt: new Date('2026-01-01'),
@@ -163,9 +147,9 @@ describe('handleSlackBotJob', () => {
 
   it('renders the agent answer with sources footer for app_mention', async () => {
     const db = makeFakeDb({
-      sources: [{ organizationId: 'org-1' }],
       credentials: [
         {
+          organizationId: 'org-1',
           accessToken: 'xoxb-test',
           lastRefreshedAt: null,
           connectedAt: new Date('2026-01-01'),
@@ -210,9 +194,9 @@ describe('handleSlackBotJob', () => {
 
   it('posts the standard error message when the agent throws', async () => {
     const db = makeFakeDb({
-      sources: [{ organizationId: 'org-1' }],
       credentials: [
         {
+          organizationId: 'org-1',
           accessToken: 'xoxb-test',
           lastRefreshedAt: null,
           connectedAt: new Date('2026-01-01'),
