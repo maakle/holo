@@ -29,14 +29,7 @@ interface CheckResult {
   detail: string;
 }
 
-const VALID_TOOLS = new Set([
-  'search',
-  'get_thread',
-  'get_pr',
-  'get_doc',
-  'get_call',
-  'get_ticket',
-]);
+const VALID_TOOLS = new Set(['search', 'bash']);
 
 function checkGoldenStructure(): CheckResult {
   const golden = loadGoldenSet();

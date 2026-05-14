@@ -2,14 +2,14 @@
 name: pr-security-review
 description: Run a focused security review on a pull request before it is merged to main
 tools:
-  - get_pr
   - search
+  - bash
 when_to_use: When a PR touches authentication, authorization, payment processing, data export, or third-party API integrations
 ---
 
 # Procedure
 
-Step 1: Use `get_pr` to read the full diff, PR description, and reviewer comments.
+Step 1: Use `bash` (e.g. `cat /github/[owner]/[repo]/pulls/[number].md`) to read the full diff, PR description, and reviewer comments.
 Step 2: Check for hardcoded secrets, API keys, or credentials in the diff — flag any string that looks like a key pattern.
 Step 3: Verify that new API endpoints enforce authentication (session check or API key validation) before any data access.
 Step 4: Check that user-supplied inputs are validated and sanitized before use in SQL queries, shell commands, or file paths.

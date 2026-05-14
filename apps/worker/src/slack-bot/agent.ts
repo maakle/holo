@@ -118,10 +118,12 @@ function citationToSource(c: WireCitation): Source {
 }
 
 /**
- * Best-effort source from a non-search artifact tool (get_doc, get_thread,
- * etc.). These don't participate in the citation namespace — they get
- * appended after the numbered citations as supplementary entries the model
- * can describe but not `[N]`-reference.
+ * Best-effort source from a non-search artifact tool. Today this only fires
+ * for custom tools that emit a `url` field on their output (built-in tools
+ * other than `search` no longer surface citations this way; bash returns
+ * raw stdout/stderr without a URL). These don't participate in the citation
+ * namespace — they get appended after the numbered citations as
+ * supplementary entries the model can describe but not `[N]`-reference.
  */
 function artifactToSource(toolName: string, output: unknown): Source | undefined {
   if (!output || typeof output !== 'object') return undefined;
@@ -136,8 +138,8 @@ function artifactToSource(toolName: string, output: unknown): Source | undefined
 
 // Anthropic's tool API requires `type: "object"` at the root of input_schema
 // AND rejects `anyOf`/`oneOf`/`allOf` at the top level. Zod's z.toJSONSchema
-// emits exactly those for unions (e.g. get_doc) and refined objects
-// (e.g. get_skill). Flatten the branches into a merged `properties` map; the
+// emits exactly those for unions and refined objects (e.g. get_skill, or
+// custom tools). Flatten the branches into a merged `properties` map; the
 // tool runner still validates via the original zod schema at runtime.
 function toAnthropicInputSchema(raw: unknown): Record<string, unknown> {
   const schema = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
@@ -203,8 +205,9 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
   // final answer text resolves unambiguously to `citationsAcc[N-1]`.
   const citationsAcc: WireCitation[] = [];
   const coverageAcc: WireSearchCoverage[] = [];
-  // Supplementary sources from non-search tools (get_doc, get_thread, …).
-  // Not part of the citation namespace; appended after the numbered list.
+  // Supplementary sources from non-search tools (custom tools that emit a
+  // `url` on their output). Not part of the citation namespace; appended
+  // after the numbered list.
   const artifactSources: Source[] = [];
   const logEvent = deps.logEvent ?? (() => {});
   let modelCallCount = 0;

@@ -28,12 +28,28 @@ describe('notionPageChunker', () => {
     }));
     const chunks = await notionPageChunker.chunk(basePage(blocks), ctx);
     expect(chunks).toHaveLength(6);
-    const blockKindCount = chunks.filter((c) => c.metadata.kind === 'block').length;
-    const pageKindCount = chunks.filter((c) => c.metadata.kind === 'page').length;
-    expect(blockKindCount).toBe(5);
-    expect(pageKindCount).toBe(1);
-    const pageChunk = chunks.find((c) => c.metadata.kind === 'page')!;
+    const blockChunks = chunks.filter((c) => c.metadata.kind === 'block');
+    const pageChunks = chunks.filter((c) => c.metadata.kind === 'page');
+    expect(blockChunks.length).toBe(5);
+    expect(pageChunks.length).toBe(1);
+    const pageChunk = pageChunks[0]!;
     expect(pageChunk.metadata.block_id).toBeUndefined();
+    expect(pageChunk.metadata.block_type).toBeUndefined();
+    expect(blockChunks.every((c) => c.metadata.block_type === 'paragraph')).toBe(true);
+  });
+
+  it('block chunks carry block_type metadata for downstream Markdown rendering', async () => {
+    const blocks = [
+      { blockId: 'b0', type: 'heading_1', text: 'Intro' },
+      { blockId: 'b1', type: 'bulleted_list_item', text: 'First' },
+      { blockId: 'b2', type: 'code', text: 'const x = 1;' },
+    ];
+    const chunks = await notionPageChunker.chunk(basePage(blocks), ctx);
+    expect(chunks.map((c) => c.metadata.block_type)).toEqual([
+      'heading_1',
+      'bulleted_list_item',
+      'code',
+    ]);
   });
 
   it('3-block page → 3 block chunks only (no page summary)', async () => {

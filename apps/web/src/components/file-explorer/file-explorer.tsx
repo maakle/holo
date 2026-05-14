@@ -32,7 +32,7 @@ import { Markdown } from '@/components/ui/markdown';
 
 const PAGE_SIZE = 50;
 
-type SortColumn = 'name' | 'source' | 'updatedAt';
+type SortColumn = 'name' | 'source' | 'size' | 'updatedAt';
 type SortDirection = 'asc' | 'desc';
 interface SortState {
   column: SortColumn;
@@ -51,6 +51,10 @@ function compareEntries(a: DirChild, b: DirChild, sort: SortState): number {
     const primary = av.localeCompare(bv) * dir;
     return primary !== 0 ? primary : a.name.localeCompare(b.name);
   }
+  if (sort.column === 'size') {
+    const primary = (a.sizeBytes - b.sizeBytes) * dir;
+    return primary !== 0 ? primary : a.name.localeCompare(b.name);
+  }
   // updatedAt — nulls always sink to the bottom regardless of direction.
   const at = a.updatedAt ? new Date(a.updatedAt).getTime() : null;
   const bt = b.updatedAt ? new Date(b.updatedAt).getTime() : null;
@@ -67,6 +71,7 @@ interface DirChild {
   source: string | null;
   updatedAt: string | null;
   kind: string | null;
+  sizeBytes: number;
 }
 
 interface ListResponse {
@@ -122,6 +127,17 @@ function prettySource(source: string | null): string {
   if (source.startsWith('openapi')) return 'OpenAPI';
   if (source === 'google-chat') return 'Google Chat';
   return source[0]!.toUpperCase() + source.slice(1);
+}
+
+function formatBytes(bytes: number): string {
+  if (!bytes) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`;
+  const gb = mb / 1024;
+  return `${gb < 10 ? gb.toFixed(1) : Math.round(gb)} GB`;
 }
 
 function relativeTime(iso: string | null): string {
@@ -221,7 +237,10 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
       }
       // First click on a new column picks the more useful default:
       // names ascend, timestamps descend (newest first).
-      return { column, direction: column === 'updatedAt' ? 'desc' : 'asc' };
+      return {
+        column,
+        direction: column === 'updatedAt' || column === 'size' ? 'desc' : 'asc',
+      };
     });
   }, []);
 
@@ -282,9 +301,10 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
       <Breadcrumb segments={segments} onNavigate={navigateTo} />
 
       <div className="border border-border rounded-md overflow-hidden">
-        <div className="grid grid-cols-[1fr_140px_180px] gap-4 px-4 py-2 text-caption text-text-subtle border-b border-border bg-surface">
+        <div className="grid grid-cols-[1fr_140px_100px_180px] gap-4 px-4 py-2 text-caption text-text-subtle border-b border-border bg-surface">
           <SortHeader label="Name" column="name" sort={sort} onClick={onSortClick} />
           <SortHeader label="Source" column="source" sort={sort} onClick={onSortClick} />
+          <SortHeader label="Size" column="size" sort={sort} onClick={onSortClick} />
           <SortHeader label="Synced" column="updatedAt" sort={sort} onClick={onSortClick} />
         </div>
 
@@ -315,7 +335,7 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
               return (
                 <li
                   key={entry.name}
-                  className="grid grid-cols-[1fr_140px_180px] gap-4 px-4 py-3 items-center border-b border-border last:border-b-0 hover:bg-surface cursor-pointer transition-colors"
+                  className="grid grid-cols-[1fr_140px_100px_180px] gap-4 px-4 py-3 items-center border-b border-border last:border-b-0 hover:bg-surface cursor-pointer transition-colors"
                   onClick={() => onRowClick(entry)}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -335,6 +355,9 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
                     ) : (
                       <span className="text-text-subtle">—</span>
                     )}
+                  </div>
+                  <div className="text-body-small text-text-muted tabular-nums">
+                    {formatBytes(entry.sizeBytes)}
                   </div>
                   <div className="text-body-small text-text-muted tabular-nums">
                     {relativeTime(entry.updatedAt)}

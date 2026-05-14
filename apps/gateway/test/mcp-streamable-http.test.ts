@@ -101,7 +101,7 @@ describe('MCP streamable HTTP transport', () => {
     const allowlists: string[][] = [
       ['search'],   // init request: doesn't matter
       ['search'],   // first tools/call: allowed
-      ['get_pr'],   // second tools/call: search NOT in list ⇒ must reject
+      ['bash'],     // second tools/call: search NOT in list ⇒ must reject
     ];
     let resolveCalls = 0;
 

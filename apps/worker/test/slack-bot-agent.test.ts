@@ -118,8 +118,9 @@ describe('runAgent', () => {
       { stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] },
     ]);
 
-    // Zod unions (e.g. get_doc) produce { anyOf: [...] } at root. Anthropic
-    // rejects both root-level `anyOf` and missing `type:object`. We flatten.
+    // Zod unions (e.g. custom tools with branched inputs) produce
+    // { anyOf: [...] } at root. Anthropic rejects both root-level `anyOf`
+    // and missing `type:object`. We flatten.
     const unionSchema = {
       anyOf: [
         { type: 'object', properties: { artifact_id: { type: 'string' } }, required: ['artifact_id'] },
@@ -128,7 +129,7 @@ describe('runAgent', () => {
       ],
     };
     const tools: ToolDefinition[] = [
-      { name: 'get_doc', description: '', inputSchema: unionSchema, run: async () => ({}) },
+      { name: 'fetch_artifact', description: '', inputSchema: unionSchema, run: async () => ({}) },
     ];
 
     await runAgent({
@@ -153,7 +154,7 @@ describe('runAgent', () => {
     });
   });
 
-  it('supports multi-hop: search → get_thread → final answer', async () => {
+  it('supports multi-hop: search → bash → final answer', async () => {
     const { client, create } = makeFakeAnthropic([
       {
         stop_reason: 'tool_use',
@@ -161,17 +162,24 @@ describe('runAgent', () => {
       },
       {
         stop_reason: 'tool_use',
-        content: [{ type: 'tool_use', id: 't2', name: 'get_thread', input: { channel: 'C1', ts: '1.1' } }],
+        content: [
+          {
+            type: 'tool_use',
+            id: 't2',
+            name: 'bash',
+            input: { script: 'cat /slack/#incidents/2026-05-14/thread-1.1.md' },
+          },
+        ],
       },
       { stop_reason: 'end_turn', content: [{ type: 'text', text: 'The incident was caused by a stale cache.' }] },
     ]);
 
     const searchRun = vi.fn(async () => ({ results: [] }));
-    const threadRun = vi.fn(async () => ({ messages: [{ user: 'U1', text: 'cache fix' }] }));
+    const bashRun = vi.fn(async () => ({ stdout: 'cache fix', stderr: '', exit_code: 0 }));
 
     const tools: ToolDefinition[] = [
       { name: 'search', description: '', inputSchema: {}, run: searchRun },
-      { name: 'get_thread', description: '', inputSchema: {}, run: threadRun },
+      { name: 'bash', description: '', inputSchema: {}, run: bashRun },
     ];
 
     const result = await runAgent({
@@ -186,7 +194,7 @@ describe('runAgent', () => {
 
     expect(result.answer).toBe('The incident was caused by a stale cache.');
     expect(searchRun).toHaveBeenCalledTimes(1);
-    expect(threadRun).toHaveBeenCalledTimes(1);
+    expect(bashRun).toHaveBeenCalledTimes(1);
     expect(create).toHaveBeenCalledTimes(3);
   });
 

@@ -19,15 +19,13 @@ describe('createCustomTool name validation', () => {
   };
 
   it.each([
+    'bash',
     'search',
-    'get_pr',
-    'get_thread',
-    'get_doc',
-    'get_call',
-    'get_ticket',
     'list_skills',
     'get_skill',
     'execute_skill',
+    'get_account_brief',
+    'submit_feedback',
   ])('rejects built-in tool name %s', async (name) => {
     await expect(createCustomTool(fakeDb, { ...baseInput, name })).rejects.toThrow(/built-in/i);
   });

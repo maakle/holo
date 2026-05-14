@@ -24,7 +24,7 @@ Output ONLY a valid YAML frontmatter + Markdown document in this exact format:
 name: <slug-with-hyphens>
 description: <one sentence: what this skill does and when to invoke it>
 tools:
-  - <holo mcp tool names used in steps; valid values: search, get_thread, get_pr, get_doc, get_call, get_ticket>
+  - <holo mcp tool names used in steps; valid values: search, bash>
 when_to_use: <2-3 sentences describing the trigger conditions>
 ---
 
@@ -40,8 +40,10 @@ Step 2: ...
 
 Rules:
 - name must match the provided slug exactly
-- tools array must only contain: search, get_thread, get_pr, get_doc, get_call, get_ticket
-- Steps must be concrete and tool-grounded (e.g. "Use search to find..."; "Use get_ticket to read...")
+- tools array must only contain: search, bash
+- Steps must be concrete and tool-grounded. Prefer bash for path-shaped operations
+  ("Use bash to cat /github/{owner}/{repo}/pulls/{number}.md"; "Use bash to grep -r 'order 66' /sample"),
+  and search for fuzzy / semantic queries ("Use search to find customer complaints about pricing").
 - Parameterize specifics: use [customer name], [ticket id], [repo name] instead of actual values
 - No hallucinated tools or systems — only reference what appears in the artifacts
 - Output must parse as valid YAML frontmatter`;

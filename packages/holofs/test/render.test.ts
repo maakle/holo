@@ -66,6 +66,58 @@ describe('renderArtifact', () => {
     expect(out.redactedChunkCount).toBe(2);
   });
 
+  it('Notion: drops page-summary chunk and translates block types to Markdown', () => {
+    const out = renderArtifact(
+      'notion-page',
+      [
+        chunk({
+          kind: 'notion-page',
+          content: 'crumb / paragraph: foo: bar baz quux',
+          metadata: { kind: 'page' },
+        }),
+        chunk({
+          kind: 'notion-page',
+          content: 'Eng / Arch / heading_1\nIntro',
+          metadata: { kind: 'block', block_type: 'heading_1' },
+        }),
+        chunk({
+          kind: 'notion-page',
+          content: 'Eng / Arch / paragraph\nHello world',
+          metadata: { kind: 'block', block_type: 'paragraph' },
+        }),
+        chunk({
+          kind: 'notion-page',
+          content: 'Eng / Arch / bulleted_list_item\nFirst item',
+          metadata: { kind: 'block', block_type: 'bulleted_list_item' },
+        }),
+        chunk({
+          kind: 'notion-page',
+          content: 'Eng / Arch / code\nconst x = 1;',
+          metadata: { kind: 'block', block_type: 'code' },
+        }),
+      ],
+      5,
+    );
+    expect(out.content).toBe(
+      '# Intro\n\nHello world\n\n- First item\n\n```\nconst x = 1;\n```',
+    );
+  });
+
+  it('Notion: falls back to parsing block_type from content header when metadata is absent', () => {
+    const out = renderArtifact(
+      'notion-page',
+      [
+        chunk({
+          kind: 'notion-page',
+          content: 'Eng / Arch / heading_2\nLegacy chunk',
+          metadata: { kind: 'block' },
+        }),
+      ],
+      1,
+    );
+    expect(out.content).toBe('## Legacy chunk');
+  });
+
   it('strips empty-content chunks before joining', () => {
     const out = renderArtifact(
       'pylon-ticket',

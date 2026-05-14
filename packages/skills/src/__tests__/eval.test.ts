@@ -48,7 +48,7 @@ describe('golden set eval harness', () => {
   });
 
   it('all tools in golden set are valid holo MCP tools', () => {
-    const VALID_TOOLS = new Set(['search', 'get_thread', 'get_pr', 'get_doc', 'get_call', 'get_ticket']);
+    const VALID_TOOLS = new Set(['search', 'bash']);
     const golden = loadGoldenSet();
     for (const g of golden) {
       for (const tool of g.parsed.frontmatter.tools) {

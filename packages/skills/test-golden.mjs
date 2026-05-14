@@ -10,7 +10,7 @@ try {
     const tools = parsed.frontmatter.tools;
     
     // Extract tools used in the body
-    const usedToolsMatch = parsed.body.match(/Use `(search|get_thread|get_pr|get_doc|get_call|get_ticket)`/g) || [];
+    const usedToolsMatch = parsed.body.match(/Use `(search|bash)`/g) || [];
     const usedTools = [...new Set(usedToolsMatch.map(m => m.match(/`([^`]+)`/)[1]))];
     
     const declared = new Set(tools);

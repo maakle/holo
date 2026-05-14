@@ -3,14 +3,13 @@ name: triage-support-ticket
 description: Triage an incoming support ticket — classify severity, assign owner, and send acknowledgement
 tools:
   - search
-  - get_ticket
-  - get_thread
+  - bash
 when_to_use: When a new support ticket arrives in Pylon and needs initial triage within the SLA window
 ---
 
 # Procedure
 
-Step 1: Use `get_ticket` to read the full ticket body, subject, and any attachments.
+Step 1: Use `bash` (e.g. `cat /pylon/tickets/[ticket id].md`) to read the full ticket body, subject, and any attachments.
 Step 2: Check the customer's contract tier from ticket metadata (Enterprise SLA: 2h first response; SMB SLA: 8h).
 Step 3: Use `search` to check if this is a known issue or duplicate (query: "[error text or feature] known issue OR duplicate").
 Step 4: Classify severity: P0 (data loss or full service down), P1 (major feature broken), P2 (degraded, workaround available), P3 (question or cosmetic issue).

@@ -28,6 +28,11 @@ interface DirChild {
   /** For files: the source-system kind (slack-thread, github-pr, …); for
    * directories, null. */
   kind: string | null;
+  /** Total byte size of rendered chunk content under this entry. For files,
+   * the sum of `octet_length(content)` across the artifact's visible chunks;
+   * for directories, the sum across all visible descendants. Approximate —
+   * does not include per-chunk render separators. */
+  sizeBytes: number;
 }
 
 export const GET = withActiveOrg(async ({ req, ctx, session, orgId }) => {
@@ -73,12 +78,28 @@ export const GET = withActiveOrg(async ({ req, ctx, session, orgId }) => {
     kind: string;
     provider: string;
     fetched_at: Date | string;
+    size_bytes: number | string | null;
   };
 
+  // Size = sum of octet_length(content) across the artifact's chunks that
+  // pass the same ACL check. Done as a LATERAL aggregate so each artifact
+  // gets one row; correlated subquery would also work but LATERAL keeps the
+  // plan obvious. The chunk-level ACL re-check matches what HoloFs.readFile
+  // does for defense in depth.
   const enrichment = await ctx.db.execute<EnrichmentRow>(sql`
-    SELECT sa.path, sa.kind, COALESCE(s.provider, sa.kind) AS provider, sa.fetched_at
+    SELECT sa.path,
+           sa.kind,
+           COALESCE(s.provider, sa.kind) AS provider,
+           sa.fetched_at,
+           COALESCE(sz.size_bytes, 0) AS size_bytes
     FROM source_artifacts sa
     LEFT JOIN sources s ON s.id = sa.source_id
+    LEFT JOIN LATERAL (
+      SELECT SUM(octet_length(c.content))::bigint AS size_bytes
+      FROM chunks c
+      WHERE c.source_artifact_id = sa.id
+        AND c.acl_subjects && ${aclArrayLiteral}::text[]
+    ) sz ON TRUE
     WHERE sa.organization_id = ${orgId}
       AND sa.path IS NOT NULL
       AND sa.deleted_at IS NULL
@@ -97,6 +118,7 @@ export const GET = withActiveOrg(async ({ req, ctx, session, orgId }) => {
     provider: string;
     updated_at: Date | string;
     kind: string;
+    size_bytes: number;
   };
   const groupedByName = new Map<string, Group>();
   for (const r of rawRows) {
@@ -108,6 +130,8 @@ export const GET = withActiveOrg(async ({ req, ctx, session, orgId }) => {
     const isFile = slashIdx === -1;
     const existing = groupedByName.get(name);
     const fetched = r.fetched_at instanceof Date ? r.fetched_at : new Date(r.fetched_at);
+    // size_bytes can come back as string for bigint depending on driver.
+    const sizeNum = Number(r.size_bytes ?? 0) || 0;
     if (!existing) {
       groupedByName.set(name, {
         name,
@@ -115,10 +139,12 @@ export const GET = withActiveOrg(async ({ req, ctx, session, orgId }) => {
         provider: r.provider,
         updated_at: fetched,
         kind: r.kind,
+        size_bytes: sizeNum,
       });
     } else {
       // A segment is a directory if ANY underlying path makes it so.
-      // Provider/kind/updated_at take the max-fetched_at row.
+      // Provider/kind/updated_at take the max-fetched_at row; size is the
+      // sum across every artifact under this segment.
       const existingFetched =
         existing.updated_at instanceof Date
           ? existing.updated_at
@@ -128,6 +154,7 @@ export const GET = withActiveOrg(async ({ req, ctx, session, orgId }) => {
         existing.kind = r.kind;
         existing.updated_at = fetched;
       }
+      existing.size_bytes += sizeNum;
       if (!isFile) existing.is_file = false;
     }
     if (groupedByName.size >= limit) break;
@@ -146,6 +173,7 @@ export const GET = withActiveOrg(async ({ req, ctx, session, orgId }) => {
             : new Date(enrich.updated_at).toISOString())
         : null,
       kind: e.type === 'file' ? enrich?.kind ?? null : null,
+      sizeBytes: enrich?.size_bytes ?? 0,
     };
   });
 

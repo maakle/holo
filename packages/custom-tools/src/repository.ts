@@ -4,17 +4,16 @@ import { schema } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
 import type { CustomToolRow } from './types';
 
-// keep in sync with apps/gateway/src/tools/index.ts
+// Keep in sync with the built-in spec in packages/agent-tools/src/registry.ts.
+// Custom tools cannot reuse these names.
 const BUILTIN_TOOL_NAMES = new Set([
+  'bash',
   'search',
-  'get_pr',
-  'get_thread',
-  'get_doc',
-  'get_call',
-  'get_ticket',
   'list_skills',
   'get_skill',
   'execute_skill',
+  'get_account_brief',
+  'submit_feedback',
 ]);
 
 export async function listCustomTools(

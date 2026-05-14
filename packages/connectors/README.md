@@ -117,6 +117,18 @@ export async function processTicket(
   body + its engagement timeline), pass an explicit
   `sourceArtifactId: 'hubspot-contact:<id>'` so they share one
   `source_artifacts` row.
+- **ACL invariant — every chunk MUST include `` `org:${ctx.organizationId}` `` in
+  `aclSubjects`.** The Files API and RAG retrieval both filter rows by
+  `acl_subjects && userSubjects`. Every user holds `org:${orgId}` as a subject,
+  so this is what makes your records visible to anyone in the workspace. The
+  framework auto-injects this subject and `console.warn`s once per `(provider,
+  kind)` per sync if it's missing — treat that warning as a bug to fix.
+  Provider-scoped subjects (e.g. `airtable:base:X`, `confluence:space:Y`,
+  `slack:user:U`) are additional **grants**, not restrictions — Postgres `&&`
+  is array overlap, so any matching subject makes the row visible. Add them
+  alongside `org:${id}` when you have richer per-user/per-space scoping (only
+  Slack populates a per-user subject cache today, via
+  [packages/user-subjects](../user-subjects)).
 - **URL invariant — every chunk MUST carry a deep link.** Put it in
   `metadata.url` (preferred) or `metadata.permalink` (legacy alias also
   accepted by the search layer). This is what makes citations like `[1]` in

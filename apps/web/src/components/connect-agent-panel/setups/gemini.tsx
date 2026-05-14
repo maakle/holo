@@ -173,8 +173,8 @@ if (call?.name === 'holo_search') {
         <Step n={5}>
           Both snippets call <InlineCode>POST /v1/search</InlineCode> on the same gateway as the
           MCP path — same chunks, same ACL, same audit log. Add more tools (
-          <InlineCode>get_thread</InlineCode>, <InlineCode>get_pr</InlineCode>,{' '}
-          <InlineCode>list_skills</InlineCode>, …) by mirroring the OpenAPI spec at{' '}
+          <InlineCode>bash</InlineCode>, <InlineCode>list_skills</InlineCode>,{' '}
+          <InlineCode>execute_skill</InlineCode>, …) by mirroring the OpenAPI spec at{' '}
           <InlineCode>{gatewayBase}/openapi.json</InlineCode>.
         </Step>
       </ol>

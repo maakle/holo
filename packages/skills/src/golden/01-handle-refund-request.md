@@ -3,14 +3,14 @@ name: handle-refund-request
 description: Process a customer refund or credit request end-to-end through the support queue
 tools:
   - search
-  - get_ticket
+  - bash
 when_to_use: When a customer contacts support requesting a full or partial refund, service credit, or billing dispute resolution
 ---
 
 # Procedure
 
 Step 1: Use `search` to pull the customer's full ticket history (query: "[customer name] refund OR credit OR billing").
-Step 2: Use `get_ticket` on the most recent open ticket to read the stated reason and attached context.
+Step 2: Use `bash` (e.g. `cat /pylon/tickets/[ticket id].md`) on the most recent open ticket to read the stated reason and attached context.
 Step 3: Check contract tier from ticket metadata — Enterprise customers can receive credits up to 30 days without manager approval; SMB customers cap at 7 days.
 Step 4: If the refund amount is ≤ $500, process directly in Pylon and reply with the confirmation template.
 Step 5: If the refund amount is > $500 or involves a disputed contract clause, escalate to the AE who owns the account.

@@ -41,6 +41,7 @@ export const notionPageChunker: Chunker<NotionPageInput> = {
         metadata: {
           ...baseMeta,
           block_id: block.blockId,
+          block_type: block.type,
           kind: 'block',
         },
         aclSubjects,

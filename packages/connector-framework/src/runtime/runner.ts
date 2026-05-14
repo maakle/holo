@@ -158,6 +158,17 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
     const permalink = metadata['permalink'];
     return typeof permalink === 'string' && permalink.length > 0;
   };
+  // Per-(provider, kind) "no org subject" warning dedup + auto-inject. The
+  // Files API and RAG retrieval both filter rows by
+  // `acl_subjects && userSubjects`, and every user holds `org:${orgId}` as a
+  // subject. A chunk without `org:${orgId}` in its aclSubjects is therefore
+  // invisible to every Holo surface for org members (unless the user happens
+  // to hold a matching provider-scoped subject via the user-subjects cache,
+  // which today only Slack populates). Auto-inject so a connector author
+  // can't silently regress; warn once per kind so the underlying bug
+  // surfaces in operator logs.
+  const orgSubject = `org:${organizationId}`;
+  const warnedAclKinds = new Set<string>();
   const tallyNew = (kind: string): void => {
     const slot = breakdown[kind] ?? { new: 0, deduped: 0 };
     slot.new += 1;
@@ -206,6 +217,18 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
             `[connector-framework] ${spec.id}: chunks of kind '${chunk.kind}' are being upserted without metadata.url or metadata.permalink. Citations to this content cannot deep-link from the Slack/Web answer surface. See packages/connectors/README.md "URL invariant".`,
           );
         }
+        // Auto-inject org tenant subject if missing, and warn once so the
+        // underlying bug is visible in operator logs.
+        let aclSubjects = chunk.aclSubjects;
+        if (!aclSubjects.includes(orgSubject)) {
+          if (!warnedAclKinds.has(chunk.kind)) {
+            warnedAclKinds.add(chunk.kind);
+            console.warn(
+              `[connector-framework] ${spec.id}: chunks of kind '${chunk.kind}' are being upserted without 'org:\${organizationId}' in aclSubjects. Auto-injecting — but fix the chunker so the row is visible to org members in Files + RAG retrieval. See packages/connectors/README.md "ACL invariant".`,
+            );
+          }
+          aclSubjects = [orgSubject, ...aclSubjects];
+        }
         const hash = chunkHash(chunk.kind, chunk.content);
         if (existingHashes.has(hash)) {
           tallyDeduped(chunk.kind);
@@ -219,7 +242,7 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
           content: chunk.content,
           contentHash: hash,
           metadata: chunk.metadata,
-          aclSubjects: chunk.aclSubjects,
+          aclSubjects,
           sourceArtifactId:
             chunk.sourceArtifactId ??
             deriveSourceArtifactId(spec.id, chunk.kind, chunk.externalId),

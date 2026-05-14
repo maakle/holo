@@ -77,15 +77,7 @@ export function progressTextForEvent(
   if (event === 'tool_call' || event === 'tool_error') {
     const tool = String(fields.tool ?? '');
     if (tool === 'search') return '_🔍 searching your sources…_';
-    if (
-      tool === 'get_doc' ||
-      tool === 'get_pr' ||
-      tool === 'get_thread' ||
-      tool === 'get_call' ||
-      tool === 'get_ticket'
-    ) {
-      return '_📄 reading sources…_';
-    }
+    if (tool === 'bash') return '_📄 reading sources…_';
     if (tool === 'list_skills' || tool === 'get_skill' || tool === 'execute_skill') {
       return '_🛠 using a skill…_';
     }

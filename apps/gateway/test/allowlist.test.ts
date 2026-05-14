@@ -8,11 +8,11 @@ describe('checkToolAllowed', () => {
   });
 
   it('allows tool present in allowlist', () => {
-    expect(checkToolAllowed('search', ['search', 'get_pr'])).toBe(true);
+    expect(checkToolAllowed('search', ['search', 'bash'])).toBe(true);
   });
 
   it('blocks tool not in allowlist', () => {
-    expect(checkToolAllowed('get_ticket', ['search', 'get_pr'])).toBe(false);
+    expect(checkToolAllowed('some_custom_tool', ['search', 'bash'])).toBe(false);
   });
 
   it('always allows execute_skill regardless of allowlist', () => {
@@ -80,9 +80,9 @@ describe('resolveActiveToolAllowlist', () => {
   });
 
   it('returns the matched skill toolAllowlist when the slug resolves', async () => {
-    const db = stubDb([{ toolAllowlist: ['search', 'get_pr'] }]);
+    const db = stubDb([{ toolAllowlist: ['search', 'bash'] }]);
     const result = await resolveActiveToolAllowlist(db, 'org-1', 'pr-security-review');
-    expect(result).toEqual(['search', 'get_pr']);
+    expect(result).toEqual(['search', 'bash']);
   });
 
   it('returns [] when the matched skill has an empty allowlist (allow-all default)', async () => {
@@ -97,7 +97,7 @@ describe('REST surface gate (parity with MCP transport)', () => {
     // The REST router calls checkToolAllowed('search', allowlist) and throws
     // ALLOWLIST_EMPTY when it returns false. Test the predicate directly to
     // match the MCP transport's behavior.
-    expect(checkToolAllowed('search', ['get_pr'])).toBe(false);
+    expect(checkToolAllowed('search', ['bash'])).toBe(false);
   });
 
   it("permits search when the active skill's allowlist explicitly includes 'search'", () => {
@@ -109,8 +109,8 @@ describe('REST surface gate (parity with MCP transport)', () => {
   });
 
   it('always permits list_skills, get_skill, execute_skill regardless of active skill (skill-pivot exit hatches)', () => {
-    expect(checkToolAllowed('list_skills', ['get_pr'])).toBe(true);
-    expect(checkToolAllowed('get_skill', ['get_pr'])).toBe(true);
-    expect(checkToolAllowed('execute_skill', ['get_pr'])).toBe(true);
+    expect(checkToolAllowed('list_skills', ['bash'])).toBe(true);
+    expect(checkToolAllowed('get_skill', ['bash'])).toBe(true);
+    expect(checkToolAllowed('execute_skill', ['bash'])).toBe(true);
   });
 });

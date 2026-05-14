@@ -3,13 +3,6 @@ import type { DB } from '@holo/db';
 import { listCustomTools, buildCustomToolDefinition } from '@holo/custom-tools';
 import { searchInputSchema, runSearchTool } from './tools/search';
 import { bashInputSchema, runBashTool, BASH_TOOL_DESCRIPTION } from './tools/bash';
-// Legacy per-source getters (get_pr, get_thread, get_doc, get_call, get_ticket)
-// were removed from the registry on 2026-05-14 in favour of `bash cat /...`.
-// The implementation files in `./tools/get-*.ts` and `./tools/_artifact-lookup.ts`
-// remain on disk for one telemetry cycle; once `mcp_invocations` confirms zero
-// legacy traffic they can be deleted along with the dead-but-harmless string
-// references in custom-tools, skills synthesis, slack-bot citation
-// extraction, gateway allowlist tests, and the landing-page marketing copy.
 import { listSkillsInputSchema, runListSkillsTool } from './tools/list-skills';
 import { getSkillInputSchema, runGetSkillTool } from './tools/get-skill';
 import { executeSkillInputSchema, runExecuteSkillTool } from './tools/execute-skill';

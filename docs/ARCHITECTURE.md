@@ -156,8 +156,7 @@ Onyx's `mcp_server` runs as a sibling service. We do the same. Independent scali
 - `search` — hybrid RRF retrieval (pgvector + tsvector). Kept as a separate tool so weak models that can't generate well-formed bash have a one-shot path. Accepts optional `path` arg to scope semantic search to a virtual-FS subtree.
 - `who_knows_about` — expertise/people search.
 
-*Deprecated retrieval tools (kept for ≥2 minor versions, then removed once telemetry shows agents have migrated to `bash`):*
-- `get_pr`, `get_thread`, `get_doc`, `get_call`, `get_ticket`, `fetch_document`, `list_recent` — all still resolve through one shared ACL helper (`tools/_artifact-lookup.ts`) but their tool descriptions are annotated `DEPRECATED: use bash with cat /path instead`.
+*Retired retrieval tools (2026-05-14):* The legacy per-source getters (`get_pr`, `get_thread`, `get_doc`, `get_call`, `get_ticket`) and their shared `_artifact-lookup` helper were removed in favour of `bash`. Rationale and rollout in [ADR 0006](decisions/0006-virtual-filesystem-over-context-layer.md) and [RFC 0009](rfcs/0009-virtual-filesystem-over-context-layer.md).
 
 *Why bash + one retriever instead of one tool per source:* Anthropic and Docker warn agents handle ~30 tools well, get confused past ~50. Holo's flat surface was already at ~10 and grew with every new connector. `bash` + `search` is **2 retrieval tools regardless of connector count**. ~70 Unix commands compose for free; `grep -r Acme /slack | head -20` is one round-trip instead of five. See `docs/rfcs/0009-virtual-filesystem-over-context-layer.md`.
 
@@ -207,7 +206,7 @@ type Skill = {
   // Tool allowlist: what MCP tools can the agent call when this skill is active?
   // This is holo's answer to "Pylon MCP can send both internal AND external messages
   // and we can't restrict it." Per-skill tool gating is enforced at the MCP proxy layer.
-  toolAllowlist: string[];         // e.g., ['search', 'get_thread', 'get_pr'] — must be a subset of available MCP tools
+  toolAllowlist: string[];         // e.g., ['search', 'bash'] — must be a subset of available MCP tools
   toolDenylist?: string[];         // optional explicit denials (e.g., ['pylon.send_external'])
 
   // System prompt + procedure body in Anthropic Skill format

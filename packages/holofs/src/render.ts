@@ -38,13 +38,60 @@ const defaultRenderer: Renderer = {
   },
 };
 
-/** Notion: page-level summary first if present, then blocks in insert order. */
+// Notion block-type → Markdown. The page-summary chunk is a retrieval signal,
+// not a human view; we drop it and render block chunks only.
+function notionBlockToMarkdown(blockType: string, text: string): string {
+  switch (blockType) {
+    case 'heading_1':
+      return `# ${text}`;
+    case 'heading_2':
+      return `## ${text}`;
+    case 'heading_3':
+      return `### ${text}`;
+    case 'bulleted_list_item':
+      return `- ${text}`;
+    case 'numbered_list_item':
+      return `1. ${text}`;
+    case 'to_do':
+      return `- [ ] ${text}`;
+    case 'quote':
+    case 'callout':
+      return `> ${text}`;
+    case 'code':
+      return '```\n' + text + '\n```';
+    case 'divider':
+      return '---';
+    case 'table_of_contents':
+      return '';
+    default:
+      return text;
+  }
+}
+
+function extractNotionBlock(chunk: ChunkLike): { type: string; text: string } | null {
+  // Block-chunk content is `${breadcrumb} / ${type}\n${text}` — strip the header.
+  const newlineIdx = chunk.content.indexOf('\n');
+  if (newlineIdx === -1) return null;
+  const header = chunk.content.slice(0, newlineIdx);
+  const text = chunk.content.slice(newlineIdx + 1).trimEnd();
+  const metaType = chunk.metadata?.block_type;
+  const type = typeof metaType === 'string'
+    ? metaType
+    : (header.split(' / ').pop() ?? '');
+  return { type, text };
+}
+
 const notionRenderer: Renderer = {
   render(chunks) {
-    const summary = chunks.filter((c) => (c.metadata?.kind ?? c.metadata?.chunk_kind) === 'page');
-    const blocks = chunks.filter((c) => (c.metadata?.kind ?? c.metadata?.chunk_kind) !== 'page');
-    return [...summary, ...blocks]
-      .map((c) => c.content.trimEnd())
+    const blocks = chunks.filter(
+      (c) => (c.metadata?.kind ?? c.metadata?.chunk_kind) !== 'page',
+    );
+    return blocks
+      .map((c) => {
+        const parsed = extractNotionBlock(c);
+        if (!parsed) return c.content.trimEnd();
+        return notionBlockToMarkdown(parsed.type, parsed.text);
+      })
       .filter((s) => s.length > 0)
       .join('\n\n');
   },

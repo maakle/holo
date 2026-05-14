@@ -6,14 +6,14 @@ name: handle-refund-request
 description: Process customer refund requests through the support queue
 tools:
   - search
-  - get_ticket
+  - bash
 when_to_use: When a customer contacts support requesting a refund or credit
 ---
 
 # Procedure
 
 Step 1: Search for the customer's ticket history using search.
-Step 2: Retrieve the specific ticket with get_ticket.
+Step 2: Read the specific ticket with bash, e.g. cat /pylon/tickets/[ticket id].md.
 Step 3: Check refund eligibility against policy.
 Step 4: Process the refund or escalate if over $500.
 
@@ -27,7 +27,7 @@ describe('parseSkill', () => {
     const skill = parseSkill(SAMPLE_SKILL);
     expect(skill.frontmatter.name).toBe('handle-refund-request');
     expect(skill.frontmatter.description).toContain('refund');
-    expect(skill.frontmatter.tools).toEqual(['search', 'get_ticket']);
+    expect(skill.frontmatter.tools).toEqual(['search', 'bash']);
     expect(skill.frontmatter.when_to_use).toContain('refund');
   });
 

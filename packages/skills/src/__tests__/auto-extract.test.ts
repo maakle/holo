@@ -6,7 +6,7 @@ describe('clusterInvocations', () => {
     const invocations = [
       { toolName: 'search', inputJson: { query: 'incident' } },
       { toolName: 'search', inputJson: { query: 'postmortem' } },
-      { toolName: 'get_pr', inputJson: { owner: 'acme', repo: 'api', number: 42 } },
+      { toolName: 'bash', inputJson: { script: 'cat /github/acme/api/pulls/42.md' } },
     ];
     const clusters = clusterInvocations(invocations);
     expect(clusters).toHaveLength(2);

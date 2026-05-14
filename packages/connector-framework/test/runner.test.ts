@@ -693,7 +693,7 @@ describe('runConnectorSync', () => {
       // Two chunks emitted of kind 'demo-thing', but only one warning.
       const warnings = warn.mock.calls
         .map((args) => String(args[0]))
-        .filter((m) => m.includes("kind 'demo-thing'"));
+        .filter((m) => m.includes("kind 'demo-thing'") && m.includes('metadata.url'));
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toContain('demo');
       warn.mockRestore();
@@ -707,7 +707,7 @@ describe('runConnectorSync', () => {
 
       const warnings = warn.mock.calls
         .map((args) => String(args[0]))
-        .filter((m) => m.includes("kind 'demo-thing'"));
+        .filter((m) => m.includes("kind 'demo-thing'") && m.includes('metadata.url'));
       expect(warnings).toHaveLength(0);
       warn.mockRestore();
     });
@@ -722,7 +722,7 @@ describe('runConnectorSync', () => {
 
       const warnings = warn.mock.calls
         .map((args) => String(args[0]))
-        .filter((m) => m.includes("kind 'demo-thing'"));
+        .filter((m) => m.includes("kind 'demo-thing'") && m.includes('metadata.url'));
       expect(warnings).toHaveLength(0);
       warn.mockRestore();
     });
@@ -735,8 +735,98 @@ describe('runConnectorSync', () => {
 
       const warnings = warn.mock.calls
         .map((args) => String(args[0]))
-        .filter((m) => m.includes("kind 'demo-thing'"));
+        .filter((m) => m.includes("kind 'demo-thing'") && m.includes('metadata.url'));
       expect(warnings).toHaveLength(1);
+      warn.mockRestore();
+    });
+  });
+
+  describe('acl invariant', () => {
+    // Holo's Files API + RAG retrieval filter rows by `acl_subjects && userSubjects`.
+    // Every user holds `org:${orgId}` as a subject, so a chunk without that
+    // subject is invisible across every surface. The framework auto-injects
+    // it and warns once per `(provider, kind)` per sync — connector authors
+    // can't silently regress this invariant. (See packages/connectors/README.md.)
+
+    function makeAclSpec(subjectsFor: (id: string) => string[]): {
+      spec: ReturnType<typeof defineConnector>;
+      fetchImpl: typeof fetch;
+    } {
+      const fetchImpl = (async () =>
+        jsonResponse({ items: [{ id: 'a' }, { id: 'b' }], next: null })) as unknown as typeof fetch;
+      const spec = defineConnector({
+        id: 'demo',
+        displayName: 'Demo',
+        sync: { intervalMs: 60_000 },
+        auth: apiKey(),
+        http: { baseUrl: 'https://x' },
+        async testConnection() {
+          return { externalId: 'x', name: 'X' };
+        },
+        resources: [
+          {
+            id: 'items',
+            cursorSchema: z.object({}).default({}),
+            async sync(ctx) {
+              for await (const page of ctx.paginate.cursor<
+                { items: Array<{ id: string }>; next: string | null },
+                { id: string }
+              >('/x', {
+                items: (p) => p.items,
+                nextCursor: (p) => p.next,
+              })) {
+                for (const item of page) {
+                  await ctx.upsert({
+                    externalId: item.id,
+                    kind: 'demo-thing',
+                    content: `body-${item.id}`,
+                    metadata: { url: `https://example.com/${item.id}` },
+                    aclSubjects: subjectsFor(item.id),
+                  });
+                }
+              }
+              return {};
+            },
+          },
+        ],
+      });
+      return { spec, fetchImpl };
+    }
+
+    it('auto-injects org:${orgId} when missing, and warns once per kind', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { spec, fetchImpl } = makeAclSpec(() => ['demo:tenant:42']);
+      const { stores, enqueued } = makeStores();
+      await runConnectorSync({ spec, stores, organizationId: 'org-1', sourceId: 's', fetchImpl });
+
+      // Both chunks enqueued have org subject injected.
+      expect(enqueued).toHaveLength(2);
+      for (const row of enqueued) {
+        expect(row.aclSubjects).toContain('org:org-1');
+        expect(row.aclSubjects).toContain('demo:tenant:42');
+      }
+      // Exactly one warning despite two emissions.
+      const warnings = warn.mock.calls
+        .map((args) => String(args[0]))
+        .filter((m) => m.includes('aclSubjects') && m.includes("kind 'demo-thing'"));
+      expect(warnings).toHaveLength(1);
+      warn.mockRestore();
+    });
+
+    it('does not warn when chunker already emits org:${orgId}', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { spec, fetchImpl } = makeAclSpec(() => ['org:org-1', 'demo:tenant:42']);
+      const { stores, enqueued } = makeStores();
+      await runConnectorSync({ spec, stores, organizationId: 'org-1', sourceId: 's', fetchImpl });
+
+      expect(enqueued).toHaveLength(2);
+      for (const row of enqueued) {
+        expect(row.aclSubjects).toEqual(['org:org-1', 'demo:tenant:42']);
+      }
+      const warnings = warn.mock.calls
+        .map((args) => String(args[0]))
+        .filter((m) => m.includes('aclSubjects'));
+      expect(warnings).toHaveLength(0);
       warn.mockRestore();
     });
   });

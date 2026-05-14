@@ -48,7 +48,7 @@ Holo is a primitive, not a product. These are the four shapes the same layer tak
 A founder or security lead pastes a customer's questionnaire into a chat agent. Holo pulls prior answers from Notion, the architecture docs, and the actual repo for evidence, then drafts responses with a link back to every source. The week-long scramble before each enterprise deal turns into a one-pass review.
 
 ```
-search("data retention policy") → get_doc(notion_id) → get_file(owner, repo, path) → draft answers with citations
+search("data retention policy") → bash cat /notion/security/retention.md → bash cat /github/acme/api/docs/data-handling.md → draft answers with citations
 ```
 
 ### 2. Drafted support replies with the right sources attached *(customer support)*
@@ -56,7 +56,7 @@ search("data retention policy") → get_doc(notion_id) → get_file(owner, repo,
 A Pylon or Zendesk webhook fires on a new ticket. Holo pulls the customer's history, the matching Mintlify docs page, and the closest past resolution, and posts a draft reply for the human to approve. Time-to-first-response drops; tone stays consistent across the team.
 
 ```
-search(ticket.subject) → get_ticket(ticket_id) → get_doc(notion_id) → draft reply for approval
+search(ticket.subject) → bash cat /pylon/tickets/<id>.md → bash cat /mintlify/<page>.md → draft reply for approval
 ```
 
 ### 3. Every call starts with full context *(sales / CS)*
@@ -64,7 +64,7 @@ search(ticket.subject) → get_ticket(ticket_id) → get_doc(notion_id) → draf
 Five minutes before a meeting with Acme, a calendar-triggered agent searches Grain transcripts, the HubSpot deal record, and any open Pylon issues, and posts a digest to the prep doc. Account owners walk in knowing exactly where things stand instead of opening four tabs in the parking lot.
 
 ```
-search("Acme Corp") → get_call(recording_id) → get_ticket(ticket_id) → digest to prep doc
+search("Acme Corp") → bash cat /grain/<date>/<title>-<id>.md → bash cat /pylon/tickets/<id>.md → digest to prep doc
 ```
 
 ### 4. One search box across every system *(everyone else)*

@@ -42,11 +42,11 @@ type StreamRow = {
 
 const STREAM: StreamRow[] = [
   { t: '14:02:11', agent: 'Claude', Icon: Sparkles, tool: 'search', scope: 'sales', ms: '64ms', status: 'ok' },
-  { t: '14:02:09', agent: 'Cursor', Icon: MousePointer2, tool: 'get_repo', scope: 'eng', ms: '82ms', status: 'ok' },
+  { t: '14:02:09', agent: 'Cursor', Icon: MousePointer2, tool: 'bash', scope: 'eng', ms: '82ms', status: 'ok' },
   { t: '14:02:08', agent: 'ChatGPT', Icon: Bot, tool: 'search', scope: 'support', ms: '71ms', status: 'ok' },
   { t: '14:02:06', agent: 'n8n', Icon: Workflow, tool: 'draft_reply', scope: 'support', ms: '210ms', status: 'warn' },
   { t: '14:02:03', agent: 'Claude', Icon: Sparkles, tool: 'answer_security_q', scope: 'sec', ms: '143ms', status: 'ok' },
-  { t: '14:02:01', agent: 'Cursor', Icon: MousePointer2, tool: 'get_ticket', scope: 'support', ms: '—', status: 'err' },
+  { t: '14:02:01', agent: 'Cursor', Icon: MousePointer2, tool: 'bash', scope: 'support', ms: '—', status: 'err' },
   { t: '14:01:58', agent: 'ChatGPT', Icon: Bot, tool: 'search', scope: 'sales', ms: '67ms', status: 'ok' },
 ];
 

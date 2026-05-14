@@ -26,7 +26,7 @@ Cut scope inside a pillar before dropping a pillar.
 
 ### v0.0 — Internal context layer · ✅ complete
 
-Three internal agents (support-question, interview-prep, customer-success) live on holo's MCP endpoint at the founder's company. Stack: monorepo (`apps/web`, `apps/mcp`, `apps/worker`), Postgres + pgvector + Drizzle, Better Auth multi-tenant, ingestion-time allowlist enforcement, hybrid search (RRF), audit log, **9 connectors** (Slack, GitHub, Notion, Grain, Pylon, HubSpot, Linear, Mintlify, Zendesk — spec called for 6), MCP tools `search` / `get_thread` / `get_pr` / `get_doc` / `get_call` / `get_ticket`. See [`CHANGELOG.md`](../CHANGELOG.md) and v0.0 commit history for detail.
+Three internal agents (support-question, interview-prep, customer-success) live on holo's MCP endpoint at the founder's company. Stack: monorepo (`apps/web`, `apps/mcp`, `apps/worker`), Postgres + pgvector + Drizzle, Better Auth multi-tenant, ingestion-time allowlist enforcement, hybrid search (RRF), audit log, **9 connectors** (Slack, GitHub, Notion, Grain, Pylon, HubSpot, Linear, Mintlify, Zendesk — spec called for 6), MCP tools `search` + `bash` (read-only virtual filesystem over `source_artifacts`; per-source getters retired in [ADR 0006](decisions/0006-virtual-filesystem-over-context-layer.md)). See [`CHANGELOG.md`](../CHANGELOG.md) and v0.0 commit history for detail.
 
 ### v0.1 — Skills + public release · 🟡 in progress
 
