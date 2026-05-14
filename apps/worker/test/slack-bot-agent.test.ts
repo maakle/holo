@@ -286,28 +286,28 @@ describe('runAgent', () => {
     ).rejects.toMatchObject({ name: 'AgentRunawayError', reason: 'wall_clock_cap' });
   });
 
-  it('collects sources from search top-3 results and get_* artifact urls', async () => {
+  it('builds sources from the search tool\'s citations[] in renumbered order', async () => {
+    // The slack bot mirrors the web orchestrator: search tool output carries
+    // a structured `citations[]` array (1-based, label + url + snippet), and
+    // we collect from THAT — not from `results[]`. Position N in
+    // result.sources corresponds 1:1 with the `[N]` reference the model is
+    // told to emit, so `[1]` in the answer text resolves to sources[0].
     const { client } = makeFakeAnthropic([
       { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'deploy' } }] },
-      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't2', name: 'get_doc', input: { artifact_id: 'a1' } }] },
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Deploys go via Vercel.' }] },
+      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Deploys go via Vercel [1][2].' }] },
     ]);
 
     const tools: ToolDefinition[] = [
       {
         name: 'search', description: '', inputSchema: {},
         run: async () => ({
-          results: [
-            { chunk_id: 'c1', content: 'one', score: 0.9, source: { provider: 'github', artifact_kind: 'doc', metadata: {} }, snippet_url: 'https://github.com/acme/web/blob/HEAD/A.md' },
-            { chunk_id: 'c2', content: 'two', score: 0.8, source: { provider: 'github', artifact_kind: 'doc', metadata: {} }, snippet_url: 'https://github.com/acme/web/blob/HEAD/B.md' },
-            { chunk_id: 'c3', content: 'three', score: 0.7, source: { provider: 'github', artifact_kind: 'doc', metadata: {} }, snippet_url: 'https://github.com/acme/web/blob/HEAD/C.md' },
-            { chunk_id: 'c4', content: 'four', score: 0.6, source: { provider: 'github', artifact_kind: 'doc', metadata: {} }, snippet_url: 'https://github.com/acme/web/blob/HEAD/D.md' },
+          results: [],
+          citations: [
+            { index: 1, chunk_id: 'c1', provider: 'github', artifact_kind: 'doc', label: 'A.md · acme/web', snippet: '...', url: 'https://github.com/acme/web/blob/HEAD/A.md' },
+            { index: 2, chunk_id: 'c2', provider: 'github', artifact_kind: 'doc', label: 'B.md · acme/web', snippet: '...', url: 'https://github.com/acme/web/blob/HEAD/B.md' },
+            { index: 3, chunk_id: 'c3', provider: 'notion', artifact_kind: 'page', label: 'Notion — Deploy Runbook', snippet: '...', url: 'https://www.notion.so/abc' },
           ],
         }),
-      },
-      {
-        name: 'get_doc', description: '', inputSchema: {},
-        run: async () => ({ provider: 'notion', kind: 'doc', title: 'Deploy Runbook', url: 'https://www.notion.so/abc' }),
       },
     ];
 
@@ -321,31 +321,24 @@ describe('runAgent', () => {
       orgName: 'Acme',
     });
 
-    expect(result.answer).toBe('Deploys go via Vercel.');
+    expect(result.answer).toBe('Deploys go via Vercel [1][2].');
     expect(result.sources).toEqual([
-      { provider: 'github', kind: 'doc', title: 'A.md', url: 'https://github.com/acme/web/blob/HEAD/A.md' },
-      { provider: 'github', kind: 'doc', title: 'B.md', url: 'https://github.com/acme/web/blob/HEAD/B.md' },
-      { provider: 'github', kind: 'doc', title: 'C.md', url: 'https://github.com/acme/web/blob/HEAD/C.md' },
-      { provider: 'notion', kind: 'doc', title: 'Deploy Runbook', url: 'https://www.notion.so/abc' },
+      { provider: 'github', kind: 'doc', title: 'A.md · acme/web', url: 'https://github.com/acme/web/blob/HEAD/A.md' },
+      { provider: 'github', kind: 'doc', title: 'B.md · acme/web', url: 'https://github.com/acme/web/blob/HEAD/B.md' },
+      { provider: 'notion', kind: 'page', title: 'Notion — Deploy Runbook', url: 'https://www.notion.so/abc' },
     ]);
   });
 
-  it('dedupes sources by url and caps at 8', async () => {
-    const dupUrl = 'https://example.com/x';
-    const { client } = makeFakeAnthropic([
-      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: {} }] },
-      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't2', name: 'search', input: {} }] },
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] },
+  it('renumbers citations across multiple search calls into one monotonic namespace', async () => {
+    // Two search calls each return 1-indexed citations starting at 1. The
+    // orchestrator must offset the second call's indices so the model sees
+    // and we render a single [1]..[N] sequence. Otherwise `[2]` in the
+    // answer would ambiguously refer to two different sources.
+    const { client, create } = makeFakeAnthropic([
+      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'a' } }] },
+      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't2', name: 'search', input: { q: 'b' } }] },
+      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Multi-source answer [1][3].' }] },
     ]);
-
-    const makeResults = (urls: string[]) => ({
-      results: urls.map((u, i) => ({
-        chunk_id: `c${u}-${i}`,
-        content: '', score: 0.5,
-        source: { provider: 'github', artifact_kind: 'doc', metadata: {} },
-        snippet_url: u,
-      })),
-    });
 
     let call = 0;
     const tools: ToolDefinition[] = [
@@ -353,8 +346,21 @@ describe('runAgent', () => {
         name: 'search', description: '', inputSchema: {},
         run: async () => {
           call += 1;
-          if (call === 1) return makeResults([dupUrl, 'https://a', 'https://b']);
-          return makeResults([dupUrl, 'https://c', 'https://d', 'https://e', 'https://f', 'https://g', 'https://h', 'https://i']);
+          if (call === 1) {
+            return {
+              results: [],
+              citations: [
+                { index: 1, chunk_id: 'c1', provider: 'github', artifact_kind: 'doc', label: 'A.md', snippet: '...', url: 'https://example.com/a' },
+                { index: 2, chunk_id: 'c2', provider: 'github', artifact_kind: 'doc', label: 'B.md', snippet: '...', url: 'https://example.com/b' },
+              ],
+            };
+          }
+          return {
+            results: [],
+            citations: [
+              { index: 1, chunk_id: 'c3', provider: 'github', artifact_kind: 'doc', label: 'C.md', snippet: '...', url: 'https://example.com/c' },
+            ],
+          };
         },
       },
     ];
@@ -369,10 +375,66 @@ describe('runAgent', () => {
       orgName: 'Acme',
     });
 
-    expect(result.sources.length).toBeLessThanOrEqual(8);
-    const urls = result.sources.map((s) => s.url);
-    expect(new Set(urls).size).toBe(urls.length);
-    expect(urls[0]).toBe(dupUrl);
+    // sources should be in renumbered order: [1]=A, [2]=B, [3]=C
+    expect(result.sources.map((s) => s.title)).toEqual(['A.md', 'B.md', 'C.md']);
+
+    // The model on the second call should have seen the second batch's
+    // citations RENUMBERED to start at index 3 (offset by 2 from the first
+    // call), not the raw `1` the tool stub returned.
+    const secondModelCall = create.mock.calls[1][0] as { messages: Array<{ content: unknown }> };
+    const firstToolResult = (secondModelCall.messages.find(
+      (m) => Array.isArray(m.content) && (m.content as Array<{ type: string }>)[0]?.type === 'tool_result',
+    )?.content as Array<{ content: string }>)[0];
+    // Tool result for the FIRST search call should carry indices [1, 2]:
+    expect(firstToolResult.content).toContain('"index":1');
+    expect(firstToolResult.content).toContain('"index":2');
+
+    const thirdModelCall = create.mock.calls[2][0] as { messages: Array<{ content: unknown }> };
+    const secondToolResultMsg = thirdModelCall.messages
+      .filter((m) => Array.isArray(m.content))
+      .at(-1)!.content as Array<{ content: string }>;
+    // Tool result for the SECOND search call should carry index [3]:
+    expect(secondToolResultMsg[0].content).toContain('"index":3');
+  });
+
+  it('omits sources whose citation has no url (label-only fallback)', async () => {
+    // A citation without a `url` field (provider we can\'t deep-link, e.g.
+    // Salesforce today) still belongs in the sources list so `[N]` resolves
+    // — just rendered label-only by the blocks layer.
+    const { client } = makeFakeAnthropic([
+      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: {} }] },
+      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok [1].' }] },
+    ]);
+
+    const tools: ToolDefinition[] = [
+      {
+        name: 'search', description: '', inputSchema: {},
+        run: async () => ({
+          results: [],
+          citations: [
+            { index: 1, chunk_id: 'c1', provider: 'salesforce', artifact_kind: 'account', label: 'Salesforce account — Acme', snippet: '...' },
+          ],
+        }),
+      },
+    ];
+
+    const result = await runAgent({
+      db: fakeDb,
+      organizationId: 'org-1',
+      userSubjects: ['org:org-1'],
+      question: '?',
+      client,
+      tools,
+      orgName: 'Acme',
+    });
+
+    expect(result.sources).toHaveLength(1);
+    expect(result.sources[0]).toMatchObject({
+      provider: 'salesforce',
+      kind: 'account',
+      title: 'Salesforce account — Acme',
+    });
+    expect(result.sources[0]!.url).toBeUndefined();
   });
 
   it('honors emit_claims terminally: returns claims and annotates the answer when any are unverified (RFC-0007)', async () => {

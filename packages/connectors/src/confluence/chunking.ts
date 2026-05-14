@@ -101,7 +101,7 @@ export async function processPage(
 
   const comments = page.children?.comment?.results ?? [];
   for (const c of comments) {
-    await processComment(ctx, page, c, sourceArtifactId, acl);
+    await processComment(ctx, page, c, sourceArtifactId, acl, siteUrl);
   }
 }
 
@@ -111,6 +111,7 @@ async function processComment(
   comment: ConfluenceComment,
   sourceArtifactId: string,
   acl: string[],
+  siteUrl: string,
 ): Promise<void> {
   const body = adfToPlainText(parseAtlasDocFormat(comment.body?.atlas_doc_format?.value)).trim();
   const author = comment.history?.createdBy?.displayName ?? 'Unknown';
@@ -132,6 +133,7 @@ async function processComment(
       authorId: comment.history?.createdBy?.accountId ?? null,
       createdAt: comment.history?.createdDate ?? null,
       updatedAt: comment.version?.when ?? null,
+      url: `${buildPageUrl(siteUrl, page)}?focusedCommentId=${comment.id}`,
     },
     sourceArtifactId,
   };

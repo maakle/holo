@@ -117,12 +117,14 @@ async function processPageTree(
       sourceArtifactId,
     });
 
+    // Notion page URLs are synthesizable from the page id (hyphens stripped).
+    const url = `https://www.notion.so/${pageId.replace(/-/g, '')}`;
     for (const c of rawChunks) {
       await ctx.upsert({
         externalId: pageId,
         kind: 'notion-page',
         content: c.content,
-        metadata: c.metadata,
+        metadata: { ...c.metadata, url },
         aclSubjects: c.aclSubjects,
         sourceArtifactId,
       } satisfies ChunkUpsert);

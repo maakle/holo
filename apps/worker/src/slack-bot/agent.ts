@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { DB } from '@holo/db';
-import type { ToolDefinition, WireAnswerClaim } from '@holo/agent-tools';
+import type {
+  ToolDefinition,
+  WireAnswerClaim,
+  WireCitation,
+  WireSearchCoverage,
+} from '@holo/agent-tools';
 import {
   CLAIMS_SUFFIX,
   EMIT_CLAIMS_TOOL_DECL,
@@ -9,6 +14,7 @@ import {
   applyClaimGuardrails,
   claimToWire,
   parseEmitClaimsInput,
+  renumberSearchOutput,
 } from '@holo/agent-tools';
 import { resolveAnthropicAgentModel } from '@holo/llm';
 
@@ -16,7 +22,12 @@ export interface Source {
   provider: string;
   kind: string;
   title: string;
-  url: string;
+  /**
+   * Deep link to the source artifact. Undefined when the provider doesn't
+   * have a stable URL pattern yet (e.g. Salesforce, HubSpot today). The
+   * Slack renderer falls back to label-only when this is missing.
+   */
+  url?: string;
 }
 
 export interface AgentResult {
@@ -73,6 +84,7 @@ const SYSTEM_PROMPT_TEMPLATE = `You are holo, a knowledge assistant for {org_nam
 
 Rules:
 - Ground every claim in a tool result. Do not speculate.
+- Cite your sources. Each \`search\` tool result includes a \`citations\` array with 1-based \`index\` values. When you state a fact grounded in one of those results, append the matching bracket reference like \`[1]\` (or \`[2][3]\` for multiple). Do not invent indices and do not cite results you didn't use.
 - Keep answers concise and Slack-friendly: use *bold* and _italic_ (Slack mrkdwn), not markdown headers (#) or fenced code blocks unless quoting code. Bullets with \`- \` are fine.
 - If you cannot find an answer, say so directly — do not invent one.
 - Do not list sources at the end of your answer; the system appends them.`;
@@ -91,77 +103,35 @@ type Message = { role: 'user' | 'assistant'; content: unknown };
 
 const META_TOOLS = new Set(['list_skills', 'get_skill', 'execute_skill']);
 
-function deriveSearchSourceTitle(args: {
-  url: string;
-  provider: string;
-  kind: string;
-  metadata: Record<string, unknown> | undefined;
-}): string {
-  const filePath = args.metadata?.file_path;
-  if (typeof filePath === 'string' && filePath.length > 0) {
-    const basename = filePath.split('/').pop();
-    if (basename) return basename;
-  }
-  try {
-    const u = new URL(args.url);
-    const pathBasename = u.pathname.split('/').filter(Boolean).pop();
-    if (pathBasename) return pathBasename;
-  } catch {
-    // not a parseable URL — fall through
-  }
-  return `${args.provider} · ${args.kind}`;
+/**
+ * Convert a renumbered citation envelope into the `Source` shape the Slack
+ * renderer consumes. Position N-1 in the returned array corresponds to the
+ * `[N]` reference the model is told to emit in the answer text.
+ */
+function citationToSource(c: WireCitation): Source {
+  return {
+    provider: c.provider,
+    kind: c.artifact_kind,
+    title: c.label,
+    ...(c.url !== undefined ? { url: c.url } : {}),
+  };
 }
 
-class SourceCollector {
-  private readonly seen = new Set<string>();
-  private readonly entries: Source[] = [];
-  private readonly cap = 8;
-
-  add(source: Source): void {
-    if (this.entries.length >= this.cap) return;
-    if (this.seen.has(source.url)) return;
-    this.seen.add(source.url);
-    this.entries.push(source);
-  }
-
-  ingestSearchResult(output: unknown): void {
-    if (!output || typeof output !== 'object') return;
-    const results = (output as { results?: unknown }).results;
-    if (!Array.isArray(results)) return;
-    for (const r of results.slice(0, 3)) {
-      if (!r || typeof r !== 'object') continue;
-      const url = (r as { snippet_url?: unknown }).snippet_url;
-      const src = (r as {
-        source?: {
-          provider?: unknown;
-          artifact_kind?: unknown;
-          metadata?: Record<string, unknown>;
-        };
-      }).source;
-      if (typeof url !== 'string' || !url) continue;
-      const provider = typeof src?.provider === 'string' ? src.provider : 'unknown';
-      const kind = typeof src?.artifact_kind === 'string' ? src.artifact_kind : 'unknown';
-      const metadata =
-        src?.metadata && typeof src.metadata === 'object' ? src.metadata : undefined;
-      const title = deriveSearchSourceTitle({ url, provider, kind, metadata });
-      this.add({ provider, kind, title, url });
-    }
-  }
-
-  ingestArtifact(toolName: string, output: unknown): void {
-    if (!output || typeof output !== 'object') return;
-    const o = output as Record<string, unknown>;
-    const url = typeof o.url === 'string' ? o.url : undefined;
-    if (!url) return;
-    const provider = typeof o.provider === 'string' ? o.provider : toolName;
-    const kind = typeof o.kind === 'string' ? o.kind : 'artifact';
-    const title = typeof o.title === 'string' ? o.title : `${provider} · ${kind}`;
-    this.add({ provider, kind, title, url });
-  }
-
-  toArray(): Source[] {
-    return this.entries.slice();
-  }
+/**
+ * Best-effort source from a non-search artifact tool (get_doc, get_thread,
+ * etc.). These don't participate in the citation namespace — they get
+ * appended after the numbered citations as supplementary entries the model
+ * can describe but not `[N]`-reference.
+ */
+function artifactToSource(toolName: string, output: unknown): Source | undefined {
+  if (!output || typeof output !== 'object') return undefined;
+  const o = output as Record<string, unknown>;
+  const url = typeof o.url === 'string' ? o.url : undefined;
+  if (!url) return undefined;
+  const provider = typeof o.provider === 'string' ? o.provider : toolName;
+  const kind = typeof o.kind === 'string' ? o.kind : 'artifact';
+  const title = typeof o.title === 'string' ? o.title : `${provider} · ${kind}`;
+  return { provider, kind, title, url };
 }
 
 // Anthropic's tool API requires `type: "object"` at the root of input_schema
@@ -228,9 +198,21 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
   const wallClockMs = deps.wallClockMs ?? 60_000;
   const now = deps.now ?? Date.now;
   const startedAt = now();
-  const sources = new SourceCollector();
+  // Citation accumulator — every `search` tool result gets renumbered into
+  // this monotonic 1..N namespace before reaching the model, so `[N]` in the
+  // final answer text resolves unambiguously to `citationsAcc[N-1]`.
+  const citationsAcc: WireCitation[] = [];
+  const coverageAcc: WireSearchCoverage[] = [];
+  // Supplementary sources from non-search tools (get_doc, get_thread, …).
+  // Not part of the citation namespace; appended after the numbered list.
+  const artifactSources: Source[] = [];
   const logEvent = deps.logEvent ?? (() => {});
   let modelCallCount = 0;
+
+  const buildSources = (): Source[] => [
+    ...citationsAcc.map(citationToSource),
+    ...artifactSources,
+  ];
 
   while (true) {
     if (now() - startedAt > wallClockMs) {
@@ -287,7 +269,7 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
       // useful; we just have no structured claims to enforce. Return an
       // empty `claims` array — slack reply renders normally without the
       // "couldn't verify" footer.
-      return { answerId, answer: text, sources: sources.toArray(), claims: [] };
+      return { answerId, answer: text, sources: buildSources(), claims: [] };
     }
 
     const toolUses = response.content.filter(
@@ -307,7 +289,7 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
       return {
         answerId,
         answer: finalAnswer,
-        sources: sources.toArray(),
+        sources: buildSources(),
         claims: enforced.map(claimToWire),
       };
     }
@@ -339,7 +321,15 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
       }
       const toolStart = now();
       try {
-        const output = await tool.run(ctx, use.input);
+        const rawOutput = await tool.run(ctx, use.input);
+        // For `search` tool calls, renumber the per-call citation indices
+        // into the turn-global namespace before the output reaches both the
+        // model (via JSON.stringify) and the source list. Mirrors the web
+        // orchestrator so `[N]` semantics are identical across surfaces.
+        const output =
+          use.name === 'search'
+            ? renumberSearchOutput(rawOutput, citationsAcc, coverageAcc)
+            : rawOutput;
         logEvent('tool_call', {
           tool: use.name,
           input: use.input,
@@ -347,10 +337,9 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
           durationMs: now() - toolStart,
           elapsedMs: now() - startedAt,
         });
-        if (use.name === 'search') {
-          sources.ingestSearchResult(output);
-        } else if (!META_TOOLS.has(use.name)) {
-          sources.ingestArtifact(use.name, output);
+        if (use.name !== 'search' && !META_TOOLS.has(use.name)) {
+          const src = artifactToSource(use.name, output);
+          if (src) artifactSources.push(src);
         }
         toolResults.push({
           type: 'tool_result',

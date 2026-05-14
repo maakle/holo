@@ -73,6 +73,7 @@ export {
   type Citation,
   type WireCitation,
 } from './citations';
+export { renumberSearchOutput } from './search-renumber';
 export {
   coverageToWire,
   type WireSearchCoverage,

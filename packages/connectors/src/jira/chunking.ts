@@ -97,6 +97,7 @@ export async function processIssue(
         authorId: c.author?.accountId ?? null,
         createdAt: c.created,
         updatedAt: c.updated,
+        url: `${buildIssueBrowseUrl(siteUrl, issue.key)}?focusedCommentId=${c.id}`,
       },
       sourceArtifactId,
     };

@@ -365,7 +365,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex min-h-[480px] flex-1 flex-col rounded-md border border-border bg-surface">
+    <div className="flex min-h-[480px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-surface">
       {/* Header */}
       <div className="flex items-center border-b border-border px-4 py-2.5">
         <div className="flex items-center gap-2 text-[13px] text-text">

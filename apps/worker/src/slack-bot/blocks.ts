@@ -21,17 +21,20 @@ export function buildAgentAnswerBlocks(
       type: 'context',
       elements: [{ type: 'mrkdwn', text: '*Sources*' }],
     });
-    for (const s of sources) {
+    sources.forEach((s, i) => {
+      // Position N-1 corresponds to the `[N]` reference the model emits in
+      // the answer text — prefix the row so the cross-reference is visible.
+      const linked = s.url ? `<${s.url}|${s.title}>` : s.title;
       blocks.push({
         type: 'context',
         elements: [
           {
             type: 'mrkdwn',
-            text: `${s.provider} · ${s.kind} · <${s.url}|${s.title}>`,
+            text: `[${i + 1}] ${s.provider} · ${s.kind} · ${linked}`,
           },
         ],
       });
-    }
+    });
   }
 
   blocks.push({

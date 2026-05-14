@@ -13,35 +13,50 @@ const FEEDBACK_FOOTER = {
 };
 
 describe('buildAgentAnswerBlocks', () => {
-  it('renders prose, divider, sources header, one context per source, and a feedback footer', () => {
+  it('renders prose, divider, sources header, [N]-prefixed source rows, and feedback footer', () => {
     const sources: Source[] = [
       { provider: 'github', kind: 'doc', title: 'README', url: 'https://github.com/a/b' },
       { provider: 'notion', kind: 'doc', title: 'Runbook', url: 'https://www.notion.so/x' },
     ];
-    const blocks = buildAgentAnswerBlocks('Deploys via *Vercel*.', sources);
+    const blocks = buildAgentAnswerBlocks('Deploys via *Vercel* [1][2].', sources);
 
     expect(blocks[0]).toEqual({
       type: 'section',
-      text: { type: 'mrkdwn', text: 'Deploys via *Vercel*.' },
+      text: { type: 'mrkdwn', text: 'Deploys via *Vercel* [1][2].' },
     });
     expect(blocks[1]).toEqual({ type: 'divider' });
     expect(blocks[2]).toEqual({
       type: 'context',
       elements: [{ type: 'mrkdwn', text: '*Sources*' }],
     });
+    // Position N-1 maps to `[N]` reference; row prefix makes the
+    // cross-reference visible.
     expect(blocks[3]).toEqual({
       type: 'context',
       elements: [
-        { type: 'mrkdwn', text: 'github · doc · <https://github.com/a/b|README>' },
+        { type: 'mrkdwn', text: '[1] github · doc · <https://github.com/a/b|README>' },
       ],
     });
     expect(blocks[4]).toEqual({
       type: 'context',
       elements: [
-        { type: 'mrkdwn', text: 'notion · doc · <https://www.notion.so/x|Runbook>' },
+        { type: 'mrkdwn', text: '[2] notion · doc · <https://www.notion.so/x|Runbook>' },
       ],
     });
     expect(blocks[5]).toEqual(FEEDBACK_FOOTER);
+  });
+
+  it('renders sources without a url as label-only (no Slack link wrapper)', () => {
+    const sources: Source[] = [
+      { provider: 'salesforce', kind: 'account', title: 'Salesforce account — Acme' },
+    ];
+    const blocks = buildAgentAnswerBlocks('Acme is an account [1].', sources);
+    expect(blocks[3]).toEqual({
+      type: 'context',
+      elements: [
+        { type: 'mrkdwn', text: '[1] salesforce · account · Salesforce account — Acme' },
+      ],
+    });
   });
 
   it('omits the divider and sources header when sources is empty but still appends the feedback footer', () => {

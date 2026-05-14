@@ -110,6 +110,15 @@ export const orgInviteLink = pgTable('org_invite_link', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Closed-beta signup allowlist. While hosted holo is invite-only, the
+// user.create.before hook rejects signups whose lowercased email isn't in
+// this table. Add rows via SQL until volume justifies an admin UI.
+export const allowedSignupEmails = pgTable('allowed_signup_emails', {
+  email: text('email').primaryKey(),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Better Auth `organization` plugin: pending email invitations to join an org.
 export const invitation = pgTable(
   'invitation',

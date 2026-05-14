@@ -316,6 +316,13 @@
       "when": 1779926400000,
       "tag": "0045_slack_answer_index",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1780012800000,
+      "tag": "0046_allowed_signup_emails",
+      "breakpoints": true
     }
   ]
 }

@@ -117,6 +117,15 @@ export async function processTicket(
   body + its engagement timeline), pass an explicit
   `sourceArtifactId: 'hubspot-contact:<id>'` so they share one
   `source_artifacts` row.
+- **URL invariant — every chunk MUST carry a deep link.** Put it in
+  `metadata.url` (preferred) or `metadata.permalink` (legacy alias also
+  accepted by the search layer). This is what makes citations like `[1]` in
+  the Slack/Web answer surface clickable. The framework `console.warn`s
+  once per `(provider, kind)` per sync when a chunk lands without either
+  field — treat that warning as a bug to fix, not noise. If the provider
+  has no stable per-artifact URL (rare; usually a sub-resource needs a
+  parent record's URL plus a fragment), document the gap in the chunker and
+  open an issue.
 
 ### 5. Write `spec.ts`
 
@@ -254,6 +263,14 @@ The framework (`@holo/connector-framework`) gives every spec these primitives:
 
 ## Common pitfalls
 
+- **Every chunk needs `metadata.url`.** The agent surface (Slack bot, web
+  chat) renders citations as clickable deep links sourced from this field.
+  A chunk without `metadata.url` or `metadata.permalink` is still indexed
+  and searchable, but the user sees an un-linkable source row — defeating
+  the point of citations. The framework warns once per `(provider, kind)`
+  per sync; do not let that warning ship. For comments/replies/sub-records,
+  build a URL with a fragment off the parent's URL (e.g.
+  `https://...issue/HOL-42#comment-123`).
 - **Don't reimplement retry / rate-limit.** The framework's `http` config
   handles it; per-call retry overrides via `opts.retry` if needed.
 - **Don't depend on `@holo/db` from the spec.** All DB access goes through

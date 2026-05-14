@@ -47,12 +47,13 @@ export async function processRecording(
     sourceArtifactId,
   });
 
+  const url = `https://grain.com/share/recording/${rec.id}`;
   for (const c of rawChunks) {
     await ctx.upsert({
       externalId: rec.id,
       kind: 'grain-call',
       content: c.content,
-      metadata: c.metadata,
+      metadata: { ...c.metadata, url },
       aclSubjects: c.aclSubjects,
     });
   }

@@ -83,12 +83,17 @@ export async function processTicket(
     ? { [CUSTOMER_ACCOUNT_HINT_KEY]: { domain } }
     : {};
 
+  // Pylon's app URL uses the human-readable `issue_number`, not the UUID.
+  const url =
+    typeof issue.number === 'number'
+      ? `https://app.usepylon.com/issues?issueNumber=${issue.number}`
+      : undefined;
   for (const c of rawChunks) {
     await ctx.upsert({
       externalId: issue.id,
       kind: 'pylon-ticket',
       content: c.content,
-      metadata: { ...c.metadata, ...accountHint },
+      metadata: { ...c.metadata, ...accountHint, ...(url ? { url } : {}) },
       aclSubjects: c.aclSubjects,
     });
   }

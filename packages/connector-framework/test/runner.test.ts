@@ -631,4 +631,113 @@ describe('runConnectorSync', () => {
       expect(apiKeyStores.saveTokens).not.toHaveBeenCalled();
     });
   });
+
+  describe('url invariant', () => {
+    // The agent surfaces (Slack bot, web chat) render citations as clickable
+    // deep links sourced from `metadata.url` (or `metadata.permalink` for
+    // legacy chunkers). When a chunker forgets, citations to that content
+    // still appear but lead nowhere. We warn once per `(provider, kind)`
+    // per sync so the gap is visible to operators without spamming.
+
+    function makeUrlSpec(itemMetadata: (id: string) => Record<string, unknown>): {
+      spec: ReturnType<typeof defineConnector>;
+      fetchImpl: typeof fetch;
+    } {
+      const fetchImpl = (async () =>
+        jsonResponse({ items: [{ id: 'a' }, { id: 'b' }], next: null })) as unknown as typeof fetch;
+      const spec = defineConnector({
+        id: 'demo',
+        displayName: 'Demo',
+        sync: { intervalMs: 60_000 },
+        auth: apiKey(),
+        http: { baseUrl: 'https://x' },
+        async testConnection() {
+          return { externalId: 'x', name: 'X' };
+        },
+        resources: [
+          {
+            id: 'items',
+            cursorSchema: z.object({}).default({}),
+            async sync(ctx) {
+              for await (const page of ctx.paginate.cursor<
+                { items: Array<{ id: string }>; next: string | null },
+                { id: string }
+              >('/x', {
+                items: (p) => p.items,
+                nextCursor: (p) => p.next,
+              })) {
+                for (const item of page) {
+                  await ctx.upsert({
+                    externalId: item.id,
+                    kind: 'demo-thing',
+                    content: `body-${item.id}`,
+                    metadata: itemMetadata(item.id),
+                    aclSubjects: [],
+                  });
+                }
+              }
+              return {};
+            },
+          },
+        ],
+      });
+      return { spec, fetchImpl };
+    }
+
+    it('warns once per kind when chunks lack metadata.url and metadata.permalink', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { spec, fetchImpl } = makeUrlSpec(() => ({}));
+      const { stores } = makeStores();
+      await runConnectorSync({ spec, stores, organizationId: 'o', sourceId: 's', fetchImpl });
+
+      // Two chunks emitted of kind 'demo-thing', but only one warning.
+      const warnings = warn.mock.calls
+        .map((args) => String(args[0]))
+        .filter((m) => m.includes("kind 'demo-thing'"));
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('demo');
+      warn.mockRestore();
+    });
+
+    it('does not warn when metadata.url is a non-empty string', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { spec, fetchImpl } = makeUrlSpec((id) => ({ url: `https://example.com/${id}` }));
+      const { stores } = makeStores();
+      await runConnectorSync({ spec, stores, organizationId: 'o', sourceId: 's', fetchImpl });
+
+      const warnings = warn.mock.calls
+        .map((args) => String(args[0]))
+        .filter((m) => m.includes("kind 'demo-thing'"));
+      expect(warnings).toHaveLength(0);
+      warn.mockRestore();
+    });
+
+    it('accepts metadata.permalink as a legacy alias for url', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { spec, fetchImpl } = makeUrlSpec((id) => ({
+        permalink: `https://slack.com/archives/C1/p${id}`,
+      }));
+      const { stores } = makeStores();
+      await runConnectorSync({ spec, stores, organizationId: 'o', sourceId: 's', fetchImpl });
+
+      const warnings = warn.mock.calls
+        .map((args) => String(args[0]))
+        .filter((m) => m.includes("kind 'demo-thing'"));
+      expect(warnings).toHaveLength(0);
+      warn.mockRestore();
+    });
+
+    it('warns when url is present but is an empty string (truthiness check)', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { spec, fetchImpl } = makeUrlSpec(() => ({ url: '' }));
+      const { stores } = makeStores();
+      await runConnectorSync({ spec, stores, organizationId: 'o', sourceId: 's', fetchImpl });
+
+      const warnings = warn.mock.calls
+        .map((args) => String(args[0]))
+        .filter((m) => m.includes("kind 'demo-thing'"));
+      expect(warnings).toHaveLength(1);
+      warn.mockRestore();
+    });
+  });
 });

@@ -91,6 +91,9 @@ export async function runGitlabProseSync(
         const breadcrumb = `${project.pathWithNamespace} / ${readme.path}`;
         const pieces = recursiveSplit(readme.content, { chunkSize: 1200, overlap: 150 });
         const sourceArtifactId = `gitlab-doc:${project.pathWithNamespace}:${readme.path}`;
+        // GitLab connector is hardcoded to gitlab.com (see `api.ts`), so the
+        // web URL follows the standard `/<path>/-/blob/<branch>/<file>` shape.
+        const readmeUrl = `https://gitlab.com/${project.pathWithNamespace}/-/blob/${project.defaultBranch}/${readme.path}`;
         const chunks: GitlabProseChunkPayload[] = pieces.map((text, idx) => ({
           externalId: `${sourceArtifactId}#${idx}`,
           kind: 'gitlab-doc',
@@ -100,6 +103,7 @@ export async function runGitlabProseSync(
             project_path: project.pathWithNamespace,
             file_path: readme.path,
             breadcrumb,
+            url: readmeUrl,
           },
           aclSubjects: acl,
           sourceArtifactId,
@@ -128,6 +132,7 @@ export async function runGitlabProseSync(
             mr_iid: mr.iid,
             state: mr.state,
             web_url: mr.web_url,
+            url: mr.web_url,
             kind: 'body',
           },
           aclSubjects: acl,
@@ -146,6 +151,7 @@ export async function runGitlabProseSync(
               mr_iid: mr.iid,
               note_id: n.id,
               kind: 'note',
+              url: `${mr.web_url}#note_${n.id}`,
             },
             aclSubjects: acl,
             sourceArtifactId,
@@ -176,6 +182,7 @@ export async function runGitlabProseSync(
             issue_iid: issue.iid,
             state: issue.state,
             web_url: issue.web_url,
+            url: issue.web_url,
             kind: 'body',
           },
           aclSubjects: acl,
@@ -194,6 +201,7 @@ export async function runGitlabProseSync(
               issue_iid: issue.iid,
               note_id: n.id,
               kind: 'note',
+              url: `${issue.web_url}#note_${n.id}`,
             },
             aclSubjects: acl,
             sourceArtifactId,

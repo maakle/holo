@@ -146,6 +146,18 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
   // kind (e.g. 'github-pr', 'linear-issue'). Mutated in the closure below;
   // returned on the SyncJobResult so the worker can persist it on sync_runs.
   const breakdown: SyncBreakdown = {};
+  // Per-(provider, kind) "no URL emitted" warning dedup. The agent surface
+  // needs `metadata.url` (or `metadata.permalink`) on every chunk to render
+  // citations as clickable deep links — without it, the model can cite the
+  // chunk but the user sees no destination. We warn once per kind per sync
+  // so existing gaps surface in operator logs without spamming.
+  const warnedKinds = new Set<string>();
+  const hasUrl = (metadata: Record<string, unknown>): boolean => {
+    const url = metadata['url'];
+    if (typeof url === 'string' && url.length > 0) return true;
+    const permalink = metadata['permalink'];
+    return typeof permalink === 'string' && permalink.length > 0;
+  };
   const tallyNew = (kind: string): void => {
     const slot = breakdown[kind] ?? { new: 0, deduped: 0 };
     slot.new += 1;
@@ -188,6 +200,12 @@ export async function runConnectorSync(input: RunConnectorSyncInput): Promise<Sy
       reportProgress: input.reportProgress,
       signal: input.signal,
       async upsert(chunk: ChunkUpsert): Promise<void> {
+        if (!hasUrl(chunk.metadata) && !warnedKinds.has(chunk.kind)) {
+          warnedKinds.add(chunk.kind);
+          console.warn(
+            `[connector-framework] ${spec.id}: chunks of kind '${chunk.kind}' are being upserted without metadata.url or metadata.permalink. Citations to this content cannot deep-link from the Slack/Web answer surface. See packages/connectors/README.md "URL invariant".`,
+          );
+        }
         const hash = chunkHash(chunk.kind, chunk.content);
         if (existingHashes.has(hash)) {
           tallyDeduped(chunk.kind);

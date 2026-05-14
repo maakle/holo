@@ -138,6 +138,7 @@ export async function processFile(
       sourceArtifactId,
       metadata: {
         ...baseMeta,
+        url,
         chunk_index: i,
         chunk_count: pieces.length,
       },

@@ -25,6 +25,7 @@ import {
   applyClaimGuardrails,
   parseEmitClaimsInput,
 } from './claims-protocol';
+import { renumberSearchOutput } from './search-renumber';
 
 export interface ChatToolContext {
   db: DB;
@@ -634,39 +635,5 @@ export async function runChatAgentLoop(
 
     messages.push({ role: 'user', content: toolResults });
   }
-}
-
-/**
- * Rewrite the `citations[].index` field on a `search` tool's output so the
- * indices count up from where the prior search call left off. Mutates the
- * returned object's citations array but leaves everything else alone, and
- * appends the (renumbered) citations + raw coverage to the loop's
- * accumulators so the final `answer` result can carry them through to the
- * caller / UI.
- *
- * Defensive against malformed tool outputs: if the shape doesn't match
- * (e.g. a test stub returned something else under the `search` name), we
- * pass the value through untouched. The orchestrator's contract is to not
- * crash on tool output shape — only the tool itself owns that schema.
- */
-function renumberSearchOutput(
-  rawOutput: unknown,
-  citationsAcc: WireCitation[],
-  coverageAcc: WireSearchCoverage[],
-): unknown {
-  if (!rawOutput || typeof rawOutput !== 'object') return rawOutput;
-  const out = rawOutput as { citations?: unknown; coverage?: unknown };
-  if (out.coverage && typeof out.coverage === 'object') {
-    coverageAcc.push(out.coverage as WireSearchCoverage);
-  }
-  if (!Array.isArray(out.citations)) return rawOutput;
-  const offset = citationsAcc.length;
-  const renumbered = out.citations.map((c, i) => {
-    const cit = c as WireCitation;
-    const renumberedCit: WireCitation = { ...cit, index: offset + i + 1 };
-    citationsAcc.push(renumberedCit);
-    return renumberedCit;
-  });
-  return { ...out, citations: renumbered };
 }
 
