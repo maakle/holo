@@ -9,6 +9,7 @@ import {
   getSampleDataStatus,
   removeSampleData,
 } from '@/lib/sample-data';
+import { buildSampleEmbedFn } from '@/lib/sample-data-embedder';
 
 async function requireSession() {
   const ctx = await getServerContext();
@@ -45,7 +46,7 @@ export async function GET() {
 export async function POST() {
   try {
     const { db, orgId, session } = await requireSession();
-    const result = await ensureSampleData(db, orgId);
+    const result = await ensureSampleData(db, orgId, { embed: buildSampleEmbedFn() });
     if (result.created) {
       emitAuditEvent({
         db,

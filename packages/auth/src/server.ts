@@ -2,7 +2,7 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { emailOTP, organization } from 'better-auth/plugins';
 import { and, eq } from 'drizzle-orm';
-import type { DB } from '@holo/db';
+import type { DB, EmbedSampleChunksFn } from '@holo/db';
 import { ensureSampleData, schema } from '@holo/db';
 import type { Env } from '@holo/env';
 import { holoError, ErrorCode } from '@holo/errors';
@@ -22,6 +22,13 @@ export interface CreateAuthOpts {
     | 'EMAIL_FROM'
   >;
   defaultOrganizationId: string;
+  /**
+   * Embedder for the sample Star Wars dataset seeded into every new
+   * workspace. When set, sample chunks are inserted with embeddings so
+   * vector search hits them. When omitted, chunks land with NULL
+   * embedding (BM25-only) — fine for tests, broken for product use.
+   */
+  embedSampleChunks?: EmbedSampleChunksFn;
 }
 
 /**
@@ -153,6 +160,7 @@ export type ProvisionResult =
 export async function provisionPersonalOrgOnSignup(
   db: DB,
   newUser: { id: string; email: string; name?: string | null },
+  opts: { embedSampleChunks?: EmbedSampleChunksFn } = {},
 ): Promise<ProvisionResult> {
   const pendingInvite = await db
     .select({ id: schema.invitation.id })
@@ -196,12 +204,12 @@ export async function provisionPersonalOrgOnSignup(
   // Seed Star Wars sample data so the new workspace shows live content on
   // first login. Matches the bootstrap seed and the in-app
   // CreateWorkspaceForm — every workspace should have demo data by default.
-  await ensureSampleData(db, newOrg!.id);
+  await ensureSampleData(db, newOrg!.id, { embed: opts.embedSampleChunks });
 
   return { created: true, organizationId: newOrg!.id };
 }
 
-export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
+export function createAuth({ db, env, defaultOrganizationId, embedSampleChunks }: CreateAuthOpts) {
   return betterAuth({
     database: drizzleAdapter(db, {
       provider: 'pg',
@@ -246,7 +254,7 @@ export function createAuth({ db, env, defaultOrganizationId }: CreateAuthOpts) {
           // See provisionPersonalOrgOnSignup for behavior + invariants.
           after: async (createdUser) => {
             const u = createdUser as { id: string; email: string; name?: string | null };
-            await provisionPersonalOrgOnSignup(db, u);
+            await provisionPersonalOrgOnSignup(db, u, { embedSampleChunks });
           },
         },
       },

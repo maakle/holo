@@ -338,7 +338,7 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
       });
 
       if (result.kind !== 'answer') throw new Error('unreachable');
-      expect(result.answer).toContain("couldn't verify");
+      expect(result.answer).toContain('Heads up');
     });
 
     it('does NOT hard-gate a quantitative claim that has citations', async () => {
@@ -375,7 +375,7 @@ describe('runChatAgentLoop — claims envelope (RFC-0007)', () => {
 
       if (result.kind !== 'answer') throw new Error('unreachable');
       expect(result.claims?.[0]?.confidence).toBe('high');
-      expect(result.answer).not.toContain("couldn't verify");
+      expect(result.answer).not.toContain('Heads up');
     });
   });
 

@@ -11,4 +11,5 @@ export {
   SAMPLE_SOURCE_EXTERNAL_ID,
   SAMPLE_DATA_DESCRIPTION,
   type SampleDataStatus,
+  type EmbedSampleChunksFn,
 } from './sample-data';

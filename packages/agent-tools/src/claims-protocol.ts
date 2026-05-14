@@ -114,7 +114,7 @@ export function applyClaimGuardrails(claims: AnswerClaim[]): AnswerClaim[] {
       return {
         ...c,
         confidence: 'unverified' as const,
-        reason: c.reason ?? "couldn't verify against indexed content",
+        reason: c.reason ?? 'no source found in your data',
       };
     }
     if (uncited && c.confidence === 'high') {
@@ -128,13 +128,13 @@ export function applyClaimGuardrails(claims: AnswerClaim[]): AnswerClaim[] {
   });
 }
 
-const UNVERIFIED_NOTE_PREFIX = "Note: I couldn't verify";
+const UNVERIFIED_NOTE_PREFIX = "⚠️ Heads up — I couldn't find";
 
 /**
  * If any claim ended up `unverified` and the answer doesn't already say
- * so, append a single explanatory line. We keep the wording mechanical
- * — the web UI banner is the primary signal there; this is the textual
- * fallback for surfaces (REST, slack bot) that don't render claim chips.
+ * so, append a single explanatory line. The web UI banner is the primary
+ * signal there; this is the textual fallback for surfaces (REST, slack
+ * bot) that don't render claim chips.
  */
 export function appendUnverifiedNoteIfNeeded(
   answer: string,
@@ -143,7 +143,9 @@ export function appendUnverifiedNoteIfNeeded(
   const unverifiedCount = claims.filter((c) => c.confidence === 'unverified').length;
   if (unverifiedCount === 0) return answer;
   if (answer.includes(UNVERIFIED_NOTE_PREFIX)) return answer;
-  const noun = unverifiedCount === 1 ? 'one claim' : `${unverifiedCount} claims`;
-  const suffix = `\n\n${UNVERIFIED_NOTE_PREFIX} ${noun} above against your indexed content.`;
+  const suffix =
+    unverifiedCount === 1
+      ? `\n\n${UNVERIFIED_NOTE_PREFIX} a source for one point above. Worth double-checking.`
+      : `\n\n${UNVERIFIED_NOTE_PREFIX} sources for ${unverifiedCount} points above. Worth double-checking.`;
   return `${answer}${suffix}`;
 }

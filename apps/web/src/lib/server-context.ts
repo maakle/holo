@@ -5,6 +5,7 @@ import { initCrypto } from '@holo/crypto';
 import { parseEnv, type Env } from '@holo/env';
 import { holoError, ErrorCode } from '@holo/errors';
 import { sql } from 'drizzle-orm';
+import { buildSampleEmbedFn } from './sample-data-embedder';
 
 let cached: { env: Env; db: DB; auth: Auth; defaultOrgId: string } | null = null;
 
@@ -25,7 +26,12 @@ export async function getServerContext() {
     });
   }
   const defaultOrgId = orgs[0].id;
-  const auth = createAuth({ db, env, defaultOrganizationId: defaultOrgId });
+  const auth = createAuth({
+    db,
+    env,
+    defaultOrganizationId: defaultOrgId,
+    embedSampleChunks: buildSampleEmbedFn(),
+  });
   cached = { env, db, auth, defaultOrgId };
   return cached;
 }

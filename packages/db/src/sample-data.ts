@@ -1,7 +1,21 @@
 import { createHash } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DB } from './client';
 import { sources, sourceArtifacts, chunks, connectorCursors } from './schema/holo';
+
+/**
+ * Embed callback for sample chunks. Returns one vector per input text in
+ * input order, plus the model tag that was used (stored in
+ * `chunks.embedding_model` so query-time model filtering can match).
+ *
+ * Injected by callers that have an embedder configured — typically the web
+ * app and the auth signup hook. When omitted, sample chunks are inserted
+ * with NULL `embedding` and the vector branch of search misses them; only
+ * BM25 can hit. Provide it whenever you want full retrieval coverage.
+ */
+export type EmbedSampleChunksFn = (
+  texts: string[],
+) => Promise<{ vectors: number[][]; model: string }>;
 
 /**
  * "sample" is a synthetic provider used to seed every fresh workspace with a
@@ -407,11 +421,16 @@ function contentHash(orgId: string, externalId: string, content: string): string
 
 /**
  * Idempotently install Star Wars sample data for an org. Safe to call
- * repeatedly — re-running is a no-op once the source row exists.
+ * repeatedly — re-running is a no-op once the source row exists, except
+ * for the embedding-backfill path: if `opts.embed` is provided and any
+ * existing sample chunks for this org have a NULL embedding (e.g. they
+ * were installed before this code wired embeddings), they get embedded
+ * in-place so retrieval recovers without a delete/reinstall.
  */
 export async function ensureSampleData(
   db: DB,
   organizationId: string,
+  opts: { embed?: EmbedSampleChunksFn } = {},
 ): Promise<{ created: boolean; artifactCount: number }> {
   const existing = await db
     .select({ id: sources.id })
@@ -436,6 +455,9 @@ export async function ensureSampleData(
         AND provider = ${SAMPLE_PROVIDER}
         AND (acl_subjects IS NULL OR cardinality(acl_subjects) = 0)
     `);
+    if (opts.embed) {
+      await backfillMissingEmbeddings(db, organizationId, opts.embed);
+    }
     return { created: false, artifactCount: SAMPLE_ARTIFACTS.length };
   }
 
@@ -451,6 +473,17 @@ export async function ensureSampleData(
     .returning({ id: sources.id });
   const sourceId = insertedSource[0]!.id;
 
+  // Build artifact + content tuples up front so we can embed every chunk in
+  // a single batch (matches the OpenAI /embeddings 100-input cap and avoids
+  // N round-trips during signup).
+  interface PreparedChunk {
+    artifactId: string;
+    kind: 'doc' | 'message' | 'issue';
+    content: string;
+    contentHashValue: string;
+    title: string;
+  }
+  const prepared: PreparedChunk[] = [];
   for (const a of SAMPLE_ARTIFACTS) {
     const artifact = await db
       .insert(sourceArtifacts)
@@ -463,21 +496,54 @@ export async function ensureSampleData(
       })
       .returning({ id: sourceArtifacts.id });
     const artifactId = artifact[0]!.id;
-
     const content = `${a.title}\n\n${a.body}`;
-    await db.insert(chunks).values({
-      organizationId,
-      sourceArtifactId: artifactId,
-      sourceId,
-      provider: SAMPLE_PROVIDER,
+    prepared.push({
+      artifactId,
       kind: a.kind,
       content,
-      contentHash: contentHash(organizationId, a.externalId, content),
+      contentHashValue: contentHash(organizationId, a.externalId, content),
+      title: a.title,
+    });
+  }
+
+  let embedded: { vectors: number[][]; model: string } | null = null;
+  if (opts.embed) {
+    embedded = await opts.embed(prepared.map((p) => p.content));
+    if (embedded.vectors.length !== prepared.length) {
+      throw new Error(
+        `ensureSampleData: embed callback returned ${embedded.vectors.length} vectors for ${prepared.length} chunks`,
+      );
+    }
+  } else {
+    // No embedder configured — chunks land with NULL embedding and only BM25
+    // can match them. The next call to ensureSampleData with a real embedder
+    // will backfill via the existing-install branch above.
+    console.warn(
+      '[ensureSampleData] inserting sample chunks without embeddings — vector search will miss them until an embedder is wired in',
+    );
+  }
+
+  for (let i = 0; i < prepared.length; i++) {
+    const p = prepared[i]!;
+    await db.insert(chunks).values({
+      organizationId,
+      sourceArtifactId: p.artifactId,
+      sourceId,
+      provider: SAMPLE_PROVIDER,
+      kind: p.kind,
+      content: p.content,
+      contentHash: p.contentHashValue,
       // Match the org-scoped ACL real chunkers use so the agent's search tool
       // (which filters chunks via `acl_subjects && userSubjects`) can reach
       // sample rows. Without this they default to '{}' and never match.
       aclSubjects: [`org:${organizationId}`],
-      metadata: { sample: true, title: a.title },
+      metadata: { sample: true, title: p.title },
+      ...(embedded
+        ? {
+            embedding: embedded.vectors[i],
+            embeddingModel: embedded.model,
+          }
+        : {}),
     });
   }
 
@@ -492,6 +558,47 @@ export async function ensureSampleData(
   });
 
   return { created: true, artifactCount: SAMPLE_ARTIFACTS.length };
+}
+
+/**
+ * Embed any sample chunks for this org whose `embedding` is still NULL.
+ * Idempotent: running again after a full pass is a no-op because the WHERE
+ * clause finds nothing. Per-chunk UPDATE (not bulk) so a partial failure
+ * still commits the rows that did embed.
+ */
+async function backfillMissingEmbeddings(
+  db: DB,
+  organizationId: string,
+  embed: EmbedSampleChunksFn,
+): Promise<void> {
+  const rows = await db
+    .select({ id: chunks.id, content: chunks.content })
+    .from(chunks)
+    .where(
+      and(
+        eq(chunks.organizationId, organizationId),
+        eq(chunks.provider, SAMPLE_PROVIDER),
+        isNull(chunks.embedding),
+      ),
+    );
+  if (rows.length === 0) return;
+
+  const { vectors, model } = await embed(rows.map((r) => r.content));
+  if (vectors.length !== rows.length) {
+    throw new Error(
+      `ensureSampleData backfill: embed callback returned ${vectors.length} vectors for ${rows.length} chunks`,
+    );
+  }
+  for (let i = 0; i < rows.length; i++) {
+    const vec = vectors[i]!;
+    const literal = `[${vec.join(',')}]`;
+    await db.execute(sql`
+      UPDATE chunks
+      SET embedding = ${literal}::vector(1024),
+          embedding_model = ${model}
+      WHERE id = ${rows[i]!.id}
+    `);
+  }
 }
 
 export interface SampleDataStatus {

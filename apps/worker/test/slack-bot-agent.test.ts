@@ -420,6 +420,6 @@ describe('runAgent', () => {
     expect(result.claims).toHaveLength(1);
     expect(result.claims[0]!.confidence).toBe('unverified');
     expect(result.claims[0]!.reason).toBeDefined();
-    expect(result.answer).toContain("Note: I couldn't verify");
+    expect(result.answer).toContain("Heads up — I couldn't find");
   });
 });

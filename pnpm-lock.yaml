@@ -150,6 +150,9 @@ importers:
       '@holo/discovery':
         specifier: workspace:*
         version: link:../../packages/discovery
+      '@holo/embedder':
+        specifier: workspace:*
+        version: link:../../packages/embedder
       '@holo/env':
         specifier: workspace:*
         version: link:../../packages/env
