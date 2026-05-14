@@ -26,13 +26,33 @@ describe('answerCard', () => {
     expect(sections[0]!.widgets[0]).toEqual({
       textParagraph: { text: 'Deploys via Vercel.' },
     });
-    // Second section: sources header + one widget per source.
+    // Second section: sources header + one widget per source, each prefixed
+    // with the `[N]` reference the model is told to emit in the answer text.
     expect(sections[1]!.header).toBe('Sources');
     expect(sections[1]!.widgets).toHaveLength(2);
     const first = sections[1]!.widgets[0] as { textParagraph: { text: string } };
+    expect(first.textParagraph.text).toMatch(/^\[1\] /);
     expect(first.textParagraph.text).toContain('github · doc');
     expect(first.textParagraph.text).toContain('https://github.com/a/b');
     expect(first.textParagraph.text).toContain('README');
+    const second = sections[1]!.widgets[1] as { textParagraph: { text: string } };
+    expect(second.textParagraph.text).toMatch(/^\[2\] /);
+  });
+
+  it('renders label-only when a source has no url (matches Slack behavior)', () => {
+    const sources: Source[] = [
+      { provider: 'salesforce', kind: 'opportunity', title: 'Acme renewal' },
+    ];
+    const card = answerCard('See opportunity.', sources);
+    const text = (
+      card.cardsV2![0]!.card.sections![1]!.widgets[0] as {
+        textParagraph: { text: string };
+      }
+    ).textParagraph.text;
+    expect(text).toMatch(/^\[1\] /);
+    expect(text).toContain('salesforce · opportunity');
+    expect(text).toContain('Acme renewal');
+    expect(text).not.toContain('<a href=');
   });
 
   it('omits the sources section when no sources are provided', () => {

@@ -58,11 +58,19 @@ export function answerCard(
   if (sources.length > 0) {
     sections.push({
       header: 'Sources',
-      widgets: sources.map((s) => ({
-        textParagraph: {
-          text: `${s.provider} · ${s.kind} · <a href="${escapeHref(s.url)}">${escapeText(s.title)}</a>`,
-        },
-      })),
+      widgets: sources.map((s, i) => {
+        // Position N-1 corresponds to the `[N]` reference the model emits
+        // in the answer text — prefix so the cross-reference is visible.
+        const linked =
+          s.url !== undefined
+            ? `<a href="${escapeHref(s.url)}">${escapeText(s.title)}</a>`
+            : escapeText(s.title);
+        return {
+          textParagraph: {
+            text: `[${i + 1}] ${escapeText(s.provider)} · ${escapeText(s.kind)} · ${linked}`,
+          },
+        };
+      }),
     } as (typeof sections)[number]);
   }
   return {
