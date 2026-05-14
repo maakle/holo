@@ -32,8 +32,10 @@ function projectIssueToContent(issue: JiraIssue): string {
   return lines.join('\n');
 }
 
-function aclFor(issue: JiraIssue): string[] {
-  return [`jira:project:${issue.fields.project.id}`, 'jira:org'];
+function aclFor(issue: JiraIssue, organizationId: string): string[] {
+  // Atlassian API token is workspace-scope → whole-org read access. The
+  // `org:${id}` subject is what Files panel + RAG retrieval check.
+  return [`org:${organizationId}`, `jira:project:${issue.fields.project.id}`, 'jira:org'];
 }
 
 function issueMetadata(issue: JiraIssue, siteUrl: string): Record<string, unknown> {
@@ -66,7 +68,7 @@ export async function processIssue(
   siteUrl: string,
 ): Promise<void> {
   const sourceArtifactId = `jira-issue:${issue.id}`;
-  const acl = aclFor(issue);
+  const acl = aclFor(issue, ctx.organizationId);
 
   const issueChunk: ChunkUpsert = {
     externalId: issue.id,
@@ -131,7 +133,7 @@ export async function processProject(
     externalId: project.id,
     kind: 'jira-project',
     content: projectProjectToContent(project),
-    aclSubjects: ['jira:org'],
+    aclSubjects: [`org:${ctx.organizationId}`, 'jira:org'],
     metadata: {
       key: project.key,
       name: project.name,

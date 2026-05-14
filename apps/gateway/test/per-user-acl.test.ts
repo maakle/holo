@@ -48,16 +48,19 @@ beforeAll(async () => {
   `;
   sourceId = sourceRows[0]!.id;
 
+  // `path` is NOT NULL since migration 0049 (RFC 0009 follow-up). Use a
+  // unique synthetic path per artifact so the unique partial index on
+  // (organization_id, path) doesn't collide across test runs.
   const aRows = await sql<{ id: string }[]>`
-    INSERT INTO source_artifacts (organization_id, source_id, external_id, kind, payload)
-    VALUES (${orgId}, ${sourceId}, ${`artifact-a-${SEED}`}, 'message', '{}'::jsonb)
+    INSERT INTO source_artifacts (organization_id, source_id, external_id, kind, payload, path)
+    VALUES (${orgId}, ${sourceId}, ${`artifact-a-${SEED}`}, 'message', '{}'::jsonb, ${`/test/acl/${SEED}/a.md`})
     RETURNING id
   `;
   artifactAId = aRows[0]!.id;
 
   const bRows = await sql<{ id: string }[]>`
-    INSERT INTO source_artifacts (organization_id, source_id, external_id, kind, payload)
-    VALUES (${orgId}, ${sourceId}, ${`artifact-b-${SEED}`}, 'message', '{}'::jsonb)
+    INSERT INTO source_artifacts (organization_id, source_id, external_id, kind, payload, path)
+    VALUES (${orgId}, ${sourceId}, ${`artifact-b-${SEED}`}, 'message', '{}'::jsonb, ${`/test/acl/${SEED}/b.md`})
     RETURNING id
   `;
   artifactBId = bRows[0]!.id;

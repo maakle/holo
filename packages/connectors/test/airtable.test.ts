@@ -214,7 +214,7 @@ describe('Airtable sync (full, wildcard allowlist)', () => {
     expect(chunk.content).toContain('[Customers · Prospects] Acme Corp');
     expect(chunk.content).toContain('Notes: Large enterprise lead.');
     expect(chunk.content).toContain('Tags: hot, enterprise');
-    expect(chunk.aclSubjects).toEqual(['airtable:base:appAAA', 'airtable:org']);
+    expect(chunk.aclSubjects).toEqual(['org:org-1', 'airtable:base:appAAA', 'airtable:org']);
     expect(chunk.metadata['baseId']).toBe('appAAA');
     expect(chunk.metadata['tableName']).toBe('Prospects');
     expect(chunk.metadata['url']).toBe('https://airtable.com/appAAA/tblProspects/rec1');

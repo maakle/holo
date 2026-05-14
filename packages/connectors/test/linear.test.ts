@@ -201,7 +201,7 @@ describe('Linear sync (full)', () => {
     expect(chunk.content).toContain('Assignee: Alice');
     expect(chunk.content).toContain('Labels: bug, p1');
     expect(chunk.content).toContain('Users hit a 500 on /login when SSO is misconfigured.');
-    expect(chunk.aclSubjects).toEqual(['linear:team:t-eng', 'linear:org']);
+    expect(chunk.aclSubjects).toEqual(['org:org-1', 'linear:team:t-eng', 'linear:org']);
     expect(chunk.metadata['identifier']).toBe('ENG-42');
     expect(chunk.metadata['priorityLabel']).toBe('High');
     expect(chunk.metadata['labels']).toEqual(['bug', 'p1']);

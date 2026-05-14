@@ -14,8 +14,10 @@ interface Props {
   nextCursor: string | null;
   kind: string | undefined;
   status: string | undefined;
+  tool: string | undefined;
   query: string;
   availableKinds: readonly string[];
+  availableTools: readonly { name: string; count: number }[];
   stats: { total: number; errors: number; replays: number; replayViewers: number };
 }
 
@@ -24,8 +26,10 @@ export function ObservabilityView({
   nextCursor,
   kind,
   status,
+  tool,
   query,
   availableKinds,
+  availableTools,
   stats,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -49,7 +53,14 @@ export function ObservabilityView({
       data-fullwidth
       className="-mx-6 -my-8 lg:-mx-10 lg:-my-10 flex h-[calc(100vh-56px)] min-h-0"
     >
-      <FilterRail kind={kind} status={status} availableKinds={availableKinds} stats={stats} />
+      <FilterRail
+        kind={kind}
+        status={status}
+        tool={tool}
+        availableKinds={availableKinds}
+        availableTools={availableTools}
+        stats={stats}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <Toolbar query={query} stats={stats} />
         <div className="flex min-h-0 flex-1">

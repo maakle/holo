@@ -225,7 +225,12 @@ describe('Asana sync (full)', () => {
     expect(chunk.content).toContain('Due: 2026-05-10');
     expect(chunk.content).toContain('Tags: bug');
     expect(chunk.content).toContain('Users hit a 500 on /login when SSO is misconfigured.');
-    expect(chunk.aclSubjects).toEqual(['asana:workspace:ws1', 'asana:org', 'asana:project:p1']);
+    expect(chunk.aclSubjects).toEqual([
+      'org:org-1',
+      'asana:workspace:ws1',
+      'asana:org',
+      'asana:project:p1',
+    ]);
     expect(chunk.metadata['url']).toBe('https://app.asana.com/0/0/t1');
     expect(chunk.metadata['projectNames']).toEqual(['Auth Hardening']);
     expect(chunk.metadata['tags']).toEqual(['bug']);

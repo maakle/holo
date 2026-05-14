@@ -28,10 +28,11 @@ function projectIssueToContent(issue: LinearIssue): string {
   return lines.join('\n');
 }
 
-function aclSubjectsFor(issue: LinearIssue): string[] {
-  // Linear has no per-issue ACL on the API; team-id keeps a future option
-  // open for "what was your team working on?" without leaking other teams.
-  return [`linear:team:${issue.team.id}`, `linear:org`];
+function aclSubjectsFor(issue: LinearIssue, organizationId: string): string[] {
+  // Linear API key is workspace-scope → whole-org read access. The
+  // `org:${id}` subject is what Files panel + RAG retrieval check;
+  // team-id keeps future per-team scoping open.
+  return [`org:${organizationId}`, `linear:team:${issue.team.id}`, `linear:org`];
 }
 
 /** Emit one chunk for a Linear issue via ctx.upsert. */
@@ -43,7 +44,7 @@ export async function processIssue(
     externalId: issue.id,
     kind: 'linear-issue',
     content: projectIssueToContent(issue),
-    aclSubjects: aclSubjectsFor(issue),
+    aclSubjects: aclSubjectsFor(issue, ctx.organizationId),
     metadata: {
       identifier: issue.identifier,
       url: issue.url,

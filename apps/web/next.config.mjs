@@ -30,6 +30,8 @@ const nextConfig = {
     'tree-sitter-php',
     'tree-sitter-c',
     'tree-sitter-cpp',
+    'just-bash',
+    '@mongodb-js/zstd',
   ],
   transpilePackages: [
     '@holo/auth',
@@ -50,7 +52,7 @@ const nextConfig = {
       '.mjs': ['.mts', '.mjs'],
     };
     if (isServer) {
-      const treeSitterPackages = [
+      const nativeExternals = [
         'tree-sitter',
         'tree-sitter-typescript',
         'tree-sitter-javascript',
@@ -62,8 +64,10 @@ const nextConfig = {
         'tree-sitter-php',
         'tree-sitter-c',
         'tree-sitter-cpp',
+        'just-bash',
+        '@mongodb-js/zstd',
       ];
-      config.externals = [...(config.externals || []), ...treeSitterPackages];
+      config.externals = [...(config.externals || []), ...nativeExternals];
     }
     return config;
   },

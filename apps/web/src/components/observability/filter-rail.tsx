@@ -9,12 +9,16 @@ import { KIND_LABELS } from './kinds';
 export function FilterRail({
   kind,
   status,
+  tool,
   availableKinds,
+  availableTools,
   stats,
 }: {
   kind: string | undefined;
   status: string | undefined;
+  tool: string | undefined;
   availableKinds: readonly string[];
+  availableTools: readonly { name: string; count: number }[];
   stats: { total: number; errors: number; replays: number; replayViewers: number };
 }) {
   const router = useRouter();
@@ -30,11 +34,38 @@ export function FilterRail({
     startTransition(() => router.push(`${pathname}?${next.toString()}`));
   };
 
+  // Selecting a tool only makes sense under kind=tool — other kinds (sync,
+  // LLM, etc.) have toolName=null and would always return zero rows.
+  // Auto-set both params together so the user can't end up in an empty
+  // state by accident.
+  const setTool = (name: string | undefined) => {
+    const next = new URLSearchParams(sp.toString());
+    next.delete('cursor');
+    if (name) {
+      next.set('tool', name);
+      next.set('kind', 'tool_call');
+    } else {
+      next.delete('tool');
+    }
+    startTransition(() => router.push(`${pathname}?${next.toString()}`));
+  };
+
+  // Switching to a non-tool kind clears the tool filter so we don't carry
+  // it into an unrelated view.
+  const setKind = (next: string | undefined) => {
+    const params = new URLSearchParams(sp.toString());
+    params.delete('cursor');
+    if (next) params.set('kind', next);
+    else params.delete('kind');
+    if (next !== 'tool_call') params.delete('tool');
+    startTransition(() => router.push(`${pathname}?${params.toString()}`));
+  };
+
   const reset = () => {
     startTransition(() => router.push(pathname));
   };
 
-  const hasActive = !!kind || !!status || !!sp.get('q');
+  const hasActive = !!kind || !!status || !!tool || !!sp.get('q');
 
   return (
     <aside
@@ -79,16 +110,31 @@ export function FilterRail({
       </FilterGroup>
 
       <FilterGroup label="Kind">
-        <FilterRadio label="All" active={!kind} onClick={() => setParam('kind', undefined)} />
+        <FilterRadio label="All" active={!kind} onClick={() => setKind(undefined)} />
         {availableKinds.map((k) => (
           <FilterRadio
             key={k}
             label={KIND_LABELS[k] ?? k}
             active={kind === k}
-            onClick={() => setParam('kind', k)}
+            onClick={() => setKind(k)}
           />
         ))}
       </FilterGroup>
+
+      {availableTools.length > 0 && (
+        <FilterGroup label="Tool" defaultOpen={kind === 'tool_call'}>
+          <FilterRadio label="All" active={!tool} onClick={() => setTool(undefined)} />
+          {availableTools.map((t) => (
+            <FilterRadio
+              key={t.name}
+              label={t.name}
+              active={tool === t.name}
+              onClick={() => setTool(t.name)}
+              count={t.count}
+            />
+          ))}
+        </FilterGroup>
+      )}
     </aside>
   );
 }

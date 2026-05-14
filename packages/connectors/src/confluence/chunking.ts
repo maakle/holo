@@ -26,9 +26,12 @@ function spaceIdString(space: ConfluencePage['space'] | ConfluenceSpace): string
   return String((space as { id: string | number }).id);
 }
 
-function pageAcl(page: ConfluencePage): string[] {
+function pageAcl(page: ConfluencePage, organizationId: string): string[] {
+  // Workspace-scope token (Atlassian API token + email): every org member has
+  // read access — `org:${id}` is what the Files panel + RAG retrieval check.
   const spaceId = spaceIdString(page.space);
-  return spaceId ? [`confluence:space:${spaceId}`, 'confluence:org'] : ['confluence:org'];
+  const base = [`org:${organizationId}`, 'confluence:org'];
+  return spaceId ? [...base, `confluence:space:${spaceId}`] : base;
 }
 
 function ancestorTrail(page: ConfluencePage): string {
@@ -87,7 +90,7 @@ export async function processPage(
   siteUrl: string,
 ): Promise<void> {
   const sourceArtifactId = `confluence-page:${page.id}`;
-  const acl = pageAcl(page);
+  const acl = pageAcl(page, ctx.organizationId);
 
   const pageChunk: ChunkUpsert = {
     externalId: page.id,
@@ -161,7 +164,7 @@ export async function processSpace(
     externalId: id,
     kind: 'confluence-space',
     content: spaceToContent(space),
-    aclSubjects: [`confluence:space:${id}`, 'confluence:org'],
+    aclSubjects: [`org:${ctx.organizationId}`, `confluence:space:${id}`, 'confluence:org'],
     metadata: {
       spaceId: id,
       key: space.key,

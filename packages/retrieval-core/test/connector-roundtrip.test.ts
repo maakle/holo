@@ -120,8 +120,9 @@ beforeAll(async () => {
 
   await db.execute(sql`
     INSERT INTO source_artifacts
-      (organization_id, source_id, kind, external_id, fetched_at, payload)
-    VALUES (${orgId}, ${sourceId}, 'github-pr', ${`pr:${REPO}#${PR_NUMBER}`}, now(), '{}'::jsonb)
+      (organization_id, source_id, kind, external_id, fetched_at, payload, path)
+    VALUES (${orgId}, ${sourceId}, 'github-pr', ${`pr:${REPO}#${PR_NUMBER}`}, now(), '{}'::jsonb,
+            ${`/test/${REPO}/pulls/${PR_NUMBER}.md`})
   `);
 }, 30_000);
 

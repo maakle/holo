@@ -106,9 +106,9 @@ beforeAll(async () => {
       ?? (sourceRes as unknown as Array<{ id: string }>))[0]!.id;
     const artRes = await db.execute<{ id: string }>(sql`
       INSERT INTO source_artifacts
-        (organization_id, source_id, kind, external_id, fetched_at, payload)
+        (organization_id, source_id, kind, external_id, fetched_at, payload, path)
       VALUES (${orgId}, ${sourceId}, ${f.artifactKind}, ${f.externalId},
-              now(), '{}'::jsonb)
+              now(), '{}'::jsonb, ${`/test/parity/${f.artifactKind}/${f.externalId}.md`})
       RETURNING id
     `);
     const artifactId = ((artRes as unknown as { rows?: Array<{ id: string }> }).rows

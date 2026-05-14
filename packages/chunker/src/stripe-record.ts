@@ -77,8 +77,16 @@ function formatDate(d: Date): string {
  * with later updates. `chunk_role` is set to `record` for parity with the
  * HubSpot chunker — the dashboard's KIND_LABELS panel reads it.
  */
+// Most chunkers have `kind` matching the artifact kind they emit (e.g.
+// the github-pr chunker emits `github-pr` artifacts). The Stripe chunker
+// is parameterised by `recordType` and the connector overrides the kind
+// to `stripe-{customer|subscription|invoice|charge}` at upsert time
+// (packages/connectors/src/stripe/chunking.ts). So `'stripe-record'` was
+// a phantom kind — no artifact ever had it, but it misleadingly looked
+// like one in the path-fn registry. Use `'stripe'` as a chunker-family
+// label that's clearly not an artifact kind.
 export const stripeRecordChunker: Chunker<StripeRecordInput> = {
-  kind: 'stripe-record',
+  kind: 'stripe',
   embeddingModel: 'openai-3-small',
 
   async chunk(input: StripeRecordInput, ctx: ChunkContext): Promise<Chunk[]> {

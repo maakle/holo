@@ -52,8 +52,9 @@ async function seedArtifact(spec: SeedSpec): Promise<string> {
 
   const artifactRes = await db.execute<{ id: string }>(sql`
     INSERT INTO source_artifacts
-      (organization_id, source_id, kind, external_id, fetched_at, payload)
-    VALUES (${orgId}, ${sourceId}, ${spec.artifactKind}, 'test-art', now(), '{}'::jsonb)
+      (organization_id, source_id, kind, external_id, fetched_at, payload, path)
+    VALUES (${orgId}, ${sourceId}, ${spec.artifactKind}, 'test-art', now(), '{}'::jsonb,
+            ${`/test/get-artifact/${spec.artifactKind}/test-art.md`})
     RETURNING id
   `);
   const artifactId = ((artifactRes as unknown as { rows?: Array<{ id: string }> }).rows

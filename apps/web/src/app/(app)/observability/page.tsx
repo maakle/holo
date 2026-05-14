@@ -11,6 +11,7 @@ const PAGE_SIZE = 200;
 interface SearchParams {
   kind?: string;
   status?: string;
+  tool?: string;
   q?: string;
   cursor?: string;
 }
@@ -30,12 +31,17 @@ export default async function ObservabilityPage({
   const params = await searchParams;
   const kindFilter = isAgentEventKind(params.kind) ? params.kind : undefined;
   const statusFilter = params.status === 'error' ? 'error' : undefined;
+  const toolFilter =
+    typeof params.tool === 'string' && params.tool.trim().length > 0
+      ? params.tool.trim()
+      : undefined;
   const cursor = params.cursor ? new Date(params.cursor) : undefined;
   const query = typeof params.q === 'string' ? params.q.trim() : '';
 
   const conditions = [eq(schema.mcpInvocations.organizationId, orgId)];
   if (kindFilter) conditions.push(eq(schema.mcpInvocations.kind, kindFilter));
   if (statusFilter === 'error') conditions.push(isNotNull(schema.mcpInvocations.errorCode));
+  if (toolFilter) conditions.push(eq(schema.mcpInvocations.toolName, toolFilter));
   if (cursor) conditions.push(lt(schema.mcpInvocations.createdAt, cursor));
   if (query) {
     conditions.push(
@@ -102,14 +108,38 @@ export default async function ObservabilityPage({
     replayViewers: replayRow?.replayViewers ?? 0,
   };
 
+  // Distinct tool names + counts for `kind = 'tool'` rows in this org.
+  // Powers the Tool sub-filter in the rail. Cheap aggregate, ordered by
+  // descending count so the most-used tools surface first.
+  const toolRows = await db
+    .select({
+      name: schema.mcpInvocations.toolName,
+      count: sql<number>`count(*)::int`.as('count'),
+    })
+    .from(schema.mcpInvocations)
+    .where(
+      and(
+        eq(schema.mcpInvocations.organizationId, orgId),
+        eq(schema.mcpInvocations.kind, 'tool_call'),
+        isNotNull(schema.mcpInvocations.toolName),
+      ),
+    )
+    .groupBy(schema.mcpInvocations.toolName)
+    .orderBy(desc(sql`count(*)`));
+  const availableTools = toolRows
+    .filter((r): r is { name: string; count: number } => r.name !== null)
+    .map((r) => ({ name: r.name, count: r.count }));
+
   return (
     <ObservabilityView
       events={events}
       nextCursor={nextCursor}
       kind={kindFilter}
       status={statusFilter}
+      tool={toolFilter}
       query={query}
       availableKinds={agentEventKind}
+      availableTools={availableTools}
       stats={stats}
     />
   );

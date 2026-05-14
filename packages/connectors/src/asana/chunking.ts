@@ -31,11 +31,15 @@ function projectTaskToContent(task: AsanaTask): string {
   return lines.join('\n');
 }
 
-function aclSubjectsFor(task: AsanaTask, workspaceGid: string): string[] {
-  // Asana has no per-task ACL exposed on the REST API; the workspace gid
-  // keeps a future option open for "what was your team working on?"
-  // without leaking other workspaces.
-  const subjects = [`asana:workspace:${workspaceGid}`, 'asana:org'];
+function aclSubjectsFor(
+  task: AsanaTask,
+  workspaceGid: string,
+  organizationId: string,
+): string[] {
+  // Asana PAT is workspace-scope → whole-org read access. The `org:${id}`
+  // subject is what Files panel + RAG retrieval check; workspace + project
+  // subjects keep future scoping options open.
+  const subjects = [`org:${organizationId}`, `asana:workspace:${workspaceGid}`, 'asana:org'];
   for (const project of task.projects) {
     subjects.push(`asana:project:${project.gid}`);
   }
@@ -52,7 +56,7 @@ export async function processTask(
     externalId: task.gid,
     kind: 'asana-task',
     content: projectTaskToContent(task),
-    aclSubjects: aclSubjectsFor(task, workspaceGid),
+    aclSubjects: aclSubjectsFor(task, workspaceGid, ctx.organizationId),
     metadata: {
       url: task.permalink_url,
       workspaceGid,

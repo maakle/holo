@@ -9,6 +9,7 @@ import type { ChunkUpsert, ResourceSyncContext } from '@holo/connector-framework
 function makeCtx() {
   const upserts: ChunkUpsert[] = [];
   const ctx = {
+    organizationId: 'org-1',
     upsert: async (chunk: ChunkUpsert) => {
       upserts.push(chunk);
     },
@@ -126,8 +127,8 @@ describe('processIssue', () => {
   it('uses jira:project:{id} and jira:org as ACL subjects', async () => {
     const { ctx, upserts } = makeCtx();
     await processIssue(ctx, issueWithComment, 'https://acme.atlassian.net');
-    expect(upserts[0].aclSubjects).toEqual(['jira:project:p-1', 'jira:org']);
-    expect(upserts[1].aclSubjects).toEqual(['jira:project:p-1', 'jira:org']);
+    expect(upserts[0].aclSubjects).toEqual(['org:org-1', 'jira:project:p-1', 'jira:org']);
+    expect(upserts[1].aclSubjects).toEqual(['org:org-1', 'jira:project:p-1', 'jira:org']);
   });
 
   it('comment chunk shares the parent issue sourceArtifactId so cascades work', async () => {
@@ -165,7 +166,7 @@ describe('processProject', () => {
     expect(upserts[0].content).toContain('Type: software');
     expect(upserts[0].content).toContain('Lead: Jane Doe');
     expect(upserts[0].content).toContain('Backend & infra.');
-    expect(upserts[0].aclSubjects).toEqual(['jira:org']);
+    expect(upserts[0].aclSubjects).toEqual(['org:org-1', 'jira:org']);
     expect(upserts[0].metadata.url).toBe('https://acme.atlassian.net/jira/projects/ENG');
   });
 });

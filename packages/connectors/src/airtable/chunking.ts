@@ -83,11 +83,14 @@ function projectRecordToContent(input: {
   return lines.join('\n');
 }
 
-function aclSubjectsFor(base: AirtableBase): string[] {
+function aclSubjectsFor(base: AirtableBase, organizationId: string): string[] {
   // Airtable's API doesn't expose per-record permissions; the base is the
-  // smallest unit a token can be scoped to. The `airtable:org` subject keeps
-  // the door open for an org-wide retrieval scope alongside per-base scopes.
-  return [`airtable:base:${base.id}`, `airtable:org`];
+  // smallest unit a token can be scoped to. The token itself is workspace-
+  // scoped (a PAT against the org's Airtable account), so every member of
+  // this Holo org has read access — emit `org:${id}` so the Files panel +
+  // RAG retrieval can see these rows alongside slack/notion. The per-base
+  // subject is retained for future per-base ACL features.
+  return [`org:${organizationId}`, `airtable:base:${base.id}`, `airtable:org`];
 }
 
 export async function processRecord(
@@ -103,7 +106,7 @@ export async function processRecord(
     externalId: `${base.id}:${table.id}:${record.id}`,
     kind: 'airtable-record',
     content: projectRecordToContent({ record, base, table }),
-    aclSubjects: aclSubjectsFor(base),
+    aclSubjects: aclSubjectsFor(base, ctx.organizationId),
     metadata: {
       baseId: base.id,
       baseName: base.name,

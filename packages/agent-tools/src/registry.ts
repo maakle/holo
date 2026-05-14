@@ -3,11 +3,13 @@ import type { DB } from '@holo/db';
 import { listCustomTools, buildCustomToolDefinition } from '@holo/custom-tools';
 import { searchInputSchema, runSearchTool } from './tools/search';
 import { bashInputSchema, runBashTool, BASH_TOOL_DESCRIPTION } from './tools/bash';
-import { getPrInputSchema, runGetPrTool } from './tools/get-pr';
-import { getThreadInputSchema, runGetThreadTool } from './tools/get-thread';
-import { getDocInputSchema, runGetDocTool } from './tools/get-doc';
-import { getCallInputSchema, runGetCallTool } from './tools/get-call';
-import { getTicketInputSchema, runGetTicketTool } from './tools/get-ticket';
+// Legacy per-source getters (get_pr, get_thread, get_doc, get_call, get_ticket)
+// were removed from the registry on 2026-05-14 in favour of `bash cat /...`.
+// The implementation files in `./tools/get-*.ts` and `./tools/_artifact-lookup.ts`
+// remain on disk for one telemetry cycle; once `mcp_invocations` confirms zero
+// legacy traffic they can be deleted along with the dead-but-harmless string
+// references in custom-tools, skills synthesis, slack-bot citation
+// extraction, gateway allowlist tests, and the landing-page marketing copy.
 import { listSkillsInputSchema, runListSkillsTool } from './tools/list-skills';
 import { getSkillInputSchema, runGetSkillTool } from './tools/get-skill';
 import { executeSkillInputSchema, runExecuteSkillTool } from './tools/execute-skill';
@@ -48,11 +50,6 @@ interface BuiltinSpec {
 const BUILTINS: BuiltinSpec[] = [
   { name: 'bash', description: BASH_TOOL_DESCRIPTION, schema: bashInputSchema, run: (ctx, a) => runBashTool(ctx, a) },
   { name: 'search', description: 'Hybrid search across all ingested artifacts (vector + BM25, fused via RRF). Optional `path` scopes results to a virtual-filesystem subtree (e.g. `/slack/#pricing`).', schema: searchInputSchema, run: (ctx, a) => runSearchTool(ctx, a) },
-  { name: 'get_pr', description: 'Reassemble a GitHub PR (title + diff + review) by owner/repo/number. DEPRECATED — use `bash` with `cat /github/{owner}/{repo}/pulls/{number}.md` instead.', schema: getPrInputSchema, run: (ctx, a) => runGetPrTool({ db: ctx.db, organizationId: ctx.organizationId, userSubjects: ctx.userSubjects }, a) },
-  { name: 'get_thread', description: 'Fetch a Slack thread by channel and ts. DEPRECATED — use `bash` with `cat /slack/...` instead.', schema: getThreadInputSchema, run: (ctx, a) => runGetThreadTool({ db: ctx.db, organizationId: ctx.organizationId, userSubjects: ctx.userSubjects }, a) },
-  { name: 'get_doc', description: 'Fetch a doc by artifact id, notion page id, or repo+path. DEPRECATED — use `bash` with `cat /notion/...` or `cat /github/...` instead.', schema: getDocInputSchema, run: (ctx, a) => runGetDocTool({ db: ctx.db, organizationId: ctx.organizationId, userSubjects: ctx.userSubjects }, a) },
-  { name: 'get_call', description: 'Fetch a Grain meeting recording (summary + full transcript) by recording_id. DEPRECATED — use `bash` with `cat /grain/...` instead.', schema: getCallInputSchema, run: (ctx, a) => runGetCallTool({ db: ctx.db, organizationId: ctx.organizationId, userSubjects: ctx.userSubjects }, a) },
-  { name: 'get_ticket', description: 'Fetch a Pylon support ticket (conversation history) by ticket_id. DEPRECATED — use `bash` with `cat /pylon/tickets/{id}.md` instead.', schema: getTicketInputSchema, run: (ctx, a) => runGetTicketTool({ db: ctx.db, organizationId: ctx.organizationId, userSubjects: ctx.userSubjects }, a) },
   { name: 'list_skills', description: 'List skills available to agents in this organization. Returns name, slug, version, status, and description. Filter by status (default: active).', schema: listSkillsInputSchema, run: (ctx, a) => runListSkillsTool(ctx, a) },
   { name: 'get_skill', description: 'Retrieve the full content of a skill by id or slug. Returns the complete Anthropic Skill format including procedure and examples.', schema: getSkillInputSchema, run: (ctx, a) => runGetSkillTool(ctx, a) },
   { name: 'execute_skill', description: "Execute a skill procedure step-by-step using the skill's written playbook. The skill must have executable=true in its frontmatter. Returns a run ID, per-step LLM responses, and a summary. This tool creates a skill_run record — it is NOT read-only.", schema: executeSkillInputSchema, run: (ctx, a) => runExecuteSkillTool({ ...ctx, anthropicApiKey: ctx.anthropicApiKey }, a) },

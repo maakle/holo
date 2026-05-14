@@ -114,6 +114,7 @@ export async function seedChunks(
       externalId: CHUNK_SEED_ARTIFACT_EXTERNAL_ID,
       kind: 'github-pr',
       payload: {},
+      path: `/test/connectors/${CHUNK_SEED_ARTIFACT_EXTERNAL_ID}.md`,
     })
     .onConflictDoNothing();
 

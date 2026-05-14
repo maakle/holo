@@ -1,0 +1,18 @@
+-- Lock in the path invariant established by RFC 0009.
+--
+-- Migration 0048 added `path` as nullable so the worker could keep writing
+-- through the rollout even before path-fns existed for every kind. Now
+-- every connector that emits artifacts has a registered path-fn (including
+-- stripe-{customer,subscription,invoice,charge} from the follow-up PR),
+-- and 100% of live rows carry a non-null path.
+--
+-- Flipping to NOT NULL means: any future connector that emits a kind
+-- without a path-fn fails loudly at insert time, instead of silently
+-- writing path=NULL and disappearing from /files. This is what would have
+-- surfaced the Stripe gap months sooner.
+--
+-- The partial index `source_artifacts_org_path_idx` (added in 0048) had
+-- `WHERE path IS NOT NULL` — keep the predicate for now; we can drop it
+-- in a later migration once tooling fully assumes NOT NULL. Two-step is
+-- cheaper than recreating the index in this migration.
+ALTER TABLE "source_artifacts" ALTER COLUMN "path" SET NOT NULL;
