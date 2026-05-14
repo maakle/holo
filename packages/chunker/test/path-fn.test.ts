@@ -128,6 +128,106 @@ describe('path-fn registry', () => {
     expect(computePath(input)).toBe(computePath(input));
   });
 
+  it('airtable-record reads camelCase metadata emitted by @holo/connectors', () => {
+    const path = computePath({
+      kind: 'airtable-record',
+      externalId: 'airtable-record:appXYZ:tblABC:recDEF',
+      metadata: {
+        baseId: 'appXYZ',
+        baseName: 'Sales CRM',
+        tableId: 'tblABC',
+        tableName: 'Pipeline',
+        recordId: 'recDEF',
+      },
+    });
+    expect(path).toBe('/airtable/sales-crm/pipeline/recDEF.md');
+  });
+
+  it('confluence-page reads camelCase metadata (spaceKey/pageId)', () => {
+    const path = computePath({
+      kind: 'confluence-page',
+      externalId: '12345',
+      metadata: {
+        pageId: '12345',
+        spaceKey: 'ENG',
+        title: 'Onboarding Runbook',
+      },
+    });
+    expect(path).toBe('/confluence/eng/onboarding-runbook-12345.md');
+  });
+
+  it('confluence-space accepts `key` as emitted by the connector', () => {
+    const path = computePath({
+      kind: 'confluence-space',
+      externalId: 'confluence-space:ENG',
+      metadata: { key: 'ENG', name: 'Engineering' },
+    });
+    expect(path).toBe('/confluence/eng.md');
+  });
+
+  it('confluence-comment falls back to spaceId when no space key is in metadata', () => {
+    const path = computePath({
+      kind: 'confluence-comment',
+      externalId: '12345:c-99',
+      metadata: { commentId: 'c-99', pageId: '12345', spaceId: '4242' },
+    });
+    expect(path).toBe('/confluence/4242/12345/comments/c-99.md');
+  });
+
+  it('jira-* read camelCase metadata emitted by @holo/connectors', () => {
+    expect(
+      computePath({
+        kind: 'jira-project',
+        externalId: 'jira-project:ENG',
+        metadata: { key: 'ENG', name: 'Engineering' },
+      }),
+    ).toBe('/jira/eng.md');
+    expect(
+      computePath({
+        kind: 'jira-issue',
+        externalId: '10001',
+        metadata: { key: 'ENG-42', projectKey: 'ENG' },
+      }),
+    ).toBe('/jira/issues/eng-42.md');
+    expect(
+      computePath({
+        kind: 'jira-comment',
+        externalId: '10001:c-7',
+        metadata: { commentId: 'c-7', issueKey: 'ENG-42' },
+      }),
+    ).toBe('/jira/issues/eng-42/comments/c-7.md');
+  });
+
+  it('linear-issue reads camelCase teamKey + identifier', () => {
+    const path = computePath({
+      kind: 'linear-issue',
+      externalId: 'linear-issue:HOLO-12',
+      metadata: { identifier: 'HOLO-12', teamKey: 'HOLO', teamId: 't-1' },
+    });
+    expect(path).toBe('/linear/holo/holo-12.md');
+  });
+
+  it('asana-task derives project from projectNames array', () => {
+    const path = computePath({
+      kind: 'asana-task',
+      externalId: 'task-gid-42',
+      metadata: {
+        name: 'Ship Files panel',
+        projectNames: ['Inbox', 'Roadmap'],
+      },
+    });
+    expect(path).toBe('/asana/inbox/ship-files-panel-task-gid-42.md');
+  });
+
+  it('googledrive-file reads camelCase fileId + name when no breadcrumb', () => {
+    const path = computePath({
+      kind: 'googledrive-file',
+      externalId: '1A2B3C',
+      metadata: { fileId: '1A2B3C', name: 'Q3 plan.docx' },
+    });
+    expect(path).toBe('/gdrive/q3-plan-docx-1A2B3C');
+  });
+
   it('throws on unknown kind', () => {
     expect(() =>
       computePath({ kind: 'nope-unknown', externalId: 'x', metadata: {} }),

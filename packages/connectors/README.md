@@ -126,6 +126,19 @@ export async function processTicket(
   has no stable per-artifact URL (rare; usually a sub-resource needs a
   parent record's URL plus a fragment), document the gap in the chunker and
   open an issue.
+- **Metadata keys are `snake_case` — this is the path-fn contract.** Every
+  artifact gets a virtual-filesystem path (RFC 0009) computed by a path-fn in
+  [`packages/chunker/src/path-fn.ts`](../chunker/src/path-fn.ts). Path-fns
+  read fields off `metadata` by key. If your chunking code emits camelCase
+  (`recordId`, `spaceKey`, `fileId`) but the path-fn expects snake_case
+  (`record_id`, `space_key`, `file_id`), `computePath()` silently falls back
+  to externalId sentinels, `path` lands as `NULL` or a meaningless string,
+  and your provider's folder never appears in the Files panel. Match the
+  emitted keys to what the path-fn reads — or vice versa — for every new
+  kind. Tests for the path-fn live in
+  [`packages/chunker/test/path-fn.test.ts`](../chunker/test/path-fn.test.ts);
+  add one for your kind that exercises the metadata shape your chunker
+  actually emits.
 
 ### 5. Write `spec.ts`
 
@@ -206,6 +219,13 @@ export type { PylonSpecOptions } from './spec';
 - **`packages/db/src/schema/holo.ts`** — add the provider id to the
   `connectorCredentials.provider` `text` enum array. **No migration needed**
   — it's a Drizzle TS-enum on a plain text column.
+- **`packages/chunker/src/path-fn.ts`** — register a path-fn for every chunk
+  `kind` your connector emits, and add a test in
+  `packages/chunker/test/path-fn.test.ts` that calls `computePath` with the
+  exact metadata shape your chunker emits. Without this, your records won't
+  appear in the Files panel (RFC 0009) — the worker upserts
+  `source_artifacts` rows with `path = NULL` and HoloFs's `readdir` filters
+  them out. See "Conventions" in §4 for the snake_case key contract.
 - **`apps/worker/src/queues/framework-bridge.ts`** — if your spec uses
   `auth: none()` (public docs / help-center connectors like Mintlify and
   Zendesk), add the provider id to the no-auth short-circuit in `loadTokens`.
@@ -287,3 +307,12 @@ The framework (`@holo/connector-framework`) gives every spec these primitives:
   provider to the mintlify/zendesk short-circuit when registering it.
 - **Engagement / sub-resource fetch failures** should be caught and the
   parent record still indexed. Use a `try/catch` around the sub-fetch.
+- **Metadata key casing must match the path-fn.** Chunkers under
+  `@holo/chunker` emit snake_case (`record_id`, `channel_name`); the
+  `path-fn` registry is written against that. If your connector chunks
+  inline (not via `@holo/chunker`) and uses camelCase, the path-fn will
+  fall through to default sentinels and your provider won't show up in the
+  Files panel. Pick snake_case in `metadata` for any field a path-fn reads,
+  or update the path-fn entry to accept both casings. The path-fn test
+  should mirror the exact metadata shape your chunker emits — that's how
+  this regression is caught at PR time instead of in prod.

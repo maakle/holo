@@ -61,11 +61,12 @@ export function SlackChannelPicker({ initialSelectedCount, initialDefaultAll }: 
           setChannels(list);
           setTeamId(body.teamId ?? null);
           setDefaultAll(isDefaultAll);
-          // In default-all mode the allowlist is empty but every bot-member
-          // channel is syncing — pre-check all so the UI matches reality.
+          // In default-all mode the allowlist is empty but the runner syncs
+          // every bot-member channel — pre-check those so the UI reflects
+          // what's actually being synced.
           setSelected(
             isDefaultAll
-              ? new Set(list.map((c) => c.id))
+              ? new Set(list.filter((c) => c.isMember).map((c) => c.id))
               : new Set(list.filter((c) => c.selected).map((c) => c.id)),
           );
           setError(null);

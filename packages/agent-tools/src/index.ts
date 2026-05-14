@@ -4,6 +4,13 @@ export {
   type ToolDefinition,
 } from './registry';
 
+export {
+  runBashTool,
+  bashInputSchema,
+  BASH_TOOL_DESCRIPTION,
+  type BashToolContext,
+  type BashToolOutput,
+} from './tools/bash';
 export { runSearchTool } from './tools/search';
 export { runListSkillsTool } from './tools/list-skills';
 export { runGetSkillTool } from './tools/get-skill';

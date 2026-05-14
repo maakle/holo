@@ -206,6 +206,7 @@ export const pathFns: Record<string, PathFn> = {
   // register path-fns here so embed-insert can populate `path` on the
   // source_artifacts row.
 
+  // Google Drive connector emits camelCase (fileId, name). No breadcrumb today.
   'googledrive-file': ({ metadata, externalId }) => {
     const driveSegments = (() => {
       const breadcrumb = metadata.breadcrumb;
@@ -217,60 +218,104 @@ export const pathFns: Record<string, PathFn> = {
       }
       return null;
     })();
-    const id = String(metadata.file_id ?? externalId);
-    const name = slug(metadata.file_name ?? metadata.title, id);
+    const id = String(metadata.file_id ?? metadata.fileId ?? externalId);
+    const name = slug(
+      metadata.file_name ?? metadata.fileName ?? metadata.name ?? metadata.title,
+      id,
+    );
     const dir = driveSegments ? `/${driveSegments}` : '';
     return `/gdrive${dir}/${name}-${id}`;
   },
 
+  // Jira connector: project chunk emits `key`; issue metadata also emits `key`
+  // (not `issue_key`); comments emit `commentId`/`issueKey`. Accept all variants.
   'jira-project': ({ metadata, externalId }) => {
-    const key = slug(metadata.project_key, slug(externalId, 'project'));
+    const key = slug(
+      metadata.project_key ?? metadata.projectKey ?? metadata.key,
+      slug(externalId, 'project'),
+    );
     return `/jira/${key}.md`;
   },
   'jira-issue': ({ metadata, externalId }) => {
-    const key = slug(metadata.issue_key, slug(externalId, 'issue'));
+    const key = slug(
+      metadata.issue_key ?? metadata.issueKey ?? metadata.key,
+      slug(externalId, 'issue'),
+    );
     return `/jira/issues/${key}.md`;
   },
   'jira-comment': ({ metadata, externalId }) => {
-    const issueKey = slug(metadata.issue_key, 'issue');
-    const id = String(metadata.comment_id ?? externalId);
+    const issueKey = slug(metadata.issue_key ?? metadata.issueKey, 'issue');
+    const id = String(metadata.comment_id ?? metadata.commentId ?? externalId);
     return `/jira/issues/${issueKey}/comments/${id}.md`;
   },
 
+  // Linear connector emits `teamKey`/`teamId` + `identifier`.
   'linear-issue': ({ metadata, externalId }) => {
-    const team = slug(metadata.team_key ?? metadata.team_name, 'team');
-    const identifier = slug(metadata.identifier ?? metadata.issue_identifier ?? externalId, 'issue');
+    const team = slug(
+      metadata.team_key ?? metadata.teamKey ?? metadata.team_name ?? metadata.teamName,
+      'team',
+    );
+    const identifier = slug(
+      metadata.identifier ?? metadata.issue_identifier ?? externalId,
+      'issue',
+    );
     return `/linear/${team}/${identifier}.md`;
   },
 
+  // Asana connector emits `projectNames` (array), no scalar `task_id`/`title`.
+  // Derive the project segment from the first array entry; use externalId
+  // (task gid) for the file id and the task name when present.
   'asana-task': ({ metadata, externalId }) => {
-    const project = slug(metadata.project_name, 'project');
-    const id = String(metadata.task_id ?? externalId);
-    const title = slug(metadata.title, id);
+    const projectName = (() => {
+      if (typeof metadata.project_name === 'string') return metadata.project_name;
+      if (typeof metadata.projectName === 'string') return metadata.projectName;
+      const arr = metadata.projectNames ?? metadata.project_names;
+      if (Array.isArray(arr) && typeof arr[0] === 'string') return arr[0];
+      return undefined;
+    })();
+    const project = slug(projectName, 'project');
+    const id = String(metadata.task_id ?? metadata.taskId ?? externalId);
+    const title = slug(metadata.title ?? metadata.name, id);
     return `/asana/${project}/${title}-${id}.md`;
   },
 
+  // The Confluence connector (@holo/connectors) emits camelCase metadata keys
+  // (spaceKey, pageId, commentId, …) while @holo/chunker-emitted kinds use
+  // snake_case. Accept both casings so HoloFs paths are populated either way.
+  // confluence-space emits `key` (the space key); confluence-comment has no
+  // space_key at all — fall back to spaceId so the comment still lands in a
+  // stable per-space-ish folder.
   'confluence-space': ({ metadata, externalId }) => {
-    const key = slug(metadata.space_key, slug(externalId, 'space'));
+    const key = slug(
+      metadata.space_key ?? metadata.spaceKey ?? metadata.key,
+      slug(externalId, 'space'),
+    );
     return `/confluence/${key}.md`;
   },
   'confluence-page': ({ metadata, externalId }) => {
-    const space = slug(metadata.space_key, 'space');
-    const id = String(metadata.page_id ?? externalId);
+    const space = slug(metadata.space_key ?? metadata.spaceKey ?? metadata.spaceId, 'space');
+    const id = String(metadata.page_id ?? metadata.pageId ?? externalId);
     const title = slug(metadata.title, id);
     return `/confluence/${space}/${title}-${id}.md`;
   },
   'confluence-comment': ({ metadata, externalId }) => {
-    const space = slug(metadata.space_key, 'space');
-    const pageId = String(metadata.page_id ?? 'page');
-    const id = String(metadata.comment_id ?? externalId);
+    const space = slug(metadata.space_key ?? metadata.spaceKey ?? metadata.spaceId, 'space');
+    const pageId = String(metadata.page_id ?? metadata.pageId ?? 'page');
+    const id = String(metadata.comment_id ?? metadata.commentId ?? externalId);
     return `/confluence/${space}/${pageId}/comments/${id}.md`;
   },
 
+  // Airtable connector emits camelCase (baseId/baseName/tableId/tableName/recordId).
   'airtable-record': ({ metadata, externalId }) => {
-    const base = slug(metadata.base_name ?? metadata.base_id, 'base');
-    const table = slug(metadata.table_name ?? metadata.table_id, 'table');
-    const id = String(metadata.record_id ?? externalId);
+    const base = slug(
+      metadata.base_name ?? metadata.baseName ?? metadata.base_id ?? metadata.baseId,
+      'base',
+    );
+    const table = slug(
+      metadata.table_name ?? metadata.tableName ?? metadata.table_id ?? metadata.tableId,
+      'table',
+    );
+    const id = String(metadata.record_id ?? metadata.recordId ?? externalId);
     return `/airtable/${base}/${table}/${id}.md`;
   },
 

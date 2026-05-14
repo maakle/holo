@@ -143,6 +143,16 @@ export async function runBashTool(
     executionLimits: V1_LIMITS,
     // python/javascript/network all left off — no `curl`, no `python`,
     // no `js-exec`.
+    //
+    // just-bash's defenseInDepth defaults to `true` and monkey-patches
+    // globals like `setImmediate` during script execution. That blocks
+    // postgres-js's connection flush (it relies on setImmediate), which
+    // means *every* HoloFs read fails with SecurityViolationError. With
+    // our V1 allowlist there's no eval/Function/network surface for the
+    // sandbox to defend against, so disabling it is the right call —
+    // primary security is the command allowlist + the read-only HoloFs,
+    // not in-process global patching.
+    defenseInDepth: false,
   });
 
   let timedOut = false;
