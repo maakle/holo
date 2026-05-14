@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull, type SQL } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 
 export interface WorkspaceCreds {
@@ -6,18 +6,60 @@ export interface WorkspaceCreds {
   accessToken: string;
 }
 
+export interface CredentialRow {
+  accessToken: string | null;
+  slackAppConfigId: string | null;
+  lastRefreshedAt: Date | null;
+  connectedAt: Date;
+}
+
 /**
- * Resolve which workspace this Slack team_id maps to. We trust whichever
- * connectorCredentials row was registered with this team — the install path
- * upserts a `sources` row keyed by team_id, and connectorCredentials is
- * already scoped per (org, provider). Multiple users in one org could each
- * own a credentials row, but they all hold tokens for the same workspace, so
- * any of them works for outbound posting; we pick the most recently
- * refreshed one to maximize the chance the token is still valid.
+ * Pick which credentials row to post outbound Slack messages with. Pure so it
+ * can be unit-tested without spinning up a DB.
+ *
+ * Disambiguation rules:
+ *   - When `slackAppConfigId` is null or a string (i.e. the caller knows
+ *     which Slack app fired the event), filter strictly. Posting with the
+ *     wrong app's token lands in the wrong bot's DM and Slack returns
+ *     channel_not_found — silent breakage for the user.
+ *   - When undefined (legacy in-flight job from before the hint existed),
+ *     fall back to "most recently refreshed/connected." This preserves
+ *     behavior for jobs already in Redis when this code ships.
+ *   - Within the matching set, prefer the most recently refreshed row so
+ *     workspaces with multiple human installers pick a fresh token.
+ */
+export function pickCredentials(
+  rows: CredentialRow[],
+  slackAppConfigId: string | null | undefined,
+): WorkspaceCreds['accessToken'] | null {
+  const usable = rows.filter(
+    (r): r is CredentialRow & { accessToken: string } =>
+      typeof r.accessToken === 'string' && r.accessToken.length > 0,
+  );
+  const filtered =
+    slackAppConfigId === undefined
+      ? usable
+      : usable.filter((r) => r.slackAppConfigId === slackAppConfigId);
+  if (filtered.length === 0) return null;
+  filtered.sort((a, b) => {
+    const ta = (a.lastRefreshedAt ?? a.connectedAt).getTime();
+    const tb = (b.lastRefreshedAt ?? b.connectedAt).getTime();
+    return tb - ta;
+  });
+  return filtered[0]!.accessToken;
+}
+
+/**
+ * Resolve which workspace this Slack team_id maps to, and which token to
+ * post with. We trust whichever connector_credentials row was registered with
+ * this team (the install path upserts a `sources` row keyed by team_id), and
+ * pick the matching `slackAppConfigId` so we don't post with the wrong app's
+ * token when one workspace has both the shared Holo app AND an EE custom app.
  */
 export async function resolveWorkspace(
   db: DB,
   teamId: string,
+  slackAppConfigId: string | null | undefined,
 ): Promise<WorkspaceCreds | null> {
   const sourceRow = await db
     .select({ organizationId: schema.sources.organizationId })
@@ -29,33 +71,32 @@ export async function resolveWorkspace(
   if (!sourceRow[0]) return null;
   const orgId = sourceRow[0].organizationId;
 
+  const whereParts: SQL[] = [
+    eq(schema.connectorCredentials.organizationId, orgId),
+    eq(schema.connectorCredentials.provider, 'slack'),
+    eq(schema.connectorCredentials.status, 'active'),
+  ];
+  // Push the filter into SQL when we have a hint — there's no point pulling
+  // every Slack credential into memory just to drop it. `undefined` keeps the
+  // pre-hint behavior for in-flight legacy jobs.
+  if (slackAppConfigId === null) {
+    whereParts.push(isNull(schema.connectorCredentials.slackAppConfigId));
+  } else if (typeof slackAppConfigId === 'string') {
+    whereParts.push(eq(schema.connectorCredentials.slackAppConfigId, slackAppConfigId));
+  }
   const credRows = await db
     .select({
       accessToken: schema.connectorCredentials.accessToken,
+      slackAppConfigId: schema.connectorCredentials.slackAppConfigId,
       lastRefreshedAt: schema.connectorCredentials.lastRefreshedAt,
       connectedAt: schema.connectorCredentials.connectedAt,
     })
     .from(schema.connectorCredentials)
-    .where(
-      and(
-        eq(schema.connectorCredentials.organizationId, orgId),
-        eq(schema.connectorCredentials.provider, 'slack'),
-        eq(schema.connectorCredentials.status, 'active'),
-      ),
-    );
-  const validRows = credRows.filter((r): r is typeof r & { accessToken: string } =>
-    typeof r.accessToken === 'string' && r.accessToken.length > 0,
-  );
-  if (validRows.length === 0) return null;
+    .where(and(...whereParts));
 
-  validRows.sort((a, b) => {
-    const ta = (a.lastRefreshedAt ?? a.connectedAt).getTime();
-    const tb = (b.lastRefreshedAt ?? b.connectedAt).getTime();
-    return tb - ta;
-  });
-  const top = validRows[0];
-  if (!top) return null;
-  return { organizationId: orgId, accessToken: top.accessToken };
+  const token = pickCredentials(credRows, slackAppConfigId);
+  if (!token) return null;
+  return { organizationId: orgId, accessToken: token };
 }
 
 export async function fetchOrgName(db: DB, organizationId: string): Promise<string> {

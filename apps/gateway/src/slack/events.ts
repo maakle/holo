@@ -48,21 +48,26 @@ interface SlackEventEnvelope {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Resolve the signing secret for an EE per-org custom Slack app. Returns
- * null if the org has no custom config — the route fails closed because the
- * tenant URL was specifically requested, so falling back to the shared
- * env secret would silently route events through the wrong app.
+ * Resolve the signing secret + config id for an EE per-org custom Slack app.
+ * Returns null if the org has no custom config — the route fails closed
+ * because the tenant URL was specifically requested, so falling back to the
+ * shared env secret would silently route events through the wrong app. The
+ * config id is plumbed into the worker job so it can pick the matching
+ * connector_credentials row instead of guessing by recency.
  */
-async function getCustomAppSigningSecret(
+async function getCustomAppForOrg(
   db: DB,
   organizationId: string,
-): Promise<string | null> {
+): Promise<{ id: string; signingSecret: string } | null> {
   const rows = await db
-    .select({ signingSecret: schema.slackAppConfigs.signingSecret })
+    .select({
+      id: schema.slackAppConfigs.id,
+      signingSecret: schema.slackAppConfigs.signingSecret,
+    })
     .from(schema.slackAppConfigs)
     .where(eq(schema.slackAppConfigs.organizationId, organizationId))
     .limit(1);
-  return rows[0]?.signingSecret ?? null;
+  return rows[0] ?? null;
 }
 
 /**
@@ -88,7 +93,7 @@ export function mountSlackEvents(
       logger.warn('slack events: SLACK_CONNECTOR_SIGNING_SECRET unset, rejecting');
       return c.json({ error: 'slack signing secret not configured' }, 503);
     }
-    return handleSlackEvent(c, opts, opts.signingSecret);
+    return handleSlackEvent(c, opts, opts.signingSecret, null);
   });
 
   app.post('/slack/events/:orgId', async (c) => {
@@ -96,15 +101,15 @@ export function mountSlackEvents(
     if (!UUID_RE.test(orgId)) {
       return c.json({ error: 'invalid org id in path' }, 400);
     }
-    const secret = await getCustomAppSigningSecret(opts.db, orgId);
-    if (!secret) {
+    const customApp = await getCustomAppForOrg(opts.db, orgId);
+    if (!customApp) {
       logger.warn(
         { orgId },
         'slack events: per-org signing secret missing — no slack_app_configs row',
       );
       return c.json({ error: 'no custom slack app for org' }, 404);
     }
-    return handleSlackEvent(c, opts, secret);
+    return handleSlackEvent(c, opts, customApp.signingSecret, customApp.id);
   });
 }
 
@@ -113,6 +118,7 @@ async function handleSlackEvent(
   c: any,
   opts: MountSlackEventsOptions,
   signingSecret: string,
+  slackAppConfigId: string | null,
 ): Promise<Response> {
   // Slack signs the *raw* request body. Read once as text — never JSON-parse
   // before verification (re-serialization changes whitespace and breaks the
@@ -187,6 +193,7 @@ async function handleSlackEvent(
         threadTs: event.thread_ts ?? event.ts ?? '',
         asker: event.user,
         text: event.text,
+        slackAppConfigId,
       });
     } else if (
       event.type === 'message' &&
@@ -202,6 +209,7 @@ async function handleSlackEvent(
         threadTs: event.thread_ts,
         asker: event.user,
         text: event.text,
+        slackAppConfigId,
       });
     } else if (
       // RFC-0008 (slack extension). Users 👍/👎 the bot's reply; the worker
@@ -223,6 +231,7 @@ async function handleSlackEvent(
         asker: event.user,
         reaction: event.reaction,
         removed: event.type === 'reaction_removed',
+        slackAppConfigId,
       });
     }
     // app_uninstalled, member_joined_channel, etc. — fall through to ack.

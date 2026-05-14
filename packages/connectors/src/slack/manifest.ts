@@ -28,6 +28,10 @@ export function buildSlackManifest(opts: SlackManifestOptions): string {
   return `display_information:
   name: ${opts.displayName}
 features:
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
   bot_user:
     display_name: ${opts.displayName}
     always_online: true

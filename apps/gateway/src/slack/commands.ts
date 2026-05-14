@@ -18,16 +18,19 @@ interface MountSlackCommandsOptions {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function getCustomAppSigningSecret(
+async function getCustomAppForOrg(
   db: DB,
   organizationId: string,
-): Promise<string | null> {
+): Promise<{ id: string; signingSecret: string } | null> {
   const rows = await db
-    .select({ signingSecret: schema.slackAppConfigs.signingSecret })
+    .select({
+      id: schema.slackAppConfigs.id,
+      signingSecret: schema.slackAppConfigs.signingSecret,
+    })
     .from(schema.slackAppConfigs)
     .where(eq(schema.slackAppConfigs.organizationId, organizationId))
     .limit(1);
-  return rows[0]?.signingSecret ?? null;
+  return rows[0] ?? null;
 }
 
 /**
@@ -52,7 +55,7 @@ export function mountSlackCommands(
       logger.warn('slack commands: SLACK_CONNECTOR_SIGNING_SECRET unset, rejecting');
       return c.json({ error: 'slack signing secret not configured' }, 503);
     }
-    return handleSlashCommand(c, opts, opts.signingSecret);
+    return handleSlashCommand(c, opts, opts.signingSecret, null);
   });
 
   app.post('/slack/commands/:orgId', async (c) => {
@@ -60,15 +63,15 @@ export function mountSlackCommands(
     if (!UUID_RE.test(orgId)) {
       return c.json({ error: 'invalid org id in path' }, 400);
     }
-    const secret = await getCustomAppSigningSecret(opts.db, orgId);
-    if (!secret) {
+    const customApp = await getCustomAppForOrg(opts.db, orgId);
+    if (!customApp) {
       logger.warn(
         { orgId },
         'slack commands: per-org signing secret missing — no slack_app_configs row',
       );
       return c.json({ error: 'no custom slack app for org' }, 404);
     }
-    return handleSlashCommand(c, opts, secret);
+    return handleSlashCommand(c, opts, customApp.signingSecret, customApp.id);
   });
 }
 
@@ -77,6 +80,7 @@ async function handleSlashCommand(
   c: any,
   opts: MountSlackCommandsOptions,
   signingSecret: string,
+  slackAppConfigId: string | null,
 ): Promise<Response> {
   const rawBody = await c.req.text();
   const verify = verifySlackSignature({
@@ -109,6 +113,7 @@ async function handleSlashCommand(
       asker: userId,
       text,
       responseUrl,
+      slackAppConfigId,
     });
   } catch (err) {
     logger.error({ err }, 'slack commands: enqueue failed');

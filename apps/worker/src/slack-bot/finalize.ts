@@ -21,16 +21,22 @@ export async function finalizeAgentAnswer(args: {
   placeholder: { ts: string; channel: string } | null;
   answer: string;
   sources: Source[];
+  logError?: (message: string) => void;
 }): Promise<{ channel: string; ts: string } | null> {
   const blocks = buildAgentAnswerBlocks(args.answer, args.sources);
   const fallback = args.answer || 'holo answered your question.';
   if (args.placeholder) {
-    await args.client.chatUpdate({
+    const upd = await args.client.chatUpdate({
       channel: args.placeholder.channel,
       ts: args.placeholder.ts,
       text: fallback,
       blocks,
     });
+    if (!upd.ok) {
+      args.logError?.(
+        `slack-bot: chat.update failed (channel=${args.placeholder.channel} ts=${args.placeholder.ts} error=${upd.error ?? 'unknown'})`,
+      );
+    }
     return { channel: args.placeholder.channel, ts: args.placeholder.ts };
   }
   const resp = await args.client.chatPostMessage({
@@ -42,6 +48,9 @@ export async function finalizeAgentAnswer(args: {
   if (resp?.ok && resp.ts && resp.channel) {
     return { channel: resp.channel, ts: resp.ts };
   }
+  args.logError?.(
+    `slack-bot: chat.postMessage final answer failed (channel=${args.channel} error=${resp?.error ?? 'unknown'})`,
+  );
   return null;
 }
 

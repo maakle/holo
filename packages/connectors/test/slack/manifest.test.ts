@@ -49,4 +49,13 @@ describe('buildSlackManifest', () => {
     expect(yaml).toContain('- app_mention');
     expect(yaml).toContain('- message.im');
   });
+
+  it('enables the Messages tab so DMs to the bot work', () => {
+    // Without features.app_home.messages_tab_enabled, Slack disables the DM
+    // composer ("Sending messages to this app has been turned off") AND
+    // silently drops message.im events — even though they're subscribed.
+    const yaml = buildSlackManifest(baseOpts);
+    expect(yaml).toContain('messages_tab_enabled: true');
+    expect(yaml).toContain('messages_tab_read_only_enabled: false');
+  });
 });

@@ -15,32 +15,41 @@ import {
 import { makeDefaultAgentRunner, type AgentImpl } from './agent-runner.js';
 import { handleFeedbackReaction } from './feedback-reaction.js';
 
+/**
+ * `slackAppConfigId` mirrors the gateway payload — it tells the worker which
+ * Slack app fired the event so resolveWorkspace can pick the matching
+ * connector_credentials row. Null = shared Holo app; UUID = EE custom app.
+ * Optional for backwards compatibility with in-flight jobs that were enqueued
+ * before this column existed; new jobs always set it.
+ */
+type SlackAppConfigHint = { slackAppConfigId?: string | null };
+
 export type SlackBotJob =
-  | {
+  | ({
       kind: 'app_mention';
       teamId: string;
       channel: string;
       threadTs: string;
       asker: string;
       text: string;
-    }
-  | {
+    } & SlackAppConfigHint)
+  | ({
       kind: 'message_im';
       teamId: string;
       channel: string;
       threadTs?: string;
       asker: string;
       text: string;
-    }
-  | {
+    } & SlackAppConfigHint)
+  | ({
       kind: 'slash_command';
       teamId: string;
       channel: string;
       asker: string;
       text: string;
       responseUrl: string;
-    }
-  | {
+    } & SlackAppConfigHint)
+  | ({
       // RFC-0008 (slack extension). A reaction landed on a bot message that
       // was previously indexed in `slack_answer_index`; emoji shorthand
       // becomes a feedback row. `removed=true` means a reaction was taken
@@ -52,7 +61,7 @@ export type SlackBotJob =
       asker: string;
       reaction: string;
       removed: boolean;
-    };
+    } & SlackAppConfigHint);
 
 export interface SlackBotHandlerDeps {
   db: DB;
@@ -91,14 +100,22 @@ export async function handleSlackBotJob(
     return handleFeedbackReaction(job, deps.db, logInfo);
   }
 
-  const workspace = await resolveWorkspace(deps.db, job.teamId);
+  // slackAppConfigId disambiguates the credentials row when a workspace has
+  // both the shared Holo app AND a custom EE app installed. `undefined` = no
+  // hint (legacy in-flight job): fall back to recency. Null/string = filter
+  // strictly by that value so we never post with the wrong app's token.
+  const workspace = await resolveWorkspace(deps.db, job.teamId, job.slackAppConfigId);
   if (!workspace) {
-    logInfo('slack-bot: workspace not connected', { teamId: job.teamId });
+    logInfo('slack-bot: workspace not connected', {
+      teamId: job.teamId,
+      slackAppConfigId: job.slackAppConfigId ?? null,
+    });
     return { ok: false, reason: 'workspace_not_connected' };
   }
   logInfo('slack-bot: workspace resolved', {
     teamId: job.teamId,
     organizationId: workspace.organizationId,
+    slackAppConfigId: job.slackAppConfigId ?? null,
   });
 
   const client = createSlackApiClient(workspace.accessToken, deps.fetchImpl);
@@ -258,8 +275,10 @@ async function runMention(args: {
   }
 
   // Post the placeholder up front so progress updates have a target. If the
-  // post itself fails (rate limit, missing scope), fall back to no-progress
-  // mode — finalize* still has a chat.postMessage path.
+  // post itself fails (rate limit, missing scope, wrong-app token), fall back
+  // to no-progress mode — finalize* still has a chat.postMessage path. Log
+  // the slack error so silent drops surface in the worker log instead of
+  // looking like a successful job that never produced a reply.
   const placeholderResp = await client.chatPostMessage({
     channel: job.channel,
     thread_ts: threadTs,
@@ -269,6 +288,11 @@ async function runMention(args: {
     placeholderResp.ok && placeholderResp.ts && placeholderResp.channel
       ? { ts: placeholderResp.ts, channel: placeholderResp.channel }
       : null;
+  if (!placeholder) {
+    logError(
+      `slack-bot: chat.postMessage placeholder failed (channel=${job.channel} error=${placeholderResp.error ?? 'unknown'})`,
+    );
+  }
   const progress = placeholder
     ? makePlaceholderProgress({ client, ...placeholder }).update
     : undefined;
@@ -295,6 +319,7 @@ async function runMention(args: {
     placeholder,
     answer: agentResult.answer,
     sources: agentResult.sources,
+    logError,
   });
 
   // RFC-0008 (slack extension): index the bot reply so a future reaction

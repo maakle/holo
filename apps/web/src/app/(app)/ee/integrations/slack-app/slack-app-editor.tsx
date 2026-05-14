@@ -112,6 +112,45 @@ export function SlackAppEditor({
           displayName={displayName}
         />
       </section>
+
+      <section className="space-y-3">
+        <h2 className="text-[15px] font-medium">3. Connect a workspace</h2>
+        <p className="text-[13px] leading-5 text-text-muted">
+          Credentials are saved. Connecting Slack from Holo runs the standard
+          OAuth flow against your custom app, which installs and authorizes it
+          in one step — you don&apos;t need to click{' '}
+          <span className="font-mono text-text">Install to Workspace</span> in
+          the Slack admin UI first.
+        </p>
+        <ol className="space-y-3 text-[13px] leading-5 text-text-muted">
+          <li className="flex gap-3">
+            <span className="shrink-0 font-mono text-text-subtle">1.</span>
+            <span>
+              Open{' '}
+              <a className="text-accent hover:underline" href="/connections">
+                Connections
+              </a>{' '}
+              in Holo and click{' '}
+              <span className="font-mono text-text">Connect</span> on Slack.
+              The bot that lands in your workspace will be{' '}
+              <span className="font-mono text-text">{effectiveName}</span>{' '}
+              instead of the shared Holo app.
+            </span>
+          </li>
+          <li className="flex gap-3">
+            <span className="shrink-0 font-mono text-text-subtle">2.</span>
+            <span>
+              Invite the bot to a channel and run{' '}
+              <span className="font-mono text-text">/holo [your question]</span>{' '}
+              to confirm Slack reaches this tenant&apos;s gateway. If you see a
+              signature-verification error, re-enter the{' '}
+              <span className="font-mono text-text">Signing Secret</span> in
+              step 2 — it&apos;s never returned by the API so the field always
+              shows a placeholder.
+            </span>
+          </li>
+        </ol>
+      </section>
     </>
   );
 }
