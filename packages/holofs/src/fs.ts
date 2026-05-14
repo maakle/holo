@@ -101,50 +101,42 @@ export class HoloFs {
     // happy with the empty array literal '{}'.
     const aclLiteral = formatTextArray(this.userSubjects);
 
-    // Single SQL: pick every artifact under the prefix the user can see, and
-    // emit the next segment. Distinct + a marker for whether it's a
-    // terminal leaf (artifact path exactly = prefix + segment) or a deeper
-    // directory.
-    const result = await this.db.execute<{
-      name: string;
-      kind: 'file' | 'directory';
-    }>(sql`
-      WITH visible AS (
-        SELECT path
-        FROM source_artifacts
-        WHERE organization_id = ${this.organizationId}
-          AND path IS NOT NULL
-          AND deleted_at IS NULL
-          AND path LIKE ${dirPrefix + '%'}
-          AND acl_subjects && ${aclLiteral}::text[]
-      )
-      SELECT name, MIN(kind) AS kind
-      FROM (
-        SELECT
-          CASE
-            WHEN position('/' IN substring(path, ${dirPrefix.length + 1})) = 0
-              THEN substring(path, ${dirPrefix.length + 1})
-            ELSE substring(
-              path,
-              ${dirPrefix.length + 1},
-              position('/' IN substring(path, ${dirPrefix.length + 1})) - 1
-            )
-          END AS name,
-          CASE
-            WHEN position('/' IN substring(path, ${dirPrefix.length + 1})) = 0
-              THEN 'file' ELSE 'directory'
-          END AS kind
-        FROM visible
-      ) seg
-      WHERE name <> ''
-      GROUP BY name
-      ORDER BY name
+    // Pull every visible path under the prefix. Segmentation happens in JS
+    // because Postgres' `substring(text, integer)` and `substring(text, text)`
+    // are different functions (the text variant is POSIX regex matching), and
+    // drizzle binds JS numbers as text parameters by default — passing `2`
+    // as text would call the regex form and return matches of the literal
+    // char '2' inside a path like `/slack/.../2026-05-14/...`. Doing the
+    // split client-side avoids that whole class of bug.
+    const result = await this.db.execute<{ path: string }>(sql`
+      SELECT path FROM source_artifacts
+      WHERE organization_id = ${this.organizationId}
+        AND path IS NOT NULL
+        AND deleted_at IS NULL
+        AND path LIKE ${dirPrefix + '%'}
+        AND acl_subjects && ${aclLiteral}::text[]
     `);
 
-    return unwrapRows<{ name: string; kind: 'file' | 'directory' }>(result).map((r) => ({
-      name: r.name,
-      type: r.kind,
-    }));
+    const rows = unwrapRows<{ path: string }>(result);
+    const seen = new Map<string, 'file' | 'directory'>();
+    for (const r of rows) {
+      if (!r.path.startsWith(dirPrefix)) continue;
+      const rest = r.path.slice(dirPrefix.length);
+      if (rest.length === 0) continue;
+      const slashIdx = rest.indexOf('/');
+      const name = slashIdx === -1 ? rest : rest.slice(0, slashIdx);
+      const type: 'file' | 'directory' = slashIdx === -1 ? 'file' : 'directory';
+      // Prefer 'directory' if we've seen the same segment as both. This can
+      // legitimately happen if one source emits a file path and another
+      // emits a deeper path under the same segment name.
+      const existing = seen.get(name);
+      if (!existing || (existing === 'file' && type === 'directory')) {
+        seen.set(name, type);
+      }
+    }
+    return Array.from(seen.entries())
+      .map(([name, type]) => ({ name, type }))
+      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   }
 
   async stat(path: string): Promise<Stat> {

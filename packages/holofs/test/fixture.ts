@@ -171,8 +171,24 @@ export async function seedFixture(db: DB, prefix: string): Promise<Fixture> {
 }
 
 export async function wipeFixture(db: DB, prefix: string): Promise<void> {
-  // The cascade chain: organization → sources → source_artifacts → chunks.
+  // `chunks.organization_id` has a FK to `organization.id` with no ON DELETE
+  // CASCADE — chunks would have to be deleted via the
+  // `sources → source_artifacts → chunks` cascade chain first. Delete in
+  // explicit dependency order to avoid the FK violation.
+  //
+  // We leave the `organization` row itself in place: seedFixture is
+  // idempotent on `slug` via ON CONFLICT, so leftover orgs don't cause
+  // re-run problems and skipping the delete avoids needing to chase every
+  // other table that references organization_id.
+  const slugs = [prefix + '-a', prefix + '-b'];
   await db.execute(sql`
-    DELETE FROM organization WHERE slug IN (${prefix + '-a'}, ${prefix + '-b'})
+    DELETE FROM chunks WHERE organization_id IN (
+      SELECT id FROM organization WHERE slug IN (${slugs[0]}, ${slugs[1]})
+    )
+  `);
+  await db.execute(sql`
+    DELETE FROM sources WHERE organization_id IN (
+      SELECT id FROM organization WHERE slug IN (${slugs[0]}, ${slugs[1]})
+    )
   `);
 }

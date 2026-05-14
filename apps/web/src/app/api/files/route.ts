@@ -58,68 +58,81 @@ export const GET = withActiveOrg(async ({ req, ctx, session, orgId }) => {
   }
 
   // Enrich each entry with source provenance + most-recent updatedAt so the
-  // UI doesn't have to round-trip per row. One query: for each child segment
-  // under `path`, return the provider + max(fetched_at) + a sample kind.
+  // UI doesn't have to round-trip per row. Pull the raw rows for visible
+  // artifacts under the prefix and group by next segment in JS — same
+  // reason as HoloFs.readdir: Postgres `substring(text, integer)` and
+  // `substring(text, text)` are different functions (the text variant is
+  // POSIX regex matching) and drizzle binds JS numbers as text by default.
   const prefix = path === '/' ? '/' : path.endsWith('/') ? path : path + '/';
   const aclArrayLiteral = `{${userSubjects
     .map((v) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`)
     .join(',')}}`;
 
-  const enrichment = await ctx.db.execute<{
+  type EnrichmentRow = {
+    path: string;
+    kind: string;
+    provider: string;
+    fetched_at: Date | string;
+  };
+
+  const enrichment = await ctx.db.execute<EnrichmentRow>(sql`
+    SELECT sa.path, sa.kind, COALESCE(s.provider, sa.kind) AS provider, sa.fetched_at
+    FROM source_artifacts sa
+    LEFT JOIN sources s ON s.id = sa.source_id
+    WHERE sa.organization_id = ${orgId}
+      AND sa.path IS NOT NULL
+      AND sa.deleted_at IS NULL
+      AND sa.path LIKE ${prefix + '%'}
+      AND sa.acl_subjects && ${aclArrayLiteral}::text[]
+  `);
+
+  const rawRows = (
+    (enrichment as unknown as { rows?: EnrichmentRow[] }).rows
+      ?? (enrichment as unknown as EnrichmentRow[])
+  ) ?? [];
+
+  type Group = {
     name: string;
     is_file: boolean;
     provider: string;
     updated_at: Date | string;
     kind: string;
-  }>(sql`
-    WITH visible AS (
-      SELECT sa.path, sa.kind, sa.fetched_at,
-             COALESCE(s.provider, sa.kind) AS provider
-      FROM source_artifacts sa
-      LEFT JOIN sources s ON s.id = sa.source_id
-      WHERE sa.organization_id = ${orgId}
-        AND sa.path IS NOT NULL
-        AND sa.deleted_at IS NULL
-        AND sa.path LIKE ${prefix + '%'}
-        AND sa.acl_subjects && ${aclArrayLiteral}::text[]
-    ),
-    seg AS (
-      SELECT
-        CASE
-          WHEN position('/' IN substring(path, ${prefix.length + 1})) = 0
-            THEN substring(path, ${prefix.length + 1})
-          ELSE substring(
-            path,
-            ${prefix.length + 1},
-            position('/' IN substring(path, ${prefix.length + 1})) - 1
-          )
-        END AS name,
-        position('/' IN substring(path, ${prefix.length + 1})) = 0 AS is_file,
-        provider,
-        fetched_at,
-        kind
-      FROM visible
-    )
-    SELECT
-      name,
-      bool_and(is_file) AS is_file,
-      MIN(provider) AS provider,
-      MAX(fetched_at) AS updated_at,
-      MIN(kind) AS kind
-    FROM seg
-    WHERE name <> ''
-    GROUP BY name
-    ORDER BY name
-    LIMIT ${limit}
-  `);
-
-  const rows = (
-    (enrichment as unknown as {
-      rows?: Array<{ name: string; is_file: boolean; provider: string; updated_at: Date | string; kind: string }>;
-    }).rows ?? (enrichment as unknown as Array<{ name: string; is_file: boolean; provider: string; updated_at: Date | string; kind: string }>)
-  ) ?? [];
-
-  const enrichmentByName = new Map(rows.map((r) => [r.name, r]));
+  };
+  const groupedByName = new Map<string, Group>();
+  for (const r of rawRows) {
+    if (!r.path.startsWith(prefix)) continue;
+    const rest = r.path.slice(prefix.length);
+    if (rest.length === 0) continue;
+    const slashIdx = rest.indexOf('/');
+    const name = slashIdx === -1 ? rest : rest.slice(0, slashIdx);
+    const isFile = slashIdx === -1;
+    const existing = groupedByName.get(name);
+    const fetched = r.fetched_at instanceof Date ? r.fetched_at : new Date(r.fetched_at);
+    if (!existing) {
+      groupedByName.set(name, {
+        name,
+        is_file: isFile,
+        provider: r.provider,
+        updated_at: fetched,
+        kind: r.kind,
+      });
+    } else {
+      // A segment is a directory if ANY underlying path makes it so.
+      // Provider/kind/updated_at take the max-fetched_at row.
+      const existingFetched =
+        existing.updated_at instanceof Date
+          ? existing.updated_at
+          : new Date(existing.updated_at);
+      if (fetched > existingFetched) {
+        existing.provider = r.provider;
+        existing.kind = r.kind;
+        existing.updated_at = fetched;
+      }
+      if (!isFile) existing.is_file = false;
+    }
+    if (groupedByName.size >= limit) break;
+  }
+  const enrichmentByName = groupedByName;
 
   const entries: DirChild[] = baseEntries.map((e) => {
     const enrich = enrichmentByName.get(e.name);
