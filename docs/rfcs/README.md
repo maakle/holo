@@ -24,3 +24,4 @@ Numbering tracks the original "PRs 3–8" sequencing from the product-direction 
 | 0006 | Pre-Call Account Brief | Draft |
 | 0007 | Hallucination Guardrails | Draft |
 | 0008 | Quality Feedback Loop | Draft |
+| 0009 | Virtual filesystem over the context layer | Draft |
