@@ -175,6 +175,37 @@ export type {
   GoogleChatUser,
   GoogleChatThread,
 } from './google-chat/index';
+// Google Chat App (conversational bot) — distinct from the ingestion
+// connector above. See docs/designs/google-chat-app.md.
+export {
+  verifyGoogleChatJwt,
+  __clearGoogleChatJwksCacheForTests,
+  createGoogleChatAppApiClient,
+  loadChatAppAccessToken,
+  __clearGoogleChatAppTokenCacheForTests,
+  GOOGLE_CHAT_APP_SCOPE,
+} from './google-chat/index';
+export type {
+  GoogleChatVerifyResult,
+  GoogleChatVerifyFailure,
+  GoogleChatVerifiedClaims,
+  VerifyGoogleChatJwtInput,
+  GoogleChatAppApiClient,
+  GoogleChatAppEvent,
+  GoogleChatAppEventType,
+  GoogleChatAppSpace,
+  GoogleChatAppMessage,
+  GoogleChatCardV2Message,
+  GoogleChatCardV2,
+  GoogleChatCard,
+  GoogleChatCardHeader,
+  GoogleChatCardSection,
+  GoogleChatCardWidget,
+  GoogleChatCreateMessageInput,
+  GoogleChatCreateMessageResult,
+  GoogleChatPatchMessageInput,
+  GoogleChatPatchMessageResult,
+} from './google-chat/index';
 export {
   createMintlifySpec,
   fetchLlmsIndex,
