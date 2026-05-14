@@ -1,8 +1,7 @@
 import { z } from 'zod';
-import { sql } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { getArtifact } from '@holo/retrieval-core';
-import { holoError, ErrorCode } from '@holo/errors';
+import { resolveArtifactIdByExternalId } from './_artifact-lookup';
 
 export const getThreadInputSchema = z.object({
   channel: z.string().min(1),
@@ -12,6 +11,7 @@ export const getThreadInputSchema = z.object({
 export interface GetThreadToolContext {
   db: DB;
   organizationId: string;
+  userSubjects: string[];
 }
 
 export async function runGetThreadTool(
@@ -21,21 +21,14 @@ export async function runGetThreadTool(
   const input = getThreadInputSchema.parse(rawInput);
   const externalId = `slack-thread:${input.channel}:${input.ts}`;
 
-  const result = await ctx.db.execute<{ id: string } & Record<string, unknown>>(sql`
-    SELECT id FROM source_artifacts
-    WHERE organization_id = ${ctx.organizationId} AND external_id = ${externalId}
-    LIMIT 1
-  `);
-  const rows = ((result as unknown as { rows?: Array<{ id: string }> }).rows
-    ?? (result as unknown as Array<{ id: string }>)) ?? [];
-  if (rows.length === 0) {
-    throw holoError({
-      code: ErrorCode.HOLO_ARTIFACT_NOT_FOUND,
-      problem: `No thread artifact for ${externalId}`,
-      fix: 'Verify the channel/ts pair has been ingested.',
-    });
-  }
-  const artifactId = rows[0]!.id;
+  const artifactId = await resolveArtifactIdByExternalId(
+    ctx.db,
+    ctx.organizationId,
+    externalId,
+    ctx.userSubjects,
+    `No thread artifact for ${externalId}`,
+    'Verify the channel/ts pair has been ingested and you have access to that channel.',
+  );
   const { chunks } = await getArtifact({
     db: ctx.db,
     artifactId,

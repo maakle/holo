@@ -6,7 +6,7 @@ This document captures the architectural decisions for Holo. The decisions here 
 
 Holo is structured as three architectural layers stacked on top of each other:
 
-1. **Context layer** — connectors ingest from every tool, normalize, embed, store with ACLs preserved. Agents and humans can query it. Foundation for everything above.
+1. **Context layer** — connectors ingest from every tool, normalize, embed, store with ACLs preserved. Agents and humans see it as a virtual filesystem (RFC 0009): paths like `/slack/#engineering/2026-05-14/thread-123.md` over Postgres+pgvector, queried via the MCP `bash` tool (read-only `IFileSystem` via [`just-bash`](https://github.com/vercel-labs/just-bash)) or `search` (hybrid RRF). Foundation for everything above.
 2. **Skills** — synthesizer extracts procedures from the context layer (how refunds get handled, how PRs get reviewed) and stores them as Postgres rows in the Anthropic Skill format (frontmatter + procedure + example tools). Agents discover and invoke them via the MCP `list_skills` and `get_skill` tools — skills are served dynamically from the database, not as filesystem artifacts.
 3. **Loop** — Plans/Intents subsystem holds declarations of what should be happening (sprint goals, PRDs, OKRs). Drift detector continuously compares actual artifacts against intent and surfaces gaps.
 
@@ -151,10 +151,15 @@ Onyx's `mcp_server` runs as a sibling service. We do the same. Independent scali
 
 **MCP tool surface:**
 
-*Retrieval tools (v0.1–v0.3):*
-- `search`, `fetch_document`, `list_recent` (generic)
-- `get_slack_thread`, `get_pr`, `get_notion_page`, `get_linear_issue`, `get_meeting` (domain-specific)
-- `who_knows_about` (expertise/people search)
+*Retrieval tools — RFC 0009 (post-v0.1):*
+- `bash` — read-only shell over a virtual filesystem of the synced context. Backed by [`vercel-labs/just-bash`](https://github.com/vercel-labs/just-bash) wired to a `HoloFs` instance implementing its `IFileSystem` interface against Postgres. Ships `ls`, `cat`, `grep`, `find`, `head`, `tail`, `wc`, `sort`, `uniq`, `tree`, `echo` in V1 (11-command allowlist). Paths look like `/slack/#engineering/2026-05-14/thread-123.md` or `/github/acme/api/pulls/42.md`. The agent's primary surface.
+- `search` — hybrid RRF retrieval (pgvector + tsvector). Kept as a separate tool so weak models that can't generate well-formed bash have a one-shot path. Accepts optional `path` arg to scope semantic search to a virtual-FS subtree.
+- `who_knows_about` — expertise/people search.
+
+*Deprecated retrieval tools (kept for ≥2 minor versions, then removed once telemetry shows agents have migrated to `bash`):*
+- `get_pr`, `get_thread`, `get_doc`, `get_call`, `get_ticket`, `fetch_document`, `list_recent` — all still resolve through one shared ACL helper (`tools/_artifact-lookup.ts`) but their tool descriptions are annotated `DEPRECATED: use bash with cat /path instead`.
+
+*Why bash + one retriever instead of one tool per source:* Anthropic and Docker warn agents handle ~30 tools well, get confused past ~50. Holo's flat surface was already at ~10 and grew with every new connector. `bash` + `search` is **2 retrieval tools regardless of connector count**. ~70 Unix commands compose for free; `grep -r Acme /slack | head -20` is one round-trip instead of five. See `docs/rfcs/0009-virtual-filesystem-over-context-layer.md`.
 
 *Skill tools (v0.5):*
 - `list_skills` — enumerate available procedural skills with descriptions and metadata

@@ -58,8 +58,9 @@ The most common contribution path. Shape:
 6. **ACL extraction** (most important — see below)
 7. Per-source chunker if needed
 8. Register the new provider in the `SYNC_PROVIDERS` allowlists (see below) — without this the dashboard's Sync now / sync history / disconnect routes return `unknown provider`
-9. Integration tests against fixtures
-10. Documentation — add a setup guide under [`docs/connectors/`](./docs/connectors/) (see [`slack.md`](./docs/connectors/slack.md) for the template)
+9. **Register a path-fn** for each `kind` your chunker / connector emits in [`packages/chunker/src/path-fn.ts`](./packages/chunker/src/path-fn.ts) — see RFC 0009 (`docs/rfcs/0009-virtual-filesystem-over-context-layer.md`). Without this the artifact still upserts (worker checks `hasPathFn(kind)` and skips path computation gracefully) but rows have `path = NULL` and stay invisible in the file explorer + `bash` tool. Path conventions go in the registry; add a corresponding test case in [`packages/chunker/test/path-fn.test.ts`](./packages/chunker/test/path-fn.test.ts) covering at least the typical metadata shape.
+10. Integration tests against fixtures
+11. Documentation — add a setup guide under [`docs/connectors/`](./docs/connectors/) (see [`slack.md`](./docs/connectors/slack.md) for the template)
 
 **ACL extraction is non-negotiable.** Every connector must populate `acl_subjects text[]` on each document with the source's native permissions. If you can't figure out a source's permission model, ask in the issue before starting.
 

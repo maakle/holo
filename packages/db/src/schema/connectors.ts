@@ -101,6 +101,23 @@ export const sourceArtifacts = pgTable(
     externalId: text('external_id').notNull(),
     kind: text('kind').notNull(),
     payload: jsonb('payload').notNull(),
+    /** Deterministic virtual-filesystem path for this artifact. Computed by
+     * the path-fn registry in @holo/chunker from kind + chunk metadata at
+     * upsert time. Same path across re-syncs (idempotent). Nullable until
+     * the path-backfill job has run for every existing kind; new rows from
+     * any kind with a registered path-fn always have a non-null path. The
+     * org-scoped partial index makes prefix LIKE queries from HoloFs cheap
+     * without indexing rows that haven't been backfilled yet. See RFC 0009. */
+    path: text('path'),
+    /** Denormalized union of acl_subjects across this artifact's chunks.
+     * Maintained by the worker in the same transaction as the chunk insert
+     * so HoloFs.readdir can enforce ACLs without joining chunks. The chunk
+     * column is still authoritative — HoloFs.readFile re-checks at the
+     * chunk level for defense in depth. See RFC 0009. */
+    aclSubjects: text('acl_subjects')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
@@ -113,6 +130,13 @@ export const sourceArtifacts = pgTable(
     sourceExternalUniq: uniqueIndex('source_artifacts_source_external_uniq').on(
       t.sourceId,
       t.externalId,
+    ),
+    orgPathIdx: index('source_artifacts_org_path_idx')
+      .on(t.organizationId, t.path)
+      .where(sql`${t.path} IS NOT NULL AND ${t.deletedAt} IS NULL`),
+    aclSubjectsGinIdx: index('source_artifacts_acl_subjects_gin_idx').using(
+      'gin',
+      t.aclSubjects,
     ),
   }),
 );

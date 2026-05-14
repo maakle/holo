@@ -330,6 +330,13 @@
       "when": 1780099200000,
       "tag": "0047_google_chat_app",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1780185600000,
+      "tag": "0048_source_artifacts_path_and_acl",
+      "breakpoints": true
     }
   ]
 }
