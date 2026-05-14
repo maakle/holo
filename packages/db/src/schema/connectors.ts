@@ -546,6 +546,77 @@ export const slackAppConfigs = pgTable(
   }),
 );
 
+/**
+ * Per-organization custom Google Chat App credentials — the "bring your
+ * own Chat app" path, parallel to slackAppConfigs but for the conversational
+ * Chat App (DM + @mention + reply), not the read-only ingestion connector.
+ *
+ * When a row exists for an org, inbound events from that org's Chat app
+ * arrive at /google-chat-app/events/<organizationId> where the JWT is
+ * verified against the audience stored here, and outbound API calls mint
+ * tokens from the row's service account JSON.
+ *
+ * Orgs without a row continue to use the shared Holo Chat App sourced from
+ * GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON / GOOGLE_CHAT_APP_AUDIENCE env vars.
+ * One row per org (`uniq` on `organization_id`) — multiple Workspaces
+ * installed under the same org share the same custom app, matching the
+ * shape of slackAppConfigs.
+ */
+export const googleChatAppConfigs = pgTable(
+  'google_chat_app_configs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    /** Service account JSON used to mint bearer tokens for outbound Chat API calls. Must include `client_email` and `private_key`. */
+    serviceAccountJson: encryptedText('service_account_json').notNull(),
+    /** Google Cloud project number used as the JWT audience for inbound verification. Required — without it we can't validate incoming requests. */
+    audience: text('audience').notNull(),
+    /** Display label shown on the connections page when this app is active. Defaults to the org name on create. */
+    displayName: text('display_name'),
+    createdByUserId: uuid('created_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgUniq: uniqueIndex('google_chat_app_configs_org_uniq').on(t.organizationId),
+  }),
+);
+
+/**
+ * Maps an inbound Google Chat Workspace to a Holo organization. Google
+ * gives us a stable `customerNumber` per Workspace in every inbound event;
+ * we trust whichever connection wizard step claimed it first, same way the
+ * read-only connector resolves tenancy. One row per customer_number
+ * (a Workspace tenants exactly one org).
+ *
+ * For the shared Holo app this is the primary tenant lookup. For BYO apps
+ * it's redundant with `google_chat_app_configs` (the per-org route already
+ * pins the org), but keeping the resolver shape consistent across both
+ * paths simplifies the handler.
+ */
+export const googleChatWorkspaces = pgTable(
+  'google_chat_workspaces',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    /** Google Workspace tenant identifier (`customerNumber` in inbound event payloads). */
+    customerNumber: text('customer_number').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerNumberUniq: uniqueIndex('google_chat_workspaces_customer_number_uniq').on(
+      t.customerNumber,
+    ),
+    orgIdx: index('google_chat_workspaces_org_idx').on(t.organizationId),
+  }),
+);
+
 // Single-use grant rows that bridge an OAuth callback (which runs on
 // WEB_PUBLIC_URL where the better-auth session cookie isn't readable) to
 // a same-origin /connections/oauth-finalize page on BETTER_AUTH_URL where

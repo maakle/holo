@@ -1,6 +1,6 @@
 {
-  "id": "142cc756-4353-4fa1-8ed8-c5fbd57d345e",
-  "prevId": "273d7390-9b94-46ef-8ed1-af563d46722c",
+  "id": "0a1de128-1aff-4337-a35a-1148fae6e363",
+  "prevId": "142cc756-4353-4fa1-8ed8-c5fbd57d345e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2698,6 +2698,19 @@
           "primaryKey": false,
           "notNull": true
         },
+        "path": {
+          "name": "path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acl_subjects": {
+          "name": "acl_subjects",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
         "fetched_at": {
           "name": "fetched_at",
           "type": "timestamp with time zone",
@@ -2759,6 +2772,43 @@
           "isUnique": true,
           "concurrently": false,
           "method": "btree",
+          "with": {}
+        },
+        "source_artifacts_org_path_idx": {
+          "name": "source_artifacts_org_path_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "path",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"source_artifacts\".\"path\" IS NOT NULL AND \"source_artifacts\".\"deleted_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "source_artifacts_acl_subjects_gin_idx": {
+          "name": "source_artifacts_acl_subjects_gin_idx",
+          "columns": [
+            {
+              "expression": "acl_subjects",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
           "with": {}
         }
       },

@@ -30,6 +30,7 @@ import { SyncSchedulerModule } from './queues/sync-scheduler.module';
 import { SyncRunnersModule } from './queues/runners.module';
 import { SlackSubjectsModule } from './slack-subjects/slack-subjects.module';
 import { SlackBotModule } from './slack-bot/slack-bot.module';
+import { GoogleChatBotModule } from './google-chat-bot/google-chat-bot.module';
 import { ObservabilityModule } from './observability/observability.module';
 
 
@@ -58,6 +59,7 @@ import { ObservabilityModule } from './observability/observability.module';
     HeartbeatModule,
     SlackSubjectsModule,
     SlackBotModule,
+    GoogleChatBotModule,
     ObservabilityModule,
     GithubCodeSyncModule,
     GithubProseSyncModule,
