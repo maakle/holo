@@ -190,6 +190,66 @@ describe('renderArtifact', () => {
     expect(out.content).toBe('Alpha body\n\n---\n\nBeta body');
   });
 
+  it('github-code: wraps source in a fenced code block tagged with language', () => {
+    const out = renderArtifact(
+      'github-code',
+      [
+        chunk({
+          kind: 'github-code',
+          content: 'export function foo() {\n  return 1;\n}',
+          metadata: { language: 'typescript', start_line: 1, end_line: 3 },
+        }),
+      ],
+      1,
+    );
+    expect(out.content).toBe(
+      '```typescript\nexport function foo() {\n  return 1;\n}\n```',
+    );
+  });
+
+  it('github-code: orders chunks by start_line and dedupes recursive-split overlap', () => {
+    const out = renderArtifact(
+      'github-code',
+      [
+        chunk({
+          kind: 'github-code',
+          content: 'line3\nline4\nline5',
+          metadata: { language: 'tsx', start_line: 3, end_line: 5 },
+        }),
+        chunk({
+          kind: 'github-code',
+          content: 'line1\nline2\nline3\nline4',
+          metadata: { language: 'tsx', start_line: 1, end_line: 4 },
+        }),
+      ],
+      2,
+    );
+    // Sorted by start_line; "line3\nline4" overlap is folded once.
+    expect(out.content).toBe('```tsx\nline1\nline2\nline3\nline4\nline5\n```');
+  });
+
+  it('github-code: AST chunks (no overlap) concatenate cleanly', () => {
+    const out = renderArtifact(
+      'github-code',
+      [
+        chunk({
+          kind: 'github-code',
+          content: 'function a() {}',
+          metadata: { language: 'javascript', start_line: 1, end_line: 1 },
+        }),
+        chunk({
+          kind: 'github-code',
+          content: 'function b() {}',
+          metadata: { language: 'javascript', start_line: 3, end_line: 3 },
+        }),
+      ],
+      2,
+    );
+    expect(out.content).toBe(
+      '```javascript\nfunction a() {}\n\nfunction b() {}\n```',
+    );
+  });
+
   it('strips empty-content chunks before joining', () => {
     const out = renderArtifact(
       'pylon-ticket',

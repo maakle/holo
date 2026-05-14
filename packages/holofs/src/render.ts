@@ -165,10 +165,55 @@ const headerDedupRenderer: Renderer = {
   },
 };
 
+// GitHub code chunks store raw source. Without a fenced code block the
+// Markdown viewer collapses whitespace and treats JSX/HTML-like syntax as
+// real tags, mangling the file. Wrap the joined source in a single
+// ```<lang> ... ``` fence, ordered by start_line, with chunk overlap
+// (from recursive-split's 600-char window) deduped at the seam.
+function joinCodeChunks(parts: string[]): string {
+  if (parts.length === 0) return '';
+  let result = parts[0]!;
+  for (let i = 1; i < parts.length; i++) {
+    const next = parts[i]!;
+    const maxOverlap = Math.min(result.length, next.length);
+    let overlap = 0;
+    for (let len = maxOverlap; len > 0; len--) {
+      if (result.endsWith(next.slice(0, len))) {
+        overlap = len;
+        break;
+      }
+    }
+    if (overlap > 0) {
+      result += next.slice(overlap);
+    } else {
+      // AST chunks (distinct top-level nodes) don't share text — give them
+      // a blank line so adjacent declarations don't collide on one line.
+      result += '\n\n' + next;
+    }
+  }
+  return result;
+}
+
+const githubCodeRenderer: Renderer = {
+  render(chunks) {
+    if (chunks.length === 0) return '';
+    const sorted = [...chunks].sort((a, b) => {
+      const al = Number(a.metadata?.start_line ?? 0);
+      const bl = Number(b.metadata?.start_line ?? 0);
+      return al - bl;
+    });
+    const rawLang = sorted[0]?.metadata?.language;
+    const language = typeof rawLang === 'string' ? rawLang : '';
+    const body = joinCodeChunks(sorted.map((c) => c.content));
+    return '```' + language + '\n' + body.replace(/\n+$/, '') + '\n```';
+  },
+};
+
 const renderers: Record<string, Renderer> = {
   'notion-page': notionRenderer,
   'grain-call': grainRenderer,
   'github-pr': githubPrRenderer,
+  'github-code': githubCodeRenderer,
   'github-doc': headerDedupRenderer,
   'mintlify-page': headerDedupRenderer,
   'prismic-document': headerDedupRenderer,

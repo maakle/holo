@@ -103,6 +103,7 @@ describe('runPathBackfill', () => {
     expect(result.totalFilled).toBe(2);
     expect(result.totalSkippedUnknownKind).toBe(0);
     expect(result.totalSkippedBadMetadata).toBe(0);
+    expect(result.filledByKind).toEqual({ 'stripe-charge': 2 });
 
     // 3rd SQL call is the bulk UPDATE.
     const updateCall = fake.calls[2];
@@ -194,6 +195,7 @@ describe('runPathBackfill', () => {
     expect(result.totalFilled).toBe(1);
     expect(result.totalUnchanged).toBe(1);
     expect(result.totalSkippedUnknownKind).toBe(0);
+    expect(result.filledByKind).toEqual({ 'airtable-record': 1 });
 
     // First call selects with the repair filter.
     expect(fake.calls[0]!.text).toMatch(/path IS NOT NULL/);

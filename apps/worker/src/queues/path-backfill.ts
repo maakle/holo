@@ -163,12 +163,21 @@ export async function runPathBackfill(
 
     // One IN query covers the whole batch's chunks. We only need one chunk's
     // metadata per artifact (artifact-level fields are shared), so we
-    // dedupe by source_artifact_id below.
+    // dedupe by source_artifact_id below — keeping the FIRST row per
+    // artifact in iteration order.
+    //
+    // ORDER BY source_artifact_id, id makes that "first" pick deterministic
+    // across runs. Without it, postgres returns chunks in heap-scan order,
+    // and any artifact whose chunks carry divergent metadata (e.g. the
+    // mintlify OpenAPI chunker, which packs N endpoints into one artifact —
+    // a contract violation but one we can't unilaterally fix) would compute
+    // a different path on every repair pass and flap forever.
     const artifactIds = artifacts.map((a) => a.id);
     const chunkRows = (await sql<ChunkMetaRow[]>`
       SELECT source_artifact_id, metadata, acl_subjects
       FROM chunks
       WHERE source_artifact_id IN ${sql(artifactIds)}
+      ORDER BY source_artifact_id, id
     `) as ChunkMetaRow[];
 
     // Group: one representative metadata per artifact + ACL union.
