@@ -32,6 +32,17 @@ export interface SlackBlock {
   [key: string]: unknown;
 }
 
+/**
+ * Slack message metadata. Slack round-trips this to `block_actions`
+ * payloads when a button on the message is clicked, so we use it to stash
+ * the full source list with the answer — avoids a DB lookup on every
+ * "Show sources" click.
+ */
+export interface SlackMessageMetadata {
+  event_type: string;
+  event_payload: Record<string, unknown>;
+}
+
 export interface SlackPostMessageInput {
   channel: string;
   text: string;
@@ -39,6 +50,7 @@ export interface SlackPostMessageInput {
   blocks?: SlackBlock[];
   unfurl_links?: boolean;
   unfurl_media?: boolean;
+  metadata?: SlackMessageMetadata;
 }
 
 export interface SlackPostMessageResult {

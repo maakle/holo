@@ -131,7 +131,7 @@ export async function insertEmbeddedChunks(
       embedding_model: e.embeddingModel,
       embedding: toPgVector(e.embedding),
       acl_subjects: e.chunk.aclSubjects ?? [],
-      metadata: JSON.stringify(cleanedMetadata),
+      metadata: cleanedMetadata,
       account_id: accountResolutions[i]?.accountId ?? null,
     };
   });

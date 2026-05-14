@@ -1,5 +1,11 @@
 import { type SlackApiClient } from '@holo/connectors';
-import { buildAgentAnswerBlocks, buildErrorBlocks, ERROR_FALLBACK_TEXT } from './blocks.js';
+import {
+  buildAgentAnswerBlocks,
+  buildAgentAnswerBlocksInline,
+  buildAnswerMetadata,
+  buildErrorBlocks,
+  ERROR_FALLBACK_TEXT,
+} from './blocks.js';
 import { type Source } from './agent.js';
 
 /**
@@ -24,6 +30,9 @@ export async function finalizeAgentAnswer(args: {
   logError?: (message: string) => void;
 }): Promise<{ channel: string; ts: string } | null> {
   const blocks = buildAgentAnswerBlocks(args.answer, args.sources);
+  // Attach metadata only when there are sources — the "Show sources" button
+  // (and therefore the metadata round-trip) only renders in that case.
+  const metadata = args.sources.length > 0 ? buildAnswerMetadata(args.sources) : undefined;
   const fallback = args.answer || 'holo answered your question.';
   if (args.placeholder) {
     const upd = await args.client.chatUpdate({
@@ -31,6 +40,7 @@ export async function finalizeAgentAnswer(args: {
       ts: args.placeholder.ts,
       text: fallback,
       blocks,
+      metadata,
     });
     if (!upd.ok) {
       args.logError?.(
@@ -44,6 +54,7 @@ export async function finalizeAgentAnswer(args: {
     thread_ts: args.threadTs,
     text: fallback,
     blocks,
+    metadata,
   });
   if (resp?.ok && resp.ts && resp.channel) {
     return { channel: resp.channel, ts: resp.ts };
@@ -90,8 +101,12 @@ export async function postSlashResponse(args: {
   fetchImpl?: typeof fetch;
 }): Promise<void> {
   const fetchImpl = args.fetchImpl ?? fetch;
+  // Slash-command responses post via response_url. Ephemeral response_url
+  // messages don't preserve `metadata`, which the channel-path button relies
+  // on — so render the inline source list here regardless of in_channel/ephemeral
+  // (keeps slash-command UX consistent and the source list immediately readable).
   const blocks = args.answer
-    ? buildAgentAnswerBlocks(args.answer, args.sources)
+    ? buildAgentAnswerBlocksInline(args.answer, args.sources)
     : [
         {
           type: 'section' as const,

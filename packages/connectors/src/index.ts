@@ -52,6 +52,7 @@ export type {
   SlackChannel,
   SlackMember,
   SlackMessage,
+  SlackMessageMetadata,
   SlackPostMessageInput,
   SlackPostMessageResult,
 } from './slack/index';

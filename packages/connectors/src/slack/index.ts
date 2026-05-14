@@ -34,6 +34,7 @@ export type {
   SlackChannel,
   SlackMember,
   SlackMessage,
+  SlackMessageMetadata,
   SlackPostMessageInput,
   SlackPostMessageResult,
 } from './types';

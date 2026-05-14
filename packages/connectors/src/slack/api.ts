@@ -14,6 +14,7 @@ import type {
   SlackChannel,
   SlackMember,
   SlackMessage,
+  SlackMessageMetadata,
   SlackPostMessageInput,
   SlackPostMessageResult,
 } from './types';
@@ -23,6 +24,7 @@ export type {
   SlackChannel,
   SlackMember,
   SlackMessage,
+  SlackMessageMetadata,
   SlackPostMessageInput,
   SlackPostMessageResult,
 };
@@ -60,6 +62,12 @@ export interface SlackApiClient {
     ts: string;
     text: string;
     blocks?: SlackBlock[];
+    /**
+     * chat.update replaces the entire message envelope — including metadata.
+     * Re-pass it on update or Slack drops it, which would break the
+     * "Show sources" button's metadata-roundtrip lookup.
+     */
+    metadata?: SlackMessageMetadata;
   }): Promise<SlackPostMessageResult>;
   /**
    * Open or fetch the IM channel ID for a user. Required before posting a DM —
@@ -282,6 +290,7 @@ export function createSlackApiClient(
       if (input.blocks) body['blocks'] = JSON.stringify(input.blocks);
       if (input.unfurl_links === false) body['unfurl_links'] = 'false';
       if (input.unfurl_media === false) body['unfurl_media'] = 'false';
+      if (input.metadata) body['metadata'] = JSON.stringify(input.metadata);
       const res = await slackPost(token, 'chat.postMessage', body, fetchImpl);
       return {
         ok: res['ok'] === true,
@@ -298,6 +307,7 @@ export function createSlackApiClient(
         text: input.text,
       };
       if (input.blocks) body['blocks'] = JSON.stringify(input.blocks);
+      if (input.metadata) body['metadata'] = JSON.stringify(input.metadata);
       const res = await slackPost(token, 'chat.update', body, fetchImpl);
       return {
         ok: res['ok'] === true,

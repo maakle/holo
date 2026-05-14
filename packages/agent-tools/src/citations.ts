@@ -43,6 +43,11 @@ export function buildCitationUrl(result: SearchResult): string | undefined {
   const provider = result.source.provider;
   const kind = result.source.artifactKind;
 
+  // Provider-specific builders below take precedence — they reconstruct a URL
+  // that points at the exact chunk (PR line, page section). The direct-URL
+  // fallback at the bottom covers providers whose connector already stored
+  // a canonical link in metadata (jira/linear/asana/confluence/zendesk/etc.).
+
   if (provider === 'github') {
     const repo = typeof m['repo_full_name'] === 'string'
       ? (m['repo_full_name'] as string)
@@ -71,6 +76,15 @@ export function buildCitationUrl(result: SearchResult): string | undefined {
   }
   if (provider === 'pylon' && typeof m['issue_number'] === 'number') {
     return `https://app.usepylon.com/issues?issueNumber=${m['issue_number']}`;
+  }
+
+  // Generic fallback: many connectors (jira, linear, asana, confluence,
+  // mintlify, zendesk, airtable) already persist a canonical URL on the
+  // artifact; google drive uses `webViewLink`, slack uses `permalink`.
+  // Accept any of those as a last resort.
+  for (const key of ['url', 'webViewLink', 'permalink'] as const) {
+    const v = m[key];
+    if (typeof v === 'string' && /^https?:\/\//.test(v)) return v;
   }
   return undefined;
 }

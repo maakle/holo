@@ -12,6 +12,7 @@ import { apiReference } from '@scalar/hono-api-reference';
 import { createRestRouter, openApiConfig } from './rest/router.js';
 import { mountSlackEvents } from './slack/events.js';
 import { mountSlackCommands } from './slack/commands.js';
+import { mountSlackInteractivity } from './slack/interactivity.js';
 import { logger } from './logger.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -125,6 +126,10 @@ async function main() {
     db,
     signingSecret: env.SLACK_CONNECTOR_SIGNING_SECRET,
     redisUrl: env.REDIS_URL,
+  });
+  mountSlackInteractivity(app, {
+    db,
+    signingSecret: env.SLACK_CONNECTOR_SIGNING_SECRET,
   });
 
   mountMcp(app, {

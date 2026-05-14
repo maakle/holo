@@ -170,6 +170,21 @@ async function handleSlackEvent(
   }
 
   const event = envelope.event;
+  // TEMP DEBUG — remove after diagnosis.
+  logger.info(
+    {
+      eventId: envelope.event_id,
+      type: event.type,
+      channelType: event.channel_type,
+      subtype: event.subtype,
+      botId: event.bot_id,
+      hasChannel: Boolean(event.channel),
+      hasUser: Boolean(event.user),
+      hasText: typeof event.text === 'string',
+      slackAppConfigId,
+    },
+    'slack events: received',
+  );
   // Ignore the bot's own messages — both bot_id presence (server-set) and
   // subtype === 'bot_message' (legacy). Without this, every reply we post
   // would re-trigger us.

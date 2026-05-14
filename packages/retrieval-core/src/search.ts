@@ -126,6 +126,7 @@ interface ChunkRow {
   id: string;
   content: string;
   provider: string;
+  kind: string;
   source_artifact_id: string;
   metadata: Record<string, unknown> | null;
   rrf_score: number;
@@ -199,7 +200,7 @@ async function searchOnce(
           (SELECT COUNT(*)::int FROM vector_ranked) AS vector_total,
           (SELECT COUNT(*)::int FROM bm25_ranked) AS bm25_total
       )
-    SELECT c.id, c.content, c.provider, c.source_artifact_id, c.metadata, f.rrf_score,
+    SELECT c.id, c.content, c.provider, c.kind, c.source_artifact_id, c.metadata, f.rrf_score,
            b.vector_total, b.bm25_total
     FROM fused f
     JOIN chunks c ON c.id = f.id
@@ -243,7 +244,16 @@ async function searchOnce(
 
   const results = rows.map((r): SearchResult => {
     const metadata = (r.metadata ?? {}) as Record<string, unknown>;
-    const artifactKind = String(metadata['artifact_kind'] ?? metadata['kind'] ?? '');
+    // Prefer the chunks.kind column over metadata.kind: chunkers store the
+    // chunk's *role* (diff/review/title for github-pr, block/page for notion)
+    // in metadata.kind, but URL/label builders need the *artifact* kind.
+    // chunks.kind is namespaced as "<provider>-<kind>"; strip the prefix so
+    // builders that check `kind === 'pr'`/`'doc'`/etc. match.
+    const prefix = `${r.provider}-`;
+    const rawKind = typeof r.kind === 'string' ? r.kind : '';
+    const artifactKind = rawKind.startsWith(prefix)
+      ? rawKind.slice(prefix.length)
+      : rawKind || String(metadata['artifact_kind'] ?? metadata['kind'] ?? '');
     const snippetUrl =
       typeof metadata['url'] === 'string'
         ? (metadata['url'] as string)
