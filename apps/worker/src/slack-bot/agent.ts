@@ -120,10 +120,10 @@ function citationToSource(c: WireCitation): Source {
 /**
  * Best-effort source from a non-search artifact tool. Today this only fires
  * for custom tools that emit a `url` field on their output (built-in tools
- * other than `search` no longer surface citations this way; bash returns
- * raw stdout/stderr without a URL). These don't participate in the citation
- * namespace — they get appended after the numbered citations as
- * supplementary entries the model can describe but not `[N]`-reference.
+ * other than `search` and `bash` don't surface citations this way). These
+ * don't participate in the citation namespace — they get appended after the
+ * numbered citations as supplementary entries the model can describe but
+ * not `[N]`-reference.
  */
 function artifactToSource(toolName: string, output: unknown): Source | undefined {
   if (!output || typeof output !== 'object') return undefined;
@@ -134,6 +134,87 @@ function artifactToSource(toolName: string, output: unknown): Source | undefined
   const kind = typeof o.kind === 'string' ? o.kind : 'artifact';
   const title = typeof o.title === 'string' ? o.title : `${provider} · ${kind}`;
   return { provider, kind, title, url };
+}
+
+/**
+ * Best-effort sources from a `bash` tool call.
+ *
+ * `cat /sample/docs/doc-rebellion-charter.md` references one file in its
+ * script; `grep -rl Rebel /sample` returns several in its stdout. Both
+ * shapes are evidence the model used those artifacts to compose the
+ * answer — without this extraction the slack reply lists zero sources
+ * even though the model just read a specific file end-to-end.
+ *
+ * Implementation: regex-scan the script + stdout for absolute paths under
+ * any known FS root, build a Source per unique match pointing at the
+ * dashboard's `/files/<path>` view, cap at 20 to keep the citation card
+ * readable when grep returns hundreds.
+ *
+ * No DB round-trip in v1 — the dashboard already enriches each file with
+ * kind / source / updatedAt when the user clicks through. If we later
+ * want deep links to the underlying source system (a slack URL, github
+ * PR URL, etc.) we'd look the artifact up by path here and read its
+ * metadata.
+ */
+// Slack channel paths use `#` (e.g. `/slack/#engineering/...`), so the
+// segment character class is broader than POSIX-clean.
+const BASH_PATH_RE = /(?:^|[\s'"`,(])(\/[a-z][a-z0-9_-]*(?:\/[A-Za-z0-9#._-]+)+)/g;
+const MAX_BASH_SOURCES_PER_CALL = 20;
+
+/**
+ * Roots emitted by the path-fn registry (packages/chunker/src/path-fn.ts)
+ * plus the `/sample` root from sample-data. Restricting to this set keeps
+ * the citation extractor from picking up genuine OS paths like `/tmp/...`
+ * that an agent might mention in passing. Keep in sync if a new chunker
+ * picks a new top-level root.
+ */
+const KNOWN_FS_ROOTS = new Set([
+  'slack',
+  'google-chat',
+  'github',
+  'notion',
+  'grain',
+  'pylon',
+  'hubspot',
+  'salesforce',
+  'stripe',
+  'mintlify',
+  'openapi',
+  'prismic',
+  'webcrawl',
+  'zendesk',
+  'googledrive',
+  'jira',
+  'asana',
+  'confluence',
+  'airtable',
+  'gitlab',
+  'linear',
+  'sample',
+]);
+
+export function extractBashSources(script: string, stdout: string): Source[] {
+  const seen = new Set<string>();
+  const sources: Source[] = [];
+  const haystack = `${script}\n${stdout}`;
+  for (const m of haystack.matchAll(BASH_PATH_RE)) {
+    const p = m[1];
+    if (!p || seen.has(p)) continue;
+    seen.add(p);
+    const segs = p.split('/').filter(Boolean);
+    if (segs.length < 2) continue;
+    const root = segs[0]!;
+    if (!KNOWN_FS_ROOTS.has(root)) continue;
+    const title = segs[segs.length - 1]!;
+    sources.push({
+      provider: root,
+      kind: 'file',
+      title,
+      url: `/files/${segs.map((s) => encodeURIComponent(s)).join('/')}`,
+    });
+    if (sources.length >= MAX_BASH_SOURCES_PER_CALL) break;
+  }
+  return sources;
 }
 
 // Anthropic's tool API requires `type: "object"` at the root of input_schema
@@ -340,7 +421,21 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
           durationMs: now() - toolStart,
           elapsedMs: now() - startedAt,
         });
-        if (use.name !== 'search' && !META_TOOLS.has(use.name)) {
+        if (use.name === 'bash') {
+          const script = String(
+            (use.input as { script?: unknown } | null)?.script ?? '',
+          );
+          const stdout = String(
+            (output as { stdout?: unknown } | null)?.stdout ?? '',
+          );
+          for (const src of extractBashSources(script, stdout)) {
+            // Dedupe against anything already on the list — repeated
+            // `cat` of the same path across tool calls is common.
+            if (!artifactSources.some((s) => s.url === src.url)) {
+              artifactSources.push(src);
+            }
+          }
+        } else if (use.name !== 'search' && !META_TOOLS.has(use.name)) {
           const src = artifactToSource(use.name, output);
           if (src) artifactSources.push(src);
         }

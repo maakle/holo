@@ -13,6 +13,12 @@
  * skipped. Kinds without a registered path-fn stay NULL and the operator
  * sees them in the summary so they can add a path-fn before re-running.
  *
+ * Repair mode (`{ repair: true }`): scans rows where `path IS NOT NULL`,
+ * recomputes via the current path-fn, and updates only when the result
+ * differs. Use this after changing a path-fn (e.g. the 2026-05-14
+ * camelCase fix that left old Airtable rows pointing at
+ * `/airtable/base/table/airtable-record:…`).
+ *
  * One-shot CLI, not a BullMQ job — matches the account-backfill pattern.
  * Trigger via `apps/worker/scripts/backfill-paths.ts`.
  */
@@ -28,17 +34,28 @@ export interface PathBackfillOptions {
   maxArtifacts?: number;
   /** Per-batch logger hook. */
   onBatch?: (stats: PathBackfillBatchStats) => void;
+  /** Recompute paths for rows that already have one and update where the
+   * result differs. Targets `path IS NOT NULL` rows instead of NULL ones.
+   * Use after a path-fn change to migrate stale paths. */
+  repair?: boolean;
 }
 
 export interface PathBackfillBatchStats {
   /** Cumulative artifacts examined. */
   scanned: number;
-  /** Cumulative artifacts whose path + ACLs were set. */
+  /** Cumulative artifacts whose path + ACLs were set (or rewritten in
+   * repair mode). */
   filled: number;
   /** Cumulative artifacts skipped because no path-fn is registered for kind. */
   skippedUnknownKind: number;
   /** Cumulative artifacts skipped because chunk metadata was unusable. */
   skippedBadMetadata: number;
+  /** Repair mode only: cumulative artifacts whose recomputed path matched
+   * the stored value (no UPDATE needed). */
+  unchanged: number;
+  /** Per-kind counts of artifacts written (filled or rewritten). Lets the
+   * operator see which connectors actually changed in a repair pass. */
+  filledByKind: Record<string, number>;
   /** Per-kind counts of artifacts skipped for missing path-fn. */
   unknownKinds: Record<string, number>;
 }
@@ -48,6 +65,10 @@ export interface PathBackfillResult {
   totalFilled: number;
   totalSkippedUnknownKind: number;
   totalSkippedBadMetadata: number;
+  /** Repair mode only. */
+  totalUnchanged: number;
+  /** Per-kind counts of artifacts written (filled or rewritten). */
+  filledByKind: Record<string, number>;
   unknownKinds: Record<string, number>;
 }
 
@@ -56,6 +77,8 @@ interface ArtifactRow {
   organization_id: string;
   kind: string;
   external_id: string;
+  /** Populated only in repair mode (so we can compare and skip no-ops). */
+  path?: string | null;
 }
 
 interface ChunkMetaRow {
@@ -70,12 +93,15 @@ export async function runPathBackfill(
 ): Promise<PathBackfillResult> {
   const batchSize = options.batchSize ?? 500;
   const maxArtifacts = options.maxArtifacts;
+  const repair = options.repair === true;
 
   let totalScanned = 0;
   let totalFilled = 0;
   let totalSkippedUnknownKind = 0;
   let totalSkippedBadMetadata = 0;
+  let totalUnchanged = 0;
   const unknownKinds: Record<string, number> = {};
+  const filledByKind: Record<string, number> = {};
 
   // Keep an in-process cursor on (organization_id, id) so a crash mid-run
   // doesn't reprocess what we already filled. The WHERE path IS NULL filter
@@ -92,24 +118,46 @@ export async function runPathBackfill(
     const take = Math.min(batchSize, remaining);
     if (take <= 0) break;
 
-    const artifacts = (cursorOrg && cursorId
-      ? await sql<ArtifactRow[]>`
-          SELECT id, organization_id, kind, external_id
-          FROM source_artifacts
-          WHERE path IS NULL
-            AND deleted_at IS NULL
-            AND (organization_id, id) > (${cursorOrg}, ${cursorId})
-          ORDER BY organization_id, id
-          LIMIT ${take}
-        `
-      : await sql<ArtifactRow[]>`
-          SELECT id, organization_id, kind, external_id
-          FROM source_artifacts
-          WHERE path IS NULL
-            AND deleted_at IS NULL
-          ORDER BY organization_id, id
-          LIMIT ${take}
-        `) as ArtifactRow[];
+    // The path filter is the only thing that differs between modes — fill
+     // mode targets NULL paths, repair mode targets non-NULL ones. Inlined
+     // (rather than parameterized) so postgres-js can plan each variant.
+    const artifacts = (repair
+      ? cursorOrg && cursorId
+        ? await sql<ArtifactRow[]>`
+            SELECT id, organization_id, kind, external_id, path
+            FROM source_artifacts
+            WHERE path IS NOT NULL
+              AND deleted_at IS NULL
+              AND (organization_id, id) > (${cursorOrg}, ${cursorId})
+            ORDER BY organization_id, id
+            LIMIT ${take}
+          `
+        : await sql<ArtifactRow[]>`
+            SELECT id, organization_id, kind, external_id, path
+            FROM source_artifacts
+            WHERE path IS NOT NULL
+              AND deleted_at IS NULL
+            ORDER BY organization_id, id
+            LIMIT ${take}
+          `
+      : cursorOrg && cursorId
+        ? await sql<ArtifactRow[]>`
+            SELECT id, organization_id, kind, external_id
+            FROM source_artifacts
+            WHERE path IS NULL
+              AND deleted_at IS NULL
+              AND (organization_id, id) > (${cursorOrg}, ${cursorId})
+            ORDER BY organization_id, id
+            LIMIT ${take}
+          `
+        : await sql<ArtifactRow[]>`
+            SELECT id, organization_id, kind, external_id
+            FROM source_artifacts
+            WHERE path IS NULL
+              AND deleted_at IS NULL
+            ORDER BY organization_id, id
+            LIMIT ${take}
+          `) as ArtifactRow[];
 
     if (artifacts.length === 0) break;
 
@@ -163,11 +211,19 @@ export async function runPathBackfill(
           externalId: a.external_id,
           metadata: group.metadata,
         });
+        if (repair && a.path === path) {
+          // No-op: the stored path already matches what the current path-fn
+          // would produce. Skip the UPDATE so repair runs are O(changes),
+          // not O(rows).
+          totalUnchanged += 1;
+          continue;
+        }
         updates.push({
           id: a.id,
           path,
           aclSubjects: [...group.aclUnion],
         });
+        filledByKind[a.kind] = (filledByKind[a.kind] ?? 0) + 1;
       } catch {
         totalSkippedBadMetadata += 1;
       }
@@ -203,6 +259,8 @@ export async function runPathBackfill(
       filled: totalFilled,
       skippedUnknownKind: totalSkippedUnknownKind,
       skippedBadMetadata: totalSkippedBadMetadata,
+      unchanged: totalUnchanged,
+      filledByKind: { ...filledByKind },
       unknownKinds: { ...unknownKinds },
     });
 
@@ -214,6 +272,8 @@ export async function runPathBackfill(
     totalFilled,
     totalSkippedUnknownKind,
     totalSkippedBadMetadata,
+    totalUnchanged,
+    filledByKind,
     unknownKinds,
   };
 }

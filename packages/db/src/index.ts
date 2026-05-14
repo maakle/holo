@@ -1,5 +1,6 @@
 export * from './client';
 export * as schema from './schema/index';
+export { intParam } from './sql-helpers';
 export { seedDefaultOrganization, DEFAULT_ORG_SLUG } from './seed';
 export { agentEventKind, type AgentEventKind } from './schema/holo';
 export {

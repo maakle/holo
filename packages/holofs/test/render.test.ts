@@ -118,6 +118,78 @@ describe('renderArtifact', () => {
     expect(out.content).toBe('## Legacy chunk');
   });
 
+  it('header-dedup renderer (github-doc): emits shared breadcrumb once, joins bodies', () => {
+    const out = renderArtifact(
+      'github-doc',
+      [
+        chunk({
+          kind: 'github-doc',
+          content: 'kombo-io/repo / docs/api.md\n\nFirst chunk body.',
+        }),
+        chunk({
+          kind: 'github-doc',
+          content: 'kombo-io/repo / docs/api.md\n\nSecond chunk body.',
+        }),
+        chunk({
+          kind: 'github-doc',
+          content: 'kombo-io/repo / docs/api.md\n\nThird chunk body.',
+        }),
+      ],
+      3,
+    );
+    // Header appears exactly once; bodies joined with `---`.
+    expect(out.content.match(/docs\/api\.md/g)?.length).toBe(1);
+    expect(out.content).toBe(
+      'kombo-io/repo / docs/api.md\n\nFirst chunk body.\n\n---\n\nSecond chunk body.\n\n---\n\nThird chunk body.',
+    );
+  });
+
+  it('header-dedup renderer (webcrawl-page): strips multi-line title+URL header', () => {
+    const out = renderArtifact(
+      'webcrawl-page',
+      [
+        chunk({
+          kind: 'webcrawl-page',
+          content: 'Kombo Docs\nhttps://docs.kombo.dev/intro\n\nIntro section text.',
+        }),
+        chunk({
+          kind: 'webcrawl-page',
+          content: 'Kombo Docs\nhttps://docs.kombo.dev/intro\n\nMore intro text.',
+        }),
+      ],
+      2,
+    );
+    expect(out.content).toBe(
+      'Kombo Docs\nhttps://docs.kombo.dev/intro\n\nIntro section text.\n\n---\n\nMore intro text.',
+    );
+  });
+
+  it('header-dedup renderer: single chunk renders verbatim (no header detection)', () => {
+    const out = renderArtifact(
+      'github-doc',
+      [
+        chunk({
+          kind: 'github-doc',
+          content: 'kombo-io/repo / docs/api.md\n\nOnly body.',
+        }),
+      ],
+      1,
+    );
+    expect(out.content).toBe('kombo-io/repo / docs/api.md\n\nOnly body.');
+  });
+
+  it('header-dedup renderer: chunks with no shared prefix render bodies without a header', () => {
+    const out = renderArtifact(
+      'github-doc',
+      [
+        chunk({ kind: 'github-doc', content: 'Alpha body' }),
+        chunk({ kind: 'github-doc', content: 'Beta body' }),
+      ],
+      2,
+    );
+    expect(out.content).toBe('Alpha body\n\n---\n\nBeta body');
+  });
+
   it('strips empty-content chunks before joining', () => {
     const out = renderArtifact(
       'pylon-ticket',

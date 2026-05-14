@@ -151,4 +151,62 @@ describe('runPathBackfill', () => {
     // after exactly the two SELECTs.
     expect(fake.calls.length).toBe(2);
   });
+
+  it('repair mode rewrites rows whose stored path disagrees with path-fn', async () => {
+    const fake = makeFakeSql();
+    // Two airtable-record rows. The first has a stale path (the literal
+    // form produced before the camelCase fix in commit e5ce89e); the
+    // second is already correct and must NOT be UPDATEd.
+    fake.queueResult([
+      {
+        id: '00000000-0000-0000-0000-000000000010',
+        organization_id: 'org-1',
+        kind: 'airtable-record',
+        external_id: 'airtable-record:appA:tblA:recA',
+        path: '/airtable/base/table/airtable-record:appA:tblA:recA.md',
+      },
+      {
+        id: '00000000-0000-0000-0000-000000000011',
+        organization_id: 'org-1',
+        kind: 'airtable-record',
+        external_id: 'airtable-record:appA:tblA:recB',
+        path: '/airtable/marketing/leads/recB.md',
+      },
+    ]);
+    fake.queueResult([
+      {
+        source_artifact_id: '00000000-0000-0000-0000-000000000010',
+        metadata: { baseName: 'Marketing', tableName: 'Leads', recordId: 'recA' },
+        acl_subjects: ['org:org-1'],
+      },
+      {
+        source_artifact_id: '00000000-0000-0000-0000-000000000011',
+        metadata: { baseName: 'Marketing', tableName: 'Leads', recordId: 'recB' },
+        acl_subjects: ['org:org-1'],
+      },
+    ]);
+    fake.queueResult([]); // bulk UPDATE
+    fake.queueResult([]); // next-iteration SELECT (empty → exit)
+
+    const result = await runPathBackfill(fake.sql, { batchSize: 100, repair: true });
+
+    expect(result.totalScanned).toBe(2);
+    expect(result.totalFilled).toBe(1);
+    expect(result.totalUnchanged).toBe(1);
+    expect(result.totalSkippedUnknownKind).toBe(0);
+
+    // First call selects with the repair filter.
+    expect(fake.calls[0]!.text).toMatch(/path IS NOT NULL/);
+    // Bulk UPDATE only carries the one row that actually changed.
+    const updateCall = fake.calls[2];
+    expect(updateCall!.text).toMatch(/UPDATE source_artifacts/);
+    const jsonArg = updateCall!.values[0] as { __json: unknown };
+    expect(jsonArg.__json).toEqual([
+      {
+        id: '00000000-0000-0000-0000-000000000010',
+        path: '/airtable/marketing/leads/recA.md',
+        acl_subjects: ['org:org-1'],
+      },
+    ]);
+  });
 });

@@ -344,6 +344,20 @@
       "when": 1780272000000,
       "tag": "0049_source_artifacts_path_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1780358400000,
+      "tag": "0050_source_artifacts_path_idx_no_predicate",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1780444800000,
+      "tag": "0051_chunks_source_artifact_id_idx",
+      "breakpoints": true
     }
   ]
 }

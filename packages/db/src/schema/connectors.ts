@@ -296,6 +296,7 @@ export const chunks = pgTable(
       t.kind,
     ),
     orgIdx: index('chunks_org_idx').on(t.organizationId),
+    sourceArtifactIdIdx: index('chunks_source_artifact_id_idx').on(t.sourceArtifactId),
     contentHashIdx: uniqueIndex('chunks_content_hash_idx').on(t.organizationId, t.contentHash),
     metadataPrIdx: index('chunks_metadata_pr_idx').using('gin', sql`${t.metadata} jsonb_path_ops`),
     orgAccountIdx: index('chunks_org_account_idx')

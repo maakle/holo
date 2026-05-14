@@ -133,10 +133,47 @@ const githubPrRenderer: Renderer = {
   },
 };
 
+// Several doc-style chunkers prepend a fixed header (breadcrumb / title / URL)
+// to every chunk's content for retrieval matching. When the artifact is
+// rendered for a human, we want that header once at the top, not N times.
+// This renderer finds the longest line-prefix shared by every chunk, emits
+// it once, then joins the remaining bodies.
+const headerDedupRenderer: Renderer = {
+  render(chunks) {
+    const contents = chunks.map((c) => c.content).filter((s) => s.length > 0);
+    if (contents.length === 0) return '';
+    if (contents.length === 1) return contents[0]!.trimEnd();
+
+    const firstLines = contents[0]!.split('\n');
+    let commonLineCount = 0;
+    for (let i = 0; i < firstLines.length; i++) {
+      const candidate = firstLines.slice(0, i + 1).join('\n');
+      const allMatch = contents.every(
+        (c) => c === candidate || c.startsWith(candidate + '\n'),
+      );
+      if (allMatch) commonLineCount = i + 1;
+      else break;
+    }
+
+    const header = firstLines.slice(0, commonLineCount).join('\n').trim();
+    const bodies = contents
+      .map((c) => c.split('\n').slice(commonLineCount).join('\n').trim())
+      .filter((s) => s.length > 0);
+
+    const joined = bodies.join('\n\n---\n\n');
+    return header.length > 0 ? `${header}\n\n${joined}` : joined;
+  },
+};
+
 const renderers: Record<string, Renderer> = {
   'notion-page': notionRenderer,
   'grain-call': grainRenderer,
   'github-pr': githubPrRenderer,
+  'github-doc': headerDedupRenderer,
+  'mintlify-page': headerDedupRenderer,
+  'prismic-document': headerDedupRenderer,
+  'webcrawl-page': headerDedupRenderer,
+  'zendesk-article': headerDedupRenderer,
 };
 
 export function renderArtifact(
