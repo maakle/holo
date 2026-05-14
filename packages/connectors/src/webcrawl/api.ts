@@ -6,7 +6,7 @@
  *
  * Endpoint reference (verify against https://docs.firecrawl.dev before merge):
  *   - POST /v2/scrape      → `{ url, formats: ['markdown'], ... }` → page
- *   - POST /v2/crawl       → `{ url, limit, maxDepth, ... }`       → { id }
+ *   - POST /v2/crawl       → `{ url, limit, maxDiscoveryDepth, ... }` → { id }
  *   - GET  /v2/crawl/{id}  → status + page batch (+ optional `next` URL)
  *   - DELETE /v2/crawl/{id} → cancel an in-flight crawl
  */
@@ -115,7 +115,9 @@ export async function startCrawl(
   const payload: Record<string, unknown> = {
     url: input.seedUrl,
     limit: Math.min(input.limit, MAX_CRAWL_LIMIT),
-    maxDepth: input.maxDepth,
+    // Firecrawl v2 renamed `maxDepth` → `maxDiscoveryDepth` (depth based on
+    // discovery order, where the seed + sitemapped pages are depth 0).
+    maxDiscoveryDepth: input.maxDepth,
     // Same-origin only. Letting Firecrawl follow off-host links would pull
     // in random third-party pages users never asked us to index.
     allowExternalLinks: false,

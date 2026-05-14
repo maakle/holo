@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
+import { holoError, ErrorCode } from '@holo/errors';
 import type { DB } from './client';
 import { sources, sourceArtifacts, chunks, connectorCursors } from './schema/holo';
 
@@ -510,9 +511,11 @@ export async function ensureSampleData(
   if (opts.embed) {
     embedded = await opts.embed(prepared.map((p) => p.content));
     if (embedded.vectors.length !== prepared.length) {
-      throw new Error(
-        `ensureSampleData: embed callback returned ${embedded.vectors.length} vectors for ${prepared.length} chunks`,
-      );
+      throw holoError({
+        code: ErrorCode.HOLO_INTERNAL,
+        problem: `ensureSampleData: embed callback returned ${embedded.vectors.length} vectors for ${prepared.length} chunks`,
+        fix: 'Ensure the embed callback returns exactly one vector per input chunk in input order.',
+      });
     }
   } else {
     // No embedder configured — chunks land with NULL embedding and only BM25
@@ -585,9 +588,11 @@ async function backfillMissingEmbeddings(
 
   const { vectors, model } = await embed(rows.map((r) => r.content));
   if (vectors.length !== rows.length) {
-    throw new Error(
-      `ensureSampleData backfill: embed callback returned ${vectors.length} vectors for ${rows.length} chunks`,
-    );
+    throw holoError({
+      code: ErrorCode.HOLO_INTERNAL,
+      problem: `ensureSampleData backfill: embed callback returned ${vectors.length} vectors for ${rows.length} chunks`,
+      fix: 'Ensure the embed callback returns exactly one vector per input chunk in input order.',
+    });
   }
   for (let i = 0; i < rows.length; i++) {
     const vec = vectors[i]!;

@@ -227,7 +227,7 @@ describe('Webcrawl sync — crawl mode', () => {
     // Crawl POST body carried our limit/depth.
     const startReq = calls.find((c) => c.url.endsWith('/crawl') && c.method === 'POST');
     expect((startReq?.body as { limit: number }).limit).toBe(5);
-    expect((startReq?.body as { maxDepth: number }).maxDepth).toBe(2);
+    expect((startReq?.body as { maxDiscoveryDepth: number }).maxDiscoveryDepth).toBe(2);
     expect((startReq?.body as { allowExternalLinks: boolean }).allowExternalLinks).toBe(false);
 
     const cursor = savedCursors.find((s) => s.resourceId === 'pages')?.cursor as {

@@ -24,6 +24,7 @@ type Run = {
   progressTotal: number | null;
   progressMessage: string | null;
   breakdown: Record<string, { new: number; deduped: number }> | null;
+  variant: string | null;
 };
 
 function totalsFromBreakdown(
@@ -252,7 +253,12 @@ export function SyncHistoryPanel({ provider }: Props) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                      <span className="font-mono text-text">{r.queue}</span>
+                      <span className="font-mono text-text">
+                        {r.queue}
+                        {r.variant ? (
+                          <span className="text-text-muted"> · {r.variant}</span>
+                        ) : null}
+                      </span>
                       <span className="text-text-muted">
                         {formatTime(r.finishedOn ?? r.processedOn ?? r.enqueuedAt)}
                       </span>
@@ -277,7 +283,12 @@ export function SyncHistoryPanel({ provider }: Props) {
                   <div className="border-t border-border bg-surface-2 px-3 py-2.5 text-[12px]">
                     <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
                       <dt className="text-text-muted">Queue</dt>
-                      <dd className="font-mono text-text">{r.queue}</dd>
+                      <dd className="font-mono text-text">
+                        {r.queue}
+                        {r.variant ? (
+                          <span className="text-text-muted"> · {r.variant}</span>
+                        ) : null}
+                      </dd>
                       <dt className="text-text-muted">Job ID</dt>
                       <dd className="font-mono text-text break-all">{r.id}</dd>
                       <dt className="text-text-muted">Status</dt>

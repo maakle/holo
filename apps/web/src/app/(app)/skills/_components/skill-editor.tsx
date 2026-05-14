@@ -36,7 +36,7 @@ export function SkillEditor({ slug, initialContent, canPromote }: Props) {
     try {
       const doc = parseSkill(yamlSource);
       return doc;
-    } catch (e) {
+    } catch {
       // Don't toast — surface in the gutter.
       return null;
     }

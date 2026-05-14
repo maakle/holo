@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { and, desc, eq, gt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
@@ -44,6 +44,10 @@ type RunRow = {
    * on completion. Null on rows written before migration 0028 and on runs
    * that bailed before reaching the upsert path (skip_reason set). */
   breakdown: Record<string, { new: number; deduped: number }> | null;
+  /** Provider-specific run flavour for UI grouping. Today this is the
+   * webcrawl mode (`scrape` / `crawl`); the queue name on its own can't
+   * distinguish them because both modes ride the same `webcrawl-sync` queue. */
+  variant: string | null;
 };
 
 const RESPONSE_LIMIT = 20;
@@ -201,6 +205,30 @@ export async function GET(
       return rows[0]?.c ?? 0;
     }
 
+    // For providers whose queue name doesn't capture the user-visible mode
+    // (today: webcrawl, where both `scrape` and `crawl` ride one queue),
+    // fetch each row's source metadata so the UI can render a flavour tag.
+    // Bounded by HISTORIC_FETCH_LIMIT distinct source ids — cheap.
+    const variantBySourceId = new Map<string, string>();
+    if (provider === 'webcrawl') {
+      const sourceIds = Array.from(new Set(historicRows.map((r) => r.sourceId)));
+      if (sourceIds.length > 0) {
+        const srcs = await db
+          .select({ id: schema.sources.id, metadata: schema.sources.metadata })
+          .from(schema.sources)
+          .where(
+            and(
+              eq(schema.sources.organizationId, orgId),
+              inArray(schema.sources.id, sourceIds),
+            ),
+          );
+        for (const s of srcs) {
+          const mode = (s.metadata as { mode?: unknown } | null)?.mode;
+          if (typeof mode === 'string') variantBySourceId.set(s.id, mode);
+        }
+      }
+    }
+
     // Track each row's BullMQ jobId alongside the row so we can dedupe
     // historic 'running' entries against the same job's live BullMQ state.
     // The row's public `id` stays the postgres UUID for stable React keys.
@@ -248,6 +276,7 @@ export async function GET(
           progressTotal: r.progressTotal ?? null,
           progressMessage: r.progressMessage ?? null,
           breakdown: r.breakdown ?? null,
+          variant: variantBySourceId.get(r.sourceId) ?? null,
         };
         rowJobIds.set(row, r.jobId);
         return row;
@@ -270,8 +299,32 @@ export async function GET(
         queue.getJobs(['waiting']),
       ]);
       for (const j of [...active, ...waiting]) {
-        const payload = j.data as { organizationId?: string } | undefined;
+        const payload = j.data as
+          | { organizationId?: string; sourceId?: string }
+          | undefined;
         if (payload?.organizationId !== orgId) continue;
+        // Live jobs for a webcrawl source whose metadata we didn't fetch
+        // above (because the source had no historic runs in the window yet)
+        // would lose the flavour tag. Fall back to a one-off lookup so the
+        // first run of a brand-new source still labels correctly.
+        if (
+          provider === 'webcrawl' &&
+          payload.sourceId &&
+          !variantBySourceId.has(payload.sourceId)
+        ) {
+          const [s] = await db
+            .select({ metadata: schema.sources.metadata })
+            .from(schema.sources)
+            .where(
+              and(
+                eq(schema.sources.organizationId, orgId),
+                eq(schema.sources.id, payload.sourceId),
+              ),
+            )
+            .limit(1);
+          const mode = (s?.metadata as { mode?: unknown } | undefined)?.mode;
+          if (typeof mode === 'string') variantBySourceId.set(payload.sourceId, mode);
+        }
         const jobId = String(j.id ?? '');
         const liveKey = `${name}:${jobId}`;
         // Replace the historic 'running' row with the live job's metadata —
@@ -305,6 +358,9 @@ export async function GET(
           progressTotal: null,
           progressMessage: null,
           breakdown: null,
+          variant: payload?.sourceId
+            ? variantBySourceId.get(payload.sourceId) ?? null
+            : null,
         };
         if (existingIdx >= 0) {
           // Carry forward the live/progress fields that come from postgres —
@@ -315,6 +371,9 @@ export async function GET(
           live.progressCurrent = prior.progressCurrent;
           live.progressTotal = prior.progressTotal;
           live.progressMessage = prior.progressMessage;
+          // Prefer the prior row's variant when present — it's resolved from
+          // the same source row and saves us a redundant lookup.
+          if (prior.variant) live.variant = prior.variant;
           rows[existingIdx] = live;
         } else if (!seenJobKeys.has(liveKey)) {
           rows.push(live);
