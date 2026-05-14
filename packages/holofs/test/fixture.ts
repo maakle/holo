@@ -37,6 +37,13 @@ function unwrap<T>(result: unknown): T[] {
   return Array.isArray(r) ? r : r.rows ?? [];
 }
 
+function pgTextArrayLiteral(values: string[]): string {
+  const escaped = values.map(
+    (v) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`,
+  );
+  return `{${escaped.join(',')}}`;
+}
+
 export async function seedFixture(db: DB, prefix: string): Promise<Fixture> {
   const slugA = `${prefix}-a`;
   const slugB = `${prefix}-b`;
@@ -111,7 +118,7 @@ export async function seedFixture(db: DB, prefix: string): Promise<Fixture> {
           (organization_id, source_id, kind, external_id, fetched_at, payload, path, acl_subjects)
         VALUES (
           ${orgId}, ${sourceId}, ${a.kind}, ${a.externalId}, now(), '{}'::jsonb,
-          ${a.path}, ${sql.array(a.acl)}::text[]
+          ${a.path}, ${pgTextArrayLiteral(a.acl)}::text[]
         )
         ON CONFLICT (source_id, external_id) DO UPDATE SET
           path = EXCLUDED.path,
@@ -129,7 +136,7 @@ export async function seedFixture(db: DB, prefix: string): Promise<Fixture> {
         VALUES (
           ${orgId}, ${sourceId}, ${artifactId}, ${a.kind}, ${a.content},
           ${hash}, 'slack', ${JSON.stringify(a.metadata)}::jsonb,
-          ${sql.array(a.acl)}::text[]
+          ${pgTextArrayLiteral(a.acl)}::text[]
         )
         ON CONFLICT (organization_id, content_hash) DO NOTHING
       `);

@@ -456,6 +456,16 @@ export async function ensureSampleData(
         AND provider = ${SAMPLE_PROVIDER}
         AND (acl_subjects IS NULL OR cardinality(acl_subjects) = 0)
     `);
+    // RFC 0009: backfill path + denormalized acl_subjects on existing sample
+    // artifacts so they show up in the file explorer.
+    await db.execute(sql`
+      UPDATE source_artifacts AS sa
+      SET path = ${sql`'/sample/' || sa.kind || 's/' || sa.external_id || '.md'`},
+          acl_subjects = ARRAY[${'org:' + organizationId}]::text[]
+      WHERE organization_id = ${organizationId}
+        AND source_id = ${existing[0].id}
+        AND path IS NULL
+    `);
     if (opts.embed) {
       await backfillMissingEmbeddings(db, organizationId, opts.embed);
     }
@@ -486,6 +496,10 @@ export async function ensureSampleData(
   }
   const prepared: PreparedChunk[] = [];
   for (const a of SAMPLE_ARTIFACTS) {
+    // RFC 0009: every artifact gets a deterministic virtual-FS path so the
+    // file explorer renders sample data the same way it renders real syncs.
+    // Path scheme mirrors the entries in packages/chunker/src/path-fn.ts.
+    const samplePath = `/sample/${a.kind}s/${a.externalId}.md`;
     const artifact = await db
       .insert(sourceArtifacts)
       .values({
@@ -494,6 +508,8 @@ export async function ensureSampleData(
         externalId: a.externalId,
         kind: a.kind,
         payload: { title: a.title, body: a.body },
+        path: samplePath,
+        aclSubjects: [`org:${organizationId}`],
       })
       .returning({ id: sourceArtifacts.id });
     const artifactId = artifact[0]!.id;

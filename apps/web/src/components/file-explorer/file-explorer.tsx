@@ -104,10 +104,6 @@ function pathSegments(path: string): string[] {
   return path.split('/').filter(Boolean);
 }
 
-function joinPath(...parts: string[]): string {
-  return '/' + parts.filter(Boolean).join('/');
-}
-
 export function FileExplorer({ initialPath }: { initialPath: string }) {
   const router = useRouter();
   const [path, setPath] = useState(initialPath);

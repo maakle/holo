@@ -14,6 +14,7 @@
  * chunks today must have a path-fn here. Adding a new chunker is a two-line
  * change: register the kind in this map, document the path scheme in RFC 0009.
  */
+import { holoError, ErrorCode } from '@holo/errors';
 
 export interface PathFnInput {
   kind: string;
@@ -187,6 +188,149 @@ export const pathFns: Record<string, PathFn> = {
     const title = slug(metadata.title, id);
     return `/zendesk/${section}/${title}-${id}.md`;
   },
+
+  // --- kinds emitted by @holo/connectors (not @holo/chunker) ----------------
+  // These connectors do their own chunking and emit chunks directly. We
+  // register path-fns here so embed-insert can populate `path` on the
+  // source_artifacts row.
+
+  'googledrive-file': ({ metadata, externalId }) => {
+    const driveSegments = (() => {
+      const breadcrumb = metadata.breadcrumb;
+      if (Array.isArray(breadcrumb)) {
+        const filtered = (breadcrumb as unknown[])
+          .filter((b): b is string => typeof b === 'string' && b.length > 0)
+          .map((b) => slug(b, 'folder'));
+        if (filtered.length > 0) return filtered.join('/');
+      }
+      return null;
+    })();
+    const id = String(metadata.file_id ?? externalId);
+    const name = slug(metadata.file_name ?? metadata.title, id);
+    const dir = driveSegments ? `/${driveSegments}` : '';
+    return `/gdrive${dir}/${name}-${id}`;
+  },
+
+  'jira-project': ({ metadata, externalId }) => {
+    const key = slug(metadata.project_key, slug(externalId, 'project'));
+    return `/jira/${key}.md`;
+  },
+  'jira-issue': ({ metadata, externalId }) => {
+    const key = slug(metadata.issue_key, slug(externalId, 'issue'));
+    return `/jira/issues/${key}.md`;
+  },
+  'jira-comment': ({ metadata, externalId }) => {
+    const issueKey = slug(metadata.issue_key, 'issue');
+    const id = String(metadata.comment_id ?? externalId);
+    return `/jira/issues/${issueKey}/comments/${id}.md`;
+  },
+
+  'linear-issue': ({ metadata, externalId }) => {
+    const team = slug(metadata.team_key ?? metadata.team_name, 'team');
+    const identifier = slug(metadata.identifier ?? metadata.issue_identifier ?? externalId, 'issue');
+    return `/linear/${team}/${identifier}.md`;
+  },
+
+  'asana-task': ({ metadata, externalId }) => {
+    const project = slug(metadata.project_name, 'project');
+    const id = String(metadata.task_id ?? externalId);
+    const title = slug(metadata.title, id);
+    return `/asana/${project}/${title}-${id}.md`;
+  },
+
+  'confluence-space': ({ metadata, externalId }) => {
+    const key = slug(metadata.space_key, slug(externalId, 'space'));
+    return `/confluence/${key}.md`;
+  },
+  'confluence-page': ({ metadata, externalId }) => {
+    const space = slug(metadata.space_key, 'space');
+    const id = String(metadata.page_id ?? externalId);
+    const title = slug(metadata.title, id);
+    return `/confluence/${space}/${title}-${id}.md`;
+  },
+  'confluence-comment': ({ metadata, externalId }) => {
+    const space = slug(metadata.space_key, 'space');
+    const pageId = String(metadata.page_id ?? 'page');
+    const id = String(metadata.comment_id ?? externalId);
+    return `/confluence/${space}/${pageId}/comments/${id}.md`;
+  },
+
+  'airtable-record': ({ metadata, externalId }) => {
+    const base = slug(metadata.base_name ?? metadata.base_id, 'base');
+    const table = slug(metadata.table_name ?? metadata.table_id, 'table');
+    const id = String(metadata.record_id ?? externalId);
+    return `/airtable/${base}/${table}/${id}.md`;
+  },
+
+  'gitlab-mr': ({ metadata }) => {
+    const repo = slugPath(metadata.repo_full_name ?? metadata.project_path, 'unknown/unknown');
+    return `/gitlab/${repo}/merge_requests/${metadata.mr_iid ?? metadata.iid ?? 'unknown'}.md`;
+  },
+  'gitlab-issue': ({ metadata }) => {
+    const repo = slugPath(metadata.repo_full_name ?? metadata.project_path, 'unknown/unknown');
+    return `/gitlab/${repo}/issues/${metadata.issue_iid ?? metadata.iid ?? 'unknown'}.md`;
+  },
+  'gitlab-code': ({ metadata }) => {
+    const repo = slugPath(metadata.repo_full_name ?? metadata.project_path, 'unknown/unknown');
+    const file = slugPath(metadata.file_path, 'unknown');
+    return `/gitlab/${repo}/code/${file}`;
+  },
+  'gitlab-doc': ({ metadata }) => {
+    const repo = slugPath(metadata.repo_full_name ?? metadata.project_path, 'unknown/unknown');
+    const file = slugPath(metadata.file_path, 'unknown');
+    return `/gitlab/${repo}/docs/${file}`;
+  },
+
+  // HubSpot connector emits four variants of the generic hubspot-record kind.
+  // Same shape; same path scheme.
+  'hubspot-contact': ({ metadata, externalId }) => {
+    const id = String(metadata.record_id ?? externalId);
+    const name = slug(metadata.display_name, id);
+    return `/hubspot/contacts/${name}-${id}.md`;
+  },
+  'hubspot-company': ({ metadata, externalId }) => {
+    const id = String(metadata.record_id ?? externalId);
+    const name = slug(metadata.display_name, id);
+    return `/hubspot/companies/${name}-${id}.md`;
+  },
+  'hubspot-deal': ({ metadata, externalId }) => {
+    const id = String(metadata.record_id ?? externalId);
+    const name = slug(metadata.display_name, id);
+    return `/hubspot/deals/${name}-${id}.md`;
+  },
+  'hubspot-engagement': ({ metadata, externalId }) => {
+    const id = String(metadata.engagement_id ?? metadata.record_id ?? externalId);
+    const type = slug(metadata.engagement_type, 'engagement');
+    return `/hubspot/engagements/${type}-${id}.md`;
+  },
+
+  'mintlify-openapi-endpoint': ({ metadata, externalId }) => {
+    const method = slug(metadata.method, 'method');
+    const path = slugPath(metadata.path, slug(externalId, 'endpoint'));
+    return `/mintlify/api/${method}-${path}.md`;
+  },
+
+  // --- sample data (db/sample-data.ts) --------------------------------------
+  // Star Wars seed. Lets the file explorer show real-shaped paths on a fresh
+  // workspace before any connector is wired up.
+
+  doc: ({ metadata, externalId }) => {
+    const title = slug(metadata.title, slug(externalId, 'doc'));
+    return `/sample/docs/${title}.md`;
+  },
+  message: ({ metadata, externalId }) => {
+    // sample message titles include the channel: "#mos-eisley — Obi-Wan Kenobi"
+    const title = String(metadata.title ?? '');
+    const channelMatch = title.match(/^#([\w-]+)/);
+    const channel = channelMatch && channelMatch[1] ? slug(channelMatch[1], 'channel') : 'general';
+    const id = slug(externalId, 'msg');
+    return `/sample/messages/#${channel}/${id}.md`;
+  },
+  issue: ({ metadata, externalId }) => {
+    const id = slug(externalId, 'issue');
+    const title = slug(metadata.title, id);
+    return `/sample/issues/${title}.md`;
+  },
 };
 
 /** Compute the virtual-filesystem path for an artifact. Throws if no path-fn
@@ -195,10 +339,11 @@ export const pathFns: Record<string, PathFn> = {
 export function computePath(input: PathFnInput): string {
   const fn = pathFns[input.kind];
   if (!fn) {
-    throw new Error(
-      `No path-fn registered for kind '${input.kind}'. ` +
-        `Add an entry to pathFns in packages/chunker/src/path-fn.ts.`,
-    );
+    throw holoError({
+      code: ErrorCode.HOLO_INVALID_INPUT,
+      problem: `No path-fn registered for kind '${input.kind}'.`,
+      fix: 'Add an entry to pathFns in packages/chunker/src/path-fn.ts. See RFC 0009.',
+    });
   }
   return fn(input);
 }
