@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { getServerAuth } from '@/lib/server-context';
+import { getServerAuth, getServerContext } from '@/lib/server-context';
 import { LandingHeader } from '@/components/landing/landing-header';
 import { LandingHero } from '@/components/landing/landing-hero';
 import { AgentsBand } from '@/components/landing/agents-band';
@@ -20,10 +20,14 @@ export default async function Home() {
   const session = await auth.api.getSession({ headers: await headers() });
   const isAuthed = !!session;
 
+  const { env } = await getServerContext();
+  const publicOrigin = (env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL).replace(/\/+$/, '');
+  const installCommand = `curl -fsSL ${publicOrigin}/install.sh | bash`;
+
   return (
     <div className="relative min-h-screen overflow-x-hidden">
       <LandingHeader isAuthed={isAuthed} />
-      <LandingHero isAuthed={isAuthed} />
+      <LandingHero isAuthed={isAuthed} installCommand={installCommand} />
       <AgentsBand />
       <PlatformBand />
       <BenchmarksBand />
@@ -32,7 +36,7 @@ export default async function Home() {
       <UseCasesBand />
       <ObservabilityBand />
       <SecurityBand />
-      <FinalCTA isAuthed={isAuthed} />
+      <FinalCTA isAuthed={isAuthed} installCommand={installCommand} />
       <LandingFooter />
     </div>
   );

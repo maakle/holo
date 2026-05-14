@@ -1,5 +1,4 @@
 import { ArrowRight, Eye, PlugZap, Puzzle } from 'lucide-react';
-import { GithubMark } from '@/components/landing/brand-marks';
 
 function IsoArchitecture() {
   return (
@@ -235,20 +234,6 @@ export function OpenSourceBand() {
             >
               Self-host guide
               <ArrowRight className="h-3 w-3" aria-hidden />
-            </a>
-            <a
-              href="https://github.com/maakle/holo"
-              className="inline-flex h-[30px] items-center gap-2 rounded-full px-3 text-[12px] font-medium"
-              style={{
-                background: '#0d0d0f',
-                border: '1px solid #1f1f24',
-                color: '#fafaf7',
-              }}
-            >
-              <GithubMark className="h-3.5 w-3.5" />
-              <span style={{ color: '#71717a' }}>Stars</span>
-              <span className="h-3.5 w-px" style={{ background: '#1f1f24' }} aria-hidden />
-              <span className="font-mono">2.8k</span>
             </a>
           </div>
         </div>

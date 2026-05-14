@@ -186,25 +186,19 @@ export function PlatformBand() {
   return (
     <section id="platform" className="border-b border-border">
       <div className="mx-auto max-w-[1280px] px-8 py-24">
-        <div className="mb-12 flex flex-wrap items-baseline justify-between gap-8">
-          <div className="max-w-[540px]">
-            <p className="caption text-text-subtle">The holo platform</p>
-            <h2
-              className="mt-3.5 font-display font-semibold text-text"
-              style={{
-                fontSize: 'clamp(34px, 4vw, 52px)',
-                lineHeight: 1.05,
-                letterSpacing: '-0.015em',
-                textWrap: 'balance',
-              }}
-            >
-              Three things. One layer underneath every agent.
-            </h2>
-          </div>
-          <p className="max-w-[360px] text-[14px] leading-[1.55] text-text-muted">
-            Holo unifies the data behind one ACL-aware index, learns the procedures your team
-            actually runs, and logs every call.
-          </p>
+        <div className="mb-12 max-w-[540px]">
+          <p className="caption text-text-subtle">The holo platform</p>
+          <h2
+            className="mt-3.5 font-display font-semibold text-text"
+            style={{
+              fontSize: 'clamp(34px, 4vw, 52px)',
+              lineHeight: 1.05,
+              letterSpacing: '-0.015em',
+              textWrap: 'balance',
+            }}
+          >
+            Three things. One layer underneath every agent.
+          </h2>
         </div>
 
         <div className="grid gap-5 md:grid-cols-3">

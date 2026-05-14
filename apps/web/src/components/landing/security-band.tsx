@@ -68,25 +68,19 @@ export function SecurityBand() {
   return (
     <section id="security" className="border-b border-border">
       <div className="mx-auto max-w-[1280px] px-8 py-24">
-        <div className="mb-12 flex flex-wrap items-end justify-between gap-8">
-          <div className="max-w-[540px]">
-            <p className="caption text-text-subtle">Enterprise ready</p>
-            <h2
-              className="mt-3.5 font-display font-semibold text-text"
-              style={{
-                fontSize: 'clamp(34px, 4vw, 52px)',
-                lineHeight: 1.05,
-                letterSpacing: '-0.015em',
-                textWrap: 'balance',
-              }}
-            >
-              Security &amp; compliance.
-            </h2>
-          </div>
-          <p className="max-w-[380px] text-[14px] leading-[1.55] text-text-muted">
-            Holo is the boring kind of infrastructure: predictable, inspectable, and yours to
-            run. Built for teams that can&apos;t hand their data to a black box.
-          </p>
+        <div className="mb-12 max-w-[540px]">
+          <p className="caption text-text-subtle">Enterprise ready</p>
+          <h2
+            className="mt-3.5 font-display font-semibold text-text"
+            style={{
+              fontSize: 'clamp(34px, 4vw, 52px)',
+              lineHeight: 1.05,
+              letterSpacing: '-0.015em',
+              textWrap: 'balance',
+            }}
+          >
+            Security &amp; compliance.
+          </h2>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr]">

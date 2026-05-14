@@ -1,27 +1,19 @@
 const AGENTS = [
-  { name: 'Claude', protocol: 'MCP' },
-  { name: 'Cursor', protocol: 'MCP' },
-  { name: 'Cline', protocol: 'MCP' },
-  { name: 'ChatGPT', protocol: 'OpenAPI' },
-  { name: 'Gemini', protocol: 'OpenAPI' },
-  { name: 'n8n', protocol: 'REST' },
-  { name: 'Continue', protocol: 'MCP' },
-  { name: 'Aider', protocol: 'REST' },
-  { name: 'Zed', protocol: 'MCP' },
-  { name: 'Windsurf', protocol: 'MCP' },
+  { name: 'Claude' },
+  { name: 'Cursor' },
+  { name: 'Slack bot' },
+  { name: 'ChatGPT' },
+  { name: 'Gemini' },
 ];
 
-function AgentItem({ name, protocol }: { name: string; protocol: string }) {
+function AgentItem({ name }: { name: string }) {
   return (
-    <div className="inline-flex flex-shrink-0 items-baseline gap-2.5">
+    <div className="inline-flex flex-shrink-0 items-baseline">
       <span
         className="font-display text-[20px] font-semibold text-text"
         style={{ letterSpacing: '-0.01em' }}
       >
         {name}
-      </span>
-      <span className="rounded-sm border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-text-subtle">
-        {protocol}
       </span>
     </div>
   );
@@ -43,19 +35,10 @@ export function AgentsBand() {
           </p>
         </div>
         <div className="flex min-w-[280px] flex-1 overflow-hidden" style={maskStyle}>
-          <div
-            className="flex flex-shrink-0 gap-14 pr-14"
-            style={{ animation: 'marquee 40s linear infinite' }}
-          >
+          <div className="flex w-max animate-marquee gap-14 pr-14">
             {AGENTS.map((a) => (
               <AgentItem key={a.name} {...a} />
             ))}
-          </div>
-          <div
-            aria-hidden
-            className="flex flex-shrink-0 gap-14 pr-14"
-            style={{ animation: 'marquee 40s linear infinite' }}
-          >
             {AGENTS.map((a) => (
               <AgentItem key={`${a.name}-dup`} {...a} />
             ))}

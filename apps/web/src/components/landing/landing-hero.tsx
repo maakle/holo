@@ -31,20 +31,39 @@ type AgentRow = {
 };
 
 const AGENT_ROWS: AgentRow[] = [
+  { name: 'Slack bot', protocol: 'REST', color: '#4A154B', status: 'accent' },
   { name: 'Claude', protocol: 'MCP', color: '#cc7c5e', status: 'success' },
   { name: 'Cursor', protocol: 'MCP', color: '#5e5e5e', status: 'success' },
   { name: 'ChatGPT', protocol: 'OpenAPI', color: '#10a37f', status: 'success' },
-  { name: 'n8n', protocol: 'REST', color: '#ea4b71', status: 'accent' },
   { name: 'Custom', protocol: 'OpenAPI', color: 'var(--accent)', status: 'muted' },
 ];
 
-function StatusDot({ status }: { status: AgentRow['status'] }) {
+function StatusDot({
+  status,
+  delayMs = 0,
+}: {
+  status: AgentRow['status'];
+  delayMs?: number;
+}) {
   const colorMap = {
     success: 'bg-success',
     accent: 'bg-accent',
     muted: 'bg-text-subtle',
   } as const;
-  return <span className={`h-1.5 w-1.5 flex-none rounded-full ${colorMap[status]}`} aria-hidden />;
+  const live = status === 'success' || status === 'accent';
+  return (
+    <span
+      className={`h-1.5 w-1.5 flex-none rounded-full ${colorMap[status]}`}
+      style={
+        live
+          ? {
+              animation: `dot-live 2.6s cubic-bezier(0.4, 0, 0.6, 1) ${delayMs}ms infinite`,
+            }
+          : undefined
+      }
+      aria-hidden
+    />
+  );
 }
 
 function HeroDiagram() {
@@ -57,7 +76,7 @@ function HeroDiagram() {
             <span className="caption text-[10px] text-text-subtle">Tools · 5 of 20</span>
             <Plug className="h-3 w-3 text-text-subtle" aria-hidden />
           </div>
-          {TOOL_ROWS.map((t) => (
+          {TOOL_ROWS.map((t, i) => (
             <div
               key={t.id}
               className="flex items-center gap-2.5 border-b border-border px-3 py-2 last:border-b-0"
@@ -71,6 +90,13 @@ function HeroDiagram() {
                 className={`h-1.5 w-1.5 flex-none rounded-full bg-success ${
                   t.active ? 'opacity-100' : 'opacity-40'
                 }`}
+                style={
+                  t.active
+                    ? {
+                        animation: `dot-live 2.6s cubic-bezier(0.4, 0, 0.6, 1) ${i * 320}ms infinite`,
+                      }
+                    : undefined
+                }
                 aria-hidden
               />
             </div>
@@ -80,15 +106,19 @@ function HeroDiagram() {
         {/* Holo cube center */}
         <div className="relative flex flex-col items-center gap-2">
           <div className="relative flex h-22 w-22 items-center justify-center">
-            <div
-              className="absolute -inset-1 rounded-full border"
-              style={{
-                borderColor: 'color-mix(in srgb, var(--accent) 35%, transparent)',
-                animation: 'pulse-ring 2.4s cubic-bezier(0.16,1,0.3,1) infinite',
-              }}
-              aria-hidden
-            />
-            <div className="flex h-16 w-16 items-center justify-center rounded-md border border-border-strong bg-surface">
+            {[0, 1200, 2400].map((delay) => (
+              <span
+                key={delay}
+                className="absolute -inset-1 rounded-full"
+                style={{
+                  border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)',
+                  animation: `pulse-ring 3.6s cubic-bezier(0.16,1,0.3,1) ${delay}ms infinite`,
+                  willChange: 'transform, opacity',
+                }}
+                aria-hidden
+              />
+            ))}
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-md border border-border-strong bg-surface">
               <Image
                 src="/logo.png"
                 alt=""
@@ -116,7 +146,7 @@ function HeroDiagram() {
             <span className="caption text-[10px] text-text-subtle">Agents · live</span>
             <Activity className="h-3 w-3 text-text-subtle" aria-hidden />
           </div>
-          {AGENT_ROWS.map((a) => (
+          {AGENT_ROWS.map((a, i) => (
             <div
               key={a.name}
               className="flex items-center gap-2.5 border-b border-border px-3 py-2 last:border-b-0"
@@ -131,7 +161,7 @@ function HeroDiagram() {
               </span>
               <span className="flex-1 truncate text-[12.5px] text-text">{a.name}</span>
               <span className="font-mono text-[10.5px] text-text-subtle">{a.protocol}</span>
-              <StatusDot status={a.status} />
+              <StatusDot status={a.status} delayMs={i * 380 + 160} />
             </div>
           ))}
         </div>
@@ -140,7 +170,13 @@ function HeroDiagram() {
   );
 }
 
-export function LandingHero({ isAuthed }: { isAuthed: boolean }) {
+export function LandingHero({
+  isAuthed,
+  installCommand,
+}: {
+  isAuthed: boolean;
+  installCommand: string;
+}) {
   return (
     <section id="top" className="relative border-b border-border">
       {/* Hero grid backdrop */}
@@ -202,7 +238,7 @@ export function LandingHero({ isAuthed }: { isAuthed: boolean }) {
             </a>
           </div>
           <div className="mt-7 flex flex-wrap items-center gap-4">
-            <InstallPill command="docker compose up" />
+            <InstallPill command={installCommand} />
             <span className="text-[12px] text-text-subtle">
               localhost:3000 in 60 seconds
             </span>

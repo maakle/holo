@@ -1,4 +1,6 @@
-import { ArrowRight } from 'lucide-react';
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
 
 type GaugeData = {
   value: number;
@@ -33,11 +35,66 @@ const GAUGES: GaugeData[] = [
 ];
 
 function Gauge({ value, unit }: { value: number; unit: '%' | 'ms' }) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const node = svgRef.current;
+    if (!node) return;
+
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      setProgress(1);
+      return;
+    }
+
+    let raf = 0;
+    let started = false;
+    const duration = 1100;
+
+    const run = () => {
+      if (started) return;
+      started = true;
+      const start = performance.now();
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - start) / duration);
+        // easeOutCubic
+        const eased = 1 - Math.pow(1 - t, 3);
+        setProgress(eased);
+        if (t < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            run();
+            observer.disconnect();
+            break;
+          }
+        }
+      },
+      { threshold: 0.35 },
+    );
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
   // ms gauges read inversely: faster = fuller
-  const filled =
+  const target =
     unit === 'ms'
       ? Math.max(0, Math.min(100, 100 - value / 2))
       : Math.max(0, Math.min(100, value));
+  const filled = target * progress;
+  const displayValue = Math.round(value * progress);
   const r = 70;
   const cx = 90;
   const cy = 90;
@@ -45,7 +102,15 @@ function Gauge({ value, unit }: { value: number; unit: '%' | 'ms' }) {
   const half = Math.PI * r;
   const offset = half * (1 - filled / 100);
   return (
-    <svg viewBox="0 0 180 110" width="180" height="110" role="img" aria-hidden className="block">
+    <svg
+      ref={svgRef}
+      viewBox="0 0 180 110"
+      width="180"
+      height="110"
+      role="img"
+      aria-hidden
+      className="block"
+    >
       <path
         d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
         fill="none"
@@ -72,7 +137,7 @@ function Gauge({ value, unit }: { value: number; unit: '%' | 'ms' }) {
         fontWeight="600"
         style={{ letterSpacing: '-0.02em' }}
       >
-        {value}
+        {displayValue}
         <tspan fontSize="18" dx="2" style={{ letterSpacing: 0 }}>
           {unit}
         </tspan>
@@ -119,30 +184,19 @@ export function BenchmarksBand() {
   return (
     <section className="border-b border-border">
       <div className="mx-auto max-w-[1280px] px-8 py-24">
-        <div className="mb-14 grid items-end gap-16 lg:grid-cols-[1fr_1.4fr]">
-          <div>
-            <p className="caption text-text-subtle">Benchmarks</p>
-            <h2
-              className="mt-3.5 font-display font-semibold text-text"
-              style={{
-                fontSize: 'clamp(34px, 4vw, 52px)',
-                lineHeight: 1.05,
-                letterSpacing: '-0.015em',
-                textWrap: 'balance',
-              }}
-            >
-              Numbers from the reference deployment.
-            </h2>
-          </div>
-          <div>
-            <p className="max-w-[520px] text-[15px] leading-[1.55] text-text-muted">
-              We instrument the open-source build and publish what we see. No cherry-picked
-              benchmarks, no &quot;win-rate vs ChatGPT&quot; framing.
-            </p>
-            <p className="mt-3 font-mono text-[12px] text-text-subtle">
-              Reproducible on your own data with <code>pnpm bench</code>.
-            </p>
-          </div>
+        <div className="mb-14 max-w-[640px]">
+          <p className="caption text-text-subtle">Benchmarks</p>
+          <h2
+            className="mt-3.5 font-display font-semibold text-text"
+            style={{
+              fontSize: 'clamp(34px, 4vw, 52px)',
+              lineHeight: 1.05,
+              letterSpacing: '-0.015em',
+              textWrap: 'balance',
+            }}
+          >
+            Numbers from the reference deployment.
+          </h2>
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
@@ -198,15 +252,6 @@ export function BenchmarksBand() {
           </div>
         </div>
 
-        <div className="mt-8">
-          <a
-            href="https://github.com/maakle/holo/blob/main/docs/BENCHMARKS.md"
-            className="inline-flex items-center gap-1.5 text-[14px] font-medium text-text transition-colors hover:text-accent"
-          >
-            See full methodology
-            <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-          </a>
-        </div>
       </div>
     </section>
   );

@@ -3,17 +3,21 @@ import { GithubMark } from '@/components/landing/brand-marks';
 
 const GITHUB_URL = 'https://github.com/maakle/holo';
 
-const QUICKSTART = `# 1. clone & boot
-git clone github.com/maakle/holo
-cd holo && docker compose up
+export function FinalCTA({
+  isAuthed,
+  installCommand,
+}: {
+  isAuthed: boolean;
+  installCommand: string;
+}) {
+  const QUICKSTART = `# 1. install & boot
+${installCommand}
 
 # 2. connect a tool
 open http://localhost:3000
 
 # 3. point your agent
 export MCP_URL=http://localhost:3000/mcp`;
-
-export function FinalCTA({ isAuthed }: { isAuthed: boolean }) {
   return (
     <section
       id="start"

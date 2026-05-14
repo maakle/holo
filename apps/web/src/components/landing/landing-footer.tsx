@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { HoloLogo } from '@/components/logo';
-import { GithubMark, LinkedinMark, TwitterMark } from '@/components/landing/brand-marks';
+import { GithubMark } from '@/components/landing/brand-marks';
 import type { ReactElement, SVGProps } from 'react';
 
 const GITHUB_URL = 'https://github.com/maakle/holo';
@@ -35,15 +35,6 @@ const FOOTER_GROUPS: { title: string; links: { label: string; href: string }[] }
     ],
   },
   {
-    title: 'Compare',
-    links: [
-      { label: 'vs Glean', href: '#' },
-      { label: 'vs Onyx', href: '#' },
-      { label: 'vs Dust', href: '#' },
-      { label: 'vs PipesHub', href: '#' },
-    ],
-  },
-  {
     title: 'Company',
     links: [
       { label: 'About', href: GITHUB_URL },
@@ -57,16 +48,12 @@ const SOCIALS: {
   Icon: (props: SVGProps<SVGSVGElement>) => ReactElement;
   href: string;
   label: string;
-}[] = [
-  { Icon: GithubMark, href: GITHUB_URL, label: 'GitHub' },
-  { Icon: TwitterMark, href: '#', label: 'Twitter' },
-  { Icon: LinkedinMark, href: '#', label: 'LinkedIn' },
-];
+}[] = [{ Icon: GithubMark, href: GITHUB_URL, label: 'GitHub' }];
 
 export function LandingFooter() {
   return (
     <footer className="bg-bg">
-      <div className="mx-auto grid max-w-[1280px] gap-8 px-8 pb-8 pt-16 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(5,1fr)]">
+      <div className="mx-auto grid max-w-[1280px] gap-8 px-8 pb-8 pt-16 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(4,1fr)]">
         <div>
           <Link href="/" aria-label="holo home" className="text-text">
             <HoloLogo wordmarkClassName="text-[20px]" logoClassName="h-6 w-6" />

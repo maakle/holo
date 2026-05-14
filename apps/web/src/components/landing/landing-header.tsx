@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { ChevronDown } from 'lucide-react';
 import { HoloLogo } from '@/components/logo';
 import { GithubMark } from '@/components/landing/brand-marks';
 
@@ -15,9 +14,9 @@ export function LandingHeader({ isAuthed }: { isAuthed: boolean }) {
         <nav className="hidden gap-6 md:flex">
           <Link
             href="#platform"
-            className="inline-flex items-center gap-1 text-[13px] font-medium text-text-muted transition-colors hover:text-text"
+            className="text-[13px] font-medium text-text-muted transition-colors hover:text-text"
           >
-            Product <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+            Product
           </Link>
           <Link
             href="#connectors"
@@ -47,8 +46,6 @@ export function LandingHeader({ isAuthed }: { isAuthed: boolean }) {
           >
             <GithubMark className="h-3.5 w-3.5" />
             <span className="text-text-muted">Star</span>
-            <span className="h-3.5 w-px bg-border" aria-hidden />
-            <span className="font-mono text-text">2.8k</span>
           </a>
           <Link
             href={isAuthed ? '/dashboard' : '/sign-in'}
