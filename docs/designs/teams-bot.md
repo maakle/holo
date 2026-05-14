@@ -104,6 +104,25 @@ Three big differences worth calling out:
 - **Include reactions in v1.** Because Teams delivers reactions to the
   same endpoint, the RFC-0008 anchor + feedback row write lands at
   launch, not in a follow-up. Saves one round-trip of design churn.
+  Because reactions ship at v1, the final answer card also includes the
+  "React 👍/👎 to rate this answer" nudge — same UX as the Slack bot's
+  `FEEDBACK_PROMPT` block added in commit `5b9e27c`. (Contrast with the
+  Google Chat plan, where the prompt is deferred along with reactions
+  themselves.)
+- **Propagate `teamsAppConfigId` on the job from day 1.** Mirrors the
+  recent Slack refactor in `aab16ce`: the gateway tags each enqueued
+  job with the config row id (UUID for BYO, null for shared) so the
+  worker can pick the matching credentials row for outbound posts.
+  Cheap to bake in now. `teams_installations.tenant_id` is `UNIQUE` so
+  the bug class isn't reachable at v1, but the hint is a
+  forward-compatibility hedge: if we later relax the unique constraint
+  to support a single tenant installed under multiple Holo orgs (e.g.
+  a partner shell scenario), no job-payload migration is needed.
+- **Surface Bot Connector failures via `logError`.** Same pattern the
+  Slack bot adopted on main (`aab16ce`): pass an optional `logError`
+  callback through `finalize.ts` / `progress.ts` / placeholder send so
+  failed POSTs/PUTs to `serviceUrl` show up in worker logs rather than
+  looking like a successful job that never produced a reply.
 - **No Bot Framework SDK dependency.** The `botbuilder` npm packages are
   heavy and pin specific transports we don't need. We do raw HTTP for
   inbound (Hono route) and outbound (`fetch` against `serviceUrl`).
@@ -201,8 +220,18 @@ namespace collision (same pattern as `google-chat/app-*.ts`).
 
 ```ts
 // apps/worker/src/teams-bot/handler.ts
+
+/**
+ * `teamsAppConfigId` mirrors the slack_app_config_id hint introduced for
+ * Slack BYO disambiguation: null = shared Holo bot route, UUID = the
+ * teams_app_configs row id from the per-org BYO route. Required on every
+ * variant from day 1 so the worker never has to guess which bot's
+ * credentials to mint outbound tokens against.
+ */
+type TeamsAppConfigHint = { teamsAppConfigId: string | null };
+
 export type TeamsBotJob =
-  | {
+  | ({
       kind: 'mention';            // Activity{type:'message'} in channel/groupChat with bot mention
       tenantId: string;           // AAD tenant GUID
       activityId: string;         // Activity.id (dedupe key)
@@ -211,8 +240,8 @@ export type TeamsBotJob =
       asker: string;              // from.aadObjectId (or from.id fallback)
       askerName?: string;         // from.name (display)
       text: string;               // textPayload, mention tags stripped
-    }
-  | {
+    } & TeamsAppConfigHint)
+  | ({
       kind: 'dm';                 // personal 1:1
       tenantId: string;
       activityId: string;
@@ -221,8 +250,8 @@ export type TeamsBotJob =
       asker: string;
       askerName?: string;
       text: string;
-    }
-  | {
+    } & TeamsAppConfigHint)
+  | ({
       kind: 'reaction';
       tenantId: string;
       activityId: string;         // the reaction Activity's own id (dedupe)
@@ -234,7 +263,7 @@ export type TeamsBotJob =
       replyToId: string;
       reactionType: string;       // 'like' | 'heart' | 'laugh' | 'surprised' | 'sad' | 'angry'
       removed: boolean;           // true for `reactionsRemoved`, false for `reactionsAdded`
-    };
+    } & TeamsAppConfigHint);
 ```
 
 ### DB additions
@@ -272,8 +301,18 @@ teams_installations (
   // is installed in N tenants" surface.
   tenant_display_name text,
   installed_at timestamptz default now() not null,
-  unique (tenant_id)  // one tenant → exactly one org
+  unique (tenant_id)  // one tenant → exactly one org (see note below)
 );
+// Note: the unique-on-tenant_id constraint is the cheap version of the
+// `aab16ce`/`21a6de6` Slack disambiguation work. Slack's `sources` table
+// is NOT unique on (provider, externalId), so a single Slack workspace
+// can be installed under multiple Holo orgs and resolveWorkspace must
+// join sources ⨝ connector_credentials with a slack_app_config_id
+// filter to route correctly. For Teams we hold the line: one tenant
+// tenants exactly one org. If we ever relax this, the
+// `teamsAppConfigId` hint on TeamsBotJob is already in place — only
+// the `resolveTeamsWorkspace` query needs to change (single LEFT JOIN
+// on teams_installations + teams_app_configs, filter by hint).
 
 teams_event_dedupe (
   tenant_id text not null,
