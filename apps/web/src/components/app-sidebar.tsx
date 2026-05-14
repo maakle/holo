@@ -9,6 +9,7 @@ import {
   Terminal,
   Settings,
   MessageSquare,
+  FolderTree,
   ChevronLeft,
   type LucideIcon,
 } from 'lucide-react';
@@ -44,6 +45,7 @@ function buildSections(): NavSection[] {
     {
       label: 'Agent runtime',
       items: [
+        { href: '/files', label: 'Files', icon: FolderTree },
         { href: '/observability', label: 'Observability', icon: Activity },
         { href: '/connect-agent', label: 'Connect agent', icon: Terminal },
         { href: '/chat', label: 'Chat', icon: MessageSquare },

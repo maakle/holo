@@ -174,22 +174,20 @@ export async function runPathBackfill(
     }
 
     if (updates.length > 0) {
-      // Bulk UPDATE via UNNEST — one round-trip per batch.
-      const ids = updates.map((u) => u.id);
-      const paths = updates.map((u) => u.path);
-      // postgres-js serializes nested arrays as text[] correctly via sql.array.
-      const aclArrays = updates.map((u) => u.aclSubjects);
+      // Bulk UPDATE via jsonb_to_recordset — one round-trip per batch.
+      // UNNEST flattens text[][] to text, so jagged ACL arrays go through
+      // JSON instead, where text[] is a first-class recordset column type.
+      const payload = updates.map((u) => ({
+        id: u.id,
+        path: u.path,
+        acl_subjects: u.aclSubjects,
+      }));
       await sql`
         UPDATE source_artifacts AS sa
         SET path = u.path,
             acl_subjects = u.acl_subjects
-        FROM (
-          SELECT * FROM UNNEST(
-            ${sql.array(ids)}::uuid[],
-            ${sql.array(paths)}::text[],
-            ${aclArrays}::text[][]
-          ) AS t(id, path, acl_subjects)
-        ) AS u
+        FROM jsonb_to_recordset(${sql.json(payload)})
+          AS u(id uuid, path text, acl_subjects text[])
         WHERE sa.id = u.id
       `;
       totalFilled += updates.length;

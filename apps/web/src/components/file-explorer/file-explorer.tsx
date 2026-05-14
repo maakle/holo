@@ -16,8 +16,50 @@ import {
   HashIcon,
   DatabaseIcon,
   ChevronRightIcon,
+  ChevronLeftIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
   HomeIcon,
 } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
+import { Markdown } from '@/components/ui/markdown';
+
+const PAGE_SIZE = 50;
+
+type SortColumn = 'name' | 'source' | 'updatedAt';
+type SortDirection = 'asc' | 'desc';
+interface SortState {
+  column: SortColumn;
+  direction: SortDirection;
+}
+
+function compareEntries(a: DirChild, b: DirChild, sort: SortState): number {
+  const dir = sort.direction === 'asc' ? 1 : -1;
+  if (sort.column === 'name') {
+    return a.name.localeCompare(b.name) * dir;
+  }
+  if (sort.column === 'source') {
+    const av = a.source ?? '';
+    const bv = b.source ?? '';
+    // Fall back to name for equal/empty sources so the tie-break is stable.
+    const primary = av.localeCompare(bv) * dir;
+    return primary !== 0 ? primary : a.name.localeCompare(b.name);
+  }
+  // updatedAt — nulls always sink to the bottom regardless of direction.
+  const at = a.updatedAt ? new Date(a.updatedAt).getTime() : null;
+  const bt = b.updatedAt ? new Date(b.updatedAt).getTime() : null;
+  if (at === null && bt === null) return a.name.localeCompare(b.name);
+  if (at === null) return 1;
+  if (bt === null) return -1;
+  const primary = (at - bt) * dir;
+  return primary !== 0 ? primary : a.name.localeCompare(b.name);
+}
 
 interface DirChild {
   name: string;
@@ -110,8 +152,11 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
   const [entries, setEntries] = useState<DirChild[] | null>(null);
   const [listError, setListError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [sort, setSort] = useState<SortState>({ column: 'name', direction: 'asc' });
 
-  // Detail-pane state — when a file row is clicked, fetch + render.
+  // Viewer state — sheet slides in from the right when a file is clicked.
+  const [viewerOpen, setViewerOpen] = useState(false);
   const [openFile, setOpenFile] = useState<ContentResponse | null>(null);
   const [openLoading, setOpenLoading] = useState(false);
   const [openError, setOpenError] = useState<ApiError | null>(null);
@@ -124,9 +169,8 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
     const ac = new AbortController();
     setLoading(true);
     setListError(null);
-    setOpenFile(null);
-    setOpenError(null);
-    fetch(`/api/files?path=${encodeURIComponent(path)}&limit=500`, {
+    setPage(0);
+    fetch(`/api/files?path=${encodeURIComponent(path)}&limit=1000`, {
       signal: ac.signal,
     })
       .then(async (r) => {
@@ -151,6 +195,36 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
 
   const segments = useMemo(() => pathSegments(path), [path]);
 
+  // Folders always at the top, then files. Within each group apply the
+  // chosen column sort so directory listings stay scannable.
+  const sortedEntries = useMemo(() => {
+    if (!entries) return null;
+    const folders = entries.filter((e) => e.type === 'directory');
+    const files = entries.filter((e) => e.type === 'file');
+    folders.sort((a, b) => compareEntries(a, b, sort));
+    files.sort((a, b) => compareEntries(a, b, sort));
+    return [...folders, ...files];
+  }, [entries, sort]);
+
+  const totalEntries = sortedEntries?.length ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalEntries / PAGE_SIZE));
+  const pageEntries = useMemo(
+    () => sortedEntries?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) ?? [],
+    [sortedEntries, page],
+  );
+
+  const onSortClick = useCallback((column: SortColumn) => {
+    setPage(0);
+    setSort((prev) => {
+      if (prev.column === column) {
+        return { column, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      // First click on a new column picks the more useful default:
+      // names ascend, timestamps descend (newest first).
+      return { column, direction: column === 'updatedAt' ? 'desc' : 'asc' };
+    });
+  }, []);
+
   const navigateTo = useCallback(
     (newPath: string) => {
       const url =
@@ -171,6 +245,7 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
         return;
       }
       const filePath = path === '/' ? `/${entry.name}` : `${path}/${entry.name}`;
+      setViewerOpen(true);
       setOpenLoading(true);
       setOpenError(null);
       setOpenFile(null);
@@ -208,9 +283,9 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
 
       <div className="border border-border rounded-md overflow-hidden">
         <div className="grid grid-cols-[1fr_140px_180px] gap-4 px-4 py-2 text-caption text-text-subtle border-b border-border bg-surface">
-          <div>Name</div>
-          <div>Source</div>
-          <div>Synced</div>
+          <SortHeader label="Name" column="name" sort={sort} onClick={onSortClick} />
+          <SortHeader label="Source" column="source" sort={sort} onClick={onSortClick} />
+          <SortHeader label="Synced" column="updatedAt" sort={sort} onClick={onSortClick} />
         </div>
 
         {loading && (
@@ -235,7 +310,7 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
 
         {!loading && !listError && entries && entries.length > 0 && (
           <ul>
-            {entries.map((entry) => {
+            {pageEntries.map((entry) => {
               const Icon = iconForEntry(entry);
               return (
                 <li
@@ -271,36 +346,128 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
         )}
       </div>
 
-      {(openLoading || openError || openFile) && (
-        <div className="border border-border rounded-md p-4 space-y-2 bg-surface">
-          {openLoading && (
-            <div className="text-body-small text-text-muted">Loading file…</div>
-          )}
-          {openError && (
-            <div className="text-error text-body-small">
-              {openError.problem}
-              {openError.fix && (
-                <div className="text-text-muted mt-1">{openError.fix}</div>
-              )}
-            </div>
-          )}
-          {openFile && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="font-mono text-caption text-text-subtle truncate">
-                  {openFile.path}
-                </div>
-                <div className="text-caption text-text-subtle tabular-nums shrink-0">
-                  {prettySource(openFile.kind)} · {relativeTime(openFile.updatedAt)}
-                </div>
-              </div>
-              <pre className="whitespace-pre-wrap font-mono text-body-small text-text bg-bg p-3 rounded border border-border overflow-x-auto">
-                {openFile.content}
-              </pre>
-            </div>
-          )}
-        </div>
+      {!loading && !listError && totalEntries > PAGE_SIZE && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          totalEntries={totalEntries}
+          pageSize={PAGE_SIZE}
+          onChange={setPage}
+        />
       )}
+
+      <Sheet open={viewerOpen} onOpenChange={setViewerOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle className="font-mono text-[13px] truncate pr-8">
+              {openFile?.path ?? '…'}
+            </SheetTitle>
+            <SheetDescription className="text-caption tabular-nums">
+              {openFile ? (
+                <>
+                  {prettySource(openFile.kind)} · {relativeTime(openFile.updatedAt)}
+                </>
+              ) : (
+                'Loading…'
+              )}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            {openLoading && (
+              <div className="text-body-small text-text-muted">Loading file…</div>
+            )}
+            {openError && (
+              <div className="text-error text-body-small">
+                {openError.problem}
+                {openError.fix && (
+                  <div className="text-text-muted mt-1">{openError.fix}</div>
+                )}
+              </div>
+            )}
+            {openFile && !openLoading && (
+              <div className="text-body text-text">
+                <Markdown text={openFile.content} />
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
+function SortHeader({
+  label,
+  column,
+  sort,
+  onClick,
+}: {
+  label: string;
+  column: SortColumn;
+  sort: SortState;
+  onClick: (column: SortColumn) => void;
+}) {
+  const isActive = sort.column === column;
+  const Arrow = sort.direction === 'asc' ? ChevronUpIcon : ChevronDownIcon;
+  return (
+    <button
+      type="button"
+      className={`inline-flex items-center gap-1 hover:text-text transition-colors ${
+        isActive ? 'text-text' : ''
+      }`}
+      onClick={() => onClick(column)}
+    >
+      <span>{label}</span>
+      {isActive && <Arrow size={12} className="text-text-muted" />}
+    </button>
+  );
+}
+
+function Pagination({
+  page,
+  totalPages,
+  totalEntries,
+  pageSize,
+  onChange,
+}: {
+  page: number;
+  totalPages: number;
+  totalEntries: number;
+  pageSize: number;
+  onChange: (next: number) => void;
+}) {
+  const start = page * pageSize + 1;
+  const end = Math.min((page + 1) * pageSize, totalEntries);
+  return (
+    <div className="flex items-center justify-between text-body-small text-text-muted">
+      <div className="tabular-nums">
+        {start.toLocaleString()}–{end.toLocaleString()} of{' '}
+        {totalEntries.toLocaleString()}
+        {totalEntries >= 1000 && ' (capped)'}
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-muted hover:bg-surface disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+          onClick={() => onChange(Math.max(0, page - 1))}
+          disabled={page === 0}
+        >
+          <ChevronLeftIcon size={14} />
+          Prev
+        </button>
+        <span className="px-2 tabular-nums text-text-subtle">
+          {page + 1} / {totalPages}
+        </span>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-muted hover:bg-surface disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+          onClick={() => onChange(Math.min(totalPages - 1, page + 1))}
+          disabled={page >= totalPages - 1}
+        >
+          Next
+          <ChevronRightIcon size={14} />
+        </button>
+      </div>
     </div>
   );
 }
