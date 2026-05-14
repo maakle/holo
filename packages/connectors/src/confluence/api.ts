@@ -24,11 +24,26 @@ const PAGE_EXPAND = [
  * unix epoch so the `lastModified >=` filter always has a value, and orders
  * ascending so the cursor watermark advances monotonically across pages.
  *
- * CQL `lastModified` uses the format `yyyy-MM-dd HH:mm`. We pass an ISO
- * timestamp through verbatim — Confluence accepts it via CQL's date parser.
+ * CQL only accepts `yyyy-MM-dd` or `yyyy-MM-dd HH:mm` for date literals —
+ * ISO 8601 strings with `T`, milliseconds, or `Z` fail the parser. We
+ * truncate to minute precision in UTC; minute-level overlap is safe because
+ * the filter is `>=` and downstream chunking dedupes by version.
  */
+export function formatCqlTimestamp(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    throw holoError({
+      code: ErrorCode.HOLO_INVALID_INPUT,
+      problem: `Invalid timestamp for CQL: ${iso}`,
+      fix: 'Pass an ISO 8601 string or undefined.',
+    });
+  }
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+}
+
 export function buildPagesCql(since: string | undefined): string {
-  const ts = since ?? '1970-01-01 00:00';
+  const ts = since ? formatCqlTimestamp(since) : '1970-01-01 00:00';
   return `(type = "page" OR type = "blogpost") AND lastModified >= "${ts}" ORDER BY lastModified ASC`;
 }
 

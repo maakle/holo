@@ -317,7 +317,8 @@ describe('Prismic sync — documents', () => {
 
     const searchUrl = seen.find((u) => u.includes('/documents/search'))!;
     expect(searchUrl).toContain('date.after');
-    expect(searchUrl).toContain('2026-04-01');
+    expect(searchUrl).toContain('2026-04-01T00%3A00%3A00Z');
+    expect(searchUrl).not.toMatch(/\.\d+Z/);
     expect(enqueued.length).toBeGreaterThan(0);
   });
 

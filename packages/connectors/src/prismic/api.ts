@@ -118,11 +118,12 @@ export async function* iterateDocuments(
     url.searchParams.set('page', String(page));
     url.searchParams.set('orderings', '[document.last_publication_date desc]');
     if (opts.afterIso) {
-      // Prismic predicate language. The double-bracket form is what the docs
-      // and SDK both emit. ISO8601 in single quotes inside the predicate.
+      // Prismic's date.after only accepts `yyyy-MM-dd` or `yyyy-MM-dd'T'HH:mm:ssZ`
+      // — fractional seconds (e.g. `.495Z` from Date.toISOString()) trigger a 400.
+      const normalized = opts.afterIso.replace(/\.\d+Z$/, 'Z');
       url.searchParams.set(
         'q',
-        `[[date.after(document.last_publication_date, "${opts.afterIso}")]]`,
+        `[[date.after(document.last_publication_date, "${normalized}")]]`,
       );
     }
     const res = await fetchImpl(url.toString(), {

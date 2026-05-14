@@ -137,7 +137,7 @@ describe('createConfluenceSpec', () => {
     await pagesResource.sync(ctx);
     const queried = new URL(calls[0].url);
     const cql = queried.searchParams.get('cql') ?? '';
-    expect(cql).toContain('lastModified >= "2026-05-09T15:22:00.000Z"');
+    expect(cql).toContain('lastModified >= "2026-05-09 15:22"');
     expect(cql).toContain('ORDER BY lastModified ASC');
   });
 
