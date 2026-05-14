@@ -1,4 +1,11 @@
 export type { Chunker, Chunk, ChunkContext, TreeSitterRegistry } from './contract';
+export {
+  computePath,
+  hasPathFn,
+  pathFns,
+  type PathFn,
+  type PathFnInput,
+} from './path-fn';
 export { recursiveSplit } from './recursive-split';
 export { createRegistry, astChunk } from './tree-sitter/index';
 export type { AstChunk } from './tree-sitter/index';

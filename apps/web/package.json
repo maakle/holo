@@ -23,6 +23,7 @@
     "@holo/embedder": "workspace:*",
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",
+    "@holo/holofs": "workspace:*",
     "@holo/llm": "workspace:*",
     "@holo/oauth-provider": "workspace:*",
     "@holo/retrieval-core": "workspace:^",

@@ -19,6 +19,14 @@ export interface SearchInput {
    * at the call site.
    */
   accountId?: string | ReadonlyArray<string>;
+  /**
+   * RFC 0009: restrict results to artifacts whose virtual-FS `path` matches
+   * this prefix. Used by the `bash`/`search` MCP tools when the agent wants
+   * to scope a semantic query to a subtree (e.g. `search "OAuthScope" --path
+   * /github`). When set, search joins `source_artifacts` and adds
+   * `path LIKE $pathPrefix || '%'`. Undefined = no scope.
+   */
+  path?: string;
 }
 
 export interface SearchResult {
@@ -147,6 +155,17 @@ async function searchOnce(
   const accountIds = normalizeAccountIds(input.accountId);
   const accountIdLiteral = accountIds === null ? null : formatUuidArray(accountIds);
 
+  // RFC 0009 path scope. When set, narrow both branches to chunks whose
+  // parent artifact's `path` starts with this prefix. Adds one trailing `/`
+  // to the prefix so `/slack` doesn't match `/slackotron/...` — root `/`
+  // is left bare (matches everything, equivalent to no filter).
+  const pathPrefix = (() => {
+    const raw = input.path;
+    if (!raw) return null;
+    if (raw === '/') return null;
+    return raw.endsWith('/') ? raw : raw + '/';
+  })();
+
   // Verbatim hybrid SQL CTE per spec — RRF constant 60, LIMIT 100 per branch.
   // pgvector accepts vector literals as JSON-style strings cast to vector.
   //
@@ -168,6 +187,11 @@ async function searchOnce(
           AND acl_subjects && ${formatTextArray(input.userSubjects)}::text[]
           AND (${provider}::text IS NULL OR provider = ${provider})
           AND (${accountIdLiteral}::uuid[] IS NULL OR account_id = ANY(${accountIdLiteral}::uuid[]))
+          AND (${pathPrefix}::text IS NULL OR EXISTS (
+            SELECT 1 FROM source_artifacts sa
+            WHERE sa.id = chunks.source_artifact_id
+              AND sa.path LIKE ${pathPrefix}::text || '%'
+          ))
         ORDER BY embedding <=> (SELECT v FROM query_vec)
         LIMIT 100
       ),
@@ -181,6 +205,11 @@ async function searchOnce(
           AND acl_subjects && ${formatTextArray(input.userSubjects)}::text[]
           AND (${provider}::text IS NULL OR provider = ${provider})
           AND (${accountIdLiteral}::uuid[] IS NULL OR account_id = ANY(${accountIdLiteral}::uuid[]))
+          AND (${pathPrefix}::text IS NULL OR EXISTS (
+            SELECT 1 FROM source_artifacts sa
+            WHERE sa.id = chunks.source_artifact_id
+              AND sa.path LIKE ${pathPrefix}::text || '%'
+          ))
         ORDER BY ts_rank(content_tsvector, plainto_tsquery('english', ${input.q})) DESC
         LIMIT 100
       ),

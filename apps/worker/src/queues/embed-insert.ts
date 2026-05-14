@@ -3,6 +3,7 @@ import {
   resolveCustomerAccountsForBatch,
   stripCustomerAccountHints,
 } from '@holo/connectors';
+import { computePath, hasPathFn } from '@holo/chunker';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sql = any;
@@ -53,20 +54,52 @@ export async function insertEmbeddedChunks(
 
   // 1. Upsert source_artifacts. Group chunks by (sourceId, kind, externalId)
   //    so we don't hit the same row repeatedly within one batch.
+  //
+  //    RFC 0009: compute a deterministic virtual-filesystem path per artifact
+  //    from the first chunk's metadata, and denormalize the union of chunk
+  //    acl_subjects onto the artifact row. HoloFs.readdir uses both to
+  //    enforce ACLs without joining chunks.
   const artifactKeys = new Map<
     string,
-    { organizationId: string; sourceId: string; kind: string; externalId: string }
+    {
+      organizationId: string;
+      sourceId: string;
+      kind: string;
+      externalId: string;
+      path: string | null;
+      aclSubjects: Set<string>;
+    }
   >();
   for (const e of embedded) {
     const key = `${e.chunk.sourceId}:${e.chunk.kind}:${e.chunk.sourceArtifactId}`;
-    if (!artifactKeys.has(key)) {
-      artifactKeys.set(key, {
+    let entry = artifactKeys.get(key);
+    if (!entry) {
+      let path: string | null = null;
+      if (hasPathFn(e.chunk.kind)) {
+        try {
+          path = computePath({
+            kind: e.chunk.kind,
+            externalId: e.chunk.sourceArtifactId,
+            metadata: e.chunk.metadata ?? {},
+          });
+        } catch {
+          // Defensive: a malformed metadata payload shouldn't fail the whole
+          // batch. The artifact still upserts with path=NULL; the backfill
+          // job picks it up later.
+          path = null;
+        }
+      }
+      entry = {
         organizationId: e.chunk.organizationId,
         sourceId: e.chunk.sourceId,
         kind: e.chunk.kind,
         externalId: e.chunk.sourceArtifactId,
-      });
+        path,
+        aclSubjects: new Set<string>(),
+      };
+      artifactKeys.set(key, entry);
     }
+    for (const s of e.chunk.aclSubjects ?? []) entry.aclSubjects.add(s);
   }
   const artifactRows = [...artifactKeys.values()].map((a) => ({
     organization_id: a.organizationId,
@@ -74,6 +107,8 @@ export async function insertEmbeddedChunks(
     external_id: a.externalId,
     kind: a.kind,
     payload: JSON.stringify({}),
+    path: a.path,
+    acl_subjects: [...a.aclSubjects],
   }));
   const upserted = await sql<{ id: string; source_id: string; external_id: string }[]>`
     INSERT INTO source_artifacts ${sql(
@@ -83,8 +118,13 @@ export async function insertEmbeddedChunks(
       'external_id',
       'kind',
       'payload',
+      'path',
+      'acl_subjects',
     )}
-    ON CONFLICT (source_id, external_id) DO UPDATE SET fetched_at = NOW()
+    ON CONFLICT (source_id, external_id) DO UPDATE SET
+      fetched_at = NOW(),
+      path = COALESCE(EXCLUDED.path, source_artifacts.path),
+      acl_subjects = EXCLUDED.acl_subjects
     RETURNING id, source_id, external_id
   `;
   const artifactIdByKey = new Map<string, string>();

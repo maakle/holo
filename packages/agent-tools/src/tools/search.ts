@@ -8,6 +8,13 @@ export const searchInputSchema = z.object({
   q: z.string().min(1),
   top_k: z.number().int().min(1).max(50).optional().default(10),
   provider: z.enum(['github', 'slack', 'notion', 'grain', 'pylon']).optional(),
+  /**
+   * RFC 0009: scope the search to artifacts whose virtual-FS path starts
+   * with this prefix (e.g. `/slack/#pricing` or `/github/acme`). Combine
+   * with grep via the `bash` tool when you want narrow keyword search;
+   * use this when the query is concept-shaped but you know the subtree.
+   */
+  path: z.string().optional(),
 });
 
 export interface SearchToolContext {
@@ -94,6 +101,7 @@ export async function runSearchTool(
     topK: input.top_k,
     provider: input.provider,
     userSubjects: ctx.userSubjects,
+    ...(input.path !== undefined ? { path: input.path } : {}),
   });
 
   const citations = results.map((r, i) => citationToWire(toCitation(r, i + 1)));
