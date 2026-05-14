@@ -65,7 +65,8 @@ settings:
       - message.im
       - app_uninstalled
   interactivity:
-    is_enabled: false
+    is_enabled: true
+    request_url: https://your-gateway-domain.com/slack/interactivity
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false
@@ -155,6 +156,7 @@ this), the gateway exposes two endpoints:
 
 - `POST /slack/events` — Slack pushes `app_mention` and `message.im` events here. Verifies the `X-Slack-Signature` HMAC, dedupes by `event_id`, and enqueues a worker job on the `slack-bot` BullMQ queue.
 - `POST /slack/commands` — Slack hits this for the `/holo` slash command. Same verification + enqueue path, plus an immediate ephemeral "thinking…" ack so Slack's 3-second deadline isn't blown.
+- `POST /slack/interactivity` — Slack hits this when a user clicks an action button on a bot message (today: the "Show sources" button on agent answers). Same HMAC verification; reads the source list from `message.metadata` and replies ephemerally via the per-interaction `response_url`. **Required for the button to work** — without it, Slack shows _"this app is not configured to handle interactive responses"_ on click.
 
 The worker (`apps/worker/src/slack-bot/`) resolves the workspace credentials
 by `team_id`, runs a workspace-scoped search, and posts back via the bot
@@ -162,10 +164,11 @@ token (or the slash command's `response_url`).
 
 ### Pointing Slack at your gateway
 
-For prod, set the Event Subscriptions Request URL and the slash command URL
-to your gateway's public origin (e.g. `https://gateway.holo.dev/slack/events`).
-For local dev, you'll need a tunnel (`cloudflared` or `ngrok`) on top of
-`MCP_PORT` (default `8080`).
+For prod, set the Event Subscriptions, slash command, and Interactivity Request
+URLs to your gateway's public origin — e.g.
+`https://gateway.holobase.dev/slack/{events,commands,interactivity}`. For local
+dev, you'll need a tunnel (`cloudflared` or `ngrok`) on top of `MCP_PORT`
+(default `8080`).
 
 ### Per-workspace ACL
 

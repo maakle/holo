@@ -9,6 +9,14 @@ export interface SlackManifestOptions {
   eventsRequestUrl: string;
   /** Slash-command webhook URL — gateway's `/slack/commands/:orgId`. */
   slashCommandsUrl: string;
+  /**
+   * Interactivity webhook URL — gateway's `/slack/interactivity/:orgId`.
+   * Required for the "Show sources" button on agent answers; without it,
+   * Slack shows "this app is not configured to handle interactive responses"
+   * on click. Optional for back-compat: omitting it keeps interactivity off,
+   * matching pre-button behavior.
+   */
+  interactivityUrl?: string;
   /** Slash command name including the leading slash. Defaults to `/holo`. */
   slashCommand?: string;
 }
@@ -54,7 +62,7 @@ settings:
       - app_mention
       - message.im
   interactivity:
-    is_enabled: false
+    is_enabled: ${opts.interactivityUrl ? 'true' : 'false'}${opts.interactivityUrl ? `\n    request_url: ${opts.interactivityUrl}` : ''}
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false

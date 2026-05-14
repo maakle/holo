@@ -77,6 +77,33 @@ export function buildCitationUrl(result: SearchResult): string | undefined {
   if (provider === 'pylon' && typeof m['issue_number'] === 'number') {
     return `https://app.usepylon.com/issues?issueNumber=${m['issue_number']}`;
   }
+  if (provider === 'google-chat') {
+    // thread_name is the canonical Google API resource id
+    // ("spaces/AAA/threads/BBB"). Build the user-facing chat URL by
+    // extracting the bare space/thread ids — the URL form Google's web app
+    // uses expects them un-prefixed.
+    const thread = typeof m['thread_name'] === 'string' ? (m['thread_name'] as string) : undefined;
+    const space = typeof m['space_name'] === 'string' ? (m['space_name'] as string) : undefined;
+    const match = thread?.match(/^spaces\/([^/]+)\/threads\/([^/]+)$/);
+    if (match) return `https://mail.google.com/chat/u/0/#chat/space/${match[1]}/thread/${match[2]}`;
+    if (space?.startsWith('spaces/')) return `https://mail.google.com/chat/u/0/#chat/space/${space.slice('spaces/'.length)}`;
+  }
+  if (provider === 'prismic') {
+    const repo = typeof m['prismic_repo'] === 'string' ? (m['prismic_repo'] as string) : undefined;
+    const docId = typeof m['prismic_document_id'] === 'string' ? (m['prismic_document_id'] as string) : undefined;
+    if (repo && docId) return `https://${repo}.prismic.io/documents/${docId}/`;
+  }
+  if (provider === 'stripe') {
+    const id = typeof m['record_id'] === 'string' ? (m['record_id'] as string) : undefined;
+    const type = typeof m['record_type'] === 'string' ? (m['record_type'] as string) : undefined;
+    if (id && type) {
+      // Charges live under /payments in the Stripe dashboard; other record
+      // types use the pluralised type as the path segment.
+      const segment = type === 'charge' ? 'payments' : `${type}s`;
+      const prefix = m['livemode'] === false ? 'test/' : '';
+      return `https://dashboard.stripe.com/${prefix}${segment}/${id}`;
+    }
+  }
 
   // Generic fallback: many connectors (jira, linear, asana, confluence,
   // mintlify, zendesk, airtable) already persist a canonical URL on the

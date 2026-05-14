@@ -57,19 +57,21 @@ export default async function CustomSlackAppPage() {
   const oauthRedirectUrl = `${publicOrigin}/api/connectors/slack/callback`;
   const eventsRequestUrl = mcpOrigin ? `${mcpOrigin}/slack/events/${orgId}` : null;
   const slashCommandsUrl = mcpOrigin ? `${mcpOrigin}/slack/commands/${orgId}` : null;
+  const interactivityUrl = mcpOrigin ? `${mcpOrigin}/slack/interactivity/${orgId}` : null;
 
-  // The manifest needs both gateway URLs. If MCP_PUBLIC_URL is unset we can't
+  // The manifest needs all gateway URLs. If MCP_PUBLIC_URL is unset we can't
   // build a working manifest — fall back to showing the raw URLs and an
   // operator-facing note instead of a half-manifest. Render with a placeholder
   // so the editor can substitute the live display name client-side without
   // re-importing the connectors package into the browser bundle.
   const manifestTemplate =
-    eventsRequestUrl && slashCommandsUrl
+    eventsRequestUrl && slashCommandsUrl && interactivityUrl
       ? buildSlackManifest({
           displayName: DISPLAY_NAME_PLACEHOLDER,
           oauthRedirectUrl,
           eventsRequestUrl,
           slashCommandsUrl,
+          interactivityUrl,
         })
       : null;
 
@@ -97,6 +99,7 @@ export default async function CustomSlackAppPage() {
         oauthRedirectUrl={oauthRedirectUrl}
         eventsRequestUrl={eventsRequestUrl}
         slashCommandsUrl={slashCommandsUrl}
+        interactivityUrl={interactivityUrl}
       />
     </div>
   );

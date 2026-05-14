@@ -18,6 +18,7 @@ export interface SlackAppEditorProps {
   oauthRedirectUrl: string;
   eventsRequestUrl: string | null;
   slashCommandsUrl: string | null;
+  interactivityUrl: string | null;
 }
 
 export function SlackAppEditor({
@@ -28,6 +29,7 @@ export function SlackAppEditor({
   oauthRedirectUrl,
   eventsRequestUrl,
   slashCommandsUrl,
+  interactivityUrl,
 }: SlackAppEditorProps) {
   const [displayName, setDisplayName] = useState(existing?.displayName ?? '');
   const effectiveName = displayName.trim() || 'Holo';
@@ -91,6 +93,7 @@ export function SlackAppEditor({
             <UrlRow label="OAuth redirect URL" value={oauthRedirectUrl} />
             <UrlRow label="Events Request URL" value={eventsRequestUrl} />
             <UrlRow label="Slash commands URL" value={slashCommandsUrl} />
+            <UrlRow label="Interactivity Request URL" value={interactivityUrl} />
           </div>
         </details>
       </section>
