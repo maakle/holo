@@ -34,8 +34,12 @@ export const CONFIG_TABS = [
   'Claude',
   'ChatGPT',
   'Gemini',
-  'Slack',
   'OpenAPI',
   'Custom MCP',
 ] as const;
 export type Tab = (typeof CONFIG_TABS)[number];
+
+export type ConnectMode = 'chat-bot' | 'agent';
+export function modeStorageKey(orgId: string): string {
+  return `holo:connect-mode:${orgId}`;
+}

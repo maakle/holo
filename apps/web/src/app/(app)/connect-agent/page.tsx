@@ -30,8 +30,8 @@ export default async function ConnectAgentPage() {
           Point your agent at holo
         </h1>
         <p className="max-w-2xl text-[15px] leading-6 text-text-muted">
-          holo speaks the Model Context Protocol and a small REST surface. Test the gateway,
-          then wire up your client below.
+          Pick how you want to use holo — as a chat bot in Slack, or as an MCP server for
+          your AI agent.
         </p>
       </header>
       <ConnectAgentBanner initial={initial} />

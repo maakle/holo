@@ -9,7 +9,6 @@ import {
   Terminal,
   Settings,
   MessageSquare,
-  Sparkles,
   ChevronLeft,
   type LucideIcon,
 } from 'lucide-react';
@@ -46,7 +45,6 @@ function buildSections(): NavSection[] {
       label: 'Agent runtime',
       items: [
         { href: '/observability', label: 'Observability', icon: Activity },
-        { href: '/skills', label: 'Skills', icon: Sparkles },
         { href: '/connect-agent', label: 'Connect agent', icon: Terminal },
         { href: '/chat', label: 'Chat', icon: MessageSquare },
       ],
@@ -64,7 +62,7 @@ function buildSettingsItems(eeEnabled: boolean): NavItem[] {
   return [
     { href: '/settings', label: 'General' },
     { href: '/settings/api-keys', label: 'API keys' },
-    { href: '/settings/integrations', label: 'Integrations' },
+    { href: '/settings/integrations', label: 'Customization' },
     { href: '/settings/team', label: 'Team' },
     ...(eeEnabled ? [{ href: '/settings/audit-log', label: 'Audit log' }] : []),
   ];

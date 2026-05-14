@@ -35,12 +35,7 @@ export function SlackSetup() {
   return (
     <div className="space-y-4">
       <div className="space-y-3 rounded-md border border-border bg-surface p-4">
-        <div className="flex items-center gap-2">
-          <span className="rounded bg-warning/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em] text-warning">
-            Beta
-          </span>
-          <span className="text-xs text-text-subtle">Talk to holo from Slack</span>
-        </div>
+        <span className="text-xs text-text-subtle">Talk to holo from Slack</span>
         <p className="text-[13px] leading-6 text-text">
           Mention <InlineCode>@holo</InlineCode> in any channel or DM, or run{' '}
           <InlineCode>/holo</InlineCode>, to retrieve context from your indexed sources. The

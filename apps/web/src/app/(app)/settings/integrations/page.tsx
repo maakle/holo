@@ -33,8 +33,8 @@ export default async function SettingsIntegrationsPage() {
     return (
       <div className="rounded-lg border border-border bg-surface px-4 py-6 text-[13px] text-text-muted">
         {eeEnabled
-          ? 'Only workspace owners can manage integrations.'
-          : 'Integrations are an Enterprise feature.'}
+          ? 'Only workspace owners can manage customization.'
+          : 'Customization is an Enterprise feature.'}
       </div>
     );
   }
@@ -42,7 +42,7 @@ export default async function SettingsIntegrationsPage() {
   return (
     <section className="space-y-3">
       <h2 className="text-[15px] font-medium">
-        Integrations <span className="caption ml-2">Enterprise</span>
+        Customization <span className="caption ml-2">Enterprise</span>
       </h2>
       <a
         href="/ee/integrations/slack-app"
