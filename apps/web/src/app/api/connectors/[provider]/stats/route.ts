@@ -55,6 +55,10 @@ export interface StatsResponse {
     artifactCount: number;
     chunkCount: number;
   };
+  /** Top-level HoloFs directory for this provider (e.g. "/slack"), so the
+   * UI can deep-link the snapshot into the file explorer. Null when nothing
+   * is indexed yet or no artifact has a path. */
+  fileRoot: string | null;
 }
 
 export async function GET(
@@ -143,12 +147,33 @@ export async function GET(
       }))
       .sort((a, b) => b.artifactCount - a.artifactCount);
 
+    // Sample one artifact path to derive the provider's HoloFs root segment.
+    // All path-fns for a given provider share the same first segment
+    // (e.g. every github-* kind starts with /github/), so one row is enough.
+    const sampleRow = await db
+      .select({ path: schema.sourceArtifacts.path })
+      .from(schema.sourceArtifacts)
+      .innerJoin(schema.sources, eq(schema.sources.id, schema.sourceArtifacts.sourceId))
+      .where(
+        and(
+          eq(schema.sourceArtifacts.organizationId, orgId),
+          eq(schema.sources.provider, provider),
+          isNull(schema.sourceArtifacts.deletedAt),
+          sql`${schema.sourceArtifacts.path} IS NOT NULL`,
+        ),
+      )
+      .limit(1);
+    const samplePath = sampleRow[0]?.path ?? null;
+    const firstSeg = samplePath?.split('/').filter(Boolean)[0] ?? null;
+    const fileRoot = firstSeg ? `/${firstSeg}` : null;
+
     const response: StatsResponse = {
       kinds,
       totals: {
         artifactCount: kinds.reduce((acc, k) => acc + k.artifactCount, 0),
         chunkCount: kinds.reduce((acc, k) => acc + k.chunkCount, 0),
       },
+      fileRoot,
     };
     return NextResponse.json(response);
   } catch (e) {

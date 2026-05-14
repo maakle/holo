@@ -110,91 +110,98 @@ export async function insertEmbeddedChunks(
     path: a.path,
     acl_subjects: [...a.aclSubjects],
   }));
-  const upserted = await sql<{ id: string; source_id: string; external_id: string }[]>`
-    INSERT INTO source_artifacts ${sql(
-      artifactRows,
-      'organization_id',
-      'source_id',
-      'external_id',
-      'kind',
-      'payload',
-      'path',
-      'acl_subjects',
-    )}
-    ON CONFLICT (source_id, external_id) DO UPDATE SET
-      fetched_at = NOW(),
-      path = COALESCE(EXCLUDED.path, source_artifacts.path),
-      acl_subjects = EXCLUDED.acl_subjects
-    RETURNING id, source_id, external_id
-  `;
-  const artifactIdByKey = new Map<string, string>();
-  for (const row of upserted) {
-    artifactIdByKey.set(`${row.source_id}:${row.external_id}`, row.id);
-  }
-
-  // 2. Resolve customer_account stamps for every chunk. Connectors emit
-  //    `customer_account_upsert` / `customer_account_hint` keys on metadata;
-  //    the resolver upserts canonical rows (HubSpot company / Salesforce
-  //    account / Pylon account) and looks up references from non-canonical
-  //    chunks (deal, opportunity, ticket). One round-trip per identity kind
-  //    across the whole batch — not per chunk.
-  const accountResolutions = await resolveCustomerAccountsForBatch(
-    sql,
-    embedded.map((e) => ({
-      organizationId: e.chunk.organizationId,
-      metadata: e.chunk.metadata ?? null,
-    })),
-  );
-
-  // 3. Insert chunks with the real source_artifacts UUID + resolved
-  //    account_id. Hint keys are stripped from metadata — they're a
-  //    transport convention, not durable data.
-  const rows = embedded.map((e, i) => {
-    const artifactId = artifactIdByKey.get(`${e.chunk.sourceId}:${e.chunk.sourceArtifactId}`);
-    if (!artifactId) {
-      // Should never happen: every embedded chunk had its key inserted above.
-      throw holoError({
-        code: ErrorCode.HOLO_INTERNAL,
-        problem: `source_artifacts row missing for ${e.chunk.sourceArtifactId} after upsert`,
-        fix: 'This is a worker bug — please report.',
-      });
+  // One transaction wraps the artifact upsert, the customer_account resolves,
+  // and the chunks insert. Before this was three separate auto-commits, which
+  // is how the 2026-05-10 Google Chat / Drive ghost rows happened: 2,014
+  // artifacts upserted, the embed/chunks step failed afterward, and the
+  // half-written rows lingered until the path-backfill exposed them.
+  return sql.begin(async (tx: Sql) => {
+    const upserted = await tx<{ id: string; source_id: string; external_id: string }[]>`
+      INSERT INTO source_artifacts ${tx(
+        artifactRows,
+        'organization_id',
+        'source_id',
+        'external_id',
+        'kind',
+        'payload',
+        'path',
+        'acl_subjects',
+      )}
+      ON CONFLICT (source_id, external_id) DO UPDATE SET
+        fetched_at = NOW(),
+        path = COALESCE(EXCLUDED.path, source_artifacts.path),
+        acl_subjects = EXCLUDED.acl_subjects
+      RETURNING id, source_id, external_id
+    `;
+    const artifactIdByKey = new Map<string, string>();
+    for (const row of upserted) {
+      artifactIdByKey.set(`${row.source_id}:${row.external_id}`, row.id);
     }
-    const cleanedMetadata = stripCustomerAccountHints(e.chunk.metadata ?? {});
-    return {
-      organization_id: e.chunk.organizationId,
-      source_artifact_id: artifactId,
-      source_id: e.chunk.sourceId,
-      provider: e.chunk.provider,
-      kind: e.chunk.kind,
-      content: e.chunk.content,
-      content_hash: e.chunk.contentHash,
-      embedding_model: e.embeddingModel,
-      embedding: toPgVector(e.embedding),
-      acl_subjects: e.chunk.aclSubjects ?? [],
-      metadata: cleanedMetadata,
-      account_id: accountResolutions[i]?.accountId ?? null,
-    };
+
+    // 2. Resolve customer_account stamps for every chunk. Connectors emit
+    //    `customer_account_upsert` / `customer_account_hint` keys on metadata;
+    //    the resolver upserts canonical rows (HubSpot company / Salesforce
+    //    account / Pylon account) and looks up references from non-canonical
+    //    chunks (deal, opportunity, ticket). One round-trip per identity kind
+    //    across the whole batch — not per chunk.
+    const accountResolutions = await resolveCustomerAccountsForBatch(
+      tx,
+      embedded.map((e) => ({
+        organizationId: e.chunk.organizationId,
+        metadata: e.chunk.metadata ?? null,
+      })),
+    );
+
+    // 3. Insert chunks with the real source_artifacts UUID + resolved
+    //    account_id. Hint keys are stripped from metadata — they're a
+    //    transport convention, not durable data.
+    const rows = embedded.map((e, i) => {
+      const artifactId = artifactIdByKey.get(`${e.chunk.sourceId}:${e.chunk.sourceArtifactId}`);
+      if (!artifactId) {
+        // Should never happen: every embedded chunk had its key inserted above.
+        throw holoError({
+          code: ErrorCode.HOLO_INTERNAL,
+          problem: `source_artifacts row missing for ${e.chunk.sourceArtifactId} after upsert`,
+          fix: 'This is a worker bug — please report.',
+        });
+      }
+      const cleanedMetadata = stripCustomerAccountHints(e.chunk.metadata ?? {});
+      return {
+        organization_id: e.chunk.organizationId,
+        source_artifact_id: artifactId,
+        source_id: e.chunk.sourceId,
+        provider: e.chunk.provider,
+        kind: e.chunk.kind,
+        content: e.chunk.content,
+        content_hash: e.chunk.contentHash,
+        embedding_model: e.embeddingModel,
+        embedding: toPgVector(e.embedding),
+        acl_subjects: e.chunk.aclSubjects ?? [],
+        metadata: cleanedMetadata,
+        account_id: accountResolutions[i]?.accountId ?? null,
+      };
+    });
+    const inserted = await tx<{ id: string }[]>`
+      INSERT INTO chunks ${tx(
+        rows,
+        'organization_id',
+        'source_artifact_id',
+        'source_id',
+        'provider',
+        'kind',
+        'content',
+        'content_hash',
+        'embedding_model',
+        'embedding',
+        'acl_subjects',
+        'metadata',
+        'account_id',
+      )}
+      ON CONFLICT (organization_id, content_hash) DO NOTHING
+      RETURNING id
+    `;
+    return inserted.length;
   });
-  const inserted = await sql<{ id: string }[]>`
-    INSERT INTO chunks ${sql(
-      rows,
-      'organization_id',
-      'source_artifact_id',
-      'source_id',
-      'provider',
-      'kind',
-      'content',
-      'content_hash',
-      'embedding_model',
-      'embedding',
-      'acl_subjects',
-      'metadata',
-      'account_id',
-    )}
-    ON CONFLICT (organization_id, content_hash) DO NOTHING
-    RETURNING id
-  `;
-  return inserted.length;
 }
 
 function toPgVector(v: number[]): string {

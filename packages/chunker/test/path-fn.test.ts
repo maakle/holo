@@ -84,6 +84,37 @@ describe('path-fn registry', () => {
     expect(b).toBe('/pylon/tickets/abc-uuid.md');
   });
 
+  it('stripe-* paths use the Stripe object id under per-type folders', () => {
+    expect(
+      computePath({
+        kind: 'stripe-customer',
+        externalId: 'cus_NffrFeUfNV2Hib',
+        metadata: { customer_id: 'cus_NffrFeUfNV2Hib' },
+      }),
+    ).toBe('/stripe/customers/cus_NffrFeUfNV2Hib.md');
+    expect(
+      computePath({
+        kind: 'stripe-subscription',
+        externalId: 'sub_1MowQVLkdIwHu7ix',
+        metadata: {},
+      }),
+    ).toBe('/stripe/subscriptions/sub_1MowQVLkdIwHu7ix.md');
+    expect(
+      computePath({
+        kind: 'stripe-invoice',
+        externalId: 'in_1MtHbELkdIwHu7ix',
+        metadata: {},
+      }),
+    ).toBe('/stripe/invoices/in_1MtHbELkdIwHu7ix.md');
+    expect(
+      computePath({
+        kind: 'stripe-charge',
+        externalId: 'ch_3MmlLrLkdIwHu7ix',
+        metadata: {},
+      }),
+    ).toBe('/stripe/charges/ch_3MmlLrLkdIwHu7ix.md');
+  });
+
   it('is deterministic — same input twice yields the same path', () => {
     const input = {
       kind: 'grain-call',

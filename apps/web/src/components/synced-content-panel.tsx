@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { onSyncTriggered } from '@/lib/sync-events';
 
 type Stats = {
@@ -10,6 +11,7 @@ type Stats = {
     chunkCount: number;
   }>;
   totals: { artifactCount: number; chunkCount: number };
+  fileRoot: string | null;
 };
 
 interface Props {
@@ -75,13 +77,15 @@ export function SyncedContentPanel({ provider }: Props) {
     );
   }
 
+  const href = stats.fileRoot ? `/files${stats.fileRoot}` : null;
+
   // Single-kind connectors get a one-line summary; a 1-row table is dishonest
   // structure. Connectors with 2+ kinds (GitHub, HubSpot) get the full table
   // so each entity type is legible.
   if (stats.kinds.length === 1) {
     const k = stats.kinds[0]!;
-    return (
-      <div className="rounded-md border border-border bg-bg px-4 py-3 [font-variant-numeric:tabular-nums]">
+    const body = (
+      <div className="flex items-center justify-between gap-3">
         <div className="text-[13px] text-text">
           <span className="font-medium">{fmt(k.artifactCount)}</span>{' '}
           <span>{k.label}</span>
@@ -90,12 +94,32 @@ export function SyncedContentPanel({ provider }: Props) {
             · {fmt(k.chunkCount)} {k.chunkCount === 1 ? 'chunk' : 'chunks'} indexed
           </span>
         </div>
+        {href ? (
+          <span className="shrink-0 text-[12px] text-text-muted transition-colors group-hover:text-text">
+            Open in Files →
+          </span>
+        ) : null}
+      </div>
+    );
+    if (href) {
+      return (
+        <Link
+          href={href}
+          className="group block rounded-md border border-border bg-bg px-4 py-3 [font-variant-numeric:tabular-nums] transition-colors hover:border-border-strong"
+        >
+          {body}
+        </Link>
+      );
+    }
+    return (
+      <div className="rounded-md border border-border bg-bg px-4 py-3 [font-variant-numeric:tabular-nums]">
+        {body}
       </div>
     );
   }
 
-  return (
-    <div className="rounded-md border border-border bg-bg [font-variant-numeric:tabular-nums]">
+  const tableEl = (
+    <div className="rounded-md border border-border bg-bg [font-variant-numeric:tabular-nums] transition-colors group-hover/synced:border-border-strong">
       <table className="w-full">
         <thead>
           <tr className="border-b border-border text-left">
@@ -136,5 +160,15 @@ export function SyncedContentPanel({ provider }: Props) {
         </tbody>
       </table>
     </div>
+  );
+
+  if (!href) return tableEl;
+  return (
+    <Link href={href} className="group/synced block">
+      {tableEl}
+      <div className="mt-1.5 text-right text-[12px] text-text-muted transition-colors group-hover/synced:text-text">
+        Open in Files →
+      </div>
+    </Link>
   );
 }

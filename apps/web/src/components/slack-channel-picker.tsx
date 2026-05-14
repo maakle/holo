@@ -57,10 +57,17 @@ export function SlackChannelPicker({ initialSelectedCount, initialDefaultAll }: 
         }
         if (!cancelled) {
           const list = body.channels ?? [];
+          const isDefaultAll = Boolean(body.defaultAll);
           setChannels(list);
           setTeamId(body.teamId ?? null);
-          setDefaultAll(Boolean(body.defaultAll));
-          setSelected(new Set(list.filter((c) => c.selected).map((c) => c.id)));
+          setDefaultAll(isDefaultAll);
+          // In default-all mode the allowlist is empty but every bot-member
+          // channel is syncing — pre-check all so the UI matches reality.
+          setSelected(
+            isDefaultAll
+              ? new Set(list.map((c) => c.id))
+              : new Set(list.filter((c) => c.selected).map((c) => c.id)),
+          );
           setError(null);
         }
       } finally {

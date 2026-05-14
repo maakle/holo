@@ -143,10 +143,22 @@ export const pathFns: Record<string, PathFn> = {
     return `/salesforce/${type}/${name}-${id}.md`;
   },
 
-  'stripe-record': ({ metadata, externalId }) => {
-    const type = slug(metadata.record_type, 'record');
-    const id = String(metadata.record_id ?? externalId);
-    return `/stripe/${type}/${id}.md`;
+  // The Stripe connector emits one artifact kind per record type — see
+  // packages/connectors/src/stripe/chunking.ts (`kind = \`stripe-\${recordType}\``).
+  // Paths use the Stripe object id directly (cus_*, sub_*, in_*, ch_*) which is
+  // globally unique and survives renames.
+  'stripe-customer': ({ metadata, externalId }) => {
+    const id = String(metadata.customer_id ?? externalId);
+    return `/stripe/customers/${id}.md`;
+  },
+  'stripe-subscription': ({ externalId }) => {
+    return `/stripe/subscriptions/${String(externalId)}.md`;
+  },
+  'stripe-invoice': ({ externalId }) => {
+    return `/stripe/invoices/${String(externalId)}.md`;
+  },
+  'stripe-charge': ({ externalId }) => {
+    return `/stripe/charges/${String(externalId)}.md`;
   },
 
   'mintlify-page': ({ metadata, externalId }) => {
