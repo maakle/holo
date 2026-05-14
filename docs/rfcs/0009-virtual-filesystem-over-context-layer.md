@@ -112,42 +112,59 @@ Useful features that fall out of the tree shape, in priority order:
 
 Each step is independently shippable and reversible.
 
-## Benefits
+## Today vs. proposed (at a glance)
 
-### For the agent
+| Dimension | Today | RFC 0009 |
+|---|---|---|
+| **Agent interface** | Flat menu of ~10 source-specific MCP tools (`search`, `get_slack_thread`, `get_pr`, `get_notion_page`, `get_linear_issue`, `get_meeting`, `fetch_document`, `list_recent`, `who_knows_about`) | Five generic filesystem tools (`ls`, `find`, `grep`, `cat`, `search`) + `who_knows_about` |
+| **How agent finds things** | Source-specific ID lookup or single-shot `search` returning top-k | Iterative: `ls` → `grep` → `cat`. Agent picks the right tool per query shape |
+| **Identifier** | Per-source IDs (`thread_ts`, `pr_number`, `notion_page_id`) | Stable virtual path (`/slack/#engineering/2026-05-14/thread-123.md`) |
+| **Storage** | Postgres + pgvector + tsvector + pg_trgm with RRF | **Unchanged.** ADR-0002 stands |
+| **Schema delta** | — | One new column: `files.path` |
+| **Hybrid search (RRF)** | Backs the single `search` tool | Backs the `search` tool. `grep` skips embeddings |
+| **ACL model** | `acl_subjects && $user_subjects` on every query | **Unchanged.** Applied to every FS tool the same way |
+| **New connector cost** | Add a new `get_<source>` MCP tool + chunker | Add a chunker + path convention. **No new MCP tool** |
+| **Scaling ceiling** | ~30 MCP tools (Anthropic/Docker guidance) — already at ~10 | Five forever, regardless of connector count |
+| **User-facing UI** | Connections + observability. No view of synced data | + File-explorer page over the same SQL substrate |
 
-- **Iteration over single-shot.** Agent can `ls`, narrow with `grep`, then `cat` — the multi-step pattern that beat single-retriever RAG in Anthropic's own evaluations. Today's flat `search` returns top-k and stops.
-- **Right tool per query.** Keyword queries (`grep "OAuthScope mismatch"`) skip the embedding model entirely — faster, cheaper, exact. Concept queries (`search "customer complaints about pricing"`) still go through RRF.
-- **Smaller tool surface as Holo grows.** Five generic tools instead of one-getter-per-source. Stays under the ~30-tool ceiling indefinitely as new connectors land.
-- **Same interface across sources.** Agent learns one mental model; Slack/Notion/GitHub/Drive all look like paths. Today every new source ships a new getter the agent has to learn.
+## Advantages
 
-### For Holo's positioning (ADR-0004)
+| Advantage | Why it matters for Holo |
+|---|---|
+| **Tool surface stays small forever** | Five generic tools regardless of connector count. Today's ~10 → unbounded growth as connectors land is capped. Agents stay below the ~30-tool confusion ceiling. |
+| **Iterative retrieval, not single-shot** | Agent can `ls` → `grep` → `cat` and refine. The pattern that beat single-retriever RAG in Anthropic's own Claude Code evals. |
+| **Cheaper named-thing queries** | `grep "OAuthScope"` skips the embedding call entirely. Lower latency, lower token cost, exact match. Mintlify reported sharp cost drops from this. |
+| **Right tool per query shape** | Keyword → `grep`. Concept ("complaints about pricing") → `search`. Structural ("Sarah's messages last week") → `find`. Agent picks; we don't have to. |
+| **Same interface across sources** | Slack, Notion, GitHub, Drive all look like paths. One mental model for the agent — and for the human. |
+| **File-explorer UI for free** | Same SQL substrate powers the dashboard tree. Answers "what has Holo synced?" — an enterprise procurement unblock. |
+| **Per-user ACL fidelity in UI** | The tree shows exactly what the signed-in user (not just the org) can see. Mirrors source-system permissions. |
+| **No storage migration** | ADR-0002 stands. pgvector + tsvector + RRF unchanged. One new column on existing tables. |
+| **Trust + transparency** | Customers see what's synced. Support can debug wrong answers by clicking into the file the agent referenced. |
+| **Bash is the most-pretrained interface** | LLMs are best at the interface they've seen most. We adopt the one with the most training-data coverage. |
+| **Drag-into-chat falls out** | Path string is the handle; agent already knows `cat`. |
+| **Lower new-connector cost** | Add a chunker + path convention. No new MCP tool. |
+| **Engine-swap optionality** | When pgvector hits its ceiling, swap `search`'s backing engine without changing the agent-facing contract. |
+| **Positioning credibility (ADR-0004)** | A shared context layer is more credible when the interface is the one Claude Code / Cursor / Devin already speak. Differentiates from Onyx/Dust/PipesHub's flat APIs. |
 
-- **A shared context layer for many agents** is more credible when the interface is the one agents already understand. Bash-shaped tools have the most pretraining coverage of any interface in existence.
-- **Differentiates from Onyx/Dust/PipesHub**, which all ship flat retrieval APIs. A virtual FS over a shared context layer is a defensible interface choice we can talk about in marketing without lying.
+## Cons and risks
 
-### For the user
+| Con | Severity | Mitigation |
+|---|---|---|
+| **`grep` can burn tokens on broad queries** | Medium — real at scale, per Milvus counter-argument | Paginate, cap results, snippet+path before full `cat`, route fuzzy queries to `search` |
+| **Path stability across renames** | Medium — Slack channel renames, Notion page moves break paths | Keep stable source IDs alongside paths; `redirects` table for moved files |
+| **ACL fidelity in UI is a breach risk** | High if wrong | RLS at DB connection level, per-connector integration tests, audit logging on every list/read |
+| **Deprecation overhead** | Low | Legacy getters stay for ≥2 minor versions; usage telemetry gates removal |
+| **Path-scheme drift across connectors** | Medium — if every chunker picks its own shape, pattern transfer is lost | Conventions locked in this RFC, not per-chunker |
+| **Backfill is a one-time job** | Low | BullMQ job per source, idempotent (paths are deterministic) |
+| **`tsvector` is not true BM25** | Low — already accepted in ADR-0002 | ParadeDB `pg_search` swap path documented |
+| **Agent might over-`grep` instead of `search`** | Medium — efficiency regression on fuzzy queries | Tool descriptions guide selection; track per-tool query counts as a telemetry signal |
+| **Tool-count temptation** | Medium — pressure to add `mv`, `cp`, `chmod` because Unix has them | Holo is read-only over synced data; writes belong with skills (v0.5). Hard line in this RFC |
+| **Binary attachments (images, video)** | Low | Path entries point at `blob_url`; `cat` returns metadata + signed URL, no chunk content |
+| **Two views of the same data drift** | Medium — file-explorer UI and agent FS must stay in sync | Same SQL functions back both; integration tests assert parity |
+| **Open design questions still unresolved** | Low — listed below | Markdown-always for `cat`? Fixed-allowlist `find` filters? Decide before code |
+| **No telemetry on which tools agents actually pick** | Low — currently | Add per-tool call counters at MCP boundary on day one of migration |
 
-- **Transparency.** The file explorer answers "what has Holo actually synced?" without a support ticket. Enterprise procurement unblock.
-- **Trust.** Permission preview shows exactly what the signed-in user (not just the org) can see — mirrors source-system ACLs.
-- **Debugging.** When the agent answers wrong, the user (or support) can navigate the tree, find the file, see whether sync, retrieval, or reasoning failed.
-- **Same model for human and agent.** "Drag this file into chat" works because the human's tree and the agent's `ls` are the same view.
-
-### For the engineering team
-
-- **No storage migration.** Postgres + pgvector stays. ADR-0002 stands. The vector column is unchanged — it's just one of several indexes on the same row.
-- **Lower deprecation risk.** Source-specific getters keep working through the transition; agents migrate when they're ready.
-- **Cheaper hot path.** Many agent queries today force an embedding call we don't need (named-thing lookups). `grep` skips it. Mintlify reported sharp cost drops from the same pattern.
-- **One SQL substrate for agent and UI.** The file explorer doesn't need a new service.
-- **Future-proof against engine swaps.** When pgvector hits its scaling ceiling (ADR-0002 calls out ~50M chunks total), the `search` tool's backing engine can swap to Qdrant or Vespa without changing the agent-facing interface. The path-shaped surface is the stable contract.
-
-## Tradeoffs and risks
-
-- **Token cost on broad `grep`.** Milvus's counter-argument (grep-only retrieval burns tokens at scale) is real. Mitigations: paginate, cap results, expose snippet+path before full `cat`, keep `search` as the right call for fuzzy queries.
-- **Path stability.** If a Slack channel is renamed or a Notion page moved, the path changes. We need stable IDs alongside paths, and a `redirects` table for moved files. Same problem Glean and Notion AI solved; not novel.
-- **ACL fidelity in the UI.** The file explorer must respect *user* ACLs, not just org. A bug here is a serious breach. Hardening: RLS at the DB connection level, integration tests per connector, audit logging on every list/read.
-- **Tool-count temptation.** Five tools is the budget; resist adding `mv`, `cp`, `chmod` etc. just because Unix has them. Holo is read-only over synced data — write tools belong with skills (v0.5), not retrieval.
-- **Path-scheme drift across connectors.** If Slack uses `#channel` and Teams uses something else, the agent loses pattern transfer. Lock conventions in this RFC, not per-chunker.
+**Net call:** advantages compound (tool ceiling + UI + cheaper queries + positioning all share one design). Cons are mostly bounded engineering work, not architectural one-way doors. The highest-stakes risk is ACL fidelity in the file explorer — that's the one place where "ship it and iterate" doesn't apply.
 
 ## Open questions
 
