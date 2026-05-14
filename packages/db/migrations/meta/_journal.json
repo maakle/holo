@@ -323,6 +323,13 @@
       "when": 1780012800000,
       "tag": "0046_allowed_signup_emails",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1780099200000,
+      "tag": "0047_google_chat_app",
+      "breakpoints": true
     }
   ]
 }

@@ -157,6 +157,29 @@ export const slackEventDedupe = pgTable(
   }),
 );
 
+/**
+ * Google Chat retries event POSTs on non-2xx; `message.name`
+ * (`spaces/AAA/messages/BBB`) is the stable per-delivery key. Insert with
+ * ON CONFLICT DO NOTHING + RETURNING for atomic check-and-set, same shape
+ * as `slackEventDedupe`. Rows TTL out via the cleanup worker (24h is
+ * plenty — Google's retry window is shorter than Slack's).
+ */
+export const googleChatEventDedupe = pgTable(
+  'google_chat_event_dedupe',
+  {
+    spaceName: text('space_name').notNull(),
+    messageName: text('message_name').notNull(),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: uniqueIndex('google_chat_event_dedupe_space_message_uniq').on(
+      t.spaceName,
+      t.messageName,
+    ),
+    receivedAtIdx: index('google_chat_event_dedupe_received_at_idx').on(t.receivedAt),
+  }),
+);
+
 export const procedureProposalDecisions = pgTable(
   'procedure_proposal_decisions',
   {

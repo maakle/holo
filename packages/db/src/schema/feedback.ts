@@ -167,3 +167,35 @@ export const slackAnswerIndex = pgTable(
     ),
   }),
 );
+
+/**
+ * Google Chat App equivalent of `slackAnswerIndex`. Anchors a Chat-side
+ * message we posted back to its agent-minted `answer_id`, so a future
+ * reaction (added in a follow-up) can locate the answer and write an
+ * `answer_feedback` row. Resource names are Google's stable identifiers:
+ *   - `space_name` = "spaces/AAAA…"
+ *   - `message_name` = "spaces/AAAA…/messages/BBBB…"
+ */
+export const googleChatAnswerIndex = pgTable(
+  'google_chat_answer_index',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    answerId: uuid('answer_id').notNull(),
+    spaceName: text('space_name').notNull(),
+    messageName: text('message_name').notNull(),
+    question: text('question').notNull(),
+    answer: text('answer').notNull(),
+    sourcesJsonb: jsonb('sources_jsonb').notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    answerIdUniq: uniqueIndex('google_chat_answer_index_answer_id_uniq').on(t.answerId),
+    spaceMessageUniq: uniqueIndex('google_chat_answer_index_space_message_uniq').on(
+      t.spaceName,
+      t.messageName,
+    ),
+  }),
+);

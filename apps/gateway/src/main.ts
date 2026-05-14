@@ -13,6 +13,7 @@ import { createRestRouter, openApiConfig } from './rest/router.js';
 import { mountSlackEvents } from './slack/events.js';
 import { mountSlackCommands } from './slack/commands.js';
 import { mountSlackInteractivity } from './slack/interactivity.js';
+import { mountGoogleChatAppEvents } from './google-chat-app/events.js';
 import { logger } from './logger.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -130,6 +131,16 @@ async function main() {
   mountSlackInteractivity(app, {
     db,
     signingSecret: env.SLACK_CONNECTOR_SIGNING_SECRET,
+  });
+
+  // Google Chat App webhook — public (Google signs requests with a JWT
+  // bearer; verification is in the handler). Same placement as Slack:
+  // mounted before MCP so Chat's POSTs aren't accidentally routed through
+  // the MCP middleware stack.
+  mountGoogleChatAppEvents(app, {
+    db,
+    sharedAudience: env.GOOGLE_CHAT_APP_AUDIENCE,
+    redisUrl: env.REDIS_URL,
   });
 
   mountMcp(app, {
