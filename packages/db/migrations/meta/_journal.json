@@ -365,6 +365,13 @@
       "when": 1780531200000,
       "tag": "0052_source_artifacts_source_url",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1780617600000,
+      "tag": "0053_teams_app",
+      "breakpoints": true
     }
   ]
 }

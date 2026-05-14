@@ -629,6 +629,70 @@ export const googleChatWorkspaces = pgTable(
   }),
 );
 
+/**
+ * EE BYO Microsoft Teams bot — Azure AD app registration per org.
+ * Mirrors `slack_app_configs` and `google_chat_app_configs`. The shared
+ * Holo bot ships in env (`WORKER_TEAMS_BOT_APP_ID` +
+ * `WORKER_TEAMS_BOT_APP_SECRET`); orgs that paste their own here get
+ * routed via `POST /teams-bot/messages/:orgId` instead of the shared
+ * endpoint.
+ */
+export const teamsAppConfigs = pgTable(
+  'teams_app_configs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    /** Microsoft App ID (GUID) — JWT audience for inbound + client_id for outbound token mint. */
+    appId: text('app_id').notNull(),
+    /** Client secret created in Azure Portal → App registrations → Certificates & secrets. */
+    appSecret: encryptedText('app_secret').notNull(),
+    /**
+     * Optional AAD tenant the app is scoped to. Empty for multi-tenant
+     * apps (most common BYO setup). The shared Holo bot is always
+     * multi-tenant.
+     */
+    appTenantId: text('app_tenant_id'),
+    /** Display label shown on the connections page when this app is active. */
+    displayName: text('display_name'),
+    createdByUserId: uuid('created_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgUniq: uniqueIndex('teams_app_configs_org_uniq').on(t.organizationId),
+  }),
+);
+
+/**
+ * Maps an installed Azure AD tenant to a Holo organization. The
+ * connections wizard writes one row per tenant id seen on inbound
+ * activities (or pre-populates via paste). One tenant → exactly one
+ * org for now; see the design doc on relaxing this if a partner-shell
+ * scenario ever needs it.
+ */
+export const teamsInstallations = pgTable(
+  'teams_installations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    /** Azure AD tenant GUID (`channelData.tenant.id` on inbound activities). */
+    tenantId: text('tenant_id').notNull(),
+    /** Best-effort display name of the AAD tenant for admin UI surfacing. */
+    tenantDisplayName: text('tenant_display_name'),
+    installedAt: timestamp('installed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tenantUniq: uniqueIndex('teams_installations_tenant_id_uniq').on(t.tenantId),
+    orgIdx: index('teams_installations_org_idx').on(t.organizationId),
+  }),
+);
+
 // Single-use grant rows that bridge an OAuth callback (which runs on
 // WEB_PUBLIC_URL where the better-auth session cookie isn't readable) to
 // a same-origin /connections/oauth-finalize page on BETTER_AUTH_URL where

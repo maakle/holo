@@ -207,6 +207,37 @@ export type {
   GoogleChatPatchMessageResult,
 } from './google-chat/index';
 export {
+  createTeamsBotApiClient,
+  loadTeamsBotAccessToken,
+  TEAMS_BOT_SCOPE,
+  verifyTeamsJwt,
+  __clearTeamsBotTokenCacheForTests,
+  __clearTeamsJwksCacheForTests,
+} from './teams/index';
+export type {
+  TeamsBotApiClient,
+  TeamsActivity,
+  TeamsActivityType,
+  TeamsConversation,
+  TeamsChannelAccount,
+  TeamsEntity,
+  TeamsChannelData,
+  TeamsMessageReaction,
+  AdaptiveCardV14,
+  AdaptiveCardElement,
+  AdaptiveCardAction,
+  TeamsOutboundActivity,
+  TeamsAttachment,
+  TeamsSendActivityInput,
+  TeamsSendActivityResult,
+  TeamsUpdateActivityInput,
+  TeamsUpdateActivityResult,
+  VerifyTeamsJwtInput,
+  TeamsVerifyResult,
+  TeamsVerifyFailure,
+  TeamsVerifiedClaims,
+} from './teams/index';
+export {
   createMintlifySpec,
   fetchLlmsIndex,
   parseLlmsIndex,
