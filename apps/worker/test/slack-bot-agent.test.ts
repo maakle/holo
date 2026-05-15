@@ -1,23 +1,28 @@
 import { describe, it, expect, vi } from 'vitest';
 import { runAgent } from '../src/slack-bot/agent';
 import type { ToolDefinition } from '@holo/agent-tools';
+import type { LLMClient, LLMRequest, LLMResponse } from '@holo/llm';
 
-function makeFakeAnthropic(responses: Array<{
-  stop_reason: 'end_turn' | 'tool_use';
-  content: Array<
-    | { type: 'text'; text: string }
-    | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
-  >;
-}>) {
-  const queue = [...responses];
-  const create = vi.fn(async () => {
-    const next = queue.shift();
-    if (!next) throw new Error('no more responses queued');
-    return next;
-  });
+// Scripted fake `LLMClient`. Each `complete` call pops the next scripted
+// response; if any are left over at the end of a test, that's a sign the
+// loop terminated earlier than expected (we don't fail on it because some
+// tests intentionally script extra rounds the agent should never reach).
+function scriptedLLM(script: LLMResponse[]): {
+  client: LLMClient;
+  calls: LLMRequest[];
+} {
+  const queue = [...script];
+  const calls: LLMRequest[] = [];
   return {
-    client: { messages: { create } } as unknown as Parameters<typeof runAgent>[0]['client'],
-    create,
+    calls,
+    client: {
+      complete(req) {
+        calls.push({ ...req, messages: req.messages.map((m) => ({ ...m })) });
+        const next = queue.shift();
+        if (!next) throw new Error('scriptedLLM: no more responses queued');
+        return Promise.resolve(next);
+      },
+    },
   };
 }
 
@@ -25,8 +30,8 @@ const fakeDb = {} as Parameters<typeof runAgent>[0]['db'];
 
 describe('runAgent', () => {
   it('returns the assistant text on a single-shot answer with no tool calls', async () => {
-    const { client, create } = makeFakeAnthropic([
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'The deploy uses Vercel.' }] },
+    const { client, calls } = scriptedLLM([
+      { stopReason: 'end_turn', content: [{ type: 'text', text: 'The deploy uses Vercel.' }] },
     ]);
 
     const result = await runAgent({
@@ -34,26 +39,25 @@ describe('runAgent', () => {
       organizationId: 'org-1',
       userSubjects: ['org:org-1'],
       question: 'how do we deploy?',
-      client,
+      llm: client,
       tools: [],
       orgName: 'Acme',
     });
 
     expect(result.answer).toBe('The deploy uses Vercel.');
     expect(result.sources).toEqual([]);
-    expect(create).toHaveBeenCalledTimes(1);
-    const callArgs = create.mock.calls[0][0] as { system: string; messages: unknown[] };
-    expect(callArgs.system).toContain('Acme');
-    expect(callArgs.messages).toEqual([{ role: 'user', content: 'how do we deploy?' }]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.system).toContain('Acme');
+    expect(calls[0]!.messages).toEqual([{ role: 'user', content: 'how do we deploy?' }]);
   });
 
   it('dispatches a tool_use, appends tool_result, and returns final text', async () => {
-    const { client, create } = makeFakeAnthropic([
+    const { client, calls } = scriptedLLM([
       {
-        stop_reason: 'tool_use',
+        stopReason: 'tool_use',
         content: [{ type: 'tool_use', id: 'toolu_1', name: 'search', input: { q: 'deploy', top_k: 10 } }],
       },
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Deploys go through Vercel.' }] },
+      { stopReason: 'end_turn', content: [{ type: 'text', text: 'Deploys go through Vercel.' }] },
     ]);
 
     const searchRun = vi.fn(async () => ({
@@ -81,7 +85,7 @@ describe('runAgent', () => {
       organizationId: 'org-1',
       userSubjects: ['org:org-1'],
       question: 'how do we deploy?',
-      client,
+      llm: client,
       tools,
       orgName: 'Acme',
     });
@@ -90,42 +94,33 @@ describe('runAgent', () => {
     expect(searchRun).toHaveBeenCalledTimes(1);
     expect(searchRun.mock.calls[0][1]).toEqual({ q: 'deploy', top_k: 10 });
 
-    expect(create).toHaveBeenCalledTimes(2);
-    const secondCall = create.mock.calls[1][0] as {
-      messages: Array<{ role: string; content: unknown }>;
-    };
-    const lastMsg = secondCall.messages[secondCall.messages.length - 1];
+    expect(calls).toHaveLength(2);
+    // The second call should carry the tool_result block in the new user turn.
+    const lastMsg = calls[1]!.messages[calls[1]!.messages.length - 1]!;
     expect(lastMsg.role).toBe('user');
     expect(Array.isArray(lastMsg.content)).toBe(true);
-    const toolResult = (lastMsg.content as Array<{ type: string; tool_use_id: string }>)[0];
-    expect(toolResult.type).toBe('tool_result');
-    expect(toolResult.tool_use_id).toBe('toolu_1');
+    const toolResult = (lastMsg.content as Array<{ type: string; toolUseId: string }>)[0];
+    expect(toolResult!.type).toBe('tool_result');
+    expect(toolResult!.toolUseId).toBe('toolu_1');
 
-    const firstCall = create.mock.calls[0][0] as { tools: Array<{ name: string; input_schema: unknown }> };
     // Caller-supplied tools + the synthetic emit_claims terminal tool the
-    // slack runAgent always appends for the RFC-0007 claims protocol.
-    expect(firstCall.tools).toHaveLength(2);
-    expect(firstCall.tools[0].name).toBe('search');
-    expect(firstCall.tools[0].input_schema).toEqual({
-      type: 'object',
-      properties: { q: { type: 'string' } },
-    });
-    expect(firstCall.tools[1].name).toBe('emit_claims');
+    // shared agent loop always appends for the RFC-0007 claims protocol.
+    expect(calls[0]!.tools?.map((t) => t.name)).toEqual(['search', 'emit_claims']);
   });
 
-  it('flattens anyOf union schemas into a merged properties object for Anthropic', async () => {
-    const { client, create } = makeFakeAnthropic([
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] },
+  it('passes input schemas through to the LLM client unmodified (anyOf flattening is the client\'s job)', async () => {
+    // The shared loop forwards `inputSchema` as-is; provider-specific
+    // shape conversion (e.g. flattening anyOf unions for Anthropic) lives
+    // in the LLMClient adapter, not the agent loop. Asserting here keeps
+    // that contract explicit.
+    const { client, calls } = scriptedLLM([
+      { stopReason: 'end_turn', content: [{ type: 'text', text: 'ok' }] },
     ]);
 
-    // Zod unions (e.g. custom tools with branched inputs) produce
-    // { anyOf: [...] } at root. Anthropic rejects both root-level `anyOf`
-    // and missing `type:object`. We flatten.
     const unionSchema = {
       anyOf: [
         { type: 'object', properties: { artifact_id: { type: 'string' } }, required: ['artifact_id'] },
         { type: 'object', properties: { notion_page_id: { type: 'string' } }, required: ['notion_page_id'] },
-        { type: 'object', properties: { repo: { type: 'string' }, github_path: { type: 'string' } }, required: ['repo', 'github_path'] },
       ],
     };
     const tools: ToolDefinition[] = [
@@ -137,31 +132,22 @@ describe('runAgent', () => {
       organizationId: 'org-1',
       userSubjects: ['org:org-1'],
       question: '?',
-      client,
+      llm: client,
       tools,
       orgName: 'Acme',
     });
 
-    const sentTools = (create.mock.calls[0][0] as { tools: Array<{ input_schema: Record<string, unknown> }> }).tools;
-    expect(sentTools[0].input_schema).toEqual({
-      type: 'object',
-      properties: {
-        artifact_id: { type: 'string' },
-        notion_page_id: { type: 'string' },
-        repo: { type: 'string' },
-        github_path: { type: 'string' },
-      },
-    });
+    expect(calls[0]!.tools?.[0]!.inputSchema).toBe(unionSchema);
   });
 
   it('supports multi-hop: search → bash → final answer', async () => {
-    const { client, create } = makeFakeAnthropic([
+    const { client, calls } = scriptedLLM([
       {
-        stop_reason: 'tool_use',
+        stopReason: 'tool_use',
         content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'incident' } }],
       },
       {
-        stop_reason: 'tool_use',
+        stopReason: 'tool_use',
         content: [
           {
             type: 'tool_use',
@@ -171,7 +157,7 @@ describe('runAgent', () => {
           },
         ],
       },
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'The incident was caused by a stale cache.' }] },
+      { stopReason: 'end_turn', content: [{ type: 'text', text: 'The incident was caused by a stale cache.' }] },
     ]);
 
     const searchRun = vi.fn(async () => ({ results: [] }));
@@ -187,7 +173,7 @@ describe('runAgent', () => {
       organizationId: 'org-1',
       userSubjects: ['org:org-1'],
       question: 'what happened in the incident?',
-      client,
+      llm: client,
       tools,
       orgName: 'Acme',
     });
@@ -195,16 +181,16 @@ describe('runAgent', () => {
     expect(result.answer).toBe('The incident was caused by a stale cache.');
     expect(searchRun).toHaveBeenCalledTimes(1);
     expect(bashRun).toHaveBeenCalledTimes(1);
-    expect(create).toHaveBeenCalledTimes(3);
+    expect(calls).toHaveLength(3);
   });
 
-  it('forwards tool runner exceptions as tool_result with is_error: true', async () => {
-    const { client, create } = makeFakeAnthropic([
+  it('forwards tool runner exceptions as tool_result with isError: true', async () => {
+    const { client, calls } = scriptedLLM([
       {
-        stop_reason: 'tool_use',
+        stopReason: 'tool_use',
         content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'x' } }],
       },
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'I could not search.' }] },
+      { stopReason: 'end_turn', content: [{ type: 'text', text: 'I could not search.' }] },
     ]);
 
     const tools: ToolDefinition[] = [
@@ -221,32 +207,30 @@ describe('runAgent', () => {
       organizationId: 'org-1',
       userSubjects: ['org:org-1'],
       question: 'x?',
-      client,
+      llm: client,
       tools,
       orgName: 'Acme',
     });
 
     expect(result.answer).toBe('I could not search.');
-    const secondCallMessages = (create.mock.calls[1][0] as {
-      messages: Array<{ role: string; content: unknown }>;
-    }).messages;
+    const secondCallMessages = calls[1]!.messages;
     const toolResult = (
-      secondCallMessages[secondCallMessages.length - 1].content as Array<{
+      secondCallMessages[secondCallMessages.length - 1]!.content as Array<{
         type: string;
-        is_error?: boolean;
+        isError?: boolean;
         content: string;
       }>
-    )[0];
-    expect(toolResult.is_error).toBe(true);
+    )[0]!;
+    expect(toolResult.isError).toBe(true);
     expect(toolResult.content).toContain('database connection lost');
   });
 
   it('throws AgentRunawayError when tool call count exceeds maxToolCalls', async () => {
     const responses = Array.from({ length: 25 }, (_, i) => ({
-      stop_reason: 'tool_use' as const,
+      stopReason: 'tool_use' as const,
       content: [{ type: 'tool_use' as const, id: `t${i}`, name: 'search', input: { q: 'x' } }],
     }));
-    const { client } = makeFakeAnthropic(responses);
+    const { client } = scriptedLLM(responses);
 
     const tools: ToolDefinition[] = [
       { name: 'search', description: '', inputSchema: {}, run: async () => ({ results: [] }) },
@@ -258,7 +242,7 @@ describe('runAgent', () => {
         organizationId: 'org-1',
         userSubjects: ['org:org-1'],
         question: 'x?',
-        client,
+        llm: client,
         tools,
         orgName: 'Acme',
         maxToolCalls: 3,
@@ -267,9 +251,9 @@ describe('runAgent', () => {
   });
 
   it('throws AgentRunawayError when wall clock budget exceeded', async () => {
-    const { client } = makeFakeAnthropic([
-      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: {} }] },
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'done' }] },
+    const { client } = scriptedLLM([
+      { stopReason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: {} }] },
+      { stopReason: 'end_turn', content: [{ type: 'text', text: 'done' }] },
     ]);
 
     const ticks = [0, 200_000];
@@ -285,7 +269,7 @@ describe('runAgent', () => {
         organizationId: 'org-1',
         userSubjects: ['org:org-1'],
         question: 'x?',
-        client,
+        llm: client,
         tools,
         orgName: 'Acme',
         wallClockMs: 60_000,
@@ -295,14 +279,14 @@ describe('runAgent', () => {
   });
 
   it('builds sources from the search tool\'s citations[] in renumbered order', async () => {
-    // The slack bot mirrors the web orchestrator: search tool output carries
-    // a structured `citations[]` array (1-based, label + url + snippet), and
-    // we collect from THAT — not from `results[]`. Position N in
-    // result.sources corresponds 1:1 with the `[N]` reference the model is
-    // told to emit, so `[1]` in the answer text resolves to sources[0].
-    const { client } = makeFakeAnthropic([
-      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'deploy' } }] },
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Deploys go via Vercel [1][2].' }] },
+    // Search tool output carries a structured `citations[]` array (1-based,
+    // label + url + snippet), and we collect from THAT — not from `results[]`.
+    // Position N in result.sources corresponds 1:1 with the `[N]` reference
+    // the model is told to emit, so `[1]` in the answer text resolves to
+    // sources[0].
+    const { client } = scriptedLLM([
+      { stopReason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'deploy' } }] },
+      { stopReason: 'end_turn', content: [{ type: 'text', text: 'Deploys go via Vercel [1][2].' }] },
     ]);
 
     const tools: ToolDefinition[] = [
@@ -324,7 +308,7 @@ describe('runAgent', () => {
       organizationId: 'org-1',
       userSubjects: ['org:org-1'],
       question: 'how do we deploy?',
-      client,
+      llm: client,
       tools,
       orgName: 'Acme',
     });
@@ -339,13 +323,13 @@ describe('runAgent', () => {
 
   it('renumbers citations across multiple search calls into one monotonic namespace', async () => {
     // Two search calls each return 1-indexed citations starting at 1. The
-    // orchestrator must offset the second call's indices so the model sees
-    // and we render a single [1]..[N] sequence. Otherwise `[2]` in the
-    // answer would ambiguously refer to two different sources.
-    const { client, create } = makeFakeAnthropic([
-      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'a' } }] },
-      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't2', name: 'search', input: { q: 'b' } }] },
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Multi-source answer [1][3].' }] },
+    // shared loop offsets the second call's indices so the model sees and
+    // we render a single [1]..[N] sequence. Otherwise `[2]` in the answer
+    // would ambiguously refer to two different sources.
+    const { client, calls } = scriptedLLM([
+      { stopReason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'a' } }] },
+      { stopReason: 'tool_use', content: [{ type: 'tool_use', id: 't2', name: 'search', input: { q: 'b' } }] },
+      { stopReason: 'end_turn', content: [{ type: 'text', text: 'Multi-source answer [1][3].' }] },
     ]);
 
     let call = 0;
@@ -378,40 +362,41 @@ describe('runAgent', () => {
       organizationId: 'org-1',
       userSubjects: ['org:org-1'],
       question: '?',
-      client,
+      llm: client,
       tools,
       orgName: 'Acme',
     });
 
-    // sources should be in renumbered order: [1]=A, [2]=B, [3]=C
+    // Sources should be in renumbered order: [1]=A, [2]=B, [3]=C
     expect(result.sources.map((s) => s.title)).toEqual(['A.md', 'B.md', 'C.md']);
 
     // The model on the second call should have seen the second batch's
     // citations RENUMBERED to start at index 3 (offset by 2 from the first
     // call), not the raw `1` the tool stub returned.
-    const secondModelCall = create.mock.calls[1][0] as { messages: Array<{ content: unknown }> };
-    const firstToolResult = (secondModelCall.messages.find(
-      (m) => Array.isArray(m.content) && (m.content as Array<{ type: string }>)[0]?.type === 'tool_result',
-    )?.content as Array<{ content: string }>)[0];
-    // Tool result for the FIRST search call should carry indices [1, 2]:
+    const secondModelCall = calls[1]!;
+    const firstToolResultMsg = secondModelCall.messages.find(
+      (m) =>
+        Array.isArray(m.content) &&
+        (m.content as Array<{ type: string }>)[0]?.type === 'tool_result',
+    );
+    const firstToolResult = (firstToolResultMsg!.content as Array<{ content: string }>)[0]!;
     expect(firstToolResult.content).toContain('"index":1');
     expect(firstToolResult.content).toContain('"index":2');
 
-    const thirdModelCall = create.mock.calls[2][0] as { messages: Array<{ content: unknown }> };
+    const thirdModelCall = calls[2]!;
     const secondToolResultMsg = thirdModelCall.messages
       .filter((m) => Array.isArray(m.content))
       .at(-1)!.content as Array<{ content: string }>;
-    // Tool result for the SECOND search call should carry index [3]:
-    expect(secondToolResultMsg[0].content).toContain('"index":3');
+    expect(secondToolResultMsg[0]!.content).toContain('"index":3');
   });
 
   it('omits sources whose citation has no url (label-only fallback)', async () => {
-    // A citation without a `url` field (provider we can\'t deep-link, e.g.
+    // A citation without a `url` field (provider we can't deep-link, e.g.
     // Salesforce today) still belongs in the sources list so `[N]` resolves
     // — just rendered label-only by the blocks layer.
-    const { client } = makeFakeAnthropic([
-      { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: {} }] },
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok [1].' }] },
+    const { client } = scriptedLLM([
+      { stopReason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'search', input: {} }] },
+      { stopReason: 'end_turn', content: [{ type: 'text', text: 'ok [1].' }] },
     ]);
 
     const tools: ToolDefinition[] = [
@@ -431,7 +416,7 @@ describe('runAgent', () => {
       organizationId: 'org-1',
       userSubjects: ['org:org-1'],
       question: '?',
-      client,
+      llm: client,
       tools,
       orgName: 'Acme',
     });
@@ -452,9 +437,9 @@ describe('runAgent', () => {
     // `unverified` and `appendUnverifiedNoteIfNeeded` tacks a "Note: I
     // couldn't verify…" footer onto the answer text — slack's user-visible
     // surrogate for the web's confidence-chip banner.
-    const { client } = makeFakeAnthropic([
+    const { client } = scriptedLLM([
       {
-        stop_reason: 'tool_use',
+        stopReason: 'tool_use',
         content: [
           {
             type: 'tool_use',
@@ -482,7 +467,7 @@ describe('runAgent', () => {
       organizationId: 'org-1',
       userSubjects: ['org:org-1'],
       question: 'what is Acme at?',
-      client,
+      llm: client,
       tools: [],
       orgName: 'Acme',
     });
@@ -491,5 +476,45 @@ describe('runAgent', () => {
     expect(result.claims[0]!.confidence).toBe('unverified');
     expect(result.claims[0]!.reason).toBeDefined();
     expect(result.answer).toContain("Heads up — I couldn't find");
+  });
+
+  it('translates shared-loop events into the legacy slack logEvent signature', async () => {
+    // `agent-runner.ts` consumes `model_call` / `tool_call` / `tool_error`
+    // for both audit (`recordAgentEventForSlack`) and Slack-mrkdwn progress
+    // (`progressTextForEvent`). The slack wrapper adapts the new structured
+    // events at the boundary; verify the legacy shape still arrives.
+    const { client } = scriptedLLM([
+      {
+        stopReason: 'tool_use',
+        content: [{ type: 'tool_use', id: 't1', name: 'search', input: { q: 'x' } }],
+      },
+      { stopReason: 'end_turn', content: [{ type: 'text', text: 'done' }] },
+    ]);
+
+    const events: Array<{ event: string; fields: Record<string, unknown> }> = [];
+    const tools: ToolDefinition[] = [
+      { name: 'search', description: '', inputSchema: {}, run: async () => ({ results: [] }) },
+    ];
+
+    await runAgent({
+      db: fakeDb,
+      organizationId: 'org-1',
+      userSubjects: ['org:org-1'],
+      question: '?',
+      llm: client,
+      tools,
+      orgName: 'Acme',
+      logEvent: (event, fields) => events.push({ event, fields }),
+    });
+
+    const eventKinds = events.map((e) => e.event);
+    expect(eventKinds).toEqual(['model_call', 'tool_call', 'model_call']);
+    const firstModelCall = events[0]!.fields;
+    expect(firstModelCall.callIndex).toBe(1);
+    expect(typeof firstModelCall.model).toBe('string');
+    expect(typeof firstModelCall.durationMs).toBe('number');
+    const toolCall = events[1]!.fields;
+    expect(toolCall.tool).toBe('search');
+    expect(toolCall.input).toEqual({ q: 'x' });
   });
 });

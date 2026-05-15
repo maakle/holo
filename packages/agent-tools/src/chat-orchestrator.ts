@@ -1,31 +1,26 @@
-// Chat orchestrator: runs the agent loop (LLM call -> tool dispatch -> repeat)
-// for the web chat surface. The web route handler stays as a thin transport
-// adapter — request/response shaping, auth, persistence — and delegates the
-// loop here so it can be unit-tested with a fake LLM client.
+// Chat orchestrator: web-chat-specific tool list + system prompt on top of
+// the shared agent loop in `agent-loop.ts`. The web route handler stays as
+// a thin transport adapter — request/response shaping, auth, persistence —
+// and delegates the loop here so it can be unit-tested with a fake LLM
+// client.
 //
-// This module is intentionally separate from the broader `listTools` registry
-// because the interactive chat surface exposes a slimmer, read-only set
-// (search, list_skills, get_skill) with chat-specific input ranges
-// (top_k max 20 vs 50, default 8 vs 10). Sharing the registry would silently
-// shift those bounds.
+// This module is intentionally separate from the broader `listTools`
+// registry because the interactive chat surface exposes a slimmer,
+// read-only set (search, list_connections, list_skills, get_skill) with
+// chat-specific input ranges (top_k max 20 vs 50, default 8 vs 10).
+// Sharing the registry would silently shift those bounds.
 
 import { z } from 'zod';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import { searchWithCoverage } from '@holo/retrieval-core';
 import { parseSkill } from '@holo/skills';
-import type { LLMClient, LLMMessage, LLMStopReason, LLMTool } from '@holo/llm';
+import type { LLMClient, LLMMessage } from '@holo/llm';
 import { citationToWire, toCitation, type WireCitation } from './citations';
 import { coverageToWire, type WireSearchCoverage } from './coverage-wire';
-import { claimToWire, type WireAnswerClaim } from './claims';
-import {
-  CLAIMS_SUFFIX,
-  EMIT_CLAIMS_TOOL_DECL,
-  appendUnverifiedNoteIfNeeded,
-  applyClaimGuardrails,
-  parseEmitClaimsInput,
-} from './claims-protocol';
-import { renumberSearchOutput } from './search-renumber';
+import { type WireAnswerClaim } from './claims';
+import { CLAIMS_SUFFIX } from './claims-protocol';
+import { runAgentLoop, type AgentLoopEvent } from './agent-loop';
 
 export interface ChatToolContext {
   db: DB;
@@ -328,23 +323,12 @@ export const CHAT_TOOLS: ChatLocalTool[] = [
   },
 ];
 
-export type ChatAgentEvent =
-  | { type: 'model_start'; modelCall: number }
-  | { type: 'model_end'; modelCall: number; stopReason: LLMStopReason }
-  | {
-      type: 'tool_start';
-      id: string;
-      name: string;
-      input: Record<string, unknown>;
-    }
-  | {
-      type: 'tool_end';
-      id: string;
-      name: string;
-      output: unknown;
-      isError?: boolean;
-      durationMs: number;
-    };
+/**
+ * Event shape emitted by the agent loop. Re-exported here as
+ * `ChatAgentEvent` so older imports keep compiling; structurally identical
+ * to `AgentLoopEvent` from `./agent-loop`.
+ */
+export type ChatAgentEvent = AgentLoopEvent;
 
 export interface ChatAgentLoopOptions {
   llm: LLMClient;
@@ -414,226 +398,26 @@ export type ChatAgentLoopResult =
  * turns, repeat until the LLM returns end_turn (or a budget is exceeded).
  *
  * Pure with respect to transport — no Next.js, no `cookies()`, no `headers()`.
- * The caller handles persistence and response shaping.
+ * The caller handles persistence and response shaping. The loop body itself
+ * lives in `runAgentLoop` (`./agent-loop`); this wrapper just supplies the
+ * web-chat tool list, system prompt, and budget defaults.
  */
 export async function runChatAgentLoop(
   opts: ChatAgentLoopOptions,
 ): Promise<ChatAgentLoopResult> {
   const tools = opts.tools ?? CHAT_TOOLS;
-  const maxToolCalls = opts.maxToolCalls ?? 12;
-  const wallClockMs = opts.wallClockMs ?? 55_000;
-  const now = opts.now ?? (() => Date.now());
-  const emit = (event: ChatAgentEvent) => {
-    if (!opts.onEvent) return;
-    try {
-      opts.onEvent(event);
-    } catch {
-      // Transport errors must not abort the agent loop.
-    }
-  };
-
-  // Stable per-turn identifier the web client uses to attach feedback to
-  // this specific assistant turn. See `ChatAgentLoopResult` for the contract.
-  const answerId = crypto.randomUUID();
-
-  const toolByName = new Map<string, ChatLocalTool>(tools.map((t) => [t.name, t]));
-  // emit_claims is a terminal "tool" — the model calls it instead of ending
-  // the turn with plain text. We advertise it to the LLM but intercept the
-  // dispatch in the loop below rather than running it through `toolByName`.
-  // Always registered (RFC-0007 is on by default; see claims-protocol.ts).
-  const llmTools: LLMTool[] = [
-    ...tools.map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: t.inputSchema,
-    })),
-    EMIT_CLAIMS_TOOL_DECL,
-  ];
-  const systemPrompt = `${CHAT_SYSTEM_PROMPT}${CLAIMS_SUFFIX}`;
-
-  const messages: LLMMessage[] = [...opts.initialMessages];
-  const traces: ChatToolCallTrace[] = [];
-  // Citations across every `search` tool call in the turn, renumbered to a
-  // single monotonic namespace before being shipped to the LLM. The model
-  // references them as [1], [2], ... in the answer text.
-  const citationsAcc: WireCitation[] = [];
-  const coverageAcc: WireSearchCoverage[] = [];
-  const startedAt = now();
-  let toolCallCount = 0;
-  let modelCalls = 0;
-
-  while (true) {
-    if (now() - startedAt > wallClockMs) {
-      return {
-        kind: 'wall_clock_exceeded',
-        toolCalls: traces,
-        modelCalls,
-        wallClockMs,
-      };
-    }
-
-    modelCalls += 1;
-    emit({ type: 'model_start', modelCall: modelCalls });
-    const response = await opts.llm.complete({
-      model: opts.model,
-      maxTokens: 4096,
-      system: systemPrompt,
-      messages,
-      tools: llmTools,
-    });
-    emit({ type: 'model_end', modelCall: modelCalls, stopReason: response.stopReason });
-
-    messages.push({ role: 'assistant', content: response.content });
-
-    if (response.stopReason !== 'tool_use') {
-      const text = response.content
-        .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-        .map((b) => b.text)
-        .join('\n')
-        .trim();
-      // Bare end_turn fallback: the model returned text without calling
-      // `emit_claims`. We don't get a structured claims envelope, but the
-      // answer text is still useful — return with an empty `claims` array
-      // (RFC-0007 treats this as "no factual claims to verify"). The UI
-      // renders no chips and no banner, same as a conversational answer.
-      return {
-        kind: 'answer',
-        answerId,
-        answer: text,
-        toolCalls: traces,
-        modelCalls,
-        citations: citationsAcc,
-        coverage: coverageAcc,
-        claims: [],
-      };
-    }
-
-    const toolUses = response.content.filter(
-      (b): b is { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> } =>
-        b.type === 'tool_use',
-    );
-
-    // Terminal `emit_claims`. If the model called it (alongside any other
-    // tools in the same turn — which would be a protocol violation, but
-    // tolerated), we honor it: extract the answer + claims, apply the
-    // server-side downgrade and hard-gate, and return. Any other tool
-    // calls in the same response are ignored — the model has signaled
-    // it's done.
-    const emitClaimsUse = toolUses.find((t) => t.name === EMIT_CLAIMS_TOOL_DECL.name);
-    if (emitClaimsUse) {
-      const { answerText, claims } = parseEmitClaimsInput(emitClaimsUse.input);
-      const enforced = applyClaimGuardrails(claims);
-      const finalAnswer = appendUnverifiedNoteIfNeeded(answerText, enforced);
-      return {
-        kind: 'answer',
-        answerId,
-        answer: finalAnswer,
-        toolCalls: traces,
-        modelCalls,
-        citations: citationsAcc,
-        coverage: coverageAcc,
-        claims: enforced.map(claimToWire),
-      };
-    }
-
-    const toolResults = [];
-    for (const use of toolUses) {
-      toolCallCount += 1;
-      if (toolCallCount > maxToolCalls) {
-        return {
-          kind: 'tool_cap_exceeded',
-          toolCalls: traces,
-          modelCalls,
-          maxToolCalls,
-        };
-      }
-      const tool = toolByName.get(use.name);
-      const callStart = now();
-      emit({ type: 'tool_start', id: use.id, name: use.name, input: use.input });
-      if (!tool) {
-        const trace: ChatToolCallTrace = {
-          id: use.id,
-          name: use.name,
-          input: use.input,
-          output: `tool ${use.name} not registered`,
-          isError: true,
-          durationMs: now() - callStart,
-        };
-        traces.push(trace);
-        emit({
-          type: 'tool_end',
-          id: trace.id,
-          name: trace.name,
-          output: trace.output,
-          isError: true,
-          durationMs: trace.durationMs ?? 0,
-        });
-        toolResults.push({
-          type: 'tool_result' as const,
-          toolUseId: use.id,
-          content: trace.output as string,
-          isError: true,
-        });
-        continue;
-      }
-      try {
-        const rawOutput = await tool.run(opts.toolCtx, use.input);
-        // For `search` tool calls, renumber the per-call citation indices
-        // into the turn-global namespace before the output reaches both the
-        // LLM (via JSON.stringify) and the trace consumer. This is the only
-        // tool-name special-case in the loop; it lives here rather than in
-        // the tool because the tool has no view of prior calls in the turn.
-        const output =
-          use.name === 'search' ? renumberSearchOutput(rawOutput, citationsAcc, coverageAcc) : rawOutput;
-        const trace: ChatToolCallTrace = {
-          id: use.id,
-          name: use.name,
-          input: use.input,
-          output,
-          durationMs: now() - callStart,
-        };
-        traces.push(trace);
-        emit({
-          type: 'tool_end',
-          id: trace.id,
-          name: trace.name,
-          output: trace.output,
-          durationMs: trace.durationMs ?? 0,
-        });
-        toolResults.push({
-          type: 'tool_result' as const,
-          toolUseId: use.id,
-          content: JSON.stringify(output),
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        const trace: ChatToolCallTrace = {
-          id: use.id,
-          name: use.name,
-          input: use.input,
-          output: `tool error: ${message}`,
-          isError: true,
-          durationMs: now() - callStart,
-        };
-        traces.push(trace);
-        emit({
-          type: 'tool_end',
-          id: trace.id,
-          name: trace.name,
-          output: trace.output,
-          isError: true,
-          durationMs: trace.durationMs ?? 0,
-        });
-        toolResults.push({
-          type: 'tool_result' as const,
-          toolUseId: use.id,
-          content: `tool error: ${message}`,
-          isError: true,
-        });
-      }
-    }
-
-    messages.push({ role: 'user', content: toolResults });
-  }
+  return runAgentLoop<ChatToolContext>({
+    llm: opts.llm,
+    model: opts.model,
+    systemPrompt: `${CHAT_SYSTEM_PROMPT}${CLAIMS_SUFFIX}`,
+    tools,
+    toolCtx: opts.toolCtx,
+    initialMessages: opts.initialMessages,
+    maxTokens: 4096,
+    maxToolCalls: opts.maxToolCalls ?? 12,
+    wallClockMs: opts.wallClockMs ?? 55_000,
+    ...(opts.now ? { now: opts.now } : {}),
+    ...(opts.onEvent ? { onEvent: opts.onEvent } : {}),
+  });
 }
 

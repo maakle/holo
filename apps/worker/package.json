@@ -11,7 +11,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.92.0",
     "@holo/agent-tools": "workspace:*",
     "@holo/audit": "workspace:*",
     "@holo/chunker": "workspace:*",

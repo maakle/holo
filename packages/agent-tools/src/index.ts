@@ -51,6 +51,16 @@ export {
 } from './chat-orchestrator';
 
 export {
+  runAgentLoop,
+  type AgentLoopEvent,
+  type AgentLoopOptions,
+  type AgentLoopResult,
+  type AgentLoopTool,
+  type AgentLoopToolCall,
+  type AgentLoopToolContext,
+} from './agent-loop';
+
+export {
   claimToWire,
   claimFromWire,
   EMIT_CLAIMS_INPUT_SCHEMA,
