@@ -21,6 +21,7 @@ import { JiraSyncModule } from './jira';
 import { ConfluenceSyncModule } from './confluence';
 import { StripeSyncModule } from './stripe';
 import { SalesforceSyncModule } from './salesforce';
+import { TeamsSyncModule } from './teams';
 import { SyncSchedulerService } from './sync-scheduler.service';
 
 @Module({
@@ -47,6 +48,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
     ConfluenceSyncModule,
     StripeSyncModule,
     SalesforceSyncModule,
+    TeamsSyncModule,
   ],
   providers: [SyncSchedulerService],
 })

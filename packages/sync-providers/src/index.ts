@@ -31,6 +31,7 @@ export const SYNC_PROVIDERS = [
   'confluence',
   'stripe',
   'salesforce',
+  'teams',
 ] as const;
 
 export type SyncProvider = (typeof SYNC_PROVIDERS)[number];
@@ -69,6 +70,7 @@ export const QUEUE_NAMES_BY_PROVIDER = {
   confluence: ['confluence-sync'],
   stripe: ['stripe-sync'],
   salesforce: ['salesforce-sync'],
+  teams: ['teams-sync'],
 } as const satisfies Record<SyncProvider, readonly string[]>;
 
 export type SyncQueueName =

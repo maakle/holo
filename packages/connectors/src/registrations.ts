@@ -40,6 +40,7 @@ import { createWebcrawlSpec, type WebcrawlSpecOptions } from './webcrawl/spec';
 import { createSalesforceSpec, type SalesforceSpecOptions } from './salesforce/spec';
 import { createSlackSpec, type SlackSpecOptions } from './slack/spec';
 import { createStripeSpec } from './stripe/spec';
+import { createTeamsSpec, type TeamsSpecOptions } from './teams/spec';
 import { createZendeskSpec } from './zendesk/spec';
 import { SYNC_INTERVAL_MS_BY_PROVIDER } from './sync-intervals';
 
@@ -54,6 +55,13 @@ export interface ConnectorBootOptions {
   github?: GithubSpecOptions;
   salesforce?: SalesforceSpecOptions;
   webcrawl?: WebcrawlSpecOptions;
+  /**
+   * Microsoft Teams ingestion — reads the bot's Azure AD app
+   * credentials so app-only Graph tokens can be minted at sync time.
+   * Distinct from the bot (`@holo/connectors/teams/app-auth`), which
+   * uses the same App ID + secret for Bot Framework calls.
+   */
+  teams?: TeamsSpecOptions;
 }
 
 /**
@@ -203,6 +211,18 @@ const googleChat: NoOptRegistration = defineConnectorRegistration<ConnectorBootO
   createSpec: () => createGoogleChatSpec(),
 });
 
+const teams: NoOptRegistration = defineConnectorRegistration<ConnectorBootOptions>({
+  providerId: 'teams',
+  syncIntervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.teams,
+  // Auth lives in env (TEAMS_BOT_APP_ID + TEAMS_BOT_APP_SECRET) — the
+  // spec mints Graph tokens at sync time, the framework just shuttles
+  // an empty `accessToken`. Same `none()` shape as mintlify/webcrawl.
+  auth: { kind: 'none' },
+  createSpec(opts): ConnectorSpec {
+    return createTeamsSpec(opts.teams ?? { appId: '', appSecret: '' });
+  },
+});
+
 const asana: NoOptRegistration = defineConnectorRegistration<ConnectorBootOptions>({
   providerId: 'asana',
   syncIntervalMs: SYNC_INTERVAL_MS_BY_PROVIDER.asana,
@@ -269,6 +289,7 @@ export const CONNECTOR_REGISTRATIONS: ReadonlyArray<ConnectorRegistration<Connec
   confluence,
   stripe,
   salesforce,
+  teams,
 ];
 
 /**

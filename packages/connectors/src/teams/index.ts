@@ -32,6 +32,24 @@ export {
   type TeamsGraphClientOptions,
   type GraphChannelMessagesPage,
 } from './graph-api';
+export {
+  createTeamsSpec,
+  type TeamsSpecOptions,
+} from './spec';
+export {
+  runTenantSync,
+  groupThreads,
+  parseStoredCursor,
+  loadResourceMembers,
+  type TeamsCursor,
+  type ResourceCursor,
+  type EmittedThread,
+  type EmittedDeletion,
+  type ResourceEmission,
+  type TenantSyncResult,
+  type GroupedThread,
+  type EmitFn,
+} from './sync';
 export type {
   GraphCollection,
   GraphOrganization,
