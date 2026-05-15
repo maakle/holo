@@ -632,8 +632,8 @@ export const googleChatWorkspaces = pgTable(
 /**
  * EE BYO Microsoft Teams bot — Azure AD app registration per org.
  * Mirrors `slack_app_configs` and `google_chat_app_configs`. The shared
- * Holo bot ships in env (`WORKER_TEAMS_BOT_APP_ID` +
- * `WORKER_TEAMS_BOT_APP_SECRET`); orgs that paste their own here get
+ * Holo bot ships in env (`TEAMS_BOT_APP_ID` +
+ * `TEAMS_BOT_APP_SECRET`); orgs that paste their own here get
  * routed via `POST /teams-bot/messages/:orgId` instead of the shared
  * endpoint.
  */

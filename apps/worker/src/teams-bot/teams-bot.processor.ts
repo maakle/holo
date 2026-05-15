@@ -18,8 +18,8 @@ export class TeamsBotProcessor extends WorkerHost {
     super();
     this.db = createDb(process.env.DATABASE_URL ?? '');
     this.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-    this.sharedAppId = process.env.WORKER_TEAMS_BOT_APP_ID;
-    this.sharedAppSecret = process.env.WORKER_TEAMS_BOT_APP_SECRET;
+    this.sharedAppId = process.env.TEAMS_BOT_APP_ID;
+    this.sharedAppSecret = process.env.TEAMS_BOT_APP_SECRET;
   }
 
   async process(job: Job<TeamsBotJob>): Promise<{ ok: boolean; reason?: string }> {

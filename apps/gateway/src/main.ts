@@ -155,7 +155,7 @@ async function main() {
   // that has its own auth contract.
   mountTeamsBotMessages(app, {
     db,
-    sharedAppId: env.WORKER_TEAMS_BOT_APP_ID,
+    sharedAppId: env.TEAMS_BOT_APP_ID,
     redisUrl: env.REDIS_URL,
   });
 

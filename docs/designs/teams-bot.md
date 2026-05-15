@@ -405,8 +405,8 @@ Each step is a separately reviewable PR.
   https://portal.azure.com → App registrations.
 - Create an Azure Bot resource (or skip if using the legacy Bot Framework
   Portal) pointing at our messaging endpoint URL.
-- Generate a client secret, store in `WORKER_TEAMS_BOT_APP_SECRET`;
-  record the App ID in `WORKER_TEAMS_BOT_APP_ID`.
+- Generate a client secret, store in `TEAMS_BOT_APP_SECRET`;
+  record the App ID in `TEAMS_BOT_APP_ID`.
 - Author the Teams app manifest (`manifest.json`) + 192×192 and 32×32
   PNG icons. Zip them as `holo-bot.zip`.
 - Sideload into our test tenant via Teams Admin Center → Manage apps →

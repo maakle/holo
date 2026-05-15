@@ -65,7 +65,7 @@ export function mountTeamsBotMessages(
   app.post('/teams-bot/messages', async (c) => {
     if (!opts.sharedAppId) {
       logger.warn(
-        'teams-bot messages: WORKER_TEAMS_BOT_APP_ID unset, rejecting',
+        'teams-bot messages: TEAMS_BOT_APP_ID unset, rejecting',
       );
       return c.json({ error: 'teams bot app id not configured' }, 503);
     }
