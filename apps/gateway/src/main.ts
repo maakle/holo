@@ -16,6 +16,7 @@ import { mountSlackInteractivity } from './slack/interactivity.js';
 import { mountGoogleChatAppEvents } from './google-chat-app/events.js';
 import { mountGoogleChatAppHealthz } from './google-chat-app/healthz.js';
 import { mountTeamsBotMessages } from './teams-bot/messages.js';
+import { mountTeamsBotHealthz } from './teams-bot/healthz.js';
 import { logger } from './logger.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -157,6 +158,10 @@ async function main() {
     db,
     sharedAppId: env.TEAMS_BOT_APP_ID,
     redisUrl: env.REDIS_URL,
+  });
+  mountTeamsBotHealthz(app, {
+    appId: env.TEAMS_BOT_APP_ID,
+    appSecret: env.TEAMS_BOT_APP_SECRET,
   });
 
   mountMcp(app, {
