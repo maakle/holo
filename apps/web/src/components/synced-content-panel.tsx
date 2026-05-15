@@ -82,6 +82,12 @@ export function SyncedContentPanel({ provider }: Props) {
   // Single-kind connectors get a one-line summary; a 1-row table is dishonest
   // structure. Connectors with 2+ kinds (GitHub, HubSpot) get the full table
   // so each entity type is legible.
+  //
+  // We deliberately don't surface chunk counts here. Chunks are a retrieval-
+  // substrate detail that doesn't help an operator decide anything from the
+  // connector card — they only matter on /observability when reasoning about
+  // search latency or embedding cost. The "Open in Files →" link tells the
+  // user what they can actually do with this data.
   if (stats.kinds.length === 1) {
     const k = stats.kinds[0]!;
     const body = (
@@ -89,10 +95,6 @@ export function SyncedContentPanel({ provider }: Props) {
         <div className="text-[13px] text-text">
           <span className="font-medium">{fmt(k.artifactCount)}</span>{' '}
           <span>{k.label}</span>
-          <span className="text-text-muted">
-            {' '}
-            · {fmt(k.chunkCount)} {k.chunkCount === 1 ? 'chunk' : 'chunks'} indexed
-          </span>
         </div>
         {href ? (
           <span className="shrink-0 text-[12px] text-text-muted transition-colors group-hover:text-text">
@@ -129,9 +131,6 @@ export function SyncedContentPanel({ provider }: Props) {
             <th className="px-4 py-2.5 text-right text-[12px] font-medium uppercase tracking-[0.06em] text-text-muted">
               Items
             </th>
-            <th className="px-4 py-2.5 text-right text-[12px] font-medium uppercase tracking-[0.06em] text-text-muted">
-              Chunks
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -141,9 +140,6 @@ export function SyncedContentPanel({ provider }: Props) {
               <td className="px-4 py-2.5 text-right text-[13px] text-text">
                 {fmt(k.artifactCount)}
               </td>
-              <td className="px-4 py-2.5 text-right text-[13px] text-text-muted">
-                {fmt(k.chunkCount)}
-              </td>
             </tr>
           ))}
           <tr className="bg-surface-2">
@@ -152,9 +148,6 @@ export function SyncedContentPanel({ provider }: Props) {
             </td>
             <td className="px-4 py-2.5 text-right text-[13px] font-medium text-text">
               {fmt(stats.totals.artifactCount)}
-            </td>
-            <td className="px-4 py-2.5 text-right text-[13px] font-medium text-text">
-              {fmt(stats.totals.chunkCount)}
             </td>
           </tr>
         </tbody>
