@@ -1,22 +1,17 @@
-import { randomUUID } from 'node:crypto';
-import type Anthropic from '@anthropic-ai/sdk';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import type {
   ToolDefinition,
   WireAnswerClaim,
   WireCitation,
-  WireSearchCoverage,
 } from '@holo/agent-tools';
 import {
-  CLAIMS_SUFFIX,
-  EMIT_CLAIMS_TOOL_DECL,
-  appendUnverifiedNoteIfNeeded,
-  applyClaimGuardrails,
-  claimToWire,
-  parseEmitClaimsInput,
-  renumberSearchOutput,
+  runAgentLoop,
+  type AgentLoopEvent,
+  type AgentLoopToolCall,
 } from '@holo/agent-tools';
+import { CLAIMS_SUFFIX } from '@holo/agent-tools';
+import type { LLMClient, LLMStopReason, LLMUsage } from '@holo/llm';
 import { resolveAnthropicAgentModel } from '@holo/llm';
 
 export interface Source {
@@ -53,17 +48,32 @@ export interface AgentResult {
   claims: WireAnswerClaim[];
 }
 
+/**
+ * Legacy event signature kept stable for `agent-runner.ts` consumers
+ * (`recordAgentEventForSlack`, `progressTextForEvent`). The slack bot ran
+ * on the raw Anthropic SDK before sharing the loop with the web chat
+ * surface; downstream audit + Slack-mrkdwn progress text was written
+ * against this shape. We translate the shared loop's structured events
+ * into this form at the wrapper boundary.
+ */
+export type SlackAgentLogEvent = 'model_call' | 'tool_call' | 'tool_error';
+
 export interface RunAgentDeps {
   db: DB;
   organizationId: string;
   userSubjects: string[];
   question: string;
-  /** Injected for tests. In production, instantiate per call from env. */
-  client: Anthropic;
-  /** Injected for tests. In production, call listTools() from @holo/agent-tools. */
+  /** Injected for tests. In production, the agent-runner constructs an
+   * `AnthropicLLMClient` from `ANTHROPIC_API_KEY`. */
+  llm: LLMClient;
+  /** Injected for tests. In production, call `listTools()` from
+   * `@holo/agent-tools`. */
   tools: ToolDefinition[];
   /** Org display name for the system prompt. */
   orgName: string;
+  /** Override the model. Defaults to `resolveAnthropicAgentModel()` so a
+   * deploy can flip Sonnet→Opus via `ANTHROPIC_AGENT_MODEL`. */
+  model?: string;
   /** Defaults to 20. */
   maxToolCalls?: number;
   /** Defaults to 60_000 ms. */
@@ -71,7 +81,7 @@ export interface RunAgentDeps {
   /** Injected for tests; defaults to Date.now. */
   now?: () => number;
   /** Optional trace callback; receives one event per model call and per tool call. */
-  logEvent?: (event: 'model_call' | 'tool_call' | 'tool_error', fields: Record<string, unknown>) => void;
+  logEvent?: (event: SlackAgentLogEvent, fields: Record<string, unknown>) => void;
 }
 
 export class AgentRunawayError extends Error {
@@ -89,18 +99,6 @@ Rules:
 - Keep answers concise and Slack-friendly: use *bold* and _italic_ (Slack mrkdwn), not markdown headers (#) or fenced code blocks unless quoting code. Bullets with \`- \` are fine.
 - If you cannot find an answer, say so directly — do not invent one.
 - Do not list sources at the end of your answer; the system appends them.`;
-
-type AnthropicTool = { name: string; description: string; input_schema: Record<string, unknown> };
-type ContentBlock =
-  | { type: 'text'; text: string }
-  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
-type ToolResultBlock = {
-  type: 'tool_result';
-  tool_use_id: string;
-  content: string;
-  is_error?: boolean;
-};
-type Message = { role: 'user' | 'assistant'; content: unknown };
 
 const META_TOOLS = new Set(['list_skills', 'get_skill', 'execute_skill']);
 
@@ -302,258 +300,169 @@ export async function resolveBashSourceUrls(
   });
 }
 
-// Anthropic's tool API requires `type: "object"` at the root of input_schema
-// AND rejects `anyOf`/`oneOf`/`allOf` at the top level. Zod's z.toJSONSchema
-// emits exactly those for unions and refined objects (e.g. get_skill, or
-// custom tools). Flatten the branches into a merged `properties` map; the
-// tool runner still validates via the original zod schema at runtime.
-function toAnthropicInputSchema(raw: unknown): Record<string, unknown> {
-  const schema = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const branches =
-    (schema['anyOf'] as unknown) ??
-    (schema['oneOf'] as unknown) ??
-    (schema['allOf'] as unknown);
+/**
+ * Convert a single shared-loop event into the legacy slack `logEvent`
+ * shape. Returns null for events that the slack audit + progress paths
+ * never consumed (`model_start`, `tool_start`).
+ */
+function adaptEventForSlack(
+  event: AgentLoopEvent,
+  model: string,
+):
+  | { kind: SlackAgentLogEvent; fields: Record<string, unknown> }
+  | null {
+  if (event.type === 'model_end') {
+    const usage: LLMUsage | undefined = event.usage;
+    return {
+      kind: 'model_call',
+      fields: {
+        callIndex: event.modelCall,
+        model,
+        durationMs: event.durationMs,
+        stopReason: event.stopReason as LLMStopReason,
+        elapsedMs: event.elapsedMs,
+        inputTokens: usage?.inputTokens,
+        outputTokens: usage?.outputTokens,
+        cacheCreationInputTokens: usage?.cacheCreationInputTokens,
+        cacheReadInputTokens: usage?.cacheReadInputTokens,
+      },
+    };
+  }
+  if (event.type === 'tool_end') {
+    if (event.isError) {
+      return {
+        kind: 'tool_error',
+        fields: {
+          tool: event.name,
+          input: event.input,
+          durationMs: event.durationMs,
+          elapsedMs: event.elapsedMs,
+          error: typeof event.output === 'string' ? event.output : String(event.output ?? ''),
+        },
+      };
+    }
+    return {
+      kind: 'tool_call',
+      fields: {
+        tool: event.name,
+        input: event.input,
+        output: event.output,
+        durationMs: event.durationMs,
+        elapsedMs: event.elapsedMs,
+      },
+    };
+  }
+  return null;
+}
 
-  if (Array.isArray(branches)) {
-    const properties: Record<string, unknown> = {};
-    for (const branch of branches) {
-      if (branch && typeof branch === 'object') {
-        const branchProps = (branch as { properties?: Record<string, unknown> }).properties;
-        if (branchProps) Object.assign(properties, branchProps);
+/**
+ * Walk the trace from `runAgentLoop` and accumulate slack-side sources.
+ * Source extraction lives outside the shared loop because it's a
+ * surface-specific concern: the web chat surfaces citations natively and
+ * doesn't need bash-path or artifact extraction, but Slack does.
+ */
+async function buildSlackSources(
+  db: DB,
+  organizationId: string,
+  citations: WireCitation[],
+  toolCalls: AgentLoopToolCall[],
+): Promise<Source[]> {
+  const sources: Source[] = citations.map(citationToSource);
+  const allBashPaths: (Source & { path: string })[] = [];
+  const seenBashPaths = new Set<string>();
+
+  for (const call of toolCalls) {
+    if (call.isError) continue;
+    if (call.name === 'bash') {
+      const script = String(
+        (call.input as { script?: unknown } | null)?.script ?? '',
+      );
+      const stdout = String(
+        (call.output as { stdout?: unknown } | null)?.stdout ?? '',
+      );
+      for (const src of extractBashSourcesWithPath(script, stdout)) {
+        if (seenBashPaths.has(src.path)) continue;
+        seenBashPaths.add(src.path);
+        allBashPaths.push(src);
+      }
+    } else if (call.name !== 'search' && !META_TOOLS.has(call.name)) {
+      const src = artifactToSource(call.name, call.output);
+      if (src && !sources.some((s) => s.url === src.url)) {
+        sources.push(src);
       }
     }
-    const { anyOf: _a, oneOf: _o, allOf: _al, type: _t, properties: _p, ...rest } = schema;
-    return { ...rest, type: 'object', properties };
   }
 
-  if (schema['type'] === 'object') return schema;
-  return { type: 'object', ...schema };
+  // One batched DB lookup for every bash-extracted path, then merge in
+  // url-order. Sources whose row has no stored source_url stay on the
+  // dashboard `/files/<path>` URL — never broken, just less-deep.
+  const resolved = await resolveBashSourceUrls(db, organizationId, allBashPaths);
+  for (const src of resolved) {
+    if (!sources.some((s) => s.url === src.url)) {
+      sources.push(src);
+    }
+  }
+  return sources;
 }
 
 export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
-  // RFC-0008: stable id minted at the top of every run so a slack reply can
-  // be indexed in `slack_answer_index` and a reaction_added event later can
-  // attribute feedback back to this exact turn.
-  const answerId = randomUUID();
-  // RFC-0007: the slack bot uses the same claims protocol as the web chat.
-  // Slack can't render confidence chips, so the user-visible signal is the
-  // "Note: I couldn't verify N claims" footer that `appendUnverifiedNoteIfNeeded`
-  // tacks onto the answer text below — same wording the REST surface uses.
+  // RFC-0007: same claims protocol the web chat uses. Slack can't render
+  // confidence chips, so the user-visible signal is the "Note: I couldn't
+  // verify N claims" footer that `appendUnverifiedNoteIfNeeded` (applied
+  // inside the shared loop) tacks onto the answer text.
   const system = `${SYSTEM_PROMPT_TEMPLATE.replace('{org_name}', deps.orgName)}${CLAIMS_SUFFIX}`;
-  const anthropicTools: AnthropicTool[] = [
-    ...deps.tools.map((t) => ({
-      name: t.name,
-      description: t.description,
-      input_schema: toAnthropicInputSchema(t.inputSchema),
-    })),
-    {
-      name: EMIT_CLAIMS_TOOL_DECL.name,
-      description: EMIT_CLAIMS_TOOL_DECL.description,
-      input_schema: toAnthropicInputSchema(EMIT_CLAIMS_TOOL_DECL.inputSchema),
+  const model = deps.model ?? resolveAnthropicAgentModel();
+  const logEvent = deps.logEvent;
+
+  const result = await runAgentLoop({
+    llm: deps.llm,
+    model,
+    systemPrompt: system,
+    tools: deps.tools,
+    toolCtx: {
+      db: deps.db,
+      organizationId: deps.organizationId,
+      userSubjects: deps.userSubjects,
     },
-  ];
-  const toolByName = new Map(deps.tools.map((t) => [t.name, t]));
-
-  const ctx = {
-    db: deps.db,
-    organizationId: deps.organizationId,
-    userSubjects: deps.userSubjects,
-  };
-
-  const messages: Message[] = [{ role: 'user', content: deps.question }];
-  const maxToolCalls = deps.maxToolCalls ?? 20;
-  let toolCallCount = 0;
-  const wallClockMs = deps.wallClockMs ?? 60_000;
-  const now = deps.now ?? Date.now;
-  const startedAt = now();
-  // Citation accumulator — every `search` tool result gets renumbered into
-  // this monotonic 1..N namespace before reaching the model, so `[N]` in the
-  // final answer text resolves unambiguously to `citationsAcc[N-1]`.
-  const citationsAcc: WireCitation[] = [];
-  const coverageAcc: WireSearchCoverage[] = [];
-  // Supplementary sources from non-search tools (custom tools that emit a
-  // `url` on their output). Not part of the citation namespace; appended
-  // after the numbered list.
-  const artifactSources: Source[] = [];
-  const logEvent = deps.logEvent ?? (() => {});
-  let modelCallCount = 0;
-
-  const buildSources = (): Source[] => [
-    ...citationsAcc.map(citationToSource),
-    ...artifactSources,
-  ];
-
-  while (true) {
-    if (now() - startedAt > wallClockMs) {
-      throw new AgentRunawayError(
-        'wall_clock_cap',
-        `agent exceeded wall clock budget (${wallClockMs}ms)`,
-      );
-    }
-    const modelStart = now();
-    const model = resolveAnthropicAgentModel();
-    const response = (await deps.client.messages.create({
-      model,
-      max_tokens: 4096,
-      system,
-      messages: [...messages] as never,
-      tools: anthropicTools as never,
-    })) as {
-      stop_reason: string;
-      content: ContentBlock[];
-      usage?: {
-        input_tokens?: number;
-        output_tokens?: number;
-        cache_creation_input_tokens?: number;
-        cache_read_input_tokens?: number;
-      };
-    };
-    modelCallCount += 1;
-    logEvent('model_call', {
-      callIndex: modelCallCount,
-      model,
-      durationMs: now() - modelStart,
-      stopReason: response.stop_reason,
-      elapsedMs: now() - startedAt,
-      inputTokens: response.usage?.input_tokens,
-      outputTokens: response.usage?.output_tokens,
-      cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
-      cacheReadInputTokens: response.usage?.cache_read_input_tokens,
-    });
-
-    messages.push({ role: 'assistant', content: response.content });
-
-    if (response.stop_reason !== 'tool_use') {
-      if (response.stop_reason === 'max_tokens') {
-        console.warn(
-          `[runAgent] response truncated by max_tokens for org=${deps.organizationId}`,
-        );
-      }
-      const text = response.content
-        .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-        .map((b) => b.text)
-        .join('\n')
-        .trim();
-      // Bare end_turn fallback (no `emit_claims` call). The answer is still
-      // useful; we just have no structured claims to enforce. Return an
-      // empty `claims` array — slack reply renders normally without the
-      // "couldn't verify" footer.
-      return { answerId, answer: text, sources: buildSources(), claims: [] };
-    }
-
-    const toolUses = response.content.filter(
-      (b): b is { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> } =>
-        b.type === 'tool_use',
-    );
-
-    // Terminal `emit_claims` (RFC-0007). The model calls this instead of
-    // ending with plain text; we apply the same server-side downgrade +
-    // hard-gate as the web orchestrator and append a "couldn't verify"
-    // footer to the answer text when any claim ended up `unverified`.
-    const emitClaimsUse = toolUses.find((t) => t.name === EMIT_CLAIMS_TOOL_DECL.name);
-    if (emitClaimsUse) {
-      const { answerText, claims: rawClaims } = parseEmitClaimsInput(emitClaimsUse.input);
-      const enforced = applyClaimGuardrails(rawClaims);
-      const finalAnswer = appendUnverifiedNoteIfNeeded(answerText, enforced);
-      return {
-        answerId,
-        answer: finalAnswer,
-        sources: buildSources(),
-        claims: enforced.map(claimToWire),
-      };
-    }
-
-    const toolResults: ToolResultBlock[] = [];
-    for (const use of toolUses) {
-      toolCallCount += 1;
-      if (toolCallCount > maxToolCalls) {
-        throw new AgentRunawayError(
-          'tool_call_cap',
-          `agent exceeded max tool calls (${maxToolCalls})`,
-        );
-      }
-      if (now() - startedAt > wallClockMs) {
-        throw new AgentRunawayError(
-          'wall_clock_cap',
-          `agent exceeded wall clock budget (${wallClockMs}ms)`,
-        );
-      }
-      const tool = toolByName.get(use.name);
-      if (!tool) {
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: use.id,
-          content: `tool ${use.name} not registered`,
-          is_error: true,
-        });
-        continue;
-      }
-      const toolStart = now();
-      try {
-        const rawOutput = await tool.run(ctx, use.input);
-        // For `search` tool calls, renumber the per-call citation indices
-        // into the turn-global namespace before the output reaches both the
-        // model (via JSON.stringify) and the source list. Mirrors the web
-        // orchestrator so `[N]` semantics are identical across surfaces.
-        const output =
-          use.name === 'search'
-            ? renumberSearchOutput(rawOutput, citationsAcc, coverageAcc)
-            : rawOutput;
-        logEvent('tool_call', {
-          tool: use.name,
-          input: use.input,
-          output,
-          durationMs: now() - toolStart,
-          elapsedMs: now() - startedAt,
-        });
-        if (use.name === 'bash') {
-          const script = String(
-            (use.input as { script?: unknown } | null)?.script ?? '',
-          );
-          const stdout = String(
-            (output as { stdout?: unknown } | null)?.stdout ?? '',
-          );
-          // Two passes: extract synchronously (cheap regex), then promote
-          // each /files/<path> URL to the real source-system URL via one
-          // batched DB lookup. Sources whose row has no source_url
-          // (sample-data, salesforce without My Domain, custom connectors)
-          // stay on the dashboard URL — never broken, just less-deep.
-          const extracted = extractBashSourcesWithPath(script, stdout);
-          const resolved = await resolveBashSourceUrls(deps.db, deps.organizationId, extracted);
-          for (const src of resolved) {
-            // Dedupe against anything already on the list — repeated
-            // `cat` of the same path across tool calls is common.
-            if (!artifactSources.some((s) => s.url === src.url)) {
-              artifactSources.push(src);
-            }
-          }
-        } else if (use.name !== 'search' && !META_TOOLS.has(use.name)) {
-          const src = artifactToSource(use.name, output);
-          if (src) artifactSources.push(src);
+    initialMessages: [{ role: 'user', content: deps.question }],
+    maxTokens: 4096,
+    maxToolCalls: deps.maxToolCalls ?? 20,
+    wallClockMs: deps.wallClockMs ?? 60_000,
+    ...(deps.now ? { now: deps.now } : {}),
+    ...(logEvent
+      ? {
+          onEvent: (event) => {
+            const adapted = adaptEventForSlack(event, model);
+            if (adapted) logEvent(adapted.kind, adapted.fields);
+          },
         }
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: use.id,
-          content: JSON.stringify(output),
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        logEvent('tool_error', {
-          tool: use.name,
-          input: use.input,
-          durationMs: now() - toolStart,
-          elapsedMs: now() - startedAt,
-          error: message,
-        });
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: use.id,
-          content: `tool error: ${message}`,
-          is_error: true,
-        });
-      }
-    }
+      : {}),
+  });
 
-    messages.push({ role: 'user', content: toolResults });
+  if (result.kind === 'wall_clock_exceeded') {
+    throw new AgentRunawayError(
+      'wall_clock_cap',
+      `agent exceeded wall clock budget (${result.wallClockMs}ms)`,
+    );
   }
+  if (result.kind === 'tool_cap_exceeded') {
+    throw new AgentRunawayError(
+      'tool_call_cap',
+      `agent exceeded max tool calls (${result.maxToolCalls})`,
+    );
+  }
+
+  const sources = await buildSlackSources(
+    deps.db,
+    deps.organizationId,
+    result.citations,
+    result.toolCalls,
+  );
+
+  return {
+    answerId: result.answerId,
+    answer: result.answer,
+    sources,
+    claims: result.claims,
+  };
 }

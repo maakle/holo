@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
-import { AnthropicLLMClient, type LLMMessage } from '@holo/llm';
+import { VercelAILLMClient, type LLMMessage } from '@holo/llm';
 import { getSubjectsForUser } from '@holo/user-subjects';
 import {
   runChatAgentLoop,
@@ -160,7 +160,7 @@ export async function POST(req: Request) {
         };
 
         const result = await runChatAgentLoop({
-          llm: new AnthropicLLMClient({ apiKey: env.ANTHROPIC_API_KEY! }),
+          llm: new VercelAILLMClient({ apiKey: env.ANTHROPIC_API_KEY! }),
           model: CHAT_MODEL_ID,
           toolCtx,
           initialMessages,

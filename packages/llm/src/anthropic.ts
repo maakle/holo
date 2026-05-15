@@ -7,6 +7,7 @@ import type {
   LLMResponse,
   LLMStopReason,
 } from './index';
+import { flattenForAnthropic } from './schema';
 
 type AnthropicContentParam =
   | { type: 'text'; text: string }
@@ -67,7 +68,7 @@ export class AnthropicLLMClient implements LLMClient {
             tools: req.tools.map((t) => ({
               name: t.name,
               description: t.description,
-              input_schema: t.inputSchema,
+              input_schema: flattenForAnthropic(t.inputSchema),
             })) as never,
           }
         : {}),
@@ -88,9 +89,27 @@ export class AnthropicLLMClient implements LLMClient {
         };
       });
 
+    const usage = response.usage
+      ? {
+          ...(typeof response.usage.input_tokens === 'number'
+            ? { inputTokens: response.usage.input_tokens }
+            : {}),
+          ...(typeof response.usage.output_tokens === 'number'
+            ? { outputTokens: response.usage.output_tokens }
+            : {}),
+          ...(typeof response.usage.cache_creation_input_tokens === 'number'
+            ? { cacheCreationInputTokens: response.usage.cache_creation_input_tokens }
+            : {}),
+          ...(typeof response.usage.cache_read_input_tokens === 'number'
+            ? { cacheReadInputTokens: response.usage.cache_read_input_tokens }
+            : {}),
+        }
+      : undefined;
+
     return {
       stopReason: mapStopReason(response.stop_reason),
       content,
+      ...(usage ? { usage } : {}),
     };
   }
 }

@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { AnthropicLLMClient } from '@holo/llm';
 import { type DB } from '@holo/db';
 import { listTools } from '@holo/agent-tools';
 import { holoError, ErrorCode } from '@holo/errors';
@@ -48,14 +48,14 @@ export function makeDefaultAgentRunner(deps: {
       toolNames: tools.map((t) => t.name),
       questionPreview: input.question.slice(0, 120),
     });
-    const anthropicClient = new Anthropic({ apiKey: deps.anthropicApiKey });
+    const llm = new AnthropicLLMClient({ apiKey: deps.anthropicApiKey });
     const startedAt = Date.now();
     const result = await runAgent({
       db: input.db,
       organizationId: input.organizationId,
       userSubjects: input.userSubjects,
       question: input.question,
-      client: anthropicClient,
+      llm,
       tools,
       orgName,
       wallClockMs: 180_000,
