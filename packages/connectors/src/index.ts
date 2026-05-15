@@ -208,14 +208,27 @@ export type {
 } from './google-chat/index';
 export {
   createTeamsBotApiClient,
+  createTeamsGraphClient,
   loadTeamsBotAccessToken,
   TEAMS_BOT_SCOPE,
+  TEAMS_GRAPH_SCOPE,
   verifyTeamsJwt,
   __clearTeamsBotTokenCacheForTests,
   __clearTeamsJwksCacheForTests,
 } from './teams/index';
 export type {
   TeamsBotApiClient,
+  TeamsGraphClient,
+  TeamsGraphClientOptions,
+  GraphChannelMessagesPage,
+  GraphCollection,
+  GraphOrganization,
+  GraphTeam,
+  GraphChannel,
+  GraphChat,
+  GraphChatMessage,
+  GraphUser,
+  GraphConversationMember,
   TeamsActivity,
   TeamsActivityType,
   TeamsConversation,
