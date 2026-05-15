@@ -2,8 +2,9 @@
 import { useState } from 'react';
 import { SlackSetup } from './slack';
 import { GoogleChatSetup } from './google-chat';
+import { TeamsSetup } from './teams';
 
-type Surface = 'slack' | 'google-chat';
+type Surface = 'slack' | 'google-chat' | 'teams';
 
 export function ChatBotSetup() {
   const [surface, setSurface] = useState<Surface>('slack');
@@ -20,11 +21,14 @@ export function ChatBotSetup() {
         >
           Google Chat
         </SurfaceTab>
-        <ComingSoonChip label="Microsoft Teams" />
+        <SurfaceTab active={surface === 'teams'} onClick={() => setSurface('teams')}>
+          Microsoft Teams
+        </SurfaceTab>
       </div>
 
       {surface === 'slack' && <SlackSetup />}
       {surface === 'google-chat' && <GoogleChatSetup />}
+      {surface === 'teams' && <TeamsSetup />}
     </div>
   );
 }
@@ -49,14 +53,5 @@ function SurfaceTab({
     >
       {children}
     </button>
-  );
-}
-
-function ComingSoonChip({ label }: { label: string }) {
-  return (
-    <span className="ml-auto mb-1 inline-flex items-center gap-1.5 self-center rounded-full border border-border bg-surface-2 px-2.5 py-1 text-[11px] text-text-muted">
-      <span className="inline-flex h-1.5 w-1.5 rounded-full bg-text-subtle" />
-      {label} coming soon
-    </span>
   );
 }
