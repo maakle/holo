@@ -199,3 +199,44 @@ export const googleChatAnswerIndex = pgTable(
     ),
   }),
 );
+
+/**
+ * Microsoft Teams bot reply index — mirrors `slackAnswerIndex` and
+ * `googleChatAnswerIndex`. Each row anchors one bot-authored Activity to
+ * the holo `answer` row that produced it, so a future
+ * `messageReaction` activity (delivered to the same /api/messages
+ * endpoint as messages) can be turned into an `answer_feedback` row via
+ * a single lookup keyed by `replyToId`.
+ *
+ * `serviceUrl` is captured at reply time so the reaction handler can
+ * post proactive follow-ups (e.g. acknowledgement) without re-reading
+ * the originating activity.
+ */
+export const teamsAnswerIndex = pgTable(
+  'teams_answer_index',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    answerId: uuid('answer_id').notNull(),
+    /** Azure AD tenant GUID. */
+    tenantId: text('tenant_id').notNull(),
+    /** Conversation id encodes thread for channels (`19:xxx@thread.tacv2;messageid=yyy`). */
+    conversationId: text('conversation_id').notNull(),
+    /** Activity.id of the bot reply — matches Activity.replyToId on a reaction. */
+    activityId: text('activity_id').notNull(),
+    /** Bot Framework region service URL captured at reply time. */
+    serviceUrl: text('service_url').notNull(),
+    question: text('question').notNull(),
+    answer: text('answer').notNull(),
+    sourcesJsonb: jsonb('sources_jsonb').notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    answerIdUniq: uniqueIndex('teams_answer_index_answer_id_uniq').on(t.answerId),
+    convoActivityUniq: uniqueIndex(
+      'teams_answer_index_conversation_activity_uniq',
+    ).on(t.tenantId, t.conversationId, t.activityId),
+  }),
+);

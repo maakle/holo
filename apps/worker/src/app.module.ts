@@ -31,6 +31,7 @@ import { SyncRunnersModule } from './queues/runners.module';
 import { SlackSubjectsModule } from './slack-subjects/slack-subjects.module';
 import { SlackBotModule } from './slack-bot/slack-bot.module';
 import { GoogleChatBotModule } from './google-chat-bot/google-chat-bot.module';
+import { TeamsBotModule } from './teams-bot/teams-bot.module';
 import { ObservabilityModule } from './observability/observability.module';
 
 
@@ -60,6 +61,7 @@ import { ObservabilityModule } from './observability/observability.module';
     SlackSubjectsModule,
     SlackBotModule,
     GoogleChatBotModule,
+    TeamsBotModule,
     ObservabilityModule,
     GithubCodeSyncModule,
     GithubProseSyncModule,

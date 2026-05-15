@@ -117,6 +117,21 @@ const EnvSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  /**
+   * Shared Holo Microsoft Teams bot — Microsoft App ID (GUID) from the
+   * Azure AD app registration. Used as both the JWT audience for inbound
+   * verification on the shared `/teams-bot/messages` route AND the
+   * client_id for outbound token mint. Optional so unrelated dev
+   * environments don't have to register an Azure bot.
+   */
+  WORKER_TEAMS_BOT_APP_ID: z.string().optional(),
+  /**
+   * Shared Holo Microsoft Teams bot — client secret created in Azure
+   * Portal → App registrations → Certificates & secrets. Paired with
+   * `WORKER_TEAMS_BOT_APP_ID` to mint outbound Bot Connector tokens via
+   * the `client_credentials` grant.
+   */
+  WORKER_TEAMS_BOT_APP_SECRET: z.string().optional(),
 }).refine(
   (env) =>
     env.EMAIL_PROVIDER !== 'resend' ||

@@ -15,6 +15,7 @@ import { mountSlackCommands } from './slack/commands.js';
 import { mountSlackInteractivity } from './slack/interactivity.js';
 import { mountGoogleChatAppEvents } from './google-chat-app/events.js';
 import { mountGoogleChatAppHealthz } from './google-chat-app/healthz.js';
+import { mountTeamsBotMessages } from './teams-bot/messages.js';
 import { logger } from './logger.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -146,6 +147,16 @@ async function main() {
   mountGoogleChatAppHealthz(app, {
     audience: env.GOOGLE_CHAT_APP_PROJECT_NUMBER,
     serviceAccountJson: env.GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON,
+  });
+
+  // Microsoft Teams bot endpoint — public (Bot Framework signs requests
+  // with a JWT; verification is in the handler). Mounted before MCP for
+  // the same reason as Slack: this is third-party-originated traffic
+  // that has its own auth contract.
+  mountTeamsBotMessages(app, {
+    db,
+    sharedAppId: env.WORKER_TEAMS_BOT_APP_ID,
+    redisUrl: env.REDIS_URL,
   });
 
   mountMcp(app, {

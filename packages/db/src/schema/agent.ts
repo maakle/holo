@@ -180,6 +180,26 @@ export const googleChatEventDedupe = pgTable(
   }),
 );
 
+/**
+ * Dedupe table for Microsoft Teams Bot Framework activities. Activity.id
+ * is stable across Microsoft retries (15s ack deadline → frequent retries
+ * on cold-start latency), so we key on (tenant_id, activity_id) same
+ * shape as Slack's `slack_event_dedupe` and Google Chat's
+ * `google_chat_event_dedupe`.
+ */
+export const teamsEventDedupe = pgTable(
+  'teams_event_dedupe',
+  {
+    tenantId: text('tenant_id').notNull(),
+    activityId: text('activity_id').notNull(),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: uniqueIndex('teams_event_dedupe_tenant_activity_uniq').on(t.tenantId, t.activityId),
+    receivedAtIdx: index('teams_event_dedupe_received_at_idx').on(t.receivedAt),
+  }),
+);
+
 export const procedureProposalDecisions = pgTable(
   'procedure_proposal_decisions',
   {
