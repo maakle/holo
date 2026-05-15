@@ -151,6 +151,39 @@ Teams ─POST(JWT)─▶ /teams-bot/messages       (apps/gateway)
 
 ## Operator runbook
 
+### Upgrading from bot-only to bot + ingestion
+
+The bot manifest now declares five Resource-Specific Consent (RSC)
+permissions so a future ingestion connector can read channel and chat
+messages from resources the bot is installed in. **Existing customer
+tenants must re-sideload** the updated `holo-bot.zip` for Microsoft to
+grant the new permissions; the bot itself keeps working unchanged in
+the meantime, but ingestion won't be able to read messages until the
+re-consent lands.
+
+The re-sideload flow:
+
+1. Customer admin opens the dashboard → **Connect** → **Microsoft
+   Teams** → **Download holo-bot.zip**. The zip's manifest version
+   auto-bumps so Teams treats it as an in-place update.
+2. **Teams Admin Center** → **Manage apps** → search for the existing
+   holo app → **Upload** new version.
+3. Teams renders a consent prompt listing the new RSC permissions
+   (`ChannelMessage.Read.Group`, `ChatMessage.Read.Chat`,
+   `TeamSettings.Read.Group`, `TeamMember.Read.Group`,
+   `ChatMember.Read.Chat`). Admin clicks **Allow**.
+4. The new permissions take effect immediately for resources the bot
+   is already installed in; no re-add to channels needed.
+
+The bot keeps responding to mentions throughout. Until the admin
+re-consents, attempting to enable Teams ingestion in the dashboard
+will surface a "RSC consent required" banner with a link to step 1.
+
+(This section will move into `docs/connectors/teams.md` — the
+ingestion sibling doc — when the ingestion connector lands. Until
+then it lives here because the manifest is what the operator
+re-uploads.)
+
 ### Rotating the client secret
 
 1. In the Azure AD app registration, create a new secret in
@@ -204,6 +237,10 @@ In order:
   inbound text only.
 - **Branded icons.** Placeholder PNGs ship in the zip — swap them in
   `apps/web/src/lib/teams-bot/manifest.ts` before customer-facing rollout.
+- **Teams ingestion.** Read-only sync of Teams channel + chat history
+  is a separate connector (`docs/designs/teams-ingestion.md`,
+  in-progress). The manifest already declares the RSC permissions
+  needed for it; the sync runner + chunker + admin UI are next.
 
 ---
 
