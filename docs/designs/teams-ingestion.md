@@ -1,9 +1,16 @@
 ---
-status: PLANNING
+status: DONE
 ---
 # Microsoft Teams ingestion connector
 
-Branch: `claude/teams-ingestion-design` · Started: 2026-05-15
+Branch: `claude/teams-ingestion-design` · Started: 2026-05-15 · Shipped: 2026-05-15
+
+> Shipped via PRs #200 (design), #201 (manifest RSC), #202 (Graph
+> client), #203 (chunker), #204 (sync orchestration), #205 (worker
+> dispatch), #206 (dashboard UI), #207 (user-subjects resolver). This
+> PR (#208) adds deletion handling + the connector docs and closes the
+> 7-step plan. Operator + customer guides live in
+> `docs/connectors/teams.md`.
 
 ## Goal
 

@@ -4,8 +4,10 @@ The Teams bot is the Microsoft equivalent of the Slack `@holo` and Google
 Chat `@holo` bots. DM the bot or @mention it in any team channel or group
 chat to get answers grounded in your indexed sources.
 
-There's no read-only Teams ingestion connector — chat history isn't synced.
-The bot answers from the existing corpus only.
+A read-only Teams ingestion connector also exists (see
+`docs/connectors/teams.md`) — they're independent surfaces sharing one
+Azure AD app + one set of env vars. Customers can use just the bot,
+just ingestion, or both. Disconnecting one doesn't affect the other.
 
 v1 ships the **shared-bot** path: one Azure AD app registration hosts the
 bot for the whole holo deployment, and each org claims its Azure AD tenant

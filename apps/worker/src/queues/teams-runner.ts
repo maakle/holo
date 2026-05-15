@@ -27,7 +27,7 @@
  * oid → literal `app`) handles missing names today; step 6 will
  * pre-load + cache per-org user maps for richer attribution.
  */
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { Queue } from 'bullmq';
 import { schema, type DB } from '@holo/db';
 import {
@@ -108,6 +108,7 @@ export function createTeamsRunner(deps: TeamsRunnerDeps): SyncRunner {
       });
 
       const buffered: ChunkInsertPayload[] = [];
+      const deletions: Array<{ externalId: string }> = [];
       const tenantCursorIn: TeamsCursor = newByTenant[tenant.tenantId] ?? {};
 
       const { cursor: tenantCursorOut, result: tenantResult } = await runTenantSync({
@@ -118,6 +119,7 @@ export function createTeamsRunner(deps: TeamsRunnerDeps): SyncRunner {
           orgId: payload.organizationId,
           sourceId: payload.sourceId,
           out: buffered,
+          deletions,
         }),
       });
       newByTenant[tenant.tenantId] = tenantCursorOut;
@@ -134,6 +136,14 @@ export function createTeamsRunner(deps: TeamsRunnerDeps): SyncRunner {
           { removeOnComplete: 200, removeOnFail: 200 },
         );
         artifactCount += buffered.length;
+      }
+
+      if (deletions.length > 0) {
+        await softDeleteArtifacts(
+          deps.db,
+          payload.organizationId,
+          deletions.map((d) => d.externalId),
+        );
       }
     }
 
@@ -179,22 +189,105 @@ function parsePersistedCursor(raw: unknown): PersistedCursor {
 
 /**
  * Returns an `EmitFn` that converts each thread emission into one or
- * more `ChunkInsertPayload`s via the `teamsThreadChunker` and appends
- * them to `out`. Deletions and `archived` emissions are no-ops in this
- * step — handling them needs the `source_artifacts` lookup that the
- * worker's embed-insert path already owns; we'll wire deletions in
- * step 7 alongside the E2E pass.
+ * more `ChunkInsertPayload`s via the `teamsThreadChunker`. Deletion
+ * emissions are translated to synthetic `externalId`s and accumulated
+ * for batched soft-delete after the per-tenant sync completes.
+ *
+ * Why a buffer rather than emit-time deletes: keeping the per-tenant
+ * sync transactional-ish — if `runTenantSync` throws partway through,
+ * we don't want a half-applied delete + partial chunk insert.
  */
 function makeEmitter(args: {
   orgId: string;
   sourceId: string;
   out: ChunkInsertPayload[];
+  deletions: Array<{ externalId: string }>;
 }) {
   return async (emission: ResourceEmission): Promise<void> => {
-    if (emission.kind !== 'thread') return;
-    const chunks = await chunksFromThread(emission.thread, args.orgId, args.sourceId);
-    for (const c of chunks) args.out.push(c);
+    if (emission.kind === 'thread') {
+      const chunks = await chunksFromThread(
+        emission.thread,
+        args.orgId,
+        args.sourceId,
+      );
+      for (const c of chunks) args.out.push(c);
+      return;
+    }
+    if (emission.kind === 'deletion') {
+      const externalId = externalIdForDeletion(emission.deletion);
+      if (externalId) args.deletions.push({ externalId });
+      return;
+    }
+    // `archived` emissions: noop here. The cursor entry transitions to
+    // `phase: 'archived'` inside `runTenantSync`, which is enough to
+    // stop further sync runs against the resource. Existing chunks
+    // stay retrievable until a separate purge.
   };
+}
+
+/**
+ * Convert a deletion emission to the synthetic `external_id` we wrote
+ * for the corresponding `source_artifacts` row. Returns null if the
+ * cursor key is malformed (defensive — shouldn't happen since the
+ * emitter set it).
+ *
+ * Channel cursor key:  `channel-<teamId>:<channelId>` →
+ *                       `teams-thread:<teamId>/<channelId>/<rootMessageId>`
+ * Chat cursor key:     `chat-<chatId>` →
+ *                       `teams-thread:<chatId>/<rootMessageId>`
+ *
+ * If the deleted message id is a thread *reply* (not a root), the
+ * lookup misses — `source_artifacts` only has rows keyed by root id.
+ * That's the right behavior: a reply deletion just means the next sync
+ * will re-emit the thread without it; the orphan content lingers in
+ * the chunk until then. v2 can add reply-level granularity if needed.
+ */
+function externalIdForDeletion(d: {
+  resourceCursorKey: string;
+  rootMessageId: string;
+}): string | null {
+  if (d.resourceCursorKey.startsWith('channel-')) {
+    const rest = d.resourceCursorKey.slice('channel-'.length);
+    const sep = rest.indexOf(':');
+    if (sep < 0) return null;
+    const teamId = rest.slice(0, sep);
+    const channelId = rest.slice(sep + 1);
+    return `teams-thread:${teamId}/${channelId}/${d.rootMessageId}`;
+  }
+  if (d.resourceCursorKey.startsWith('chat-')) {
+    const chatId = d.resourceCursorKey.slice('chat-'.length);
+    return `teams-thread:${chatId}/${d.rootMessageId}`;
+  }
+  return null;
+}
+
+/**
+ * Soft-delete a batch of `source_artifacts` rows by their synthetic
+ * `external_id`. Sets `deleted_at = now()` so HoloFs's
+ * `WHERE deleted_at IS NULL` filter takes them out of retrieval
+ * without losing the audit trail. The chunks themselves stay in the
+ * `chunks` table until a separate purge job runs (today: never; the
+ * next reindex of the same id replaces them).
+ *
+ * One UPDATE per batch — Drizzle's `inArray` with up to a few hundred
+ * ids per sync run is fine; for unusually large deletion bursts the
+ * caller can chunk in advance.
+ */
+async function softDeleteArtifacts(
+  db: DB,
+  organizationId: string,
+  externalIds: string[],
+): Promise<void> {
+  if (externalIds.length === 0) return;
+  await db
+    .update(schema.sourceArtifacts)
+    .set({ deletedAt: new Date() })
+    .where(
+      and(
+        eq(schema.sourceArtifacts.organizationId, organizationId),
+        inArray(schema.sourceArtifacts.externalId, externalIds),
+      ),
+    );
 }
 
 /**
@@ -290,6 +383,7 @@ function toChunkerMessage(
 export const __testing = {
   chunksFromThread,
   parsePersistedCursor,
+  externalIdForDeletion,
 };
 // Avoid unused-import warning for `ResourceCursor` (kept in scope for
 // readers of this file's types).
