@@ -1,4 +1,4 @@
-export type SubjectSource = 'slack';
+export type SubjectSource = 'slack' | 'teams';
 
 export interface UserSubject {
   subject: string;
