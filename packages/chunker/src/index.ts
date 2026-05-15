@@ -6,6 +6,13 @@ export {
   type PathFn,
   type PathFnInput,
 } from './path-fn';
+export {
+  computeSourceUrl,
+  hasUrlFn,
+  urlFns,
+  type UrlFn,
+  type UrlFnInput,
+} from './url-fn';
 export { recursiveSplit } from './recursive-split';
 export { createRegistry, astChunk } from './tree-sitter/index';
 export type { AstChunk } from './tree-sitter/index';

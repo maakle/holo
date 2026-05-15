@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { extractBashSources } from '../src/slack-bot/agent';
+import { extractBashSources, resolveBashSourceUrls } from '../src/slack-bot/agent';
+import type { DB } from '@holo/db';
 
 describe('extractBashSources', () => {
   it('extracts a single path from a cat invocation', () => {
@@ -69,5 +70,100 @@ describe('extractBashSources', () => {
 
   it('returns the empty list when no paths are present', () => {
     expect(extractBashSources('echo hello', 'hello\n')).toEqual([]);
+  });
+});
+
+/**
+ * Stub `DB` exposing just the chainable shape used by
+ * `resolveBashSourceUrls`: db.select(...).from(...).where(...) awaits to
+ * the rows directly.
+ */
+function stubDb(rows: { path: string; sourceUrl: string | null }[]): DB {
+  const chain: { from: () => typeof chain; where: () => Promise<typeof rows> } = {
+    from: () => chain,
+    where: () => Promise.resolve(rows),
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { select: () => chain } as unknown as DB;
+}
+
+function failingDb(): DB {
+  const chain = {
+    from: () => chain,
+    where: () => {
+      throw new Error('db down');
+    },
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { select: () => chain } as unknown as DB;
+}
+
+describe('resolveBashSourceUrls', () => {
+  it('promotes /files URLs to real source URLs when source_url is stored', async () => {
+    const db = stubDb([
+      {
+        path: '/github/acme/api/pulls/42.md',
+        sourceUrl: 'https://github.com/acme/api/pull/42',
+      },
+      { path: '/stripe/charges/ch_x.md', sourceUrl: 'https://dashboard.stripe.com/payments/ch_x' },
+    ]);
+    const extracted = extractBashSources(
+      'cat /github/acme/api/pulls/42.md /stripe/charges/ch_x.md',
+      '',
+    ).map((s, i) => ({
+      ...s,
+      path: i === 0 ? '/github/acme/api/pulls/42.md' : '/stripe/charges/ch_x.md',
+    }));
+
+    const resolved = await resolveBashSourceUrls(db, 'org-1', extracted);
+
+    expect(resolved.map((s) => s.url)).toEqual([
+      'https://github.com/acme/api/pull/42',
+      'https://dashboard.stripe.com/payments/ch_x',
+    ]);
+    // `path` is internal — should never leak out.
+    for (const s of resolved) expect(s).not.toHaveProperty('path');
+  });
+
+  it('keeps the dashboard URL when source_url is null for that artifact', async () => {
+    const db = stubDb([
+      { path: '/sample/docs/doc-order-66-contingency.md', sourceUrl: null },
+    ]);
+    const extracted = extractBashSources(
+      'cat /sample/docs/doc-order-66-contingency.md',
+      '',
+    ).map((s) => ({ ...s, path: '/sample/docs/doc-order-66-contingency.md' }));
+
+    const resolved = await resolveBashSourceUrls(db, 'org-1', extracted);
+
+    expect(resolved[0]!.url).toBe(
+      '/files/sample/docs/doc-order-66-contingency.md',
+    );
+  });
+
+  it('returns inputs unchanged when the DB lookup throws (best-effort enrichment)', async () => {
+    const extracted = extractBashSources(
+      'cat /github/acme/api/pulls/42.md',
+      '',
+    ).map((s) => ({ ...s, path: '/github/acme/api/pulls/42.md' }));
+
+    const resolved = await resolveBashSourceUrls(failingDb(), 'org-1', extracted);
+
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]!.url).toBe('/files/github/acme/api/pulls/42.md');
+  });
+
+  it('returns the empty list when given no sources (no DB round-trip)', async () => {
+    let queried = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = {
+      select: () => {
+        queried = true;
+        throw new Error('should not query');
+      },
+    } as unknown as DB;
+    const result = await resolveBashSourceUrls(db, 'org-1', []);
+    expect(result).toEqual([]);
+    expect(queried).toBe(false);
   });
 });

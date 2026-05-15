@@ -10,6 +10,7 @@
  * `[1]`, `[2]`, ... in its answer. The web layer renders the references as
  * footnote-style links.
  */
+import { computeSourceUrl } from '@holo/chunker';
 import type { SearchResult } from '@holo/retrieval-core';
 
 export interface Citation {
@@ -32,88 +33,28 @@ export interface Citation {
 }
 
 /**
- * Provider-aware deep link. Mirrors the existing `deriveSnippetUrl` in
- * `tools/search.ts` (which we also keep, to avoid changing the tool's wire
- * format for already-deployed agents). When that source is `result.snippetUrl`
- * — already set by the chunker — we trust it.
+ * Provider-aware deep link. Two layers:
+ *   1. `result.snippetUrl` — chunker-set, points at the exact chunk (PR
+ *      line, doc section). Most accurate; trust it when present.
+ *   2. `computeSourceUrl({ kind, externalId, metadata })` — the shared
+ *      url-fn registry in @holo/chunker. Same logic that stamps
+ *      `source_artifacts.source_url` at embed-insert time, so a citation
+ *      URL here and a bash-citation URL elsewhere always agree.
+ *
+ * The retrieval layer strips the `<provider>-` prefix from chunks.kind
+ * before handing it to citation builders (so the local switch could match
+ * `'pr'`/`'doc'`), but the url-fn registry is keyed on the full namespaced
+ * kind. Reconstruct it here.
  */
 export function buildCitationUrl(result: SearchResult): string | undefined {
   if (result.snippetUrl) return result.snippetUrl;
-  const m = result.source.metadata;
-  const provider = result.source.provider;
-  const kind = result.source.artifactKind;
-
-  // Provider-specific builders below take precedence — they reconstruct a URL
-  // that points at the exact chunk (PR line, page section). The direct-URL
-  // fallback at the bottom covers providers whose connector already stored
-  // a canonical link in metadata (jira/linear/asana/confluence/zendesk/etc.).
-
-  if (provider === 'github') {
-    const repo = typeof m['repo_full_name'] === 'string'
-      ? (m['repo_full_name'] as string)
-      : typeof m['repoFullName'] === 'string'
-        ? (m['repoFullName'] as string)
-        : undefined;
-    if (!repo) return undefined;
-    if (kind === 'pr' && typeof m['pr_number'] === 'number') {
-      return `https://github.com/${repo}/pull/${m['pr_number']}`;
-    }
-    if (kind === 'doc' && typeof m['file_path'] === 'string') {
-      return `https://github.com/${repo}/blob/HEAD/${m['file_path']}`;
-    }
-    if (kind === 'code' && typeof m['file_path'] === 'string') {
-      const ref = typeof m['commit_sha'] === 'string' ? (m['commit_sha'] as string) : 'HEAD';
-      const start = m['start_line'] !== undefined ? `#L${m['start_line']}` : '';
-      const end = m['end_line'] !== undefined ? `-L${m['end_line']}` : '';
-      return `https://github.com/${repo}/blob/${ref}/${m['file_path']}${start}${end}`;
-    }
-  }
-  if (provider === 'notion' && typeof m['notion_page_id'] === 'string') {
-    return `https://www.notion.so/${(m['notion_page_id'] as string).replace(/-/g, '')}`;
-  }
-  if (provider === 'grain' && typeof m['recording_id'] === 'string') {
-    return `https://grain.com/share/recording/${m['recording_id']}`;
-  }
-  if (provider === 'pylon' && typeof m['issue_number'] === 'number') {
-    return `https://app.usepylon.com/issues?issueNumber=${m['issue_number']}`;
-  }
-  if (provider === 'google-chat') {
-    // thread_name is the canonical Google API resource id
-    // ("spaces/AAA/threads/BBB"). Build the user-facing chat URL by
-    // extracting the bare space/thread ids — the URL form Google's web app
-    // uses expects them un-prefixed.
-    const thread = typeof m['thread_name'] === 'string' ? (m['thread_name'] as string) : undefined;
-    const space = typeof m['space_name'] === 'string' ? (m['space_name'] as string) : undefined;
-    const match = thread?.match(/^spaces\/([^/]+)\/threads\/([^/]+)$/);
-    if (match) return `https://mail.google.com/chat/u/0/#chat/space/${match[1]}/thread/${match[2]}`;
-    if (space?.startsWith('spaces/')) return `https://mail.google.com/chat/u/0/#chat/space/${space.slice('spaces/'.length)}`;
-  }
-  if (provider === 'prismic') {
-    const repo = typeof m['prismic_repo'] === 'string' ? (m['prismic_repo'] as string) : undefined;
-    const docId = typeof m['prismic_document_id'] === 'string' ? (m['prismic_document_id'] as string) : undefined;
-    if (repo && docId) return `https://${repo}.prismic.io/documents/${docId}/`;
-  }
-  if (provider === 'stripe') {
-    const id = typeof m['record_id'] === 'string' ? (m['record_id'] as string) : undefined;
-    const type = typeof m['record_type'] === 'string' ? (m['record_type'] as string) : undefined;
-    if (id && type) {
-      // Charges live under /payments in the Stripe dashboard; other record
-      // types use the pluralised type as the path segment.
-      const segment = type === 'charge' ? 'payments' : `${type}s`;
-      const prefix = m['livemode'] === false ? 'test/' : '';
-      return `https://dashboard.stripe.com/${prefix}${segment}/${id}`;
-    }
-  }
-
-  // Generic fallback: many connectors (jira, linear, asana, confluence,
-  // mintlify, zendesk, airtable) already persist a canonical URL on the
-  // artifact; google drive uses `webViewLink`, slack uses `permalink`.
-  // Accept any of those as a last resort.
-  for (const key of ['url', 'webViewLink', 'permalink'] as const) {
-    const v = m[key];
-    if (typeof v === 'string' && /^https?:\/\//.test(v)) return v;
-  }
-  return undefined;
+  const fullKind = `${result.source.provider}-${result.source.artifactKind}`;
+  const fromRegistry = computeSourceUrl({
+    kind: fullKind,
+    externalId: result.chunkId,
+    metadata: result.source.metadata,
+  });
+  return fromRegistry ?? undefined;
 }
 
 /**

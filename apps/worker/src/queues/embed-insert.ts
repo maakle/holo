@@ -3,7 +3,7 @@ import {
   resolveCustomerAccountsForBatch,
   stripCustomerAccountHints,
 } from '@holo/connectors';
-import { computePath, hasPathFn } from '@holo/chunker';
+import { computePath, computeSourceUrl, hasPathFn } from '@holo/chunker';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sql = any;
@@ -67,6 +67,7 @@ export async function insertEmbeddedChunks(
       kind: string;
       externalId: string;
       path: string | null;
+      sourceUrl: string | null;
       aclSubjects: Set<string>;
     }
   >();
@@ -75,6 +76,7 @@ export async function insertEmbeddedChunks(
     let entry = artifactKeys.get(key);
     if (!entry) {
       let path: string | null = null;
+      let sourceUrl: string | null = null;
       if (hasPathFn(e.chunk.kind)) {
         try {
           path = computePath({
@@ -88,6 +90,17 @@ export async function insertEmbeddedChunks(
           // job picks it up later.
           path = null;
         }
+        try {
+          sourceUrl = computeSourceUrl({
+            kind: e.chunk.kind,
+            externalId: e.chunk.sourceArtifactId,
+            metadata: e.chunk.metadata ?? {},
+          });
+        } catch {
+          // Same posture as path — a bad URL fn shouldn't fail the batch.
+          // The next backfill run will pick it up once metadata is sane.
+          sourceUrl = null;
+        }
       }
       entry = {
         organizationId: e.chunk.organizationId,
@@ -95,6 +108,7 @@ export async function insertEmbeddedChunks(
         kind: e.chunk.kind,
         externalId: e.chunk.sourceArtifactId,
         path,
+        sourceUrl,
         aclSubjects: new Set<string>(),
       };
       artifactKeys.set(key, entry);
@@ -108,6 +122,7 @@ export async function insertEmbeddedChunks(
     kind: a.kind,
     payload: JSON.stringify({}),
     path: a.path,
+    source_url: a.sourceUrl,
     acl_subjects: [...a.aclSubjects],
   }));
   // One transaction wraps the artifact upsert, the customer_account resolves,
@@ -125,11 +140,13 @@ export async function insertEmbeddedChunks(
         'kind',
         'payload',
         'path',
+        'source_url',
         'acl_subjects',
       )}
       ON CONFLICT (source_id, external_id) DO UPDATE SET
         fetched_at = NOW(),
         path = COALESCE(EXCLUDED.path, source_artifacts.path),
+        source_url = COALESCE(EXCLUDED.source_url, source_artifacts.source_url),
         acl_subjects = EXCLUDED.acl_subjects
       RETURNING id, source_id, external_id
     `;

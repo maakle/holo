@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type Anthropic from '@anthropic-ai/sdk';
-import type { DB } from '@holo/db';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { schema, type DB } from '@holo/db';
 import type {
   ToolDefinition,
   WireAnswerClaim,
@@ -195,7 +196,7 @@ const KNOWN_FS_ROOTS = new Set([
 
 export function extractBashSources(script: string, stdout: string): Source[] {
   const seen = new Set<string>();
-  const sources: Source[] = [];
+  const sources: (Source & { __path: string })[] = [];
   const haystack = `${script}\n${stdout}`;
   for (const m of haystack.matchAll(BASH_PATH_RE)) {
     const p = m[1];
@@ -211,10 +212,94 @@ export function extractBashSources(script: string, stdout: string): Source[] {
       kind: 'file',
       title,
       url: `/files/${segs.map((s) => encodeURIComponent(s)).join('/')}`,
+      __path: p,
+    });
+    if (sources.length >= MAX_BASH_SOURCES_PER_CALL) break;
+  }
+  // Strip the internal __path tag from the returned shape so callers see
+  // the plain Source. resolveBashSourceUrls reads __path directly when
+  // it's still present.
+  return sources.map(({ __path: _p, ...s }) => s);
+}
+
+/**
+ * Internal cousin of `extractBashSources` that preserves the underlying
+ * virtual-FS path on each Source so `resolveBashSourceUrls` can do a
+ * batched lookup. The path is *not* leaked outside the agent — callers
+ * see only the public `Source` shape.
+ */
+function extractBashSourcesWithPath(
+  script: string,
+  stdout: string,
+): (Source & { path: string })[] {
+  const seen = new Set<string>();
+  const sources: (Source & { path: string })[] = [];
+  const haystack = `${script}\n${stdout}`;
+  for (const m of haystack.matchAll(BASH_PATH_RE)) {
+    const p = m[1];
+    if (!p || seen.has(p)) continue;
+    seen.add(p);
+    const segs = p.split('/').filter(Boolean);
+    if (segs.length < 2) continue;
+    const root = segs[0]!;
+    if (!KNOWN_FS_ROOTS.has(root)) continue;
+    const title = segs[segs.length - 1]!;
+    sources.push({
+      provider: root,
+      kind: 'file',
+      title,
+      url: `/files/${segs.map((s) => encodeURIComponent(s)).join('/')}`,
+      path: p,
     });
     if (sources.length >= MAX_BASH_SOURCES_PER_CALL) break;
   }
   return sources;
+}
+
+/**
+ * Promote each source's URL from the dashboard `/files/<path>` view to the
+ * real source-system URL (the actual slack thread, github PR, notion page,
+ * stripe dashboard, …) by looking up `source_artifacts.source_url` for
+ * every path in one round-trip.
+ *
+ * Falls back to the original `/files/<path>` URL when the row has no
+ * stored source_url — sample-data kinds, salesforce records without a My
+ * Domain, etc. Errors are swallowed (returns the inputs unchanged) so a
+ * DB blip during enrichment never costs the model its tool output.
+ */
+export async function resolveBashSourceUrls(
+  db: DB,
+  organizationId: string,
+  sources: (Source & { path: string })[],
+): Promise<Source[]> {
+  if (sources.length === 0) return [];
+  const paths = sources.map((s) => s.path);
+  let urlByPath = new Map<string, string>();
+  try {
+    const rows = await db
+      .select({ path: schema.sourceArtifacts.path, sourceUrl: schema.sourceArtifacts.sourceUrl })
+      .from(schema.sourceArtifacts)
+      .where(
+        and(
+          eq(schema.sourceArtifacts.organizationId, organizationId),
+          inArray(schema.sourceArtifacts.path, paths),
+          isNull(schema.sourceArtifacts.deletedAt),
+        ),
+      );
+    urlByPath = new Map(
+      rows
+        .filter((r): r is { path: string; sourceUrl: string } => !!r.sourceUrl)
+        .map((r) => [r.path, r.sourceUrl]),
+    );
+  } catch {
+    // Best-effort enrichment — if the lookup fails the model still gets
+    // back the dashboard URLs and the slack reply still renders.
+  }
+  return sources.map((s) => {
+    const realUrl = urlByPath.get(s.path);
+    const { path: _p, ...rest } = s;
+    return realUrl ? { ...rest, url: realUrl } : rest;
+  });
 }
 
 // Anthropic's tool API requires `type: "object"` at the root of input_schema
@@ -428,7 +513,14 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
           const stdout = String(
             (output as { stdout?: unknown } | null)?.stdout ?? '',
           );
-          for (const src of extractBashSources(script, stdout)) {
+          // Two passes: extract synchronously (cheap regex), then promote
+          // each /files/<path> URL to the real source-system URL via one
+          // batched DB lookup. Sources whose row has no source_url
+          // (sample-data, salesforce without My Domain, custom connectors)
+          // stay on the dashboard URL — never broken, just less-deep.
+          const extracted = extractBashSourcesWithPath(script, stdout);
+          const resolved = await resolveBashSourceUrls(deps.db, deps.organizationId, extracted);
+          for (const src of resolved) {
             // Dedupe against anything already on the list — repeated
             // `cat` of the same path across tool calls is common.
             if (!artifactSources.some((s) => s.url === src.url)) {

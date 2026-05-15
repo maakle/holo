@@ -22,7 +22,7 @@
  * One-shot CLI, not a BullMQ job — matches the account-backfill pattern.
  * Trigger via `apps/worker/scripts/backfill-paths.ts`.
  */
-import { computePath, hasPathFn } from '@holo/chunker';
+import { computePath, computeSourceUrl, hasPathFn } from '@holo/chunker';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sql = any;
@@ -79,6 +79,8 @@ interface ArtifactRow {
   external_id: string;
   /** Populated only in repair mode (so we can compare and skip no-ops). */
   path?: string | null;
+  /** Populated only in repair mode (so we can compare and skip no-ops). */
+  source_url?: string | null;
 }
 
 interface ChunkMetaRow {
@@ -121,10 +123,14 @@ export async function runPathBackfill(
     // The path filter is the only thing that differs between modes — fill
      // mode targets NULL paths, repair mode targets non-NULL ones. Inlined
      // (rather than parameterized) so postgres-js can plan each variant.
+    // Fill mode targets rows missing either `path` or `source_url`. Repair
+    // mode re-evaluates every non-tombstoned row against the current
+    // path-fn / url-fn output and rewrites only on diff. Both modes pull
+    // path + source_url so the per-row no-op short-circuit works.
     const artifacts = (repair
       ? cursorOrg && cursorId
         ? await sql<ArtifactRow[]>`
-            SELECT id, organization_id, kind, external_id, path
+            SELECT id, organization_id, kind, external_id, path, source_url
             FROM source_artifacts
             WHERE path IS NOT NULL
               AND deleted_at IS NULL
@@ -133,7 +139,7 @@ export async function runPathBackfill(
             LIMIT ${take}
           `
         : await sql<ArtifactRow[]>`
-            SELECT id, organization_id, kind, external_id, path
+            SELECT id, organization_id, kind, external_id, path, source_url
             FROM source_artifacts
             WHERE path IS NOT NULL
               AND deleted_at IS NULL
@@ -142,18 +148,18 @@ export async function runPathBackfill(
           `
       : cursorOrg && cursorId
         ? await sql<ArtifactRow[]>`
-            SELECT id, organization_id, kind, external_id
+            SELECT id, organization_id, kind, external_id, path, source_url
             FROM source_artifacts
-            WHERE path IS NULL
+            WHERE (path IS NULL OR source_url IS NULL)
               AND deleted_at IS NULL
               AND (organization_id, id) > (${cursorOrg}, ${cursorId})
             ORDER BY organization_id, id
             LIMIT ${take}
           `
         : await sql<ArtifactRow[]>`
-            SELECT id, organization_id, kind, external_id
+            SELECT id, organization_id, kind, external_id, path, source_url
             FROM source_artifacts
-            WHERE path IS NULL
+            WHERE (path IS NULL OR source_url IS NULL)
               AND deleted_at IS NULL
             ORDER BY organization_id, id
             LIMIT ${take}
@@ -197,7 +203,12 @@ export async function runPathBackfill(
       for (const s of c.acl_subjects ?? []) entry.aclUnion.add(s);
     }
 
-    const updates: { id: string; path: string; aclSubjects: string[] }[] = [];
+    const updates: {
+      id: string;
+      path: string;
+      sourceUrl: string | null;
+      aclSubjects: string[];
+    }[] = [];
 
     for (const a of artifacts) {
       totalScanned += 1;
@@ -220,16 +231,22 @@ export async function runPathBackfill(
           externalId: a.external_id,
           metadata: group.metadata,
         });
-        if (repair && a.path === path) {
-          // No-op: the stored path already matches what the current path-fn
-          // would produce. Skip the UPDATE so repair runs are O(changes),
-          // not O(rows).
+        const sourceUrl = computeSourceUrl({
+          kind: a.kind,
+          externalId: a.external_id,
+          metadata: group.metadata,
+        });
+        if (repair && a.path === path && (a.source_url ?? null) === sourceUrl) {
+          // No-op: both stored values already match what the current
+          // registries would produce. Skip the UPDATE so repair runs are
+          // O(changes), not O(rows).
           totalUnchanged += 1;
           continue;
         }
         updates.push({
           id: a.id,
           path,
+          sourceUrl,
           aclSubjects: [...group.aclUnion],
         });
         filledByKind[a.kind] = (filledByKind[a.kind] ?? 0) + 1;
@@ -245,14 +262,16 @@ export async function runPathBackfill(
       const payload = updates.map((u) => ({
         id: u.id,
         path: u.path,
+        source_url: u.sourceUrl,
         acl_subjects: u.aclSubjects,
       }));
       await sql`
         UPDATE source_artifacts AS sa
         SET path = u.path,
+            source_url = u.source_url,
             acl_subjects = u.acl_subjects
         FROM jsonb_to_recordset(${sql.json(payload)})
-          AS u(id uuid, path text, acl_subjects text[])
+          AS u(id uuid, path text, source_url text, acl_subjects text[])
         WHERE sa.id = u.id
       `;
       totalFilled += updates.length;

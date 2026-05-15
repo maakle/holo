@@ -15,6 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@holo/chunker": "workspace:*",
     "@holo/custom-tools": "workspace:*",
     "@holo/db": "workspace:*",
     "@holo/errors": "workspace:*",

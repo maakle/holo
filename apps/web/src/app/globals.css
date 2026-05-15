@@ -218,6 +218,17 @@
 
     --code-bg: #f4f4f0;
 
+    /* Syntax highlighting (light). Restrained editorial palette — deliberately
+       avoids the brand accent (#3F47FF) since code has many keywords and the
+       accent is reserved for 3–5 uses per screen. */
+    --syn-comment: #71717a;
+    --syn-keyword: #b91c1c;
+    --syn-string: #047857;
+    --syn-number: #b45309;
+    --syn-function: #0f766e;
+    --syn-type: #a16207;
+    --syn-attribute: #1e40af;
+
     --radius: 6px;
   }
 
@@ -242,6 +253,15 @@
     --error: #ef4444;
 
     --code-bg: #0f0f11;
+
+    /* Syntax highlighting (dark). Same restraint, brightened for dark bg. */
+    --syn-comment: #71717a;
+    --syn-keyword: #f87171;
+    --syn-string: #6ee7b7;
+    --syn-number: #fcd34d;
+    --syn-function: #5eead4;
+    --syn-type: #fdba74;
+    --syn-attribute: #93c5fd;
   }
 
   html {
@@ -310,5 +330,71 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--border-strong);
+  }
+
+  /* Syntax highlighting via rehype-highlight (highlight.js classes).
+     Mapped to the editorial palette defined above; both themes follow the
+     existing dark-mode toggle. */
+  .hljs {
+    color: var(--text);
+    background: transparent;
+  }
+  .hljs-comment,
+  .hljs-quote {
+    color: var(--syn-comment);
+    font-style: italic;
+  }
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-literal,
+  .hljs-section,
+  .hljs-link,
+  .hljs-meta,
+  .hljs-meta-keyword,
+  .hljs-doctag {
+    color: var(--syn-keyword);
+  }
+  .hljs-string,
+  .hljs-regexp,
+  .hljs-symbol,
+  .hljs-bullet,
+  .hljs-addition {
+    color: var(--syn-string);
+  }
+  .hljs-number,
+  .hljs-deletion {
+    color: var(--syn-number);
+  }
+  .hljs-title,
+  .hljs-title.function_,
+  .hljs-function .hljs-title,
+  .hljs-name {
+    color: var(--syn-function);
+  }
+  .hljs-type,
+  .hljs-class .hljs-title,
+  .hljs-built_in,
+  .hljs-builtin-name,
+  .hljs-params {
+    color: var(--syn-type);
+  }
+  .hljs-tag {
+    color: var(--syn-keyword);
+  }
+  .hljs-attr,
+  .hljs-attribute,
+  .hljs-selector-attr,
+  .hljs-selector-class,
+  .hljs-selector-id,
+  .hljs-selector-pseudo,
+  .hljs-template-variable,
+  .hljs-variable {
+    color: var(--syn-attribute);
+  }
+  .hljs-emphasis {
+    font-style: italic;
+  }
+  .hljs-strong {
+    font-weight: 600;
   }
 }

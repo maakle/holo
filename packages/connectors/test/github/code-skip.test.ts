@@ -80,5 +80,12 @@ describe('extToLanguage', () => {
   it('maps .py to python', () => expect(extToLanguage('app.py')).toBe('python'));
   it('maps .go to go', () => expect(extToLanguage('main.go')).toBe('go'));
   it('maps .rs to rust', () => expect(extToLanguage('lib.rs')).toBe('rust'));
-  it('maps unknown to text', () => expect(extToLanguage('Makefile')).toBe('text'));
+  it('maps unknown to text', () =>
+    expect(extToLanguage('something.unknownext')).toBe('text'));
+  it('maps .sql to sql', () => expect(extToLanguage('schema.sql')).toBe('sql'));
+  it('maps .yaml to yaml', () => expect(extToLanguage('config.yaml')).toBe('yaml'));
+  it('maps Dockerfile (no ext) to dockerfile', () =>
+    expect(extToLanguage('services/web/Dockerfile')).toBe('dockerfile'));
+  it('maps Makefile (no ext) to makefile', () =>
+    expect(extToLanguage('Makefile')).toBe('makefile'));
 });

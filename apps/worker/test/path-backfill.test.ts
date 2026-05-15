@@ -120,11 +120,13 @@ describe('runPathBackfill', () => {
       {
         id: '00000000-0000-0000-0000-000000000001',
         path: '/stripe/charges/ch_aaa.md',
+        source_url: 'https://dashboard.stripe.com/payments/ch_aaa',
         acl_subjects: ['org:org-1', 'user:alice', 'group:eng'],
       },
       {
         id: '00000000-0000-0000-0000-000000000002',
         path: '/stripe/charges/ch_bbb.md',
+        source_url: 'https://dashboard.stripe.com/payments/ch_bbb',
         acl_subjects: ['org:org-1'],
       },
     ]);
@@ -207,6 +209,9 @@ describe('runPathBackfill', () => {
       {
         id: '00000000-0000-0000-0000-000000000010',
         path: '/airtable/marketing/leads/recA.md',
+        // airtable-record has no dedicated url-fn and no `url` in metadata,
+        // so the generic fallback returns null.
+        source_url: null,
         acl_subjects: ['org:org-1'],
       },
     ]);

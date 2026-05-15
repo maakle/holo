@@ -103,12 +103,16 @@ export const sourceArtifacts = pgTable(
     payload: jsonb('payload').notNull(),
     /** Deterministic virtual-filesystem path for this artifact. Computed by
      * the path-fn registry in @holo/chunker from kind + chunk metadata at
-     * upsert time. Same path across re-syncs (idempotent). Nullable until
-     * the path-backfill job has run for every existing kind; new rows from
-     * any kind with a registered path-fn always have a non-null path. The
-     * org-scoped partial index makes prefix LIKE queries from HoloFs cheap
-     * without indexing rows that haven't been backfilled yet. See RFC 0009. */
-    path: text('path'),
+     * upsert time. Same path across re-syncs (idempotent). NOT NULL since
+     * migration 0049 — every artifact has a registered path-fn. See RFC 0009. */
+    path: text('path').notNull(),
+    /** Deep link back to the source system (the actual slack thread URL,
+     * github PR URL, notion page URL, etc.). Computed by the url-fn registry
+     * in @holo/chunker from kind + chunk metadata at upsert time. Nullable —
+     * not every kind has a derivable URL (salesforce, some hubspot record
+     * types, custom connectors). When NULL, citation extractors fall back to
+     * the dashboard's `/files/<path>` view. See migration 0051. */
+    sourceUrl: text('source_url'),
     /** Denormalized union of acl_subjects across this artifact's chunks.
      * Maintained by the worker in the same transaction as the chunk insert
      * so HoloFs.readdir can enforce ACLs without joining chunks. The chunk
@@ -131,9 +135,16 @@ export const sourceArtifacts = pgTable(
       t.sourceId,
       t.externalId,
     ),
+    // Predicate is just `deleted_at IS NULL` since migration 0050 — path is
+    // NOT NULL post-0049 so the old half of the predicate is always-true.
     orgPathIdx: index('source_artifacts_org_path_idx')
       .on(t.organizationId, t.path)
-      .where(sql`${t.path} IS NOT NULL AND ${t.deletedAt} IS NULL`),
+      .where(sql`${t.deletedAt} IS NULL`),
+    // Lookup-by-path for citation enrichment (e.g. `extractBashSources`).
+    // Partial — only indexes rows that have a URL to surface.
+    orgPathWithUrlIdx: index('source_artifacts_org_path_with_url_idx')
+      .on(t.organizationId, t.path)
+      .where(sql`${t.sourceUrl} IS NOT NULL AND ${t.deletedAt} IS NULL`),
     aclSubjectsGinIdx: index('source_artifacts_acl_subjects_gin_idx').using(
       'gin',
       t.aclSubjects,

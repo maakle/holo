@@ -99,17 +99,85 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   '.cxx': 'cpp',
   '.h': 'c',
   '.hpp': 'cpp',
-  '.cs': 'c_sharp',
+  '.cs': 'csharp',
   '.php': 'php',
   '.scala': 'scala',
   '.ex': 'elixir',
   '.exs': 'elixir',
   '.hs': 'haskell',
   '.lua': 'lua',
+  // Web
+  '.html': 'html',
+  '.htm': 'html',
+  '.css': 'css',
+  '.scss': 'scss',
+  '.sass': 'scss',
+  '.less': 'less',
+  '.vue': 'vue',
+  '.svelte': 'svelte',
+  // Data + config
+  '.json': 'json',
+  '.jsonc': 'json',
+  '.yaml': 'yaml',
+  '.yml': 'yaml',
+  '.toml': 'toml',
+  '.xml': 'xml',
+  '.svg': 'xml',
+  // Shell + scripting
+  '.sh': 'bash',
+  '.bash': 'bash',
+  '.zsh': 'bash',
+  '.fish': 'bash',
+  '.ps1': 'powershell',
+  // SQL + query languages
+  '.sql': 'sql',
+  '.graphql': 'graphql',
+  '.gql': 'graphql',
+  // Docs
+  '.md': 'markdown',
+  '.mdx': 'markdown',
+  '.markdown': 'markdown',
+  // Infra
+  '.tf': 'hcl',
+  '.tfvars': 'hcl',
+  '.hcl': 'hcl',
+  '.nix': 'nix',
+  '.proto': 'protobuf',
+  // Other languages
+  '.dart': 'dart',
+  '.r': 'r',
+  '.jl': 'julia',
+  '.zig': 'zig',
+  '.elm': 'elm',
+  '.fs': 'fsharp',
+  '.fsx': 'fsharp',
+  '.ml': 'ocaml',
+  '.mli': 'ocaml',
+  '.clj': 'clojure',
+  '.cljs': 'clojure',
+  '.cljc': 'clojure',
+  '.erl': 'erlang',
+  '.hrl': 'erlang',
+  '.groovy': 'groovy',
+  '.gradle': 'groovy',
+  '.pl': 'perl',
+  '.pm': 'perl',
+};
+
+// No-extension or compound-name files (matched on lowercase basename).
+const FILENAME_TO_LANGUAGE: Record<string, string> = {
+  dockerfile: 'dockerfile',
+  makefile: 'makefile',
+  'cmakelists.txt': 'cmake',
+  rakefile: 'ruby',
+  gemfile: 'ruby',
 };
 
 export function extToLanguage(filePath: string): string {
   const filename = filePath.split('/').pop() ?? '';
+  const lowerName = filename.toLowerCase();
+  const byName = FILENAME_TO_LANGUAGE[lowerName];
+  if (byName !== undefined) return byName;
   const dotIdx = filename.lastIndexOf('.');
   const ext = dotIdx > 0 ? filename.slice(dotIdx).toLowerCase() : '';
   return EXT_TO_LANGUAGE[ext] ?? 'text';
