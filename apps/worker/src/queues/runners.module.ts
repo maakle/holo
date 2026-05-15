@@ -6,6 +6,7 @@ import { createDb, type DB } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
 import { QUEUE_NAMES } from './types';
 import { createGenericRunner } from './framework-bridge';
+import { createTeamsRunner } from './teams-runner';
 import {
   createLinearSpec,
   createPylonSpec,
@@ -246,8 +247,24 @@ export class SyncRunnersBootstrap implements OnApplicationBootstrap {
         deps,
       ),
     );
+    // Microsoft Teams: app-only Graph auth, env-supplied bot creds.
+    // Custom runner (not `createGenericRunner`) because Teams' "one
+    // connection → many tenants → many channels/chats" doesn't fit the
+    // framework's per-source-row resource flow. See teams-runner.ts.
+    // Registered unconditionally so the queue exists; jobs without env
+    // creds fail with HOLO_ENV_INVALID at runtime, which only matters
+    // when the dashboard actually enables ingestion for an org.
+    setSyncRunner(
+      QUEUE_NAMES.TEAMS_SYNC,
+      createTeamsRunner({
+        db: deps.db,
+        embedQueue: deps.embedQueue,
+        appId: process.env.TEAMS_BOT_APP_ID ?? '',
+        appSecret: process.env.TEAMS_BOT_APP_SECRET ?? '',
+      }),
+    );
     this.logger.log(
-      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat, asana, jira, confluence, stripe, salesforce',
+      'Registered framework SyncRunners for slack, grain, pylon, hubspot, notion, linear, github-prose, github-code, gitlab-prose, gitlab-code, mintlify, zendesk, googledrive, airtable, google-chat, asana, jira, confluence, stripe, salesforce, teams',
     );
   }
 }
