@@ -30,7 +30,7 @@ const FILE_BY_ID: Partial<Record<ConnectorMeta['id'], string>> = {
   confluence: '/connectors/confluence.webp',
   jira: '/connectors/jira.webp',
   intercom: '/connectors/intercom.webp',
-  'microsoft-teams': '/connectors/teams.webp',
+  teams: '/connectors/teams.webp',
   'microsoft-365': '/connectors/office.webp',
   salesforce: '/connectors/salesforce.webp',
   stripe: '/connectors/stripe.webp',

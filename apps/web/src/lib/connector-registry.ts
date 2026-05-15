@@ -46,7 +46,7 @@ export interface ConnectorMeta {
     | 'confluence'
     | 'jira'
     | 'intercom'
-    | 'microsoft-teams'
+    | 'teams'
     | 'microsoft-365'
     | 'asana'
     | 'stripe'
@@ -242,12 +242,17 @@ export const CONNECTORS: ConnectorMeta[] = [
     flowType: 'oauth',
   },
   {
-    id: 'microsoft-teams',
+    id: 'teams',
     displayName: 'Microsoft Teams',
-    description: 'Channels, threads, and messages from Microsoft Teams.',
+    description:
+      'Channel + chat history from resources where the @holo bot is installed (read-only).',
     category: 'communication',
-    implemented: false,
-    flowType: 'oauth',
+    implemented: true,
+    // App-only Graph auth — env-supplied bot creds, no per-org credential
+    // form. Closest existing flow type is `apikey` (inline single-step
+    // form). The Teams wizard step renders status + an Enable button
+    // rather than a token input.
+    flowType: 'apikey',
   },
   {
     id: 'microsoft-365',

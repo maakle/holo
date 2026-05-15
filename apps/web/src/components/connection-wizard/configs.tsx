@@ -21,6 +21,7 @@ import { apiKeyStep } from './steps/api-key-step';
 import { jiraCredentialsStep } from './steps/jira-credentials-step';
 import { serviceAccountStep } from './steps/service-account-step';
 import { firstSyncStep } from './steps/first-sync-step';
+import { teamsIngestionStep } from './steps/teams-ingestion-step';
 import { webcrawlStep } from './steps/webcrawl-step';
 // Imported from @holo/sync-providers (client-safe constants module) rather
 // than @holo/connectors — the connectors barrel pulls the chunker package,
@@ -288,6 +289,21 @@ const stripeConfig: ConnectorWizardConfig = {
   ],
 };
 
+/**
+ * Microsoft Teams ingestion has no per-org credentials — the operator
+ * supplies them via env (`TEAMS_BOT_APP_ID` / `TEAMS_BOT_APP_SECRET`).
+ * The wizard is two steps: a state-aware "Enable" page (showing
+ * "operator runbook" / "bot not installed" / "ready" / "enabled") and
+ * the standard first-sync watcher.
+ */
+const teamsConfig: ConnectorWizardConfig = {
+  initialState: {},
+  steps: [
+    { id: 'enable', label: 'Enable', render: (ctx) => teamsIngestionStep(ctx) },
+    { id: 'firstSync', label: 'First sync', render: (ctx) => firstSyncStep(ctx) },
+  ],
+};
+
 const mintlifyConfig: ConnectorWizardConfig = {
   initialState: {},
   steps: [
@@ -524,6 +540,7 @@ const REGISTRY: Partial<Record<ConnectorMeta['id'], ConnectorWizardConfig<any>>>
   jira: jiraConfig,
   confluence: confluenceConfig,
   stripe: stripeConfig,
+  teams: teamsConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
