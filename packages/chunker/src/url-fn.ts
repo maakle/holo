@@ -75,6 +75,19 @@ export const urlFns: Record<string, UrlFn> = {
     return null;
   },
 
+  /**
+   * Microsoft Graph hands us a fully-rendered `webUrl` on the root message
+   * (e.g. `https://teams.microsoft.com/l/message/19:xxx@thread.tacv2/yyy?
+   * tenantId=...&groupId=...`). The chunker persists it as
+   * `metadata.web_url` so we just read it back. Returning null falls
+   * through to the dashboard's `/files/<path>` view — accurate when
+   * Graph didn't supply a webUrl (deleted parent message, system event
+   * thread, etc.).
+   */
+  'teams-thread': ({ metadata }) => {
+    return str(metadata.web_url) ?? null;
+  },
+
   'github-pr': ({ metadata }) => {
     const repo = str(metadata.repo_full_name) ?? str(metadata.repoFullName);
     const n = num(metadata.pr_number);
