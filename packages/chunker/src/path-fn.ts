@@ -86,6 +86,38 @@ export const pathFns: Record<string, PathFn> = {
     return `/google-chat/${space}/${thread}.md`;
   },
 
+  /**
+   * Microsoft Teams threads land under one of two trees depending on the
+   * resource kind:
+   *
+   *   /teams/<team>/<channel>/<YYYY-MM-DD>/<root-msg>.md   (channel posts)
+   *   /teams/chats/<chat-label>/<root-msg>.md              (1:1, group, meeting chats)
+   *
+   * The date segment for channel posts mirrors Slack's per-day directory
+   * scheme so HoloFs `ls /teams/<team>/<channel>/2026-05/` returns a
+   * usable listing for a busy channel without scanning the whole tree.
+   * Chats don't get the date partition — they're typically lower-volume
+   * and the chat label is enough to disambiguate.
+   *
+   * `resource_kind` is set by the chunker to `'channel'` or `'chat'`.
+   */
+  'teams-thread': ({ metadata, externalId }) => {
+    const kind = metadata.resource_kind;
+    const root = slug(metadata.root_message_id, slug(externalId, 'thread'));
+    if (kind === 'channel') {
+      const team = slug(metadata.team_display_name, slug(metadata.team_id, 'unknown'));
+      const channel = slug(
+        metadata.channel_display_name,
+        slug(metadata.channel_id, 'unknown'),
+      );
+      return `/teams/${team}/${channel}/${dateFromIsoLike(metadata.created_date_time)}/${root}.md`;
+    }
+    // Chat (1:1, group, meeting). `chat_topic` is often empty for 1:1
+    // and meeting chats — fall back to the chat id.
+    const chat = slug(metadata.chat_topic, slug(metadata.chat_id, 'chat'));
+    return `/teams/chats/${chat}/${root}.md`;
+  },
+
   'github-pr': ({ metadata }) => {
     const repo = slugPath(metadata.repo_full_name, 'unknown/unknown');
     return `/github/${repo}/pulls/${metadata.pr_number ?? 'unknown'}.md`;

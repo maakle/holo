@@ -117,6 +117,16 @@ describe('url-fn registry', () => {
     ).toBe('https://acme.slack.com/archives/C1/p1234567890');
     expect(
       computeSourceUrl({
+        kind: 'teams-thread',
+        externalId: 'teams-thread:team-x/channel-y/root-1',
+        metadata: {
+          web_url:
+            'https://teams.microsoft.com/l/message/19:abc@thread.tacv2/root-1',
+        },
+      }),
+    ).toBe('https://teams.microsoft.com/l/message/19:abc@thread.tacv2/root-1');
+    expect(
+      computeSourceUrl({
         kind: 'googledrive-file',
         externalId: 'gd-1',
         metadata: { webViewLink: 'https://drive.google.com/file/d/abc/view' },

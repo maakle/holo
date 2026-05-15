@@ -47,6 +47,52 @@ describe('path-fn registry', () => {
     }
   });
 
+  it('teams-thread channel path uses team + channel + date + root id', () => {
+    const path = computePath({
+      kind: 'teams-thread',
+      externalId: 'teams-thread:team-x/channel-y/root-1',
+      metadata: {
+        resource_kind: 'channel',
+        team_id: 'team-x',
+        team_display_name: 'Engineering',
+        channel_id: 'channel-y',
+        channel_display_name: 'general',
+        root_message_id: 'root-1',
+        created_date_time: '2026-05-14T22:13:20Z',
+      },
+    });
+    expect(path).toBe('/teams/engineering/general/2026-05-14/root-1.md');
+  });
+
+  it('teams-thread chat path lives under /teams/chats/ with no date segment', () => {
+    const path = computePath({
+      kind: 'teams-thread',
+      externalId: 'teams-thread:chat-z/root-1',
+      metadata: {
+        resource_kind: 'chat',
+        chat_id: 'chat-z',
+        chat_topic: 'Q4 Planning',
+        root_message_id: 'root-1',
+        created_date_time: '2026-05-14T22:13:20Z',
+      },
+    });
+    expect(path).toBe('/teams/chats/q4-planning/root-1.md');
+  });
+
+  it('teams-thread chat falls back to chat_id when chat_topic is empty (1:1 chats)', () => {
+    const path = computePath({
+      kind: 'teams-thread',
+      externalId: 'teams-thread:chat-z/root-1',
+      metadata: {
+        resource_kind: 'chat',
+        chat_id: 'chat-z',
+        chat_topic: '',
+        root_message_id: 'root-1',
+      },
+    });
+    expect(path).toBe('/teams/chats/chat-z/root-1.md');
+  });
+
   it('slack-thread path uses channel + date from thread_ts', () => {
     const path = computePath({
       kind: 'slack-thread',

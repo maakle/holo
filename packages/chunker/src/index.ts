@@ -25,6 +25,12 @@ export {
   googleChatThreadChunker,
   type GoogleChatThreadInput,
 } from './google-chat-thread';
+export {
+  teamsThreadChunker,
+  stripHtmlBody as __stripTeamsHtmlBodyForTests,
+  type TeamsThreadInput,
+  type TeamsMessageInput,
+} from './teams-thread';
 export { notionPageChunker, type NotionPageInput } from './notion-page';
 export { grainCallChunker, type GrainCallInput, type GrainSpeakerTurn } from './grain-call';
 export { pylonTicketChunker, type PylonTicketInput, type PylonMessage } from './pylon-ticket';
