@@ -95,6 +95,29 @@ interface TeamsAppManifest {
   }>;
   permissions: Array<'identity' | 'messageTeamMembers'>;
   validDomains: string[];
+  /**
+   * Required by Teams when declaring Resource-Specific Consent (RSC).
+   * `id` is the bot's Microsoft App ID; `resource` is the canonical
+   * `api://botid-<appId>` form per Microsoft's docs (the "resource"
+   * field's value is conventionally a URI even when no SSO is enabled).
+   */
+  webApplicationInfo: { id: string; resource: string };
+  /**
+   * Resource-Specific Consent permissions — declared in the manifest,
+   * granted by the tenant admin at sideload time, and enforced by
+   * Microsoft Graph itself. The bot can only read channel/chat
+   * messages in resources where it's been installed. See
+   * docs/designs/teams-ingestion.md for the rationale (vs. the
+   * tenant-wide `Chat.Read.All` application permission).
+   */
+  authorization: {
+    permissions: {
+      resourceSpecific: Array<{
+        name: string;
+        type: 'Application' | 'Delegated';
+      }>;
+    };
+  };
 }
 
 function buildManifest(input: TeamsManifestInput): TeamsAppManifest {
@@ -137,6 +160,30 @@ function buildManifest(input: TeamsManifestInput): TeamsAppManifest {
     ],
     permissions: ['identity', 'messageTeamMembers'],
     validDomains: [host],
+    webApplicationInfo: {
+      id: input.appId,
+      resource: `api://botid-${input.appId}`,
+    },
+    authorization: {
+      permissions: {
+        // Order is intentional: bot-related perms first, then ingestion
+        // perms. Adding a permission here forces a re-sideload to grant.
+        resourceSpecific: [
+          // Channel-message ingestion (reads only channels where the bot
+          // is installed; Microsoft enforces the boundary).
+          { name: 'ChannelMessage.Read.Group', type: 'Application' },
+          // Team metadata for ACL derivation (display name, settings).
+          { name: 'TeamSettings.Read.Group', type: 'Application' },
+          // Team membership for per-user ACL filtering at retrieval time.
+          { name: 'TeamMember.Read.Group', type: 'Application' },
+          // Chat-message ingestion for 1:1 / group / meeting chats where
+          // the bot has been added.
+          { name: 'ChatMessage.Read.Chat', type: 'Application' },
+          // Chat membership for ACL derivation on chat threads.
+          { name: 'ChatMember.Read.Chat', type: 'Application' },
+        ],
+      },
+    },
   };
 }
 
