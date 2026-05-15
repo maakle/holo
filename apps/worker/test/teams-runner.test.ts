@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { __testing } from '../src/queues/teams-runner';
 import type { EmittedThread } from '@holo/connectors';
 
-const { chunksFromThread, parsePersistedCursor } = __testing;
+const { chunksFromThread, parsePersistedCursor, externalIdForDeletion } = __testing;
 
 function channelEmission(over: Partial<EmittedThread> = {}): EmittedThread {
   return {
@@ -96,6 +96,52 @@ describe('parsePersistedCursor', () => {
       },
     });
     expect(parsed.byTenant['tenant-a']).toEqual({});
+  });
+});
+
+describe('externalIdForDeletion', () => {
+  it('reconstructs the channel synthetic id from the cursor key', () => {
+    expect(
+      externalIdForDeletion({
+        resourceCursorKey: 'channel-team-1:ch-1',
+        rootMessageId: 'root-1',
+      }),
+    ).toBe('teams-thread:team-1/ch-1/root-1');
+  });
+
+  it('reconstructs the chat synthetic id from the cursor key', () => {
+    expect(
+      externalIdForDeletion({
+        resourceCursorKey: 'chat-chat-z',
+        rootMessageId: 'root-1',
+      }),
+    ).toBe('teams-thread:chat-z/root-1');
+  });
+
+  it('returns null for a malformed cursor key', () => {
+    expect(
+      externalIdForDeletion({
+        resourceCursorKey: 'unknown-prefix-xyz',
+        rootMessageId: 'root-1',
+      }),
+    ).toBeNull();
+    expect(
+      externalIdForDeletion({
+        resourceCursorKey: 'channel-without-colon',
+        rootMessageId: 'root-1',
+      }),
+    ).toBeNull();
+  });
+
+  it('handles channel ids that contain unusual characters', () => {
+    // Real Graph channel ids are like `19:abc@thread.tacv2` — preserve
+    // the literal value all the way through to the synthetic id.
+    expect(
+      externalIdForDeletion({
+        resourceCursorKey: 'channel-team-1:19:abc@thread.tacv2',
+        rootMessageId: '1700000000000',
+      }),
+    ).toBe('teams-thread:team-1/19:abc@thread.tacv2/1700000000000');
   });
 });
 
