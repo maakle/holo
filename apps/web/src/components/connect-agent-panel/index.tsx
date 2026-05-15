@@ -266,7 +266,7 @@ function ModePicker({
       <ModeCard
         active={mode === 'chat-bot'}
         title="Chat bot"
-        description="Talk to holo from Slack — Google Chat and Teams coming soon."
+        description="Talk to holo from Slack or Google Chat — Microsoft Teams coming soon."
         onClick={() => onSelect('chat-bot')}
       />
       <ModeCard

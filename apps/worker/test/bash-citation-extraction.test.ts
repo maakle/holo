@@ -83,7 +83,6 @@ function stubDb(rows: { path: string; sourceUrl: string | null }[]): DB {
     from: () => chain,
     where: () => Promise.resolve(rows),
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { select: () => chain } as unknown as DB;
 }
 
@@ -94,7 +93,6 @@ function failingDb(): DB {
       throw new Error('db down');
     },
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { select: () => chain } as unknown as DB;
 }
 
@@ -155,7 +153,6 @@ describe('resolveBashSourceUrls', () => {
 
   it('returns the empty list when given no sources (no DB round-trip)', async () => {
     let queried = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = {
       select: () => {
         queried = true;

@@ -66,7 +66,7 @@ export function mountGoogleChatAppEvents(
   app.post('/google-chat-app/events', async (c) => {
     if (!opts.sharedAudience) {
       logger.warn(
-        'google-chat-app events: GOOGLE_CHAT_APP_AUDIENCE unset, rejecting',
+        'google-chat-app events: GOOGLE_CHAT_APP_PROJECT_NUMBER unset, rejecting',
       );
       return c.json(
         { error: 'google chat app audience not configured' },

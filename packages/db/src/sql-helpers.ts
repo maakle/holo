@@ -5,6 +5,7 @@
  * sugar — keep this file minimal.
  */
 import { sql, type SQL } from 'drizzle-orm';
+import { holoError, ErrorCode } from '@holo/errors';
 
 /**
  * Bind a JS number as Postgres `integer`.
@@ -40,7 +41,11 @@ import { sql, type SQL } from 'drizzle-orm';
  */
 export function intParam(value: number): SQL {
   if (!Number.isInteger(value)) {
-    throw new Error(`intParam expects an integer, got ${value}`);
+    throw holoError({
+      code: ErrorCode.HOLO_INVALID_INPUT,
+      problem: `intParam expects an integer, got ${value}`,
+      fix: 'Pass an integer; for floats, bind explicitly as numeric/text instead.',
+    });
   }
   return sql`${value}::integer`;
 }

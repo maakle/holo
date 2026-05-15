@@ -569,7 +569,7 @@ export const slackAppConfigs = pgTable(
  * tokens from the row's service account JSON.
  *
  * Orgs without a row continue to use the shared Holo Chat App sourced from
- * GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON / GOOGLE_CHAT_APP_AUDIENCE env vars.
+ * GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON / GOOGLE_CHAT_APP_PROJECT_NUMBER env vars.
  * One row per org (`uniq` on `organization_id`) — multiple Workspaces
  * installed under the same org share the same custom app, matching the
  * shape of slackAppConfigs.

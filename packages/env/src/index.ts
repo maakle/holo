@@ -40,16 +40,18 @@ const EnvSchema = z.object({
    * single service account whose JSON is provided here; per-org BYO apps
    * store their own credentials in `google_chat_app_configs`.
    *
-   * GOOGLE_CHAT_APP_AUDIENCE is the Cloud project number used to validate
-   * inbound JWTs at /google-chat-app/events. Without it the shared route
-   * fails closed (503).
+   * GOOGLE_CHAT_APP_PROJECT_NUMBER is the Cloud project number (digits
+   * only, from Cloud Console → Project Settings) used as the JWT audience
+   * to validate inbound Chat events at /google-chat-app/events. Without
+   * it the shared route fails closed (503). Named for what the operator
+   * pastes; in code it plays the JWT `aud` role.
    *
    * GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON is the service account JSON used
    * to mint app-level tokens for outbound `messages.create` /
    * `messages.patch` calls. Multi-line; paste it raw (not base64'd) or
    * source from a secret store.
    */
-  GOOGLE_CHAT_APP_AUDIENCE: z.string().optional(),
+  GOOGLE_CHAT_APP_PROJECT_NUMBER: z.string().optional(),
   GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON: z.string().optional(),
   // Linear uses per-user personal API keys (Settings → API → Personal API
   // keys). The token is collected through the wizard and stored in

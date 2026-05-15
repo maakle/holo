@@ -14,6 +14,7 @@ import { mountSlackEvents } from './slack/events.js';
 import { mountSlackCommands } from './slack/commands.js';
 import { mountSlackInteractivity } from './slack/interactivity.js';
 import { mountGoogleChatAppEvents } from './google-chat-app/events.js';
+import { mountGoogleChatAppHealthz } from './google-chat-app/healthz.js';
 import { logger } from './logger.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -139,8 +140,12 @@ async function main() {
   // the MCP middleware stack.
   mountGoogleChatAppEvents(app, {
     db,
-    sharedAudience: env.GOOGLE_CHAT_APP_AUDIENCE,
+    sharedAudience: env.GOOGLE_CHAT_APP_PROJECT_NUMBER,
     redisUrl: env.REDIS_URL,
+  });
+  mountGoogleChatAppHealthz(app, {
+    audience: env.GOOGLE_CHAT_APP_PROJECT_NUMBER,
+    serviceAccountJson: env.GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON,
   });
 
   mountMcp(app, {
