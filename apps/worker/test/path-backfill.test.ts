@@ -132,6 +132,18 @@ describe('runPathBackfill', () => {
     ]);
   });
 
+  it('fill-mode SELECT also picks up /_unbackfilled/ sentinel rows from migration 0049', async () => {
+    const fake = makeFakeSql();
+    fake.queueResult([]);
+
+    await runPathBackfill(fake.sql, { batchSize: 100 });
+
+    // The SELECT must include the sentinel branch — a regression to a
+    // `path IS NULL` only filter would leave orphans from migration 0049
+    // stuck on /_unbackfilled/<id> forever.
+    expect(fake.calls[0]!.text).toContain("/_unbackfilled/%");
+  });
+
   it('skips kinds without a registered path-fn and reports them', async () => {
     const fake = makeFakeSql();
     fake.queueResult([

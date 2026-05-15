@@ -123,10 +123,16 @@ export async function runPathBackfill(
     // The path filter is the only thing that differs between modes — fill
      // mode targets NULL paths, repair mode targets non-NULL ones. Inlined
      // (rather than parameterized) so postgres-js can plan each variant.
-    // Fill mode targets rows missing either `path` or `source_url`. Repair
-    // mode re-evaluates every non-tombstoned row against the current
-    // path-fn / url-fn output and rewrites only on diff. Both modes pull
-    // path + source_url so the per-row no-op short-circuit works.
+    // Fill mode targets rows missing either `path` or `source_url`, plus
+    // rows that landed on the `/_unbackfilled/` sentinel set by migration
+    // 0049's NULL-rescue UPDATE — those are deploy-time orphans that
+    // ought to be replaced with the proper path-fn output on the next
+    // backfill pass.
+    //
+    // Repair mode re-evaluates every non-tombstoned row against the
+    // current path-fn / url-fn output and rewrites only on diff. Both
+    // modes pull path + source_url so the per-row no-op short-circuit
+    // works.
     const artifacts = (repair
       ? cursorOrg && cursorId
         ? await sql<ArtifactRow[]>`
@@ -150,7 +156,7 @@ export async function runPathBackfill(
         ? await sql<ArtifactRow[]>`
             SELECT id, organization_id, kind, external_id, path, source_url
             FROM source_artifacts
-            WHERE (path IS NULL OR source_url IS NULL)
+            WHERE (path IS NULL OR source_url IS NULL OR path LIKE '/_unbackfilled/%')
               AND deleted_at IS NULL
               AND (organization_id, id) > (${cursorOrg}, ${cursorId})
             ORDER BY organization_id, id
@@ -159,7 +165,7 @@ export async function runPathBackfill(
         : await sql<ArtifactRow[]>`
             SELECT id, organization_id, kind, external_id, path, source_url
             FROM source_artifacts
-            WHERE (path IS NULL OR source_url IS NULL)
+            WHERE (path IS NULL OR source_url IS NULL OR path LIKE '/_unbackfilled/%')
               AND deleted_at IS NULL
             ORDER BY organization_id, id
             LIMIT ${take}
