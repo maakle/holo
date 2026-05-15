@@ -12,15 +12,18 @@ type GoogleChatBotStatus =
 interface BotStatusResponse {
   status?: GoogleChatBotStatus;
   customerNumber?: string;
+  eventsUrl?: string | null;
 }
 
 function useGoogleChatBotStatus(): {
   status: GoogleChatBotStatus;
   customerNumber: string | null;
+  eventsUrl: string | null;
   refresh: () => void;
 } {
   const [status, setStatus] = useState<GoogleChatBotStatus>('loading');
   const [customerNumber, setCustomerNumber] = useState<string | null>(null);
+  const [eventsUrl, setEventsUrl] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -30,6 +33,7 @@ function useGoogleChatBotStatus(): {
         if (cancelled) return;
         setStatus(data.status ?? 'error');
         setCustomerNumber(data.customerNumber ?? null);
+        setEventsUrl(data.eventsUrl ?? null);
       })
       .catch(() => {
         if (!cancelled) setStatus('error');
@@ -38,11 +42,16 @@ function useGoogleChatBotStatus(): {
       cancelled = true;
     };
   }, [tick]);
-  return { status, customerNumber, refresh: () => setTick((t) => t + 1) };
+  return {
+    status,
+    customerNumber,
+    eventsUrl,
+    refresh: () => setTick((t) => t + 1),
+  };
 }
 
 export function GoogleChatSetup() {
-  const { status, customerNumber, refresh } = useGoogleChatBotStatus();
+  const { status, customerNumber, eventsUrl, refresh } = useGoogleChatBotStatus();
 
   return (
     <div className="space-y-4">
@@ -59,7 +68,7 @@ export function GoogleChatSetup() {
         <p className="text-xs text-text-subtle">Checking workspace…</p>
       )}
 
-      {status === 'not_configured' && <NotConfigured />}
+      {status === 'not_configured' && <NotConfigured eventsUrl={eventsUrl} />}
 
       {status === 'workspace_unclaimed' && <ClaimWorkspace onClaimed={refresh} />}
 
@@ -208,30 +217,156 @@ function DeploymentReport({
   );
 }
 
-function NotConfigured() {
+function NotConfigured({ eventsUrl }: { eventsUrl: string | null }) {
+  const endpointUrl = eventsUrl ?? 'https://{your-gateway-host}/google-chat-app/events';
   return (
-    <div className="space-y-2 rounded-md border border-warning/40 bg-warning/10 p-4">
+    <div className="space-y-4 rounded-md border border-warning/40 bg-warning/10 p-4">
       <p className="text-[13px] leading-6 text-text">
         The holo Google Chat App isn&apos;t configured on this deployment yet.
-        An operator must:
+        An operator must complete the three steps below in Google Cloud
+        Console, then set env vars on the gateway + worker.
       </p>
-      <ol className="list-decimal space-y-1 pl-5 text-[13px] leading-6 text-text">
-        <li>
-          Create a Google Cloud project, enable the Chat API, and create a
-          service account.
-        </li>
-        <li>
-          Configure the Chat app to point at{' '}
-          <InlineCode>{`{GATEWAY}/google-chat-app/events`}</InlineCode> (HTTP
-          endpoint mode).
-        </li>
-        <li>
-          Set <InlineCode>GOOGLE_CHAT_APP_PROJECT_NUMBER</InlineCode> (Cloud
-          project number) and{' '}
-          <InlineCode>GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON</InlineCode> on
-          gateway + worker, then redeploy.
-        </li>
+
+      <ol className="list-none space-y-4">
+        <Step n={1}>
+          <div className="font-medium text-text">
+            Create a Cloud project + service account
+          </div>
+          <ol className="list-decimal space-y-1 pl-4 text-[12px] leading-5 text-text-subtle">
+            <li>
+              In{' '}
+              <ConsoleLink href="https://console.cloud.google.com/projectcreate">
+                Google Cloud Console
+              </ConsoleLink>
+              , create a dedicated project (e.g.{' '}
+              <InlineCode>holo-chat-app-prod</InlineCode>).
+            </li>
+            <li>
+              Enable the{' '}
+              <ConsoleLink href="https://console.cloud.google.com/apis/library/chat.googleapis.com">
+                Google Chat API
+              </ConsoleLink>
+              .
+            </li>
+            <li>
+              Create a service account (any name, no roles). Generate a JSON
+              key and download it — treat as a secret.
+            </li>
+            <li>
+              Note the <strong>Cloud project number</strong> from{' '}
+              <em>Project Settings → Project number</em> (12-digit integer,
+              not the project ID slug).
+            </li>
+          </ol>
+        </Step>
+
+        <Step n={2}>
+          <div className="font-medium text-text">
+            Configure the Chat App
+          </div>
+          <p className="text-[12px] leading-5 text-text-subtle">
+            Open the{' '}
+            <ConsoleLink href="https://console.cloud.google.com/apis/api/chat.googleapis.com/hangouts-chat">
+              Chat API Configuration tab
+            </ConsoleLink>{' '}
+            and set:
+          </p>
+          <ul className="list-disc space-y-1 pl-4 text-[12px] leading-5 text-text-subtle">
+            <li>
+              <strong>Build as Workspace Add-on:</strong> unchecked
+            </li>
+            <li>
+              <strong>App name:</strong> <InlineCode>holo</InlineCode>
+            </li>
+            <li>
+              <strong>Avatar URL:</strong> any HTTPS-hosted 250×250 PNG
+            </li>
+            <li>
+              <strong>Description:</strong>{' '}
+              <InlineCode>Ask holo from Google Chat</InlineCode>
+            </li>
+            <li>
+              <strong>Interactive features:</strong> ON
+              <ul className="mt-1 list-[circle] space-y-0.5 pl-4">
+                <li>
+                  Functionality: check both <em>Receive 1:1 messages</em> and{' '}
+                  <em>Join spaces and group conversations</em>
+                </li>
+                <li>
+                  Connection settings: <strong>HTTP endpoint URL</strong>
+                </li>
+                <li>
+                  Endpoint URL (paste this):
+                  <div className="mt-1">
+                    <InlineCode>{endpointUrl}</InlineCode>
+                  </div>
+                </li>
+                <li>
+                  Authentication audience:{' '}
+                  <strong>Project number</strong> (Google signs JWTs with{' '}
+                  <InlineCode>aud</InlineCode> = your Cloud project number,
+                  which is what holo&apos;s gateway verifies). Picking{' '}
+                  <em>HTTP endpoint URL</em> will cause every inbound event
+                  to fail with <InlineCode>wrong_audience</InlineCode>.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>Visibility / installation model:</strong> the Cloud
+              project is the platform owner, not the tenant boundary —
+              the JWT <InlineCode>aud</InlineCode> is your project number
+              regardless of which Workspace originated the event.
+              Pick based on your deployment shape:
+              <ul className="mt-1 list-[circle] space-y-0.5 pl-4">
+                <li>
+                  <strong>Single-tenant</strong> (just your own Workspace):
+                  restrict to your domain.
+                </li>
+                <li>
+                  <strong>Multi-tenant</strong> (hosted holo — other orgs&apos;
+                  Workspace admins install it themselves): publish the app to
+                  the <strong>Google Workspace Marketplace</strong> on the
+                  same Cloud project. Private listings skip public brand
+                  review and let you whitelist customer domains.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>App status:</strong> LIVE — available to users in your
+              domain
+            </li>
+          </ul>
+        </Step>
+
+        <Step n={3}>
+          <div className="font-medium text-text">
+            Set env vars on gateway + worker
+          </div>
+          <p className="text-[12px] leading-5 text-text-subtle">
+            Both variables must be set on <strong>both</strong>{' '}
+            <InlineCode>apps/gateway</InlineCode> and{' '}
+            <InlineCode>apps/worker</InlineCode>, then redeploy:
+          </p>
+          <ul className="list-disc space-y-1 pl-4 text-[12px] leading-5 text-text-subtle">
+            <li>
+              <InlineCode>GOOGLE_CHAT_APP_PROJECT_NUMBER</InlineCode> — the
+              Cloud project number from step 1 (12-digit integer, not the
+              project ID).
+            </li>
+            <li>
+              <InlineCode>GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON</InlineCode> —
+              the full contents of the service-account JSON key file as a
+              single string (mints outbound bot-reply tokens).
+            </li>
+          </ul>
+          <p className="text-[12px] leading-5 text-text-subtle">
+            Set them in your deploy platform&apos;s env-var panel (Vercel /
+            Render / Fly / k8s secrets). Redeploy both services, then click{' '}
+            <strong>Run check</strong> below to verify.
+          </p>
+        </Step>
       </ol>
+
       <p className="text-[12px] text-text-subtle">
         Full guide:{' '}
         <a
@@ -244,6 +379,19 @@ function NotConfigured() {
         </a>
       </p>
     </div>
+  );
+}
+
+function ConsoleLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="text-accent hover:underline"
+    >
+      {children}
+    </a>
   );
 }
 

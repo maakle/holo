@@ -39,7 +39,33 @@ export const CONFIG_TABS = [
 ] as const;
 export type Tab = (typeof CONFIG_TABS)[number];
 
+const TAB_SLUGS: Record<Tab, string> = {
+  Claude: 'claude',
+  ChatGPT: 'chatgpt',
+  Gemini: 'gemini',
+  OpenAPI: 'openapi',
+  'Custom MCP': 'custom-mcp',
+};
+const SLUG_TO_TAB: Record<string, Tab> = Object.fromEntries(
+  (Object.entries(TAB_SLUGS) as [Tab, string][]).map(([tab, slug]) => [slug, tab]),
+);
+export function tabToSlug(tab: Tab): string {
+  return TAB_SLUGS[tab];
+}
+export function slugToTab(slug: string | null): Tab | null {
+  if (!slug) return null;
+  return SLUG_TO_TAB[slug] ?? null;
+}
+
 export type ConnectMode = 'chat-bot' | 'agent';
 export function modeStorageKey(orgId: string): string {
   return `holo:connect-mode:${orgId}`;
+}
+
+export type ChatSurface = 'slack' | 'google-chat' | 'teams';
+export function isChatSurface(value: string | null): value is ChatSurface {
+  return value === 'slack' || value === 'google-chat' || value === 'teams';
+}
+export function isConnectMode(value: string | null): value is ConnectMode {
+  return value === 'chat-bot' || value === 'agent';
 }

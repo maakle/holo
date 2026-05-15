@@ -35,11 +35,14 @@ export async function GET() {
     }
     const orgId = resolveActiveOrgId(session);
 
+    const gatewayBase = env.MCP_PUBLIC_URL?.replace(/\/+$/, '') ?? null;
+    const eventsUrl = gatewayBase ? `${gatewayBase}/google-chat-app/events` : null;
+
     const envReady = Boolean(
       env.GOOGLE_CHAT_APP_PROJECT_NUMBER && env.GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON,
     );
     if (!envReady) {
-      return NextResponse.json({ status: 'not_configured' as const });
+      return NextResponse.json({ status: 'not_configured' as const, eventsUrl });
     }
 
     const rows = await db

@@ -173,12 +173,30 @@ function BotNotInstalledCard({ onRefresh }: { onRefresh: () => void }) {
       </p>
       <ol className="list-decimal space-y-1 pl-5 text-[12px] leading-5 text-text-subtle">
         <li>
-          Go to <strong>Connect</strong> → <strong>Microsoft Teams</strong>{' '}
-          (under Chat bot) and download <code>holo-bot.zip</code>.
+          Open{' '}
+          <a
+            href="/connect-agent?mode=chat-bot&surface=teams"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-accent hover:underline"
+          >
+            Connect agent → Chat bot → Microsoft Teams
+            <ExternalLink className="h-3 w-3" />
+          </a>{' '}
+          and download <code>holo-bot.zip</code>.
         </li>
         <li>
-          Sideload the zip in <strong>Teams Admin Center</strong> →{' '}
-          <em>Manage apps</em> → <em>Upload custom app</em>.
+          Sideload the zip in{' '}
+          <a
+            href="https://admin.teams.microsoft.com/policies/manage-apps"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-accent hover:underline"
+          >
+            Teams Admin Center → Manage apps
+            <ExternalLink className="h-3 w-3" />
+          </a>{' '}
+          → <em>Actions</em> → <em>Upload new app</em>.
         </li>
         <li>
           Add the bot to a team, channel, or DM, then paste the tenant ID

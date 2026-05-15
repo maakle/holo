@@ -1,13 +1,26 @@
 'use client';
-import { useState } from 'react';
+import { useCallback } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { SlackSetup } from './slack';
 import { GoogleChatSetup } from './google-chat';
 import { TeamsSetup } from './teams';
-
-type Surface = 'slack' | 'google-chat' | 'teams';
+import { isChatSurface, type ChatSurface } from '../lib';
 
 export function ChatBotSetup() {
-  const [surface, setSurface] = useState<Surface>('slack');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const raw = searchParams.get('surface');
+  const surface: ChatSurface = isChatSurface(raw) ? raw : 'slack';
+
+  const setSurface = useCallback(
+    (next: ChatSurface) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('surface', next);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
 
   return (
     <div className="space-y-6">

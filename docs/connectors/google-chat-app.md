@@ -42,13 +42,30 @@ Open the Chat API page and switch to the **Configuration** tab:
   - **Connection settings**: choose **HTTP endpoint URL**.
   - **Endpoint URL**:
     `https://{your-gateway-host}/google-chat-app/events`
-  - **Authentication audience**: pick **App URL** (Google signs JWTs with
-    aud = your project number — this matches what holo verifies).
-- **Visibility**: restrict to your domain, or your specific test users
-  during rollout.
+  - **Authentication audience**: pick **Project number** (Google signs
+    JWTs with `aud` = your Cloud project number, which is what holo's
+    gateway verifies against `GOOGLE_CHAT_APP_PROJECT_NUMBER`). Picking
+    *HTTP endpoint URL* will cause every inbound event to fail
+    verification with `wrong_audience`.
+- **Visibility / installation model**: this controls *who can install*
+  the app — not who the JWT aud is. Pick based on your deployment shape:
+  - **Single-tenant** (you're running holo just for your own
+    Workspace): "Restrict to specific people and groups in your
+    organization" → your domain. Only users in your Workspace can install.
+  - **Multi-tenant** (hosted holo, e.g. holobase.dev — you want other
+    holo orgs' Workspace admins to be able to install): publish the app
+    to the **Google Workspace Marketplace**. Create a Marketplace SDK
+    listing on the same Cloud project; private listing skips public
+    brand review and lets you whitelist customer domains.
 - **App status**: **LIVE — available to users in your domain**.
 
 Save.
+
+The Cloud project is the *platform owner* (it signs and receives every
+event for every Workspace that installs the app), not the *tenant
+boundary*. The JWT `aud` is your project number regardless of which
+customer Workspace originated the event; per-org routing happens via the
+`customerNumber` in the event payload (see step "Admin setup" below).
 
 ### 3. Set env vars on gateway + worker
 

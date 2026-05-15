@@ -204,19 +204,28 @@ function NotConfigured() {
       </p>
       <ol className="list-decimal space-y-1 pl-5 text-[13px] leading-6 text-text">
         <li>
-          Register a multi-tenant Azure AD app at{' '}
+          Register a multi-tenant app in{' '}
           <a
-            href="https://portal.azure.com"
+            href="https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"
             target="_blank"
             rel="noreferrer"
             className="text-accent hover:underline"
           >
-            portal.azure.com
+            Entra ID → App registrations
           </a>{' '}
-          → App registrations → New.
+          → <em>New registration</em>.
         </li>
         <li>
-          Create an Azure Bot resource pointing at{' '}
+          Create an{' '}
+          <a
+            href="https://portal.azure.com/#browse/Microsoft.BotService%2FbotServices"
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent hover:underline"
+          >
+            Azure Bot resource
+          </a>{' '}
+          with messaging endpoint{' '}
           <InlineCode>{`{GATEWAY}/teams-bot/messages`}</InlineCode>.
         </li>
         <li>
@@ -301,19 +310,34 @@ function ClaimTenant({ onClaimed }: { onClaimed: () => void }) {
         </div>
       </Step>
       <Step n={2}>
-        In <strong>Teams Admin Center</strong> → <em>Manage apps</em> →{' '}
-        <em>Upload custom app</em>, upload the zip. Approve the app for your
-        organization.
+        Open{' '}
+        <a
+          href="https://admin.teams.microsoft.com/policies/manage-apps"
+          target="_blank"
+          rel="noreferrer"
+          className="text-accent hover:underline"
+        >
+          Teams Admin Center → Manage apps
+        </a>{' '}
+        → <em>Actions</em> → <em>Upload new app</em>, upload the zip, and
+        approve the app for your organization.
       </Step>
       <Step n={3}>
-        Add the bot to a team, channel, or DM in the Teams desktop/web client.
-        The first activity it receives carries your tenant id.
+        In the Teams desktop/web client, add the <strong>holo</strong> bot to a
+        team, channel, or DM. The first activity it receives carries your
+        tenant id.
       </Step>
       <Step n={4}>
-        Copy your <strong>Azure AD tenant ID</strong> from{' '}
-        <InlineCode>portal.azure.com</InlineCode> → <em>Azure Active Directory</em> →{' '}
-        <em>Overview</em> → <em>Tenant ID</em>. It looks like a GUID
-        (8-4-4-4-12 hex).
+        Copy your <strong>tenant ID</strong> from{' '}
+        <a
+          href="https://entra.microsoft.com/#view/Microsoft_AAD_IAM/TenantOverview.ReactView"
+          target="_blank"
+          rel="noreferrer"
+          className="text-accent hover:underline"
+        >
+          Entra ID → Overview
+        </a>
+        . It looks like a GUID (8-4-4-4-12 hex).
       </Step>
       <Step n={5}>
         <form onSubmit={submit} className="space-y-2">

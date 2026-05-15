@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
@@ -28,14 +28,27 @@ interface Args {
    * service-account flow — e.g. Google Chat's "configure a Chat app" page,
    * which is required even after the Chat API is enabled. Rendered as part
    * of the Google Cloud setup sub-step.
+   *
+   * `fields` renders as a nested a/b/c list under the outer numeric list,
+   * with a copy button next to each value. Order should mirror the order
+   * fields appear in the third-party UI so users can fill top-to-bottom.
    */
   extraSteps?: ReadonlyArray<{
     /** Headline link text. */
     label: string;
     /** URL the label points to. */
     href: string;
-    /** One-line explanation of *why* this step is needed. */
-    body: string;
+    /** Short intro before the field list. */
+    body?: string;
+    /** Optional field-by-field instructions; renders a/b/c with copy buttons. */
+    fields?: ReadonlyArray<{
+      /** Label of the field in the third-party UI. */
+      label: string;
+      /** Value to paste — renders a copy button when present. */
+      value?: string;
+      /** Action without a value (e.g. "Uncheck", "Turn OFF", "Click Save"). */
+      action?: string;
+    }>;
   }>;
 }
 
@@ -277,16 +290,31 @@ function GcpSetupBody({
         </li>
       ) : null}
       {args.extraSteps?.map((step) => (
-        <li key={step.href}>
-          <a
-            href={step.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent underline-offset-2 hover:underline"
-          >
-            {step.label}
-          </a>
-          . {step.body}
+        <li key={step.href} className="flex flex-col gap-2">
+          <span>
+            <a
+              href={step.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent underline-offset-2 hover:underline"
+            >
+              {step.label}
+            </a>
+            {step.body ? <>. {step.body}</> : null}
+          </span>
+          {step.fields && step.fields.length > 0 ? (
+            <ol className="ml-1 flex flex-col gap-1.5 pl-4 [list-style:lower-alpha]">
+              {step.fields.map((f) => (
+                <li key={f.label}>
+                  <FieldRow
+                    label={f.label}
+                    value={f.value}
+                    action={f.action}
+                  />
+                </li>
+              ))}
+            </ol>
+          ) : null}
         </li>
       ))}
       <li>
@@ -301,8 +329,8 @@ function GcpSetupBody({
         </a>
         , create a service account (or pick an existing one). You can skip
         the optional &ldquo;Grant this service account access&rdquo; (IAM
-        roles) step — {meta.displayName} doesn&apos;t need any project-level
-        role.
+        roles) step — {meta.displayName}{' '}doesn&apos;t need any
+        project-level role.
       </li>
       <li>
         Open the service account, go to the{' '}
@@ -402,10 +430,10 @@ function PasteCredentialsBody({
           disabled={busy}
         />
         <span className="text-[11px] text-text-subtle">
-          A real Workspace user —
-          <strong className="font-medium text-text"> not</strong> the
-          service account&apos;s own email. The SA impersonates this user;
-          Holo only sees what they can see.
+          A real Workspace user —{' '}
+          <strong className="font-medium text-text">not</strong>{' '}
+          the service account&apos;s own email. The SA impersonates this
+          user; Holo only sees what they can see.
         </span>
       </label>
 
@@ -434,6 +462,52 @@ function PasteCredentialsBody({
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function FieldRow({
+  label,
+  value,
+  action,
+}: {
+  label: string;
+  value?: string;
+  action?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      toast.success(`${label} copied`);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // ignore
+    }
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="font-medium text-text">{label}</span>
+      {action ? <span className="text-text-muted">— {action}</span> : null}
+      {value ? (
+        <span className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-border bg-surface-2 px-1.5 py-0.5">
+          <code className="truncate font-mono text-[11px] text-text">{value}</code>
+          <button
+            type="button"
+            onClick={copy}
+            aria-label={`Copy ${label}`}
+            className="flex shrink-0 items-center gap-1 rounded-sm px-1 text-[11px] text-text-muted hover:text-text focus:outline-hidden focus:focus-ring"
+          >
+            {copied ? (
+              <Check className="h-3 w-3 text-success" aria-hidden />
+            ) : (
+              <Copy className="h-3 w-3" aria-hidden />
+            )}
+          </button>
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function ScopeBlock({ scopes }: { scopes: ReadonlyArray<string> }) {

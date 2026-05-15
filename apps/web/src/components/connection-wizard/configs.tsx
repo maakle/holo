@@ -127,6 +127,7 @@ const googleDriveConfig: ConnectorWizardConfig<GoogleDriveDrivesState> = {
     {
       id: 'install',
       label: 'Service account',
+      size: 'wide',
       render: (ctx) =>
         serviceAccountStep(ctx, {
           scopes: GOOGLEDRIVE_SCOPES,
@@ -414,6 +415,7 @@ const googleChatConfig: ConnectorWizardConfig<GoogleChatSpacesState> = {
     {
       id: 'install',
       label: 'Service account',
+      size: 'wide',
       render: (ctx) =>
         serviceAccountStep(ctx, {
           scopes: GOOGLE_CHAT_SCOPES,
@@ -424,7 +426,33 @@ const googleChatConfig: ConnectorWizardConfig<GoogleChatSpacesState> = {
               label: 'Configure a Chat app',
               href: 'https://console.cloud.google.com/apis/api/chat.googleapis.com/hangouts-chat',
               body:
-                'Open the Configuration tab. Uncheck "Build as a Workspace Add-on". App name: "Holo". Avatar URL: https://raw.githubusercontent.com/maakle/holo/main/apps/web/public/logo.png. Description (≤40 chars): "Read-only ingestion for Holo". Turn OFF Interactive Features — Holo only reads via service account, no triggers needed. App status: "LIVE — available to users in your domain". Save. Full field-by-field guide: docs/connectors/google-chat.md.',
+                'Open the Configuration tab and fill it in top-to-bottom — the fields below match the order on the page:',
+              fields: [
+                {
+                  label: 'Build as a Workspace Add-on',
+                  action: 'Uncheck.',
+                },
+                {
+                  label: 'App status',
+                  action: 'Select "LIVE — available to users in your domain".',
+                },
+                { label: 'App name', value: 'Holo' },
+                {
+                  label: 'Avatar URL',
+                  value:
+                    'https://raw.githubusercontent.com/maakle/holo/main/apps/web/public/logo.png',
+                },
+                {
+                  label: 'Description (≤40 chars)',
+                  value: 'Indexes Chat history for Holo search',
+                },
+                {
+                  label: 'Interactive features',
+                  action:
+                    'Turn OFF — Holo only reads via service account, no triggers needed.',
+                },
+                { label: 'Save', action: 'Click Save at the bottom of the page.' },
+              ],
             },
           ],
         }),

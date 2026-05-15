@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { and, eq, ne, sql } from 'drizzle-orm';
@@ -35,7 +36,9 @@ export default async function ConnectAgentPage() {
         </p>
       </header>
       <ConnectAgentBanner initial={initial} />
-      <ConnectAgentPanel mcpUrl={mcpUrl} gatewayBase={gatewayBase} orgId={orgId} />
+      <Suspense fallback={null}>
+        <ConnectAgentPanel mcpUrl={mcpUrl} gatewayBase={gatewayBase} orgId={orgId} />
+      </Suspense>
     </div>
   );
 }

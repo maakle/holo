@@ -1,9 +1,13 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   CONFIG_TABS,
+  isConnectMode,
   modeStorageKey,
+  slugToTab,
+  tabToSlug,
   testDismissedKey,
   type ConnectMode,
   type Tab,
@@ -26,13 +30,24 @@ interface Props {
 export function ConnectAgentPanel({ mcpUrl, gatewayBase, orgId }: Props) {
   const dismissedKey = testDismissedKey(orgId);
   const modeKey = modeStorageKey(orgId);
-  const [mode, setMode] = useState<ConnectMode>('chat-bot');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // URL is the source of truth for tab state when present. Falls back to
+  // last-used (localStorage) → 'chat-bot' so deep links like
+  // /connect-agent?mode=chat-bot&surface=teams work from anywhere.
+  const urlMode = searchParams.get('mode');
+  const urlTab = slugToTab(searchParams.get('tab'));
+  const mode: ConnectMode = isConnectMode(urlMode) ? urlMode : 'chat-bot';
+  const activeTab: Tab = urlTab ?? 'Claude';
+
+  const [bootMode, setBootMode] = useState<ConnectMode | null>(null);
   const [token, setToken] = useState('');
   const [tokenId, setTokenId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('Claude');
   const [lastUsedAt, setLastUsedAt] = useState<string | null>(null);
   const [testDismissed, setTestDismissed] = useState<boolean | null>(null);
 
@@ -40,20 +55,58 @@ export function ConnectAgentPanel({ mcpUrl, gatewayBase, orgId }: Props) {
     try {
       setTestDismissed(localStorage.getItem(dismissedKey) === '1');
       const stored = localStorage.getItem(modeKey);
-      if (stored === 'chat-bot' || stored === 'agent') setMode(stored);
+      if (stored === 'chat-bot' || stored === 'agent') setBootMode(stored);
+      else setBootMode('chat-bot');
     } catch {
       setTestDismissed(false);
+      setBootMode('chat-bot');
     }
   }, [dismissedKey, modeKey]);
 
+  // If no ?mode in the URL and we have a stored preference, rewrite the URL
+  // once on boot. Keeps deep links explicit and the back button useful.
+  useEffect(() => {
+    if (bootMode === null) return;
+    if (urlMode !== null) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('mode', bootMode);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [bootMode, urlMode, pathname, router, searchParams]);
+
+  const updateParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(updates)) {
+        if (value === null) params.delete(key);
+        else params.set(key, value);
+      }
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
   function selectMode(next: ConnectMode) {
-    setMode(next);
     try {
       localStorage.setItem(modeKey, next);
     } catch {
-      // storage may be unavailable; in-memory selection is fine
+      // storage may be unavailable; URL state is the actual source of truth
     }
+    // Clear the agent-only `tab` param when switching to chat-bot, and
+    // the chat-bot-only `surface` when switching to agent, so the URL
+    // doesn't accumulate stale values.
+    updateParams({
+      mode: next,
+      ...(next === 'chat-bot' ? { tab: null } : { surface: null }),
+    });
   }
+
+  const setActiveTab = useCallback(
+    (next: Tab) => {
+      updateParams({ tab: tabToSlug(next) });
+    },
+    [updateParams],
+  );
 
   function dismissTesting() {
     try {
@@ -266,7 +319,7 @@ function ModePicker({
       <ModeCard
         active={mode === 'chat-bot'}
         title="Chat bot"
-        description="Talk to holo from Slack or Google Chat — Microsoft Teams coming soon."
+        description="Talk to holo from Slack, Google Chat, or Microsoft Teams."
         onClick={() => onSelect('chat-bot')}
       />
       <ModeCard
