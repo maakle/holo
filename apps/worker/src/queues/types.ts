@@ -23,6 +23,7 @@ export const QUEUE_NAMES = {
   CONFLUENCE_SYNC: 'confluence-sync',
   STRIPE_SYNC: 'stripe-sync',
   SALESFORCE_SYNC: 'salesforce-sync',
+  TEAMS_SYNC: 'teams-sync',
   EMBED: 'embed',
   // Background queue for re-embedding legacy chunks under the migrated
   // OpenAI model (PR #128 → text-embedding-3-small). Kept separate from
@@ -85,6 +86,7 @@ export const QUEUE_CONCURRENCY: Record<QueueName, number> = {
   'confluence-sync': 2,
   'stripe-sync': 2,
   'salesforce-sync': 2,
+  'teams-sync': 3,
   embed: 5,
   // Backfill is intentionally serial: rewriting legacy chunks is one-shot
   // work that should never crowd live ingest off OpenAI.

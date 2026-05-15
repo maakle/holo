@@ -52,6 +52,10 @@ export const SYNC_INTERVAL_MS_BY_PROVIDER: Record<SyncProvider, number> = {
   // dashboards without burning embedding spend on no-op syncs.
   stripe: 6 * HOUR_MS,
   salesforce: 6 * HOUR_MS,
+  // Teams ingestion runs every 6h. Delta sync keeps it cheap — most
+  // resources return an empty page when nothing new has been said,
+  // so the run cost is dominated by the resource-enumeration calls.
+  teams: 6 * HOUR_MS,
 };
 
 export function getSyncIntervalMs(provider: SyncProvider): number {
