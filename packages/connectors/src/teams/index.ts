@@ -1,8 +1,20 @@
 /**
- * Microsoft Teams Bot integration — outbound API client + inbound JWT
- * verification + wire-format types. This is the bot/conversational
- * surface only; a read-only ingestion sibling can be added later without
- * filename collision (same pattern as `google-chat/app-*.ts`).
+ * Microsoft Teams integration.
+ *
+ * Two surfaces share this folder and the same Azure AD app registration:
+ *   - bot/conversational  → `app-*.ts` (outbound Bot Framework client,
+ *                            inbound JWT verification, Adaptive Card
+ *                            wire types)
+ *   - read-only ingestion → `graph-*.ts` (Microsoft Graph client +
+ *                            response types; consumed by
+ *                            `packages/connectors/src/teams/spec.ts`
+ *                            and the worker sync runners)
+ *
+ * The two surfaces overlap only at the token mint
+ * (`loadTeamsBotAccessToken`), which is parameterized over scope +
+ * tenant so the bot path stays on `api.botframework.com/.default` and
+ * the ingestion path mints `graph.microsoft.com/.default` per
+ * customer tenant.
  */
 export {
   createTeamsBotApiClient,
@@ -11,8 +23,25 @@ export {
 export {
   loadTeamsBotAccessToken,
   TEAMS_BOT_SCOPE,
+  TEAMS_GRAPH_SCOPE,
   __clearTeamsBotTokenCacheForTests,
 } from './app-auth';
+export {
+  createTeamsGraphClient,
+  type TeamsGraphClient,
+  type TeamsGraphClientOptions,
+  type GraphChannelMessagesPage,
+} from './graph-api';
+export type {
+  GraphCollection,
+  GraphOrganization,
+  GraphTeam,
+  GraphChannel,
+  GraphChat,
+  GraphChatMessage,
+  GraphUser,
+  GraphConversationMember,
+} from './graph-types';
 export {
   verifyTeamsJwt,
   __clearTeamsJwksCacheForTests,
