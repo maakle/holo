@@ -64,7 +64,7 @@ describe('path-fn registry', () => {
     expect(path).toBe('/teams/engineering/general/2026-05-14/root-1.md');
   });
 
-  it('teams-thread chat path lives under /teams/chats/ with no date segment', () => {
+  it('teams-thread chat path uses chat label + date + root id', () => {
     const path = computePath({
       kind: 'teams-thread',
       externalId: 'teams-thread:chat-z/root-1',
@@ -76,7 +76,7 @@ describe('path-fn registry', () => {
         created_date_time: '2026-05-14T22:13:20Z',
       },
     });
-    expect(path).toBe('/teams/chats/q4-planning/root-1.md');
+    expect(path).toBe('/teams/chats/q4-planning/2026-05-14/root-1.md');
   });
 
   it('teams-thread chat falls back to chat_id when chat_topic is empty (1:1 chats)', () => {
@@ -88,9 +88,24 @@ describe('path-fn registry', () => {
         chat_id: 'chat-z',
         chat_topic: '',
         root_message_id: 'root-1',
+        created_date_time: '2026-05-14T22:13:20Z',
       },
     });
-    expect(path).toBe('/teams/chats/chat-z/root-1.md');
+    expect(path).toBe('/teams/chats/chat-z/2026-05-14/root-1.md');
+  });
+
+  it('google-chat-thread path uses space + date + thread id', () => {
+    const path = computePath({
+      kind: 'google-chat-thread',
+      externalId: 'spaces/AAA/threads/T1',
+      metadata: {
+        space_name: 'spaces/AAA',
+        space_display_name: 'Engineering',
+        thread_name: 'spaces/AAA/threads/T1',
+        parent_create_time: '2026-05-14T22:13:20.000Z',
+      },
+    });
+    expect(path).toBe('/google-chat/engineering/2026-05-14/spaces-aaa-threads-t1.md');
   });
 
   it('slack-thread path uses channel + date from thread_ts', () => {

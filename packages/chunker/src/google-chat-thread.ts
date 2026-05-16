@@ -64,6 +64,7 @@ export const googleChatThreadChunker: Chunker<GoogleChatThreadInput> = {
           space_display_name: input.spaceDisplayName,
           thread_name: input.threadName,
           participant_user_names: input.participantUserNames,
+          parent_create_time: input.parent.createTime,
         },
         aclSubjects,
       },

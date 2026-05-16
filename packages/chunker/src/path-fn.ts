@@ -83,7 +83,8 @@ export const pathFns: Record<string, PathFn> = {
   'google-chat-thread': ({ metadata, externalId }) => {
     const space = slug(metadata.space_display_name, slug(metadata.space_name, 'unknown'));
     const thread = slug(metadata.thread_name, slug(externalId, 'thread'));
-    return `/google-chat/${space}/${thread}.md`;
+    const date = dateFromIsoLike(metadata.parent_create_time);
+    return `/google-chat/${space}/${date}/${thread}.md`;
   },
 
   /**
@@ -91,31 +92,34 @@ export const pathFns: Record<string, PathFn> = {
    * resource kind:
    *
    *   /teams/<team>/<channel>/<YYYY-MM-DD>/<root-msg>.md   (channel posts)
-   *   /teams/chats/<chat-label>/<root-msg>.md              (1:1, group, meeting chats)
+   *   /teams/chats/<chat-label>/<YYYY-MM-DD>/<root-msg>.md  (1:1, group, meeting chats)
    *
-   * The date segment for channel posts mirrors Slack's per-day directory
-   * scheme so HoloFs `ls /teams/<team>/<channel>/2026-05/` returns a
-   * usable listing for a busy channel without scanning the whole tree.
-   * Chats don't get the date partition — they're typically lower-volume
-   * and the chat label is enough to disambiguate.
+   * The date segment mirrors Slack's per-day directory scheme so HoloFs
+   * `ls /teams/<team>/<channel>/2026-05/` returns a usable listing for a
+   * busy channel without scanning the whole tree. The same applies to chats:
+   * even though they're typically lower-volume, partitioning by date keeps
+   * a single chat label (e.g. a long-running 1:1) from accumulating an
+   * unbounded directory and matches the unit-of-retrieval pattern used by
+   * every other chat source.
    *
    * `resource_kind` is set by the chunker to `'channel'` or `'chat'`.
    */
   'teams-thread': ({ metadata, externalId }) => {
     const kind = metadata.resource_kind;
     const root = slug(metadata.root_message_id, slug(externalId, 'thread'));
+    const date = dateFromIsoLike(metadata.created_date_time);
     if (kind === 'channel') {
       const team = slug(metadata.team_display_name, slug(metadata.team_id, 'unknown'));
       const channel = slug(
         metadata.channel_display_name,
         slug(metadata.channel_id, 'unknown'),
       );
-      return `/teams/${team}/${channel}/${dateFromIsoLike(metadata.created_date_time)}/${root}.md`;
+      return `/teams/${team}/${channel}/${date}/${root}.md`;
     }
     // Chat (1:1, group, meeting). `chat_topic` is often empty for 1:1
     // and meeting chats — fall back to the chat id.
     const chat = slug(metadata.chat_topic, slug(metadata.chat_id, 'chat'));
-    return `/teams/chats/${chat}/${root}.md`;
+    return `/teams/chats/${chat}/${date}/${root}.md`;
   },
 
   'github-pr': ({ metadata }) => {
