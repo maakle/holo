@@ -9,14 +9,17 @@ export const GOOGLE_CHAT_BOT_QUEUE = 'google-chat-bot';
  * card, runs the agent, patches the placeholder, and (for reactions, v2)
  * writes a feedback row.
  *
- * `customerNumber` is the Google Workspace tenant id (Slack's `team_id`
- * analog). `spaceName` / `messageName` / `threadName` are Google's stable
- * resource names ("spaces/AAA", "spaces/AAA/messages/BBB", etc).
+ * `domainId` is the Google Workspace tenant identifier (Slack's `team_id`
+ * analog) — pulled from `user.domainId` on the inbound event. Despite the
+ * name, this is what Chat events reliably carry; the older `customerNumber`
+ * field is not present on modern payloads. `spaceName` / `messageName` /
+ * `threadName` are Google's stable resource names ("spaces/AAA",
+ * "spaces/AAA/messages/BBB", etc).
  */
 export type GoogleChatBotJob =
   | {
       kind: 'mention';
-      customerNumber: string;
+      organizationId: string;
       spaceName: string;
       threadName: string;
       messageName: string;
@@ -25,7 +28,7 @@ export type GoogleChatBotJob =
     }
   | {
       kind: 'dm';
-      customerNumber: string;
+      organizationId: string;
       spaceName: string;
       threadName?: string;
       messageName: string;
@@ -37,12 +40,26 @@ export type GoogleChatBotJob =
       // looks up `google_chat_answer_index` and writes an `answer_feedback`
       // row (RFC-0008 extension), parallel to slack-bot's path.
       kind: 'reaction';
-      customerNumber: string;
+      organizationId: string;
       spaceName: string;
       messageName: string;
       asker: string;
       emoji: string;
       removed: boolean;
+    }
+  | {
+      // Multi-tenant onboarding fallback: when a MESSAGE event arrives
+      // from an unregistered email domain, the bot DMs a plain
+      // informational reply telling the asker their admin needs to
+      // register the domain in Holo. No tokens, no links, no DB row —
+      // just a heads-up so the bot isn't silent.
+      kind: 'unbound-info';
+      domainId: string;
+      askerEmail: string | null;
+      spaceName: string;
+      threadName?: string;
+      setupUrl: string;
+      useSharedServiceAccount: true;
     };
 
 let queue: Queue<GoogleChatBotJob> | null = null;

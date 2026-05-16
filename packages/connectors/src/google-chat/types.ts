@@ -22,6 +22,14 @@ export interface GoogleChatUser {
   displayName?: string;
   /** 'HUMAN' or 'BOT' — the spec filters out BOT senders. */
   type?: 'TYPE_UNSPECIFIED' | 'HUMAN' | 'BOT';
+  /** User email — present on inbound App events for HUMAN users. */
+  email?: string;
+  /**
+   * Workspace numeric domain id — present on every inbound App event for a
+   * Workspace user. The gateway uses this to map to a Holo org via
+   * `google_chat_workspaces.domain_id`.
+   */
+  domainId?: string;
 }
 
 export interface GoogleChatThread {

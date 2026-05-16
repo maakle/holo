@@ -144,6 +144,7 @@ async function main() {
     db,
     sharedAudience: env.GOOGLE_CHAT_APP_PROJECT_NUMBER,
     redisUrl: env.REDIS_URL,
+    webPublicUrl,
   });
   mountGoogleChatAppHealthz(app, {
     audience: env.GOOGLE_CHAT_APP_PROJECT_NUMBER,

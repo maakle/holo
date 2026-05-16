@@ -24,14 +24,13 @@ export interface GoogleChatAppEvent {
   /** ISO 8601 timestamp from Google. */
   eventTime: string;
   type: GoogleChatAppEventType;
-  /**
-   * Workspace tenant identifier. Present on every event for apps installed
-   * in a Workspace; we use it as the org-lookup key (analogous to Slack's
-   * `team_id`). Absent on dev-mode app pings — those get rejected at
-   * envelope validation.
-   */
-  customerNumber?: string;
   space: GoogleChatAppSpace;
+  /**
+   * The asker. `domainId` here is the Workspace tenant identifier — the
+   * inbound resolver maps it to a Holo org via `google_chat_workspaces`.
+   * Top-level `customerNumber` and `space.customer` are NOT populated by
+   * Google's current Chat events API, so do not depend on them.
+   */
   user?: GoogleChatUser;
   message?: GoogleChatAppMessage;
 }
@@ -111,6 +110,13 @@ export interface GoogleChatCardHeader {
 export interface GoogleChatCardSection {
   header?: string;
   widgets: GoogleChatCardWidget[];
+  /**
+   * When true, Chat renders an automatic "Show more/less" toggle that hides
+   * widgets beyond `uncollapsibleWidgetsCount`. Used for the answer's
+   * Sources block so a 15-source list doesn't dominate the reply.
+   */
+  collapsible?: boolean;
+  uncollapsibleWidgetsCount?: number;
 }
 
 export type GoogleChatCardWidget =

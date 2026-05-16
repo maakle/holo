@@ -36,7 +36,7 @@ export class GoogleChatBotProcessor extends WorkerHost {
       });
       if (!result.ok) {
         this.logger.warn(
-          `google-chat-bot job ${job.id} skipped: ${result.reason} customerNumber=${job.data.customerNumber}`,
+          `google-chat-bot job ${job.id} skipped: ${result.reason} kind=${job.data.kind}`,
         );
       }
       return result;

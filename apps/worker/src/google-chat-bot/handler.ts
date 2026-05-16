@@ -3,7 +3,7 @@ import { schema, type DB } from '@holo/db';
 import { createGoogleChatAppApiClient } from '@holo/connectors';
 import { recordAgentEvent } from '@holo/audit';
 import { type AgentResult } from '../slack-bot/agent.js';
-import { resolveChatWorkspace } from './workspace.js';
+import { loadChatWorkspaceCreds } from './workspace.js';
 import { makeDefaultAgentRunner, type AgentImpl } from '../slack-bot/agent-runner.js';
 import { finalizeChatAnswer, finalizeChatError, postPlaceholder } from './finalize.js';
 import { makeChatPlaceholderProgress } from './progress.js';
@@ -16,7 +16,7 @@ import { makeChatPlaceholderProgress } from './progress.js';
 export type GoogleChatBotJob =
   | {
       kind: 'mention';
-      customerNumber: string;
+      organizationId: string;
       spaceName: string;
       threadName: string;
       messageName: string;
@@ -25,7 +25,7 @@ export type GoogleChatBotJob =
     }
   | {
       kind: 'dm';
-      customerNumber: string;
+      organizationId: string;
       spaceName: string;
       threadName?: string;
       messageName: string;
@@ -34,12 +34,21 @@ export type GoogleChatBotJob =
     }
   | {
       kind: 'reaction';
-      customerNumber: string;
+      organizationId: string;
       spaceName: string;
       messageName: string;
       asker: string;
       emoji: string;
       removed: boolean;
+    }
+  | {
+      kind: 'unbound-info';
+      domainId: string;
+      askerEmail: string | null;
+      spaceName: string;
+      threadName?: string;
+      setupUrl: string;
+      useSharedServiceAccount: true;
     };
 
 export interface GoogleChatBotHandlerDeps {
@@ -68,9 +77,9 @@ export async function handleGoogleChatBotJob(
   const logInfo = deps.logInfo ?? ((msg, fields) => console.log(msg, fields ?? {}));
   logInfo('google-chat-bot: job received', {
     kind: job.kind,
-    customerNumber: job.customerNumber,
+    organizationId: 'organizationId' in job ? job.organizationId : undefined,
     spaceName: job.spaceName,
-    asker: job.asker,
+    asker: 'asker' in job ? job.asker : undefined,
     textPreview: 'text' in job ? job.text.slice(0, 80) : undefined,
   });
 
@@ -84,19 +93,61 @@ export async function handleGoogleChatBotJob(
     return { ok: false, reason: 'reactions_not_implemented' };
   }
 
-  const workspace = await resolveChatWorkspace(
+  if (job.kind === 'unbound-info') {
+    // No org owns this Workspace yet — the gateway couldn't match the
+    // asker's email domain to any registered tenant. Post a plain reply
+    // pointing them at the Holo setup page so the bot isn't silent. Uses
+    // the shared SA (no org context to look up a BYO SA).
+    if (!deps.sharedServiceAccountJson) {
+      logError(
+        'google-chat-bot: unbound-info skipped — sharedServiceAccountJson unset on worker',
+      );
+      return { ok: false, reason: 'shared_sa_unset' };
+    }
+    const client = createGoogleChatAppApiClient({
+      serviceAccountJson: deps.sharedServiceAccountJson,
+      fetchImpl: deps.fetchImpl,
+    });
+    const emailDomain = job.askerEmail?.split('@')[1] ?? null;
+    const text = buildUnboundInfoText({
+      emailDomain,
+      setupUrl: job.setupUrl,
+    });
+    const res = await client.createMessage({
+      parent: job.spaceName,
+      body: {
+        text,
+        thread: job.threadName ? { name: job.threadName } : undefined,
+      },
+      messageReplyOption: job.threadName
+        ? 'REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD'
+        : undefined,
+    });
+    if (!res.ok) {
+      logError(
+        `google-chat-bot: unbound-info messages.create failed (parent=${job.spaceName} error=${res.error ?? 'unknown'})`,
+      );
+      return { ok: false, reason: 'unbound_info_post_failed' };
+    }
+    logInfo('google-chat-bot: unbound-info posted', {
+      askerEmail: job.askerEmail,
+      spaceName: job.spaceName,
+    });
+    return { ok: true };
+  }
+
+  const workspace = await loadChatWorkspaceCreds(
     deps.db,
-    job.customerNumber,
+    job.organizationId,
     deps.sharedServiceAccountJson,
   );
   if (!workspace) {
-    logInfo('google-chat-bot: workspace not connected', {
-      customerNumber: job.customerNumber,
-    });
-    return { ok: false, reason: 'workspace_not_connected' };
+    logError(
+      `google-chat-bot: no service account available for org ${job.organizationId} — set GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON on worker or add a BYO config`,
+    );
+    return { ok: false, reason: 'no_service_account' };
   }
-  logInfo('google-chat-bot: workspace resolved', {
-    customerNumber: job.customerNumber,
+  logInfo('google-chat-bot: workspace creds loaded', {
     organizationId: workspace.organizationId,
   });
 
@@ -127,7 +178,6 @@ export async function handleGoogleChatBotJob(
       text: job.text,
     },
     metadata: {
-      customerNumber: job.customerNumber,
       threadName: 'threadName' in job ? job.threadName : undefined,
       provider: 'google-chat',
     },
@@ -166,10 +216,10 @@ export async function handleGoogleChatBotJob(
     threadName,
     logError: (msg) => logError(msg),
   });
-  const progress = placeholder
+  const progressAdapter = placeholder
     ? makeChatPlaceholderProgress({ client, messageName: placeholder.messageName })
-        .update
-    : undefined;
+    : null;
+  const progress = progressAdapter?.update;
 
   let agentResult: AgentResult;
   try {
@@ -179,12 +229,15 @@ export async function handleGoogleChatBotJob(
       userSubjects,
       question: query,
       // Progress text is built for Slack mrkdwn (underscored italics + emoji).
-      // Cards v2 renders italics via underscores the same way, so we pass it
-      // through unmodified.
+      // The Chat progress adapter rewrites `_..._` to `<i>...</i>` because
+      // Cards v2 textParagraph parses HTML, not Slack-style underscores.
       progress,
     });
   } catch (err) {
     logError('google-chat-bot: agent failed', err);
+    // Drain any pending/in-flight progress patch before the error patch so
+    // a stale "reasoning…" can't land after it.
+    await progressAdapter?.cancel();
     await finalizeChatError({
       client,
       spaceName: job.spaceName,
@@ -194,6 +247,12 @@ export async function handleGoogleChatBotJob(
     });
     return { ok: true };
   }
+
+  // Drain pending/in-flight progress patches — without this, a throttled
+  // setTimeout can fire *after* finalize and overwrite the answer with the
+  // last progress phrase (we observed this as "answer flashed then
+  // disappeared back to reasoning…").
+  await progressAdapter?.cancel();
 
   const finalReply = await finalizeChatAnswer({
     client,
@@ -248,4 +307,24 @@ export async function handleGoogleChatBotJob(
   });
 
   return { ok: true };
+}
+
+function buildUnboundInfoText({
+  emailDomain,
+  setupUrl,
+}: {
+  emailDomain: string | null;
+  setupUrl: string;
+}): string {
+  const domainHint = emailDomain
+    ? `Your email domain is *${emailDomain}*. Ask your admin to register it in Holo`
+    : `Ask your admin to register your Workspace's email domain in Holo`;
+  const setupHint = setupUrl
+    ? ` at:\n${setupUrl}`
+    : '.';
+  return (
+    `👋 Hi! This Google Workspace isn't connected to Holo yet, so I can't answer questions.\n\n` +
+    `${domainHint}${setupHint}\n\n` +
+    `Once registered, every user with that email domain can DM me from this Workspace.`
+  );
 }

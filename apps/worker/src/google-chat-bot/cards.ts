@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import type { GoogleChatCardV2Message } from '@holo/connectors';
+import type {
+  GoogleChatCardSection,
+  GoogleChatCardV2Message,
+} from '@holo/connectors';
 import type { Source } from '../slack-bot/agent.js';
 
 /**
@@ -9,9 +12,10 @@ import type { Source } from '../slack-bot/agent.js';
  * notifications. Future iterations can swap richer widgets behind the
  * same export shape.
  *
- * The `text` field is always populated as a fallback — Chat uses it for
- * push-notification previews and email digest snippets where cards aren't
- * rendered.
+ * We intentionally omit the top-level `text` field: Google Chat renders a
+ * message with both `text` and `cardsV2` as two stacked bubbles (text on
+ * top, card below), which doubles up every reply. Notification previews
+ * fall back to the card's first textParagraph, which is good enough.
  *
  * TODO(reactions): once the Workspace Events reaction subscription lands
  * (post-launch step 11 in docs/designs/google-chat-app.md), append a
@@ -30,14 +34,13 @@ export const PLACEHOLDER_TEXT = PLACEHOLDER_MESSAGE;
 
 export function placeholderCard(): GoogleChatCardV2Message {
   return {
-    text: PLACEHOLDER_MESSAGE,
     cardsV2: [
       {
         cardId: randomUUID(),
         card: {
           sections: [
             {
-              widgets: [{ textParagraph: { text: `_${PLACEHOLDER_MESSAGE}_` } }],
+              widgets: [{ textParagraph: { text: `<i>${PLACEHOLDER_MESSAGE}</i>` } }],
             },
           ],
         },
@@ -50,14 +53,19 @@ export function answerCard(
   answer: string,
   sources: Source[],
 ): GoogleChatCardV2Message {
-  const sections = [
+  const sections: GoogleChatCardSection[] = [
     {
-      widgets: [{ textParagraph: { text: answer } }],
+      widgets: [{ textParagraph: { text: slackMrkdwnToCardsHtml(answer) } }],
     },
   ];
   if (sources.length > 0) {
     sections.push({
       header: 'Sources',
+      // Collapse the source list by default — Cards v2 renders an automatic
+      // "Show more" toggle. Mirrors the Slack bot's button-driven reveal so
+      // a 15-source answer doesn't visually swamp the actual reply.
+      collapsible: true,
+      uncollapsibleWidgetsCount: 0,
       widgets: sources.map((s, i) => {
         // Position N-1 corresponds to the `[N]` reference the model emits
         // in the answer text — prefix so the cross-reference is visible.
@@ -71,10 +79,9 @@ export function answerCard(
           },
         };
       }),
-    } as (typeof sections)[number]);
+    });
   }
   return {
-    text: answer || 'holo answered your question.',
     cardsV2: [
       {
         cardId: randomUUID(),
@@ -86,7 +93,6 @@ export function answerCard(
 
 export function errorCard(): GoogleChatCardV2Message {
   return {
-    text: ERROR_MESSAGE,
     cardsV2: [
       {
         cardId: randomUUID(),
@@ -108,4 +114,55 @@ function escapeHref(s: string): string {
   // javascript: URL through the chat client.
   if (!/^https?:\/\//i.test(s)) return 'about:blank';
   return s.replace(/"/g, '%22');
+}
+
+/**
+ * Convert the agent's Slack-mrkdwn answer text to the subset of HTML that
+ * Cards v2 `textParagraph` understands (`<b>`, `<i>`, `<a href>`, `<br>`).
+ *
+ * The agent was trained against Slack rendering and emits `*bold*`,
+ * `_italic_`, and `<url|label>` link syntax. Passing that string straight
+ * into a textParagraph renders the asterisks/underscores literally, which
+ * is what we saw before this conversion existed.
+ *
+ * Strategy: pull out `<url|label>` link tokens first (they contain literal
+ * `<>` that would otherwise be HTML-escaped), escape the remaining text,
+ * apply markdown substitutions, then re-insert link tokens as `<a>` tags.
+ * Order matters: link extraction has to precede HTML escaping, and
+ * markdown substitution has to follow it so the regexes don't match
+ * inside escaped entities. The sentinel is a 3-char ASCII tag (`@@N@`)
+ * chosen to be vanishingly rare in answer text and to contain no
+ * markdown-significant characters.
+ */
+export function slackMrkdwnToCardsHtml(input: string): string {
+  const linkTokens: string[] = [];
+  let staged = input.replace(
+    /<(https?:\/\/[^|>]+)(?:\|([^>]+))?>/g,
+    (_, url: string, label?: string) => {
+      const i = linkTokens.length;
+      const href = escapeHref(url.trim());
+      const text = escapeText((label ?? url).trim());
+      linkTokens.push(`<a href="${href}">${text}</a>`);
+      return `@@${i}@`;
+    },
+  );
+
+  staged = escapeText(staged);
+
+  staged = staged
+    // Bold: `**text**` (CommonMark) first so it isn't half-consumed by the
+    // single-asterisk Slack form below.
+    .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^\w*])\*([^*\n]+)\*(?!\w)/g, '$1<b>$2</b>')
+    // Italic: `_text_` — avoid matching `snake_case_words` by requiring a
+    // non-word boundary on both sides.
+    .replace(/(^|[^\w_])_([^_\n]+)_(?!\w)/g, '$1<i>$2</i>')
+    // Strikethrough: `~text~`.
+    .replace(/(^|[^\w~])~([^~\n]+)~(?!\w)/g, '$1<s>$2</s>');
+
+  staged = staged.replace(/@@(\d+)@/g, (_, idx: string) => {
+    return linkTokens[Number(idx)] ?? '';
+  });
+
+  return staged;
 }

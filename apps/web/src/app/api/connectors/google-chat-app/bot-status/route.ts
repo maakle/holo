@@ -46,19 +46,25 @@ export async function GET() {
     }
 
     const rows = await db
-      .select({ customerNumber: schema.googleChatWorkspaces.customerNumber })
+      .select({
+        primaryDomains: schema.googleChatWorkspaces.primaryDomains,
+        domainId: schema.googleChatWorkspaces.domainId,
+      })
       .from(schema.googleChatWorkspaces)
       .where(eq(schema.googleChatWorkspaces.organizationId, orgId))
       .limit(1);
 
     const first = rows[0];
-    if (!first) {
+    if (!first || first.primaryDomains.length === 0) {
       return NextResponse.json({ status: 'workspace_unclaimed' as const });
     }
 
+    // `domainId` is cached after the first inbound event from a matching
+    // email domain — its absence is normal until someone DMs the bot.
     return NextResponse.json({
       status: 'bot_enabled' as const,
-      customerNumber: first.customerNumber,
+      primaryDomains: first.primaryDomains,
+      domainId: first.domainId,
     });
   } catch (e) {
     if (e instanceof HoloError) {

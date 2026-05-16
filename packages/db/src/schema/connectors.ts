@@ -617,15 +617,29 @@ export const googleChatWorkspaces = pgTable(
     organizationId: uuid('organization_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
-    /** Google Workspace tenant identifier (`customerNumber` in inbound event payloads). */
-    customerNumber: text('customer_number').notNull(),
+    /**
+     * Verified email domains owned by the Workspace, lowercased. The
+     * primary routing key: inbound Chat events carry `user.email`, and we
+     * route to this org when the asker's email domain matches any element.
+     * Multi-element lists support Workspaces with multiple verified
+     * domains (e.g. `acme.com` + `acme.io`).
+     */
+    primaryDomains: text('primary_domains').array().notNull().default(sql`'{}'::text[]`),
+    /**
+     * Cached `user.domainId` (Chat's per-Workspace internal identifier).
+     * Populated lazily on first email-domain match so subsequent events
+     * skip the array search. Nullable until the first match.
+     */
+    domainId: text('domain_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    customerNumberUniq: uniqueIndex('google_chat_workspaces_customer_number_uniq').on(
-      t.customerNumber,
-    ),
+    domainIdUniq: uniqueIndex('google_chat_workspaces_domain_id_uniq')
+      .on(t.domainId)
+      .where(sql`${t.domainId} IS NOT NULL`),
     orgIdx: index('google_chat_workspaces_org_idx').on(t.organizationId),
+    primaryDomainsIdx: index('google_chat_workspaces_primary_domains_idx')
+      .using('gin', t.primaryDomains),
   }),
 );
 

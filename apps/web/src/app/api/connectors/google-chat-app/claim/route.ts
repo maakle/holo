@@ -1,22 +1,34 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 
 /**
- * Claim a Google Workspace `customerNumber` for the active org. Inbound
- * Chat events carry `customerNumber` in every payload; the worker resolves
- * it to an org via `google_chat_workspaces`. Without a row here the bot
- * stays silent — this route is how an admin registers their Workspace.
- *
- * `customer_number` is `UNIQUE` at the DB level (a Workspace tenants
- * exactly one org), so a conflict here means another org already claimed
- * it. We surface that as 409 rather than overwriting.
+ * Register a Google Workspace for the active org. The required field is
+ * `primaryDomains`: one or more verified email domains the Workspace
+ * owns (e.g. `acme.com`, `acme.io`). Inbound Chat events carry
+ * `user.email`; the gateway routes the event to this org when the
+ * asker's domain matches any element here.
  */
-const CUSTOMER_NUMBER_RE = /^C[A-Za-z0-9]{6,16}$/;
+// Per RFC 1035/1123 lite — labels of 1–63 alphanumeric/hyphen, at least
+// one dot. We don't need full IDN/punycode handling for v1.
+const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/;
+
+function parseDomains(input: unknown): string[] | null {
+  const raw = Array.isArray(input) ? input : [input];
+  const cleaned: string[] = [];
+  for (const v of raw) {
+    if (typeof v !== 'string') return null;
+    const lower = v.trim().toLowerCase();
+    if (!lower) continue;
+    if (!DOMAIN_RE.test(lower)) return null;
+    if (!cleaned.includes(lower)) cleaned.push(lower);
+  }
+  return cleaned;
+}
 
 export async function POST(req: Request) {
   try {
@@ -31,63 +43,70 @@ export async function POST(req: Request) {
     }
     const orgId = resolveActiveOrgId(session);
 
-    let body: { customerNumber?: unknown };
+    let body: { primaryDomains?: unknown };
     try {
-      body = (await req.json()) as { customerNumber?: unknown };
+      body = (await req.json()) as { primaryDomains?: unknown };
     } catch {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
         problem: 'request body must be JSON',
-        fix: 'POST { "customerNumber": "C0xxxxxxx" }',
+        fix: 'POST { "primaryDomains": ["acme.com"] }',
       });
     }
 
-    const raw = typeof body.customerNumber === 'string' ? body.customerNumber.trim() : '';
-    // Google customer IDs look like `C0xxxxxxx`; accept the alphanumeric
-    // tail with or without a leading `customers/` prefix.
-    const customerNumber = raw.replace(/^customers\//, '');
-    if (!CUSTOMER_NUMBER_RE.test(customerNumber)) {
+    const primaryDomains = parseDomains(body.primaryDomains);
+    if (!primaryDomains || primaryDomains.length === 0) {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
-        problem: 'customerNumber must look like "C0xxxxxxx"',
-        fix: 'Copy it from Google Admin Console → Account → Account settings → Customer ID.',
+        problem: 'at least one valid email domain is required',
+        fix: 'Enter your Workspace primary domain (e.g. "acme.com").',
       });
     }
 
-    try {
+    // Reject if any of these domains is already claimed by another org.
+    // We check explicitly rather than relying on a unique constraint
+    // because primary_domains is an array — Postgres can't unique-index
+    // overlapping arrays without a trigger.
+    for (const domain of primaryDomains) {
+      const conflicting = await db
+        .select({ organizationId: schema.googleChatWorkspaces.organizationId })
+        .from(schema.googleChatWorkspaces)
+        .where(
+          sql`${schema.googleChatWorkspaces.primaryDomains} @> ARRAY[${domain}]::text[]`,
+        )
+        .limit(1);
+      const owner = conflicting[0]?.organizationId;
+      if (owner && owner !== orgId) {
+        return NextResponse.json(
+          {
+            problem: `domain "${domain}" is already linked to another Holo org`,
+            fix: 'Unlink it from the other org first, or use a different domain.',
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    // Upsert: one row per org. Replace the domain list wholesale on
+    // re-register.
+    const existing = await db
+      .select({ id: schema.googleChatWorkspaces.id })
+      .from(schema.googleChatWorkspaces)
+      .where(eq(schema.googleChatWorkspaces.organizationId, orgId))
+      .limit(1);
+
+    if (existing[0]) {
+      await db
+        .update(schema.googleChatWorkspaces)
+        .set({ primaryDomains })
+        .where(eq(schema.googleChatWorkspaces.id, existing[0].id));
+    } else {
       await db
         .insert(schema.googleChatWorkspaces)
-        .values({ organizationId: orgId, customerNumber })
-        .onConflictDoNothing({
-          target: schema.googleChatWorkspaces.customerNumber,
-        });
-    } catch (err) {
-      console.error('google-chat-app claim insert failed', err);
-      throw holoError({
-        code: ErrorCode.HOLO_INTERNAL,
-        problem: 'failed to register workspace',
-        fix: 'Retry; if it persists check worker logs.',
-      });
+        .values({ organizationId: orgId, primaryDomains });
     }
 
-    // Verify the row landed under THIS org — if onConflictDoNothing fired
-    // because another org already owns this customer_number, that's a 409.
-    const rows = await db
-      .select({ organizationId: schema.googleChatWorkspaces.organizationId })
-      .from(schema.googleChatWorkspaces)
-      .where(eq(schema.googleChatWorkspaces.customerNumber, customerNumber))
-      .limit(1);
-    if (!rows[0] || rows[0].organizationId !== orgId) {
-      return NextResponse.json(
-        {
-          problem: 'this Google Workspace is already linked to another Holo org',
-          fix: 'Unlink it from the other org first, or contact support.',
-        },
-        { status: 409 },
-      );
-    }
-
-    return NextResponse.json({ ok: true, customerNumber });
+    return NextResponse.json({ ok: true, primaryDomains });
   } catch (e) {
     if (e instanceof HoloError) {
       return NextResponse.json({ problem: e.problem, fix: e.fix }, { status: 400 });
@@ -98,8 +117,8 @@ export async function POST(req: Request) {
 }
 
 /**
- * Unclaim — release the Workspace mapping so another org can take it (or
- * so the admin can re-enter the right number after a typo).
+ * Unclaim — release the Workspace mapping so another org can take the
+ * domain.
  */
 export async function DELETE() {
   try {

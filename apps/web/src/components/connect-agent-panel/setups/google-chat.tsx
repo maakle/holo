@@ -11,18 +11,21 @@ type GoogleChatBotStatus =
 
 interface BotStatusResponse {
   status?: GoogleChatBotStatus;
-  customerNumber?: string;
+  primaryDomains?: string[];
+  domainId?: string | null;
   eventsUrl?: string | null;
 }
 
 function useGoogleChatBotStatus(): {
   status: GoogleChatBotStatus;
-  customerNumber: string | null;
+  primaryDomains: string[];
+  domainId: string | null;
   eventsUrl: string | null;
   refresh: () => void;
 } {
   const [status, setStatus] = useState<GoogleChatBotStatus>('loading');
-  const [customerNumber, setCustomerNumber] = useState<string | null>(null);
+  const [primaryDomains, setPrimaryDomains] = useState<string[]>([]);
+  const [domainId, setDomainId] = useState<string | null>(null);
   const [eventsUrl, setEventsUrl] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -32,7 +35,8 @@ function useGoogleChatBotStatus(): {
       .then((data: BotStatusResponse) => {
         if (cancelled) return;
         setStatus(data.status ?? 'error');
-        setCustomerNumber(data.customerNumber ?? null);
+        setPrimaryDomains(data.primaryDomains ?? []);
+        setDomainId(data.domainId ?? null);
         setEventsUrl(data.eventsUrl ?? null);
       })
       .catch(() => {
@@ -44,14 +48,16 @@ function useGoogleChatBotStatus(): {
   }, [tick]);
   return {
     status,
-    customerNumber,
+    primaryDomains,
+    domainId,
     eventsUrl,
     refresh: () => setTick((t) => t + 1),
   };
 }
 
 export function GoogleChatSetup() {
-  const { status, customerNumber, eventsUrl, refresh } = useGoogleChatBotStatus();
+  const { status, primaryDomains, domainId, eventsUrl, refresh } =
+    useGoogleChatBotStatus();
 
   return (
     <div className="space-y-4">
@@ -70,10 +76,14 @@ export function GoogleChatSetup() {
 
       {status === 'not_configured' && <NotConfigured eventsUrl={eventsUrl} />}
 
-      {status === 'workspace_unclaimed' && <ClaimWorkspace onClaimed={refresh} />}
+      {status === 'workspace_unclaimed' && <RegisterDomains onChange={refresh} />}
 
       {status === 'bot_enabled' && (
-        <BotEnabled customerNumber={customerNumber} onUnlink={refresh} />
+        <BotEnabled
+          primaryDomains={primaryDomains}
+          domainId={domainId}
+          onChange={refresh}
+        />
       )}
 
       {status === 'error' && (
@@ -395,34 +405,7 @@ function ConsoleLink({ href, children }: { href: string; children: React.ReactNo
   );
 }
 
-function ClaimWorkspace({ onClaimed }: { onClaimed: () => void }) {
-  const [value, setValue] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setErr(null);
-    try {
-      const res = await fetch('/api/connectors/google-chat-app/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerNumber: value.trim() }),
-      });
-      const data = (await res.json()) as { ok?: boolean; problem?: string };
-      if (res.ok && data.ok) {
-        onClaimed();
-        return;
-      }
-      setErr(data.problem ?? 'Failed to register the Workspace.');
-    } catch {
-      setErr('Network error.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
+function RegisterDomains({ onChange }: { onChange: () => void }) {
   return (
     <ol className="list-none space-y-4">
       <Step n={1}>
@@ -431,45 +414,106 @@ function ClaimWorkspace({ onClaimed }: { onClaimed: () => void }) {
         Marketplace → manage apps).
       </Step>
       <Step n={2}>
-        Copy your <strong>Google customer ID</strong> from Google Admin Console
-        → <em>Account</em> → <em>Account settings</em>. It looks like{' '}
-        <InlineCode>C0xxxxxxx</InlineCode>.
+        Register the Workspace&apos;s verified email domain(s) below. holo
+        routes inbound bot messages to this org when the asker&apos;s email
+        domain matches.
       </Step>
       <Step n={3}>
-        <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="C0xxxxxxx"
-            className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-text outline-none focus:border-accent"
-            disabled={busy}
-          />
-          <button
-            type="submit"
-            disabled={busy || value.trim().length === 0}
-            className="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
-          >
-            {busy ? 'Registering…' : 'Register Workspace'}
-          </button>
-          {err && <span className="text-xs text-error">{err}</span>}
-        </form>
+        <DomainsForm onSaved={onChange} initial={[]} submitLabel="Register Workspace" />
       </Step>
       <Step n={4}>
-        Once registered, DM <InlineCode>@holo</InlineCode> in Google Chat or
-        @mention it in any space — replies thread under your message.
+        Once registered, DM <InlineCode>@holo</InlineCode> from any user
+        with one of the registered domains — replies thread under your
+        message.
       </Step>
     </ol>
   );
 }
 
-function BotEnabled({
-  customerNumber,
-  onUnlink,
+function DomainsForm({
+  initial,
+  submitLabel,
+  onSaved,
 }: {
-  customerNumber: string | null;
-  onUnlink: () => void;
+  initial: string[];
+  submitLabel: string;
+  onSaved: () => void;
 }) {
+  const [domains, setDomains] = useState<string>(initial.join(', '));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    const parsed = domains
+      .split(/[,\s]+/)
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean);
+    if (parsed.length === 0) {
+      setErr('Enter at least one domain.');
+      setBusy(false);
+      return;
+    }
+    try {
+      const res = await fetch('/api/connectors/google-chat-app/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ primaryDomains: parsed }),
+      });
+      const data = (await res.json()) as { ok?: boolean; problem?: string };
+      if (res.ok && data.ok) {
+        onSaved();
+        return;
+      }
+      setErr(data.problem ?? 'Failed to save.');
+    } catch {
+      setErr('Network error.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      <label className="block space-y-1">
+        <span className="text-[12px] text-text-subtle">
+          Workspace email domains (comma- or space-separated)
+        </span>
+        <input
+          type="text"
+          value={domains}
+          onChange={(e) => setDomains(e.target.value)}
+          placeholder="acme.com, acme.io"
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-text outline-none focus:border-accent"
+          disabled={busy}
+        />
+      </label>
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={busy || domains.trim().length === 0}
+          className="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
+        >
+          {busy ? 'Saving…' : submitLabel}
+        </button>
+        {err && <span className="text-xs text-error">{err}</span>}
+      </div>
+    </form>
+  );
+}
+
+function BotEnabled({
+  primaryDomains,
+  domainId,
+  onChange,
+}: {
+  primaryDomains: string[];
+  domainId: string | null;
+  onChange: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function unlink() {
@@ -479,7 +523,7 @@ function BotEnabled({
     setBusy(true);
     try {
       await fetch('/api/connectors/google-chat-app/claim', { method: 'DELETE' });
-      onUnlink();
+      onChange();
     } finally {
       setBusy(false);
     }
@@ -488,29 +532,75 @@ function BotEnabled({
   return (
     <ol className="list-none space-y-4">
       <Step n={1}>
-        <span className="text-success">
-          ✓ holo Chat App is active for Workspace{' '}
-          <InlineCode>{customerNumber ?? '—'}</InlineCode>.
-        </span>
+        <div className="space-y-1">
+          <span className="text-success">
+            ✓ holo Chat App is active for{' '}
+            {primaryDomains.length === 1 ? (
+              <InlineCode>{primaryDomains[0]}</InlineCode>
+            ) : (
+              <>
+                {primaryDomains.map((d, i) => (
+                  <span key={d}>
+                    {i > 0 && ', '}
+                    <InlineCode>{d}</InlineCode>
+                  </span>
+                ))}
+              </>
+            )}
+            {domainId && (
+              <span className="text-text-subtle">
+                {' '}— routing cached
+              </span>
+            )}
+            .
+          </span>
+        </div>
       </Step>
       <Step n={2}>
-        Open a DM with the <strong>holo</strong> app in Google Chat and ask:{' '}
-        <InlineCode>what do we know about onboarding?</InlineCode>
+        DM <InlineCode>@holo</InlineCode> in Google Chat from any user with
+        a registered domain, or @mention it in a space:{' '}
+        <InlineCode>@holo what shipped last week?</InlineCode>
       </Step>
       <Step n={3}>
-        Or @mention the bot in any space:{' '}
-        <InlineCode>@holo what shipped last week?</InlineCode> The reply threads
-        under your message.
-      </Step>
-      <Step n={4}>
-        <button
-          onClick={unlink}
-          disabled={busy}
-          className="text-xs text-text-subtle underline-offset-2 transition-colors hover:text-text hover:underline disabled:opacity-50"
-        >
-          {busy ? 'Unlinking…' : 'Unlink this Workspace'}
-        </button>
+        {editing ? (
+          <div className="space-y-2">
+            <DomainsForm
+              initial={primaryDomains}
+              submitLabel="Save changes"
+              onSaved={() => {
+                setEditing(false);
+                onChange();
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="text-xs text-text-subtle underline-offset-2 transition-colors hover:text-text hover:underline"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-3 text-xs">
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="text-text-subtle underline-offset-2 transition-colors hover:text-text hover:underline"
+            >
+              Edit domains
+            </button>
+            <button
+              type="button"
+              onClick={unlink}
+              disabled={busy}
+              className="text-text-subtle underline-offset-2 transition-colors hover:text-text hover:underline disabled:opacity-50"
+            >
+              {busy ? 'Unlinking…' : 'Unlink this Workspace'}
+            </button>
+          </div>
+        )}
       </Step>
     </ol>
   );
 }
+
