@@ -78,7 +78,7 @@ export async function GET(req: Request) {
       });
     }
 
-    const { auth, db } = await getServerContext();
+    const { auth, db, env } = await getServerContext();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       throw holoError({
@@ -329,12 +329,19 @@ export async function GET(req: Request) {
       });
     }
 
-    const ok = new URL('/connections/oauth-complete', req.url);
+    const ok = new URL('/connections/oauth-complete', env.BETTER_AUTH_URL);
     ok.searchParams.set('provider', provider);
     ok.searchParams.set('status', 'ok');
     return NextResponse.redirect(ok);
   } catch (e) {
-    const u = new URL('/connections/oauth-complete', req.url);
+    let appOrigin: string;
+    try {
+      const { env: errEnv } = await getServerContext();
+      appOrigin = errEnv.BETTER_AUTH_URL;
+    } catch {
+      appOrigin = new URL(req.url).origin;
+    }
+    const u = new URL('/connections/oauth-complete', appOrigin);
     u.searchParams.set('provider', provider);
     u.searchParams.set('status', 'error');
     if (e instanceof HoloError) {
