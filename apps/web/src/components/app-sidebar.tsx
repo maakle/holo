@@ -70,29 +70,44 @@ function buildSettingsItems(eeEnabled: boolean): NavItem[] {
   ];
 }
 
-export function AppSidebar({
-  userEmail,
-  userName,
-  orgs,
-  activeOrgId,
-  sampleDataActive,
-  eeEnabled,
-}: {
+export interface SidebarProps {
   userEmail?: string | null;
   userName?: string | null;
   orgs: OrgSummary[];
   activeOrgId: string | null;
   sampleDataActive: boolean;
   eeEnabled: boolean;
-}) {
-  const pathname = usePathname();
-  const inSettings = pathname === '/settings' || pathname.startsWith('/settings/');
+}
 
+export function AppSidebar(props: SidebarProps) {
   return (
     <aside
       className="hidden lg:flex w-[256px] shrink-0 flex-col border-r border-border bg-bg"
       aria-label="Primary"
     >
+      <SidebarBody {...props} />
+    </aside>
+  );
+}
+
+/**
+ * Shared sidebar body — used both by the desktop fixed `<aside>` and by the
+ * mobile drawer (`MobileNav`). Kept presentation-agnostic so the same nav
+ * structure renders identically in both surfaces.
+ */
+export function SidebarBody({
+  userEmail,
+  userName,
+  orgs,
+  activeOrgId,
+  sampleDataActive,
+  eeEnabled,
+}: SidebarProps) {
+  const pathname = usePathname();
+  const inSettings = pathname === '/settings' || pathname.startsWith('/settings/');
+
+  return (
+    <>
       {/* Brand */}
       <Link
         href="/dashboard"
@@ -132,7 +147,7 @@ export function AppSidebar({
           <UserMenu email={userEmail} name={userName} />
         </div>
       ) : null}
-    </aside>
+    </>
   );
 }
 

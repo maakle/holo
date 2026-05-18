@@ -20,7 +20,7 @@ import { and, eq } from 'drizzle-orm';
 import type { DB } from '@holo/db';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
-import { GOOGLE_SERVICE_ACCOUNT_SCOPES } from '@holo/sync-providers';
+import { GOOGLE_CHAT_APP_SCOPES, GOOGLE_SERVICE_ACCOUNT_SCOPES } from '@holo/sync-providers';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const JWT_TTL_SECONDS = 3600; // Google caps at 1 hour
@@ -179,6 +179,62 @@ export async function mintDelegatedAccessToken(
   };
 }
 
+interface MintAppArgs {
+  key: GoogleServiceAccountKey;
+  scopes: ReadonlyArray<string>;
+  fetchImpl?: typeof fetch;
+}
+
+/**
+ * App-level token mint: sign a JWT with the SA private key but omit the `sub`
+ * (impersonation) claim. The resulting token authenticates the SA as itself,
+ * not as a Workspace user. Used by Google Chat's bot-in-space mode where reads
+ * are scoped to spaces the bot has joined, not to an impersonated user's view.
+ *
+ * Bypasses cache — callers should prefer loadGoogleServiceAccountToken.
+ */
+export async function mintAppAccessToken(
+  args: MintAppArgs,
+): Promise<{ accessToken: string; expiresAt: Date }> {
+  const fetchImpl = args.fetchImpl ?? fetch;
+  const key = loadPrivateKey(args.key.private_key);
+  const now = Math.floor(Date.now() / 1000);
+  const jwt = await new SignJWT({
+    scope: args.scopes.join(' '),
+  })
+    .setProtectedHeader({ alg: 'RS256', kid: args.key.private_key_id })
+    .setIssuer(args.key.client_email)
+    // Deliberately no .setSubject() — app-level auth, the SA acts as itself.
+    .setAudience(args.key.token_uri ?? TOKEN_URL)
+    .setIssuedAt(now)
+    .setExpirationTime(now + JWT_TTL_SECONDS)
+    .sign(key);
+
+  const body = new URLSearchParams({
+    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+    assertion: jwt,
+  });
+  const res = await fetchImpl(args.key.token_uri ?? TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  const json = (await res.json().catch(() => ({}))) as TokenResponse;
+  if (!res.ok || !json.access_token) {
+    throw holoError({
+      code: ErrorCode.HOLO_OAUTH_EXCHANGE_FAILED,
+      problem: `Google JWT bearer exchange (app mode) failed (${res.status}): ${json.error ?? 'unknown'}`,
+      cause: json.error_description,
+      fix: 'Verify the service account JSON key, that the Chat API is enabled on its project, and that the SA has the Chat Bot role.',
+    });
+  }
+  const expiresIn = json.expires_in ?? JWT_TTL_SECONDS;
+  return {
+    accessToken: json.access_token,
+    expiresAt: new Date(Date.now() + expiresIn * 1000),
+  };
+}
+
 interface CachedToken {
   accessToken: string;
   expiresAt: number;
@@ -223,12 +279,13 @@ export interface LoadGoogleServiceAccountTokenInput {
  */
 export async function loadGoogleServiceAccountToken(
   input: LoadGoogleServiceAccountTokenInput,
-): Promise<{ accessToken: string; expiresAt: Date; impersonationEmail: string }> {
+): Promise<{ accessToken: string; expiresAt: Date; impersonationEmail: string | null }> {
   const cached = tokenCache.get(cacheKey(input.organizationId, input.provider));
   if (cached && cached.expiresAt > Date.now() + 60_000) {
     // We don't carry impersonationEmail through the cache — re-fetch it on a
     // miss only. The cache hit path returns the token; impersonation email
-    // matters only at mint time and for display.
+    // matters only at mint time and for display. App-mode rows have no
+    // impersonation email at all (null).
     const rows = await input.db
       .select({ impersonationEmail: schema.connectorServiceAccounts.impersonationEmail })
       .from(schema.connectorServiceAccounts)
@@ -243,7 +300,7 @@ export async function loadGoogleServiceAccountToken(
     return {
       accessToken: cached.accessToken,
       expiresAt: new Date(cached.expiresAt),
-      impersonationEmail: rows[0]?.impersonationEmail ?? '',
+      impersonationEmail: rows[0]?.impersonationEmail ?? null,
     };
   }
 
@@ -251,6 +308,7 @@ export async function loadGoogleServiceAccountToken(
     .select({
       keyJson: schema.connectorServiceAccounts.keyJson,
       impersonationEmail: schema.connectorServiceAccounts.impersonationEmail,
+      authMode: schema.connectorServiceAccounts.authMode,
     })
     .from(schema.connectorServiceAccounts)
     .where(
@@ -272,12 +330,34 @@ export async function loadGoogleServiceAccountToken(
   }
 
   const key = parseServiceAccountKey(row.keyJson);
-  const minted = await mintDelegatedAccessToken({
-    key,
-    impersonationEmail: row.impersonationEmail,
-    scopes: googleServiceAccountScopes(input.provider),
-    fetchImpl: input.fetchImpl,
-  });
+
+  // App-mode is only meaningful for Chat (Drive needs per-user impersonation
+  // for drive.readonly to surface a user's files). Reject the combination
+  // explicitly rather than silently producing an unusable token.
+  if (row.authMode === 'app' && input.provider !== 'google-chat') {
+    throw holoError({
+      code: ErrorCode.HOLO_INVALID_INPUT,
+      problem: `auth_mode='app' is only supported for google-chat, got '${input.provider}'`,
+      fix: 'Use auth_mode=dwd for googledrive; app-level auth requires per-user impersonation for Drive scopes.',
+    });
+  }
+
+  const minted =
+    row.authMode === 'app'
+      ? await mintAppAccessToken({
+          key,
+          scopes: GOOGLE_CHAT_APP_SCOPES,
+          fetchImpl: input.fetchImpl,
+        })
+      : await mintDelegatedAccessToken({
+          key,
+          // dwd mode requires an impersonation email; guard against a row that
+          // was inserted before the schema relaxed the NOT NULL constraint and
+          // somehow ended up with NULL despite dwd mode.
+          impersonationEmail: requireImpersonationEmail(row.impersonationEmail, input.provider),
+          scopes: googleServiceAccountScopes(input.provider),
+          fetchImpl: input.fetchImpl,
+        });
 
   // Cache 60s before actual expiry so a long-running call doesn't catch a
   // token that expires mid-flight.
@@ -291,4 +371,18 @@ export async function loadGoogleServiceAccountToken(
     expiresAt: minted.expiresAt,
     impersonationEmail: row.impersonationEmail,
   };
+}
+
+function requireImpersonationEmail(
+  value: string | null,
+  provider: GoogleServiceAccountProvider,
+): string {
+  if (!value) {
+    throw holoError({
+      code: ErrorCode.HOLO_INVALID_INPUT,
+      problem: `auth_mode='dwd' requires impersonation_email but the ${provider} SA row has none`,
+      fix: 'Re-run the service-account wizard or set the impersonation email directly on the SA row.',
+    });
+  }
+  return value;
 }

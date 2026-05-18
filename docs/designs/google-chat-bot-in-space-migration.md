@@ -133,18 +133,24 @@ Once all three checks have run, edit this section with results before opening th
 
 (Detail below is the same plan I sketched in conversation — keeping it here for the PR description.)
 
-### Phase 1 — App-level read client + dual auth mode
+### Phase 1 — Dual auth mode at the token-loader layer
 
-**New file:** `packages/connectors/src/google-chat/app-read-api.ts` — read-side counterpart to `app-api.ts`. Reuses `loadChatAppAccessToken`. Exposes `listSpaces`, `listSpaceMessages`, `listThreadMessages`, `listMembers`. Same shapes as `api.ts` so the chunker is auth-agnostic.
+**Architectural simplification from the original sketch.** The framework-bridge already centralizes Google token minting at one chokepoint (`loadGoogleServiceAccountToken` in `packages/connectors/src/google-shared/service-account.ts`), and the spec uses the framework's `HttpClient` which receives whichever token the loader returns. So the right place to branch on auth mode is the **token loader**, not the read API. Result:
+
+- ❌ No new `app-read-api.ts` file
+- ❌ No changes to `spec.ts`, `api.ts`, `chunking.ts`
+- ✅ One branch in `loadGoogleServiceAccountToken` that picks DWD-impersonated vs app-level token based on the SA row's `auth_mode`
+- ✅ `impersonationEmail` becomes nullable (app mode doesn't impersonate)
 
 **Modified:**
-- `packages/connectors/src/google-chat/spec.ts` — branch on `config.authMode` (`'dwd'` legacy / `'app'` new). New mode mints via `loadChatAppAccessToken`, uses `app-read-api.ts`. `testConnection` hits `spaces.list` and reports "Holo bot member of N spaces."
-- `packages/connectors/src/google-chat/chunking.ts` — accept either API client via DI.
-- `packages/connectors/src/google-chat/types.ts` — add `authMode: 'dwd' | 'app'`.
+- `packages/connectors/src/google-shared/service-account.ts` — read `auth_mode` from the SA row, mint either a delegated token (current) or an app-level token (no `sub`, `chat.bot` scope) via the existing `loadChatAppAccessToken` from `google-chat/app-auth.ts`.
+- `packages/db/src/schema/connectors.ts` — add `auth_mode` column to `connectorServiceAccounts` (`'dwd' | 'app'`, default `'dwd'`); make `impersonation_email` nullable.
 
-**Schema:** Drizzle migration adds `auth_mode` column to Google Chat source config. Defaults `'dwd'` for existing, `'app'` for new.
+**Schema migration:** new Drizzle migration adds the column and relaxes the NOT NULL constraint on `impersonation_email`. Hand-authored — needs `_journal.json` entry.
 
-**Tests:** add `authMode: 'app'` variant of the existing sync test.
+**Tests:**
+- Add `auth_mode: 'app'` variant to the service-account loader test that asserts the no-`sub` path is taken.
+- Existing Google Chat sync tests stay unchanged — they don't care which token mode is in play, since the token is opaque from their perspective.
 
 ### Phase 2 — Setup flow (admin OAuth + space picker)
 

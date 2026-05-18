@@ -441,8 +441,21 @@ export const connectorServiceAccounts = pgTable(
     provider: text('provider', { enum: SYNC_PROVIDERS }).notNull(),
     /** Encrypted JSON key blob (the full file from Google Cloud Console). */
     keyJson: encryptedText('key_json').notNull(),
-    /** Workspace user the SA impersonates via DWD (e.g. admin@company.com). */
-    impersonationEmail: text('impersonation_email').notNull(),
+    /**
+     * Authentication mode for this SA row:
+     *   - 'dwd': domain-wide delegation. The SA impersonates `impersonationEmail`
+     *     and reads as that Workspace user. Original default; required for
+     *     Google Drive and for Google Chat connections that pre-date the
+     *     bot-in-space migration.
+     *   - 'app': app-level Chat bot auth. No impersonation; the SA acts as
+     *     itself with the `chat.bot` scope and reads only spaces where the
+     *     Holo Chat App has been added as a member. `impersonationEmail` is
+     *     unused (and should be NULL) for app-mode rows.
+     */
+    authMode: text('auth_mode', { enum: ['dwd', 'app'] }).notNull().default('dwd'),
+    /** Workspace user the SA impersonates via DWD (e.g. admin@company.com).
+     *  Nullable for app-mode rows where there is no impersonation. */
+    impersonationEmail: text('impersonation_email'),
     /** Service account's client_email — surfaced to admins on the settings page so they know which SA to grant DWD to. Derived from keyJson at install time, kept here so we don't have to decrypt to display. */
     serviceAccountEmail: text('service_account_email').notNull(),
     /** SA client_id from the JSON key. The Workspace admin pastes this into Admin Console → Security → API Controls → Domain-wide Delegation. Pre-extracted so the dashboard can show it without decrypting. */

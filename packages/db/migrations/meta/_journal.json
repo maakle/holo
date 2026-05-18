@@ -400,6 +400,13 @@
       "when": 1780963200000,
       "tag": "0057_google_chat_drop_customer_number",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1781049600000,
+      "tag": "0058_google_chat_auth_mode",
+      "breakpoints": true
     }
   ]
 }
