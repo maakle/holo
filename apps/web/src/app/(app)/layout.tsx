@@ -6,6 +6,7 @@ import { schema, SAMPLE_PROVIDER } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppTopbar } from '@/components/app-topbar';
+import { MobileNav } from '@/components/mobile-nav';
 import { isEnterpriseEnabled } from '@/lib/ee/license';
 
 export const dynamic = 'force-dynamic';
@@ -66,18 +67,20 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     .limit(1);
   const sampleDataActive = sampleSourceRows.length > 0;
 
+  const sidebarProps = {
+    userEmail: session.user.email,
+    userName: session.user.name,
+    orgs: memberOrgs,
+    activeOrgId,
+    sampleDataActive,
+    eeEnabled: isEnterpriseEnabled(),
+  } as const;
+
   return (
     <div className="flex h-screen bg-bg text-text">
-      <AppSidebar
-        userEmail={session.user.email}
-        userName={session.user.name}
-        orgs={memberOrgs}
-        activeOrgId={activeOrgId}
-        sampleDataActive={sampleDataActive}
-        eeEnabled={isEnterpriseEnabled()}
-      />
+      <AppSidebar {...sidebarProps} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <AppTopbar />
+        <AppTopbar leading={<MobileNav {...sidebarProps} />} />
         <main className="min-h-0 flex-1 overflow-y-auto px-6 lg:px-10">
           <div className="mx-auto w-full max-w-[1280px] py-8 lg:py-10 [&:has([data-fullwidth])]:max-w-none [&:has([data-fullheight])]:flex [&:has([data-fullheight])]:h-full [&:has([data-fullheight])]:flex-col">{children}</div>
         </main>
