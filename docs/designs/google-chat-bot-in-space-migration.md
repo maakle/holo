@@ -121,13 +121,92 @@ Determines whether Phase 3 (real-time) is bundled or deferred.
 
 ## Recording results
 
-Once all three checks have run, edit this section with results before opening the Phase 1 PR:
-
 | Check | Result | Date | Notes |
 |---|---|---|---|
-| 0.1 — pre-join history | ☐ pass / ☐ fail | | |
-| 0.2 — admin add bot | ☐ pass / ☐ fail | | |
-| 0.3 — Pub/Sub events | ☐ pass / ☐ fail | | |
+| 0.1 — pre-join history | ✅ **PASS** | 2026-05-18 | Bot reads full history via app-auth — verification notes below |
+| 0.2 — admin add bot | ☐ deferred (use case shifted) | | Original plan assumed `chat.admin.memberships`; bot-in-space now uses Marketplace install + per-space @-mention or admin UI to add |
+| 0.3 — Pub/Sub events | ☐ not yet run | | Bundle with Phase 3 |
+
+### Check 0.1 verification notes (2026-05-18) — PASS
+
+**Outcome:** 7 messages returned by `messages.list` for a space the bot had been invited to,
+including all 3 messages posted **before** the bot joined. The load-bearing architectural
+assumption is confirmed: bot-in-space can read full history via app-auth.
+
+**What we ran** (see `scripts/google-chat-diagnostics/`):
+- **0.1** mints app-level token with `chat.app.*` scopes, calls `members.list` + `messages.list`
+- **0.1b** scope probe across 8 candidate scope variants
+- **0.1c** introspects the minted token via Google's tokeninfo endpoint
+- **0.1d** fallback via DWD-impersonated user-context token
+
+**The setup that actually worked** (in our test workspace `midlane.com`, GCP project `web-app-380316`):
+
+1. Enabled Google Chat API + Google Workspace Marketplace SDK.
+2. Created service account `holo-key@web-app-380316.iam.gserviceaccount.com` and downloaded JSON key.
+3. Configured the Marketplace SDK (Visibility=Privat, Chat-App integration, OAuth-Bereiche
+   listing the 3 `chat.app.*` scopes).
+4. Published the private listing; installed via Admin Console → Marketplace apps for the
+   entire org with the admin install dialog showing `chat.app.*` scope approval.
+5. **The non-obvious step**: Added the SA's client_id (`101306705334546342231`) to the
+   Workspace Admin Console's **Domain-wide Delegation** list with the three `chat.app.*` scopes
+   as its scope list. This is what unblocked the API calls.
+6. Bot added to the test space via `@Holo`. Pre-join messages were already posted before this.
+
+**The non-obvious architectural insight**:
+
+Google's documentation implies the Marketplace install grants the `chat.app.*` scopes to the
+app. Empirically (verified 2026-05-18 by uninstalling the Marketplace listing while keeping
+DWD, then re-running verify-bot-access — same PASS, 7 messages returned):
+
+- **Marketplace install** grants the scopes to the app's *OAuth Web Application clients*
+  (the `{app-id}-*` clients Google auto-creates). These are used for user-context OAuth flows.
+  **For SA-based app-auth (the BYO ingestion path), Marketplace install is not required.**
+- **For service-account app-auth** (no `sub` claim — the SA acts as itself with `chat.app.*`),
+  the SA must appear on the Workspace Admin Console's **Domain-wide Delegation** list with
+  the `chat.app.*` scopes. This alone is sufficient. Without it, every API call returns 403
+  `"The administrator must grant the app the required OAuth authorization scope for this action"`,
+  even though the token endpoint cheerfully mints tokens with those scopes (verified via
+  `tokeninfo` in inspect-token-scopes).
+
+This DWD-with-app-scopes pattern is different from classic DWD because the SA still acts as
+itself (no impersonation). Google's docs don't describe it explicitly — discovered empirically.
+
+**Two architectural paths going forward**:
+
+| | BYO (what we built) | Shared Marketplace App (future) |
+|---|---|---|
+| GCP project | Customer's | Holobase's |
+| Service account | Customer's | Holobase's (central) |
+| Marketplace listing | Not needed | Public listing, Google reviewed |
+| Customer-side DWD | Required | Not required (Google handles cross-tenant trust) |
+| Setup time | ~9 min admin work | ~30 sec one-click install |
+| Google review | None | 4–8 weeks |
+| Customer data flows through | Customer's project | Holobase's central infrastructure |
+| Target customers | Enterprise / security-conscious | SaaS default for everyone else |
+
+The BYO path is implemented in this branch (Phase 1+2). The Shared Marketplace path is the
+natural next workstream and reuses the same `auth_mode='app'` backend infrastructure — only
+the identity origin changes (env-based central SA instead of per-customer SA row).
+
+**What this means for setup docs and the Phase 2 wizard**:
+
+The BYO install flow has 3 admin actions:
+1. **GCP setup** — Enable Chat API, create SA, configure Chat API identity.
+2. **DWD entry** for the SA with `chat.app.*` scopes (grants scopes to the SA principal).
+3. **Add bot to spaces** via `@Holo` mention (per-space membership).
+4. Paste SA JSON in Holo.
+
+Wizard reflects this 3-sub-step flow as of commit `<this commit>`. Marketplace SDK setup
+removed — it was a red herring discovered during debugging.
+
+**What we did NOT verify and should before declaring full readiness**:
+- `members.list` with app-auth — our run still returned 0 members despite the filter
+  (`member.type = "BOT" OR "HUMAN"`). Might be a filter quirk or a separate permission issue.
+  Not blocking because messages.list works and that's where the value is.
+- Behaviour with very large spaces (>1k messages) — pagination handling.
+- Pub/Sub event delivery for bot-member spaces (Check 0.3 — Phase 3 work).
+- The Shared Marketplace App path's "no customer-side DWD" assumption — hypothesis only,
+  needs empirical confirmation once we publish via Google's review process.
 
 ## Phase 1 → 4 plan
 

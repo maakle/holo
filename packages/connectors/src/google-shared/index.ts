@@ -1,6 +1,7 @@
 export {
   loadGoogleServiceAccountToken,
   mintDelegatedAccessToken,
+  mintAppAccessToken,
   parseServiceAccountKey,
   isGoogleServiceAccountProvider,
   googleServiceAccountScopes,

@@ -17,6 +17,8 @@
     "db:generate": "pnpm -F @holo/db generate",
     "db:studio": "pnpm -F @holo/db studio",
     "db:check": "pnpm -F @holo/db check",
+    "chat:verify-bot-access": "pnpm -F @holo/db exec tsx ../../scripts/google-chat-diagnostics/verify-bot-access.ts",
+    "chat:inspect-token-scopes": "pnpm -F @holo/db exec tsx ../../scripts/google-chat-diagnostics/inspect-token-scopes.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

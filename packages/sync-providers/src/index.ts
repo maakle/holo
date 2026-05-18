@@ -122,13 +122,24 @@ export const GOOGLE_CHAT_SCOPES = [
 ] as const;
 
 /**
- * Scope used when authenticating as the Holo Chat App itself (no user
+ * Scopes used when authenticating as the Holo Chat App itself (no user
  * impersonation). Reads are scoped to spaces where the bot is a member.
  * Used by SA rows with `auth_mode = 'app'` — the bot-in-space model that
  * replaces domain-wide delegation as the default for new connections.
+ *
+ * `chat.bot` alone is insufficient for `spaces.messages.list` (confirmed
+ * empirically in Phase 0 — 403 ACCESS_TOKEN_SCOPE_INSUFFICIENT). The three
+ * `chat.app.*` scopes require Workspace Admin → Domain-wide Delegation with
+ * the SA's client_id (the SA acts as itself, no `sub` claim — different
+ * from classic user-impersonation DWD). See
+ * docs/designs/google-chat-bot-in-space-migration.md Phase 0 verification
+ * notes.
  */
 export const GOOGLE_CHAT_APP_SCOPES = [
   'https://www.googleapis.com/auth/chat.bot',
+  'https://www.googleapis.com/auth/chat.app.messages.readonly',
+  'https://www.googleapis.com/auth/chat.app.memberships',
+  'https://www.googleapis.com/auth/chat.app.spaces',
 ] as const;
 
 export const GOOGLE_SERVICE_ACCOUNT_SCOPES = {

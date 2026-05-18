@@ -60,7 +60,7 @@ describe('mintAppAccessToken', () => {
     // The load-bearing assertion: no `sub` means no impersonation.
     expect(claims.sub).toBeUndefined();
     expect(claims.iss).toBe(key.client_email);
-    expect(claims.scope).toBe('https://www.googleapis.com/auth/chat.bot');
+    expect(claims.scope).toBe(GOOGLE_CHAT_APP_SCOPES.join(' '));
   });
 
   it('returns the access token and a future expiry', async () => {
@@ -91,9 +91,16 @@ describe('mintAppAccessToken', () => {
     ).rejects.toThrow(/app mode.*failed.*invalid_grant/);
   });
 
-  it('contrast with delegated mode: app token has scope but no sub', async () => {
-    // Sanity check that GOOGLE_CHAT_APP_SCOPES is exactly the chat.bot scope
-    // and nothing else. If this drifts, the bot-in-space auth contract breaks.
-    expect(GOOGLE_CHAT_APP_SCOPES).toEqual(['https://www.googleapis.com/auth/chat.bot']);
+  it('sanity check: GOOGLE_CHAT_APP_SCOPES covers chat.bot + the three app-auth read scopes', async () => {
+    // The bot-in-space auth contract: chat.bot for posting + chat.app.* for
+    // reading. If this drifts the auth-mode='app' path stops being able to
+    // ingest messages. The three chat.app.* scopes need Workspace Marketplace
+    // SDK + admin install to be granted (Phase 0 verification).
+    expect(GOOGLE_CHAT_APP_SCOPES).toEqual([
+      'https://www.googleapis.com/auth/chat.bot',
+      'https://www.googleapis.com/auth/chat.app.messages.readonly',
+      'https://www.googleapis.com/auth/chat.app.memberships',
+      'https://www.googleapis.com/auth/chat.app.spaces',
+    ]);
   });
 });
