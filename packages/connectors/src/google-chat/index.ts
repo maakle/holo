@@ -42,3 +42,4 @@ export type {
   GoogleChatPatchMessageInput,
   GoogleChatPatchMessageResult,
 } from './app-types';
+export { HOLO_CHAT_SLASH_COMMAND_HELP } from './app-types';

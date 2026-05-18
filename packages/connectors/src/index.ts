@@ -185,6 +185,7 @@ export {
   loadChatAppAccessToken,
   __clearGoogleChatAppTokenCacheForTests,
   GOOGLE_CHAT_APP_SCOPE,
+  HOLO_CHAT_SLASH_COMMAND_HELP,
 } from './google-chat/index';
 export type {
   GoogleChatVerifyResult,

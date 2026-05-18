@@ -3,6 +3,7 @@ import { eq, sql } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import {
   verifyGoogleChatJwt,
+  HOLO_CHAT_SLASH_COMMAND_HELP,
   type GoogleChatAppEvent,
 } from '@holo/connectors';
 import { tryClaimGoogleChatEvent } from './dedupe.js';
@@ -170,6 +171,18 @@ async function handleGoogleChatEvent(
     return c.json({}, 200);
   }
 
+  if (envelope.type === 'REMOVED_FROM_SPACE') {
+    // No durable per-space state to clean: google_chat_workspaces is keyed
+    // on domainId, not spaceName, and google_chat_answer_index rows stay
+    // useful for historical analytics even after the bot leaves. Log so
+    // ops can correlate sudden drops in mention traffic with removals.
+    logger.info(
+      { spaceName: envelope.space?.name, askerEmail },
+      'google-chat-app events: bot removed from space',
+    );
+    return c.json({}, 200);
+  }
+
   if (envelope.type !== 'MESSAGE' || !envelope.message || !envelope.space) {
     logger.debug(
       { type: envelope.type },
@@ -212,7 +225,16 @@ async function handleGoogleChatEvent(
   }
 
   // Prefer argumentText (mention stripped) when present, fall back to text.
-  const text = envelope.message.argumentText ?? envelope.message.text ?? '';
+  // Slash commands invoked via Chat's autocomplete picker arrive with
+  // `slashCommand.commandId` set and an empty `argumentText`/`text` body,
+  // so normalize them to the matching textual form here — that way the
+  // worker's single `isHelpCommand` check handles both invocation paths
+  // (picker click + literal `/help` typed) without divergent branches.
+  const rawText = envelope.message.argumentText ?? envelope.message.text ?? '';
+  const text =
+    envelope.message.slashCommand?.commandId === HOLO_CHAT_SLASH_COMMAND_HELP
+      ? '/help'
+      : rawText;
   const asker = envelope.user?.name ?? envelope.message.sender?.name ?? '';
 
   try {

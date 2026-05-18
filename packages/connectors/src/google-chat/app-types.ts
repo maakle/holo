@@ -69,7 +69,18 @@ export interface GoogleChatAppMessage {
   thread?: GoogleChatThread;
   /** Set on messages the bot itself authored — filter at the gateway. */
   type?: 'TEXT' | 'SYSTEM_MESSAGE';
+  /**
+   * Populated when the user invoked a slash command registered against the
+   * Chat app. `commandId` matches the integer chosen in the Chat API
+   * configuration. We pin `/help` to `1` so the handler can short-circuit
+   * even when `argumentText` is empty (slash-command picker invocations
+   * arrive with the command stripped from the text body).
+   */
+  slashCommand?: { commandId: number };
 }
+
+/** Integer command IDs registered against the Holo Chat app in the Chat API config. */
+export const HOLO_CHAT_SLASH_COMMAND_HELP = 1;
 
 /**
  * Cards v2 message body for outbound replies. Narrow on purpose — v1 of
