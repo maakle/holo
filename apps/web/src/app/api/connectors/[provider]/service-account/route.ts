@@ -8,6 +8,7 @@ import {
   createGoogleChatSpec,
   parseServiceAccountKey,
   mintDelegatedAccessToken,
+  mintAppAccessToken,
   googleServiceAccountScopes,
   invalidateGoogleServiceAccountTokenCache,
   isGoogleServiceAccountProvider,
@@ -15,13 +16,25 @@ import {
 } from '@holo/connectors';
 import { createHttpClient } from '@holo/connector-framework';
 import { emitAuditEvent } from '@holo/audit';
+import { GOOGLE_CHAT_APP_SCOPES } from '@holo/sync-providers';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { enqueueInitialSync } from '@/lib/sync-queue';
 
 interface RequestBody {
   keyJson?: string;
+  /**
+   * For `authMode: 'dwd'` (default): the Workspace user the SA impersonates.
+   * Ignored when `authMode: 'app'` — app-mode acts as the SA itself.
+   */
   impersonationEmail?: string;
+  /**
+   * Authentication mode for this connection. Defaults to 'dwd' to preserve
+   * existing wizard behavior. 'app' is only supported for google-chat and
+   * routes the install through the bot-in-space path (no impersonation;
+   * requires Marketplace install + admin OAuth grant of chat.app.* scopes).
+   */
+  authMode?: 'dwd' | 'app';
 }
 
 /**
@@ -68,7 +81,9 @@ export async function POST(
 
     const body = (await req.json().catch(() => ({}))) as RequestBody;
     const keyJsonRaw = body.keyJson?.trim();
-    const impersonationEmail = body.impersonationEmail?.trim().toLowerCase();
+    const impersonationEmailRaw = body.impersonationEmail?.trim().toLowerCase();
+    const authMode: 'dwd' | 'app' = body.authMode === 'app' ? 'app' : 'dwd';
+
     if (!keyJsonRaw) {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
@@ -76,44 +91,84 @@ export async function POST(
         fix: 'Paste the full service account JSON key in the wizard.',
       });
     }
-    if (!impersonationEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(impersonationEmail)) {
+
+    // app-mode is Chat-only — Drive scopes are user-context (no drive.app.*)
+    // and require impersonation. Reject the combination at install time so
+    // we don't ship a token loader that throws mid-sync.
+    if (authMode === 'app' && provider !== 'google-chat') {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
-        problem: 'impersonationEmail must be a valid email address',
-        fix: 'Enter the Workspace user the service account should act as.',
+        problem: `authMode='app' is only supported for google-chat, not ${provider}`,
+        fix: 'Use authMode=dwd for googledrive — Drive scopes require user impersonation.',
       });
     }
-    // Block the common footgun: pasting the service account's own email
-    // as the impersonation user. Google returns a SA-only token for that
-    // case (no `invalid_grant`), and downstream API calls then run as the
-    // bot — which is in zero spaces / sees zero files. Fail loudly here.
-    if (impersonationEmail.endsWith('.iam.gserviceaccount.com')) {
-      throw holoError({
-        code: ErrorCode.HOLO_INVALID_INPUT,
-        problem: 'impersonationEmail must be a Workspace user, not the service account itself',
-        fix: 'Enter a real Workspace user email (e.g. yours or admin@yourcompany.com). Holo will only see what that user can see.',
-      });
+
+    let impersonationEmail: string | null = null;
+    if (authMode === 'dwd') {
+      if (!impersonationEmailRaw || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(impersonationEmailRaw)) {
+        throw holoError({
+          code: ErrorCode.HOLO_INVALID_INPUT,
+          problem: 'impersonationEmail must be a valid email address',
+          fix: 'Enter the Workspace user the service account should act as.',
+        });
+      }
+      // Block the common footgun: pasting the service account's own email
+      // as the impersonation user. Google returns a SA-only token for that
+      // case (no `invalid_grant`), and downstream API calls then run as the
+      // bot — which is in zero spaces / sees zero files. Fail loudly here.
+      if (impersonationEmailRaw.endsWith('.iam.gserviceaccount.com')) {
+        throw holoError({
+          code: ErrorCode.HOLO_INVALID_INPUT,
+          problem:
+            'impersonationEmail must be a Workspace user, not the service account itself',
+          fix: 'Enter a real Workspace user email (e.g. yours or admin@yourcompany.com). Holo will only see what that user can see.',
+        });
+      }
+      impersonationEmail = impersonationEmailRaw;
     }
 
     // Step 1: parse + validate the JSON shape (throws HoloError on bad input).
     const key = parseServiceAccountKey(keyJsonRaw);
 
-    // Step 2: prove the SA + DWD + impersonation actually works by minting
-    // a real token. If DWD isn't set up or the impersonation user doesn't
-    // exist, Google returns invalid_grant — surface that here, before we
-    // store anything.
-    const minted = await mintDelegatedAccessToken({
-      key,
-      impersonationEmail,
-      scopes: googleServiceAccountScopes(provider),
-    });
+    // Step 2: prove the SA works by minting a real token. Different mint
+    // call per auth mode — DWD mints a delegated token (catches DWD
+    // misconfigs), app mode mints an app-level token (catches SA key /
+    // Chat-API-enablement misconfigs). App-mode token successfully minting
+    // is necessary but not sufficient — `chat.app.*` scope grants from the
+    // Marketplace install can propagate slowly, so we don't gate install
+    // on a downstream API call working.
+    const minted =
+      authMode === 'app'
+        ? await mintAppAccessToken({
+            key,
+            scopes: GOOGLE_CHAT_APP_SCOPES,
+          })
+        : await mintDelegatedAccessToken({
+            key,
+            impersonationEmail: impersonationEmail!,
+            scopes: googleServiceAccountScopes(provider),
+          });
 
     // Step 3: probe the connector to capture identity for the sources row.
-    const spec =
-      provider === 'googledrive' ? createGoogleDriveSpec() : createGoogleChatSpec();
-    const tokens = { accessToken: minted.accessToken, expiresAt: minted.expiresAt };
-    const api = createHttpClient({ config: spec.http!, auth: spec.auth, tokens });
-    const ident = await spec.testConnection({ api, tokens });
+    // DWD-mode tests connection (impersonation + scope check), app-mode
+    // skips the probe because `spaces.list` may 403 until the Marketplace
+    // scope grant fully propagates (Phase 0 verification notes). We
+    // synthesize an identity from the SA email instead — once an actual
+    // sync runs, the workspace identity gets enriched by the per-space
+    // membership state.
+    let ident: { externalId: string; name: string };
+    if (authMode === 'app') {
+      ident = {
+        externalId: `app:${key.project_id}`,
+        name: `Google Chat (Holo app — project ${key.project_id})`,
+      };
+    } else {
+      const spec =
+        provider === 'googledrive' ? createGoogleDriveSpec() : createGoogleChatSpec();
+      const tokens = { accessToken: minted.accessToken, expiresAt: minted.expiresAt };
+      const api = createHttpClient({ config: spec.http!, auth: spec.auth, tokens });
+      ident = await spec.testConnection({ api, tokens });
+    }
 
     // Step 4a: upsert the SA row (per org+provider, no userId).
     const existing = await db
@@ -132,6 +187,7 @@ export async function POST(
         .set({
           keyJson: keyJsonRaw,
           impersonationEmail,
+          authMode,
           serviceAccountEmail: key.client_email,
           serviceAccountClientId: key.client_id,
           status: 'active',
@@ -145,6 +201,7 @@ export async function POST(
         provider,
         keyJson: keyJsonRaw,
         impersonationEmail,
+        authMode,
         serviceAccountEmail: key.client_email,
         serviceAccountClientId: key.client_id,
         installedByUserId: userId,
@@ -162,6 +219,11 @@ export async function POST(
     invalidateGoogleServiceAccountTokenCache(orgId, provider);
 
     // Step 4b: upsert the source row so sync queues have a target.
+    const sourceMetadata = {
+      auth_mode: authMode,
+      impersonation_email: impersonationEmail,
+      service_account_email: key.client_email,
+    };
     await db
       .insert(schema.sources)
       .values({
@@ -169,10 +231,7 @@ export async function POST(
         provider,
         externalId: ident.externalId,
         name: ident.name,
-        metadata: {
-          impersonation_email: impersonationEmail,
-          service_account_email: key.client_email,
-        },
+        metadata: sourceMetadata,
       })
       .onConflictDoUpdate({
         target: [
@@ -182,10 +241,7 @@ export async function POST(
         ],
         set: {
           name: ident.name,
-          metadata: {
-            impersonation_email: impersonationEmail,
-            service_account_email: key.client_email,
-          },
+          metadata: sourceMetadata,
           updatedAt: new Date(),
         },
       });
@@ -201,6 +257,7 @@ export async function POST(
       resourceId: provider,
       meta: {
         provider,
+        authMode,
         externalId: ident.externalId,
         name: ident.name,
         serviceAccountEmail: key.client_email,
@@ -210,6 +267,7 @@ export async function POST(
 
     return NextResponse.json({
       ok: true,
+      authMode,
       connectedAs: ident.name,
       externalId: ident.externalId,
     });
