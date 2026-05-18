@@ -63,6 +63,10 @@ export default tseslint.config(
       'apps/*/test/**/*.ts',
       '**/*.test.ts',
       '**/*.test.tsx',
+      // One-off diagnostic scripts (e.g. scripts/phase0-verify/) — not
+      // product code; bare throws are fine to surface unexpected API
+      // shapes when an operator runs them by hand.
+      'scripts/**/*.ts',
     ],
     rules: { 'local/no-bare-throw-error': 'off' },
   },
