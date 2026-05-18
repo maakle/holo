@@ -18,6 +18,7 @@ interface Args {
 const SUB_STEPS = [
   { id: 'marketplace', label: 'Marketplace SDK setup' },
   { id: 'install', label: 'Admin install + scope grant' },
+  { id: 'dwd', label: 'Grant scopes to the SA' },
   { id: 'paste', label: 'Paste service-account key' },
 ] as const;
 
@@ -26,13 +27,18 @@ const SUB_STEPS = [
  * setup with the Marketplace SDK + admin OAuth grant path — narrower trust
  * (chat.app.* scopes only, no user impersonation), one-click install.
  *
- * Three sub-steps that mirror the admin's context switches:
+ * Four sub-steps that mirror the admin's context switches:
  *   1. GCP Console: configure Workspace Marketplace SDK (private listing,
  *      Chat app integration, OAuth-Bereiche with chat.app.* scopes).
  *   2. Admin Console: install the (now-published) private app for the
  *      domain — Google's install dialog surfaces the chat.app.* scopes for
  *      explicit approval here.
- *   3. Holo: paste the SA JSON key. We POST with authMode='app' so the
+ *   3. Admin Console: add the SA's client_id to Domain-wide Delegation with
+ *      the chat.app.* scopes. This is the non-obvious step that makes the
+ *      Marketplace-granted scopes actually work for SA-based app-auth —
+ *      Google treats the app's OAuth clients and the SA as separate
+ *      principals, both need the grant.
+ *   4. Holo: paste the SA JSON key. We POST with authMode='app' so the
  *      token-loader skips impersonation and mints app-level tokens.
  *
  * Why no impersonation email here: app-mode authenticates the SA as itself
@@ -133,6 +139,8 @@ function GoogleChatAppInstallStep<TState>({
           <MarketplaceSdkBody scopes={args.scopes} />
         ) : subStep === 1 ? (
           <AdminInstallBody />
+        ) : subStep === 2 ? (
+          <DwdSetupBody scopes={args.scopes} />
         ) : (
           <PasteCredentialsBody
             keyJson={keyJson}
@@ -314,6 +322,58 @@ function AdminInstallBody() {
         owners add it. The bot can read history once it&apos;s a member.
       </li>
     </ol>
+  );
+}
+
+function DwdSetupBody({ scopes }: { scopes: ReadonlyArray<string> }) {
+  // chat.bot doesn't need DWD — it's project-implicit. Only the chat.app.*
+  // scopes need to be on the SA's DWD list. Without this step every API
+  // call 403s with "admin must grant" even though the Marketplace install
+  // already approved the scopes for the app's OAuth clients (Google
+  // distinguishes per-principal grants: app-OAuth-clients vs SA).
+  const appScopes = scopes.filter((s) => s.includes('chat.app.'));
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-md border border-warning/40 bg-[color-mix(in_srgb,var(--warning,#d97706)_8%,transparent)] px-3 py-2 text-[12px] text-text-muted">
+        <span className="font-medium text-text">Why this step is required:</span>{' '}
+        the Marketplace install grants the scopes to the app&apos;s OAuth
+        clients. Service-account app-auth (what Holo uses for ingestion)
+        additionally needs the SA principal listed here with the{' '}
+        <code className="font-mono">chat.app.*</code> scopes. Without this step,
+        every API call 403s.
+      </div>
+      <ol className="flex flex-col gap-3 text-[12px] text-text-muted list-decimal pl-4">
+        <li>
+          Open{' '}
+          <a
+            href="https://admin.google.com/ac/owl/domainwidedelegation"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent underline-offset-2 hover:underline"
+          >
+            Workspace Admin Console → Security → API Controls → Domain-wide Delegation
+          </a>{' '}
+          and click <span className="font-medium text-text">Add new</span>.
+        </li>
+        <li>
+          Paste the service account&apos;s{' '}
+          <span className="font-mono">client ID</span> (visible in the SA&apos;s
+          Details tab in Google Cloud Console — a 21-digit number).
+        </li>
+        <li className="flex flex-col gap-2">
+          <span>
+            Paste the scopes below into the OAuth scopes field, then{' '}
+            <span className="font-medium text-text">Authorize</span>.
+          </span>
+          <ScopeBlock scopes={appScopes} />
+        </li>
+        <li>
+          DWD typically propagates in &lt;60 seconds. After this step the
+          install&apos;s &ldquo;Connect&rdquo; click can validate the bot can
+          actually read messages.
+        </li>
+      </ol>
+    </div>
   );
 }
 

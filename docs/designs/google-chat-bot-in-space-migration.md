@@ -123,63 +123,70 @@ Determines whether Phase 3 (real-time) is bundled or deferred.
 
 | Check | Result | Date | Notes |
 |---|---|---|---|
-| 0.1 — pre-join history | ⏳ blocked on Google permission propagation | 2026-05-18 | See verification notes below |
-| 0.2 — admin add bot | ☐ deferred (use case shifted) | | Original plan assumed `chat.admin.memberships`; bot-in-space now uses Marketplace install path instead |
+| 0.1 — pre-join history | ✅ **PASS** | 2026-05-18 | Bot reads full history via app-auth — verification notes below |
+| 0.2 — admin add bot | ☐ deferred (use case shifted) | | Original plan assumed `chat.admin.memberships`; bot-in-space now uses Marketplace install + per-space @-mention or admin UI to add |
 | 0.3 — Pub/Sub events | ☐ not yet run | | Bundle with Phase 3 |
 
-### Check 0.1 verification notes (2026-05-18)
+### Check 0.1 verification notes (2026-05-18) — PASS
 
-What we ran (see `scripts/phase0-verify/`):
+**Outcome:** 7 messages returned by `messages.list` for a space the bot had been invited to,
+including all 3 messages posted **before** the bot joined. The load-bearing architectural
+assumption is confirmed: bot-in-space can read full history via app-auth.
+
+**What we ran** (see `scripts/phase0-verify/`):
 - **0.1** mints app-level token with `chat.app.*` scopes, calls `members.list` + `messages.list`
 - **0.1b** scope probe across 8 candidate scope variants
 - **0.1c** introspects the minted token via Google's tokeninfo endpoint
 - **0.1d** fallback via DWD-impersonated user-context token
 
-What we confirmed:
-- ✅ `chat.app.messages.readonly`, `chat.app.memberships`, `chat.app.spaces` are real Google Chat
-  scopes (confirmed by Google's developer docs + accepted by Google's token endpoint).
-- ✅ `chat.bot` alone is **insufficient** for `messages.list` (probe 0.1b: 403
-  `ACCESS_TOKEN_SCOPE_INSUFFICIENT`).
-- ✅ The `chat.app.*` scopes require **Workspace Marketplace SDK setup + admin install**, NOT
-  generic OAuth Consent Screen registration (which rejects them as "invalid"). This is the
-  load-bearing setup-path discovery from this session.
-- ✅ Token-side: introspection confirms all 4 requested scopes are present in the minted token
-  (probe 0.1c).
-- ⏳ API-side: `messages.list` still returns 403
-  `"The administrator must grant the app the required OAuth authorization scope for this action"`
-  despite the admin install having approved the scopes for the app's OAuth clients
-  (`881293320323-*`). This is consistent with Google Workspace's known eventual-consistency lag
-  on app-permission propagation (documented 5min–several hours).
+**The setup that actually worked** (in our test workspace `midlane.com`, GCP project `web-app-380316`):
 
-Setup performed in our test workspace (`midlane.com`):
-1. Enabled Google Workspace Marketplace SDK in GCP project `web-app-380316`.
-2. Configured the SDK with Visibility=Privat, Chat-App integration, OAuth-Bereiche listing all
-   3 `chat.app.*` scopes.
-3. Published the private listing; installed via Admin Console → Marketplace apps for the entire
-   org with explicit `chat.app.*` scope approval (visible in admin install dialog).
-4. Verified the install via Admin Console → app status: `gewährt` for 3 OAuth client IDs
-   (`881293320323-*`).
-5. Removed + re-added the bot to the test space to rule out per-membership scope caching — same
-   error.
+1. Enabled Google Chat API + Google Workspace Marketplace SDK.
+2. Created service account `holo-key@web-app-380316.iam.gserviceaccount.com` and downloaded JSON key.
+3. Configured the Marketplace SDK (Visibility=Privat, Chat-App integration, OAuth-Bereiche
+   listing the 3 `chat.app.*` scopes).
+4. Published the private listing; installed via Admin Console → Marketplace apps for the
+   entire org with the admin install dialog showing `chat.app.*` scope approval.
+5. **The non-obvious step**: Added the SA's client_id (`101306705334546342231`) to the
+   Workspace Admin Console's **Domain-wide Delegation** list with the three `chat.app.*` scopes
+   as its scope list. This is what unblocked the API calls.
+6. Bot added to the test space via `@Holo`. Pre-join messages were already posted before this.
 
-Open questions for follow-up:
-- Does Google's permission propagation eventually deliver `chat.app.*` to our SA-minted tokens,
-  given the SA is in the same project as the Chat App? Re-run `pnpm phase0:check-0.1` after
-  several hours / next day.
-- If not, the path may be: app-auth requires the **auto-generated** Marketplace OAuth clients
-  (`881293320323-*`) as the calling principal, not a separately-created project SA. Worth
-  testing by minting tokens via one of those Web-application OAuth clients (requires per-user
-  consent or admin-wide auto-consent on install).
+**The non-obvious architectural insight**:
 
-What this means for Phase 1 (does not block code work):
-- The verified scope URLs are correct and can be coded against. `GOOGLE_CHAT_APP_SCOPES` should
-  include all 4 (`chat.bot` + the 3 `chat.app.*`).
-- The architectural assertion ("bot-in-space with app-auth can read history") is documented by
-  Google but not yet empirically demonstrated in our test workspace due to the propagation
-  issue. The fallback (user-context tokens via DWD or per-user OAuth) provably works — same
-  read-API call, different token issuance.
-- Phase 2 setup flow design should anticipate **both** paths: app-auth-when-available,
-  user-context-fallback-when-not.
+Google's documentation implies the Marketplace install alone grants the `chat.app.*` scopes to
+the app. Empirically that's only partially true:
+
+- **Marketplace install** grants the scopes to the app's *OAuth Web Application clients*
+  (the `881293320323-*` clients that Google auto-creates for the Chat App). These are used for
+  user-context OAuth flows.
+- **For service-account app-auth** (no `sub` claim — the SA acts as itself with `chat.app.*`),
+  the SA must additionally appear on the Workspace Admin Console's **Domain-wide Delegation**
+  list with the `chat.app.*` scopes. Without this, every API call returns 403
+  `"The administrator must grant the app the required OAuth authorization scope for this action"`,
+  even though the token endpoint cheerfully mints tokens with those scopes (verified via
+  `tokeninfo` in check-0.1c).
+
+This DWD-with-app-scopes pattern is different from classic DWD because the SA still acts as
+itself (no impersonation). Google's docs don't describe it explicitly — discovered empirically
+during this verification session.
+
+**What this means for setup docs and the Phase 2 wizard**:
+
+The install flow has 3 admin actions, not 2:
+1. Marketplace SDK configuration + install (grants scopes to the *app*).
+2. **DWD entry for the SA with `chat.app.*` scopes** (grants scopes to the *SA principal*).
+3. Bot added to the spaces to be indexed (per-space membership via `@Holo` or admin invite).
+
+Wizard updated in commit `<next>` to surface step 2 explicitly. Without it, every customer
+hitting this setup will see the same 403 we did.
+
+**What we did NOT verify and should before declaring full readiness**:
+- `members.list` with app-auth — our run still returned 0 members despite the filter
+  (`member.type = "BOT" OR "HUMAN"`). Might be a filter quirk or a separate permission issue.
+  Not blocking because messages.list works and that's where the value is.
+- Behaviour with very large spaces (>1k messages) — pagination handling.
+- Pub/Sub event delivery for bot-member spaces (Check 0.3 — Phase 3 work).
 
 ## Phase 1 → 4 plan
 
