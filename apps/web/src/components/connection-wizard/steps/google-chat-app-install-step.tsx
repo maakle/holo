@@ -9,37 +9,38 @@ import type { WizardContext } from '../types';
 interface Args {
   /**
    * App-auth scopes the SA needs (chat.bot + the three chat.app.*). Rendered
-   * in the Marketplace SDK setup sub-step so the admin can paste them into
-   * the SDK's OAuth-Bereiche field.
+   * in the DWD setup sub-step so the admin can paste the chat.app.* scopes
+   * into Workspace Admin's Domain-wide Delegation field.
    */
   scopes: ReadonlyArray<string>;
 }
 
 const SUB_STEPS = [
-  { id: 'marketplace', label: 'Marketplace SDK setup' },
-  { id: 'install', label: 'Admin install + scope grant' },
+  { id: 'gcp', label: 'GCP setup' },
   { id: 'dwd', label: 'Grant scopes to the SA' },
   { id: 'paste', label: 'Paste service-account key' },
 ] as const;
 
 /**
- * Bot-in-space install step for Google Chat. Replaces the DWD-impersonation
- * setup with the Marketplace SDK + admin OAuth grant path — narrower trust
- * (chat.app.* scopes only, no user impersonation), one-click install.
+ * Bot-in-space install step for Google Chat. Replaces DWD-impersonation
+ * with narrower DWD-with-app-scopes — same admin friction (one DWD entry)
+ * but app reads only spaces it's been added to, no user impersonation.
  *
- * Four sub-steps that mirror the admin's context switches:
- *   1. GCP Console: configure Workspace Marketplace SDK (private listing,
- *      Chat app integration, OAuth-Bereiche with chat.app.* scopes).
- *   2. Admin Console: install the (now-published) private app for the
- *      domain — Google's install dialog surfaces the chat.app.* scopes for
- *      explicit approval here.
- *   3. Admin Console: add the SA's client_id to Domain-wide Delegation with
- *      the chat.app.* scopes. This is the non-obvious step that makes the
- *      Marketplace-granted scopes actually work for SA-based app-auth —
- *      Google treats the app's OAuth clients and the SA as separate
- *      principals, both need the grant.
- *   4. Holo: paste the SA JSON key. We POST with authMode='app' so the
+ * Three sub-steps that mirror the admin's context switches:
+ *   1. GCP Console: enable Chat API, create SA + download JSON key,
+ *      configure the Chat App identity (name/avatar/visibility).
+ *   2. Workspace Admin Console: add the SA's client_id to Domain-wide
+ *      Delegation with the chat.app.* scopes. The SA still acts as itself
+ *      (no `sub` claim — discovered empirically that this is what grants
+ *      chat.app.* to SA-based app-auth principals). See
+ *      docs/designs/google-chat-bot-in-space-migration.md Phase 0 notes.
+ *   3. Holo: paste the SA JSON key. We POST with authMode='app' so the
  *      token-loader skips impersonation and mints app-level tokens.
+ *
+ * Why no Marketplace SDK setup here: empirically verified that DWD-with-
+ * app-scopes alone is sufficient for BYO installs. Marketplace SDK is only
+ * needed for the future "published Holo app" path (one-click install for
+ * SaaS customers, requires Google review — separate workstream).
  *
  * Why no impersonation email here: app-mode authenticates the SA as itself
  * (no `sub` claim in the JWT). Reads are scoped to spaces where the Holo
@@ -129,17 +130,15 @@ function GoogleChatAppInstallStep<TState>({
         <p className="text-[13px] text-text-muted">
           Holo joins your Google Chat as a workspace app. Admin grants{' '}
           <code className="font-mono text-[12px] text-text">chat.app.*</code>{' '}
-          scopes once via Marketplace install; the bot then reads only spaces
-          it&apos;s been explicitly added to. No user impersonation.
+          scopes once via Domain-wide Delegation; the bot then reads only
+          spaces it&apos;s been explicitly added to. No user impersonation.
         </p>
 
         <SubStepIndicator current={subStep} />
 
         {subStep === 0 ? (
-          <MarketplaceSdkBody scopes={args.scopes} />
+          <GcpSetupBody />
         ) : subStep === 1 ? (
-          <AdminInstallBody />
-        ) : subStep === 2 ? (
           <DwdSetupBody scopes={args.scopes} />
         ) : (
           <PasteCredentialsBody
@@ -215,10 +214,7 @@ function SubStepIndicator({ current }: { current: number }) {
   );
 }
 
-function MarketplaceSdkBody({ scopes }: { scopes: ReadonlyArray<string> }) {
-  // chat.bot is granted automatically; the three chat.app.* scopes are what
-  // admins must explicitly add to the Marketplace SDK's OAuth-Bereiche field.
-  const appScopes = scopes.filter((s) => s.includes('chat.app.'));
+function GcpSetupBody() {
   return (
     <ol className="flex flex-col gap-3 text-[12px] text-text-muted list-decimal pl-4">
       <li>
@@ -230,15 +226,6 @@ function MarketplaceSdkBody({ scopes }: { scopes: ReadonlyArray<string> }) {
           className="text-accent underline-offset-2 hover:underline"
         >
           Google Chat API
-        </a>{' '}
-        and the{' '}
-        <a
-          href="https://console.cloud.google.com/apis/library/appsmarket-component.googleapis.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-accent underline-offset-2 hover:underline"
-        >
-          Google Workspace Marketplace SDK
         </a>{' '}
         in your GCP project.
       </li>
@@ -253,73 +240,31 @@ function MarketplaceSdkBody({ scopes }: { scopes: ReadonlyArray<string> }) {
           IAM → Service Accounts
         </a>
         , create a service account (no IAM role needed) and download a JSON
-        key — keep it for the final step.
-      </li>
-      <li className="flex flex-col gap-2">
-        <span>
-          Open the{' '}
-          <a
-            href="https://console.cloud.google.com/apis/api/appsmarket-component.googleapis.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent underline-offset-2 hover:underline"
-          >
-            Marketplace SDK
-          </a>{' '}
-          → <span className="font-medium text-text">Anwendungskonfiguration</span> tab.
-          Set Visibility = <span className="font-medium text-text">Private</span>{' '}
-          (irreversible — choose carefully). Check{' '}
-          <span className="font-medium text-text">Chat-App</span>. Under{' '}
-          <span className="font-medium text-text">OAuth-Bereiche</span>, add the
-          three app-auth scopes below alongside the existing defaults.
-        </span>
-        <ScopeBlock scopes={appScopes} />
-        <span className="text-[11px] text-text-subtle">
-          (These three only — <code className="font-mono">chat.bot</code> is
-          granted to your project automatically.)
-        </span>
+        key — keep it for the final step. Note the SA&apos;s{' '}
+        <span className="font-mono">client ID</span> (21-digit number on the
+        Details tab) — you&apos;ll need it in step 2.
       </li>
       <li>
-        In the{' '}
-        <span className="font-medium text-text">Store-Eintrag</span> tab, fill
-        in the required fields (name, icon, descriptions, privacy + terms
-        URLs) and publish. Private listings skip Google&apos;s public review.
-      </li>
-    </ol>
-  );
-}
-
-function AdminInstallBody() {
-  return (
-    <ol className="flex flex-col gap-3 text-[12px] text-text-muted list-decimal pl-4">
-      <li>
-        Go to{' '}
+        In{' '}
         <a
-          href="https://admin.google.com/ac/apps/gsuiteapps"
+          href="https://console.cloud.google.com/apis/api/chat.googleapis.com/hangouts-chat"
           target="_blank"
           rel="noopener noreferrer"
           className="text-accent underline-offset-2 hover:underline"
         >
-          Workspace Admin Console → Apps → Google Workspace Marketplace apps
+          Chat API → Configuration
         </a>
-        .
-      </li>
-      <li>
-        Click <span className="font-medium text-text">App installieren</span>{' '}
-        (top right) → switch to the{' '}
-        <span className="font-medium text-text">Interne Apps</span> filter →
-        find your private listing.
-      </li>
-      <li>
-        Install for{' '}
-        <span className="font-medium text-text">your entire organisation</span>
-        . Google&apos;s install dialog surfaces the three{' '}
-        <code className="font-mono">chat.app.*</code> scopes — approve them.
+        , set <span className="font-medium text-text">App name</span> = Holo,
+        upload an avatar, set Visibility = &ldquo;Specific people / groups
+        in your domain&rdquo;, and enter your admin email. Make sure{' '}
+        <span className="font-medium text-text">Gruppenbereichen beitreten</span>{' '}
+        is enabled so users can add the bot to spaces via{' '}
+        <code className="font-mono">@Holo</code>.
       </li>
       <li>
         Add the Holo bot to the Chat spaces you want indexed via{' '}
         <code className="font-mono">@Holo</code> in each space, or have space
-        owners add it. The bot can read history once it&apos;s a member.
+        owners add it. The bot reads only the spaces it&apos;s a member of.
       </li>
     </ol>
   );
@@ -327,20 +272,22 @@ function AdminInstallBody() {
 
 function DwdSetupBody({ scopes }: { scopes: ReadonlyArray<string> }) {
   // chat.bot doesn't need DWD — it's project-implicit. Only the chat.app.*
-  // scopes need to be on the SA's DWD list. Without this step every API
-  // call 403s with "admin must grant" even though the Marketplace install
-  // already approved the scopes for the app's OAuth clients (Google
-  // distinguishes per-principal grants: app-OAuth-clients vs SA).
+  // scopes need to be on the SA's DWD list. Empirically verified on
+  // 2026-05-18: this step alone is sufficient for SA-based app-auth to
+  // read chat.app.* APIs (no Marketplace SDK install needed for the BYO
+  // path). The SA still acts as itself (no `sub` claim) — DWD here just
+  // grants the scopes to the SA principal.
   const appScopes = scopes.filter((s) => s.includes('chat.app.'));
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-md border border-warning/40 bg-[color-mix(in_srgb,var(--warning,#d97706)_8%,transparent)] px-3 py-2 text-[12px] text-text-muted">
         <span className="font-medium text-text">Why this step is required:</span>{' '}
-        the Marketplace install grants the scopes to the app&apos;s OAuth
-        clients. Service-account app-auth (what Holo uses for ingestion)
-        additionally needs the SA principal listed here with the{' '}
-        <code className="font-mono">chat.app.*</code> scopes. Without this step,
-        every API call 403s.
+        Google&apos;s <code className="font-mono">chat.app.*</code> scopes are
+        admin-approval-required. For service-account app-auth (what Holo uses
+        for ingestion), the grant happens by listing the SA&apos;s client_id
+        here with the scopes. The SA still acts as itself — this isn&apos;t
+        classic user-impersonation DWD; reads are scoped to spaces the bot
+        was added to.
       </div>
       <ol className="flex flex-col gap-3 text-[12px] text-text-muted list-decimal pl-4">
         <li>
@@ -357,8 +304,7 @@ function DwdSetupBody({ scopes }: { scopes: ReadonlyArray<string> }) {
         </li>
         <li>
           Paste the service account&apos;s{' '}
-          <span className="font-mono">client ID</span> (visible in the SA&apos;s
-          Details tab in Google Cloud Console — a 21-digit number).
+          <span className="font-mono">client ID</span> from step 1.
         </li>
         <li className="flex flex-col gap-2">
           <span>

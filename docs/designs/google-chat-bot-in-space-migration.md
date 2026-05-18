@@ -154,32 +154,50 @@ assumption is confirmed: bot-in-space can read full history via app-auth.
 
 **The non-obvious architectural insight**:
 
-Google's documentation implies the Marketplace install alone grants the `chat.app.*` scopes to
-the app. Empirically that's only partially true:
+Google's documentation implies the Marketplace install grants the `chat.app.*` scopes to the
+app. Empirically (verified 2026-05-18 by uninstalling the Marketplace listing while keeping
+DWD, then re-running check-0.1 — same PASS, 7 messages returned):
 
 - **Marketplace install** grants the scopes to the app's *OAuth Web Application clients*
-  (the `881293320323-*` clients that Google auto-creates for the Chat App). These are used for
-  user-context OAuth flows.
+  (the `{app-id}-*` clients Google auto-creates). These are used for user-context OAuth flows.
+  **For SA-based app-auth (the BYO ingestion path), Marketplace install is not required.**
 - **For service-account app-auth** (no `sub` claim — the SA acts as itself with `chat.app.*`),
-  the SA must additionally appear on the Workspace Admin Console's **Domain-wide Delegation**
-  list with the `chat.app.*` scopes. Without this, every API call returns 403
+  the SA must appear on the Workspace Admin Console's **Domain-wide Delegation** list with
+  the `chat.app.*` scopes. This alone is sufficient. Without it, every API call returns 403
   `"The administrator must grant the app the required OAuth authorization scope for this action"`,
   even though the token endpoint cheerfully mints tokens with those scopes (verified via
   `tokeninfo` in check-0.1c).
 
 This DWD-with-app-scopes pattern is different from classic DWD because the SA still acts as
-itself (no impersonation). Google's docs don't describe it explicitly — discovered empirically
-during this verification session.
+itself (no impersonation). Google's docs don't describe it explicitly — discovered empirically.
+
+**Two architectural paths going forward**:
+
+| | BYO (what we built) | Shared Marketplace App (future) |
+|---|---|---|
+| GCP project | Customer's | Holobase's |
+| Service account | Customer's | Holobase's (central) |
+| Marketplace listing | Not needed | Public listing, Google reviewed |
+| Customer-side DWD | Required | Not required (Google handles cross-tenant trust) |
+| Setup time | ~9 min admin work | ~30 sec one-click install |
+| Google review | None | 4–8 weeks |
+| Customer data flows through | Customer's project | Holobase's central infrastructure |
+| Target customers | Enterprise / security-conscious | SaaS default for everyone else |
+
+The BYO path is implemented in this branch (Phase 1+2). The Shared Marketplace path is the
+natural next workstream and reuses the same `auth_mode='app'` backend infrastructure — only
+the identity origin changes (env-based central SA instead of per-customer SA row).
 
 **What this means for setup docs and the Phase 2 wizard**:
 
-The install flow has 3 admin actions, not 2:
-1. Marketplace SDK configuration + install (grants scopes to the *app*).
-2. **DWD entry for the SA with `chat.app.*` scopes** (grants scopes to the *SA principal*).
-3. Bot added to the spaces to be indexed (per-space membership via `@Holo` or admin invite).
+The BYO install flow has 3 admin actions:
+1. **GCP setup** — Enable Chat API, create SA, configure Chat API identity.
+2. **DWD entry** for the SA with `chat.app.*` scopes (grants scopes to the SA principal).
+3. **Add bot to spaces** via `@Holo` mention (per-space membership).
+4. Paste SA JSON in Holo.
 
-Wizard updated in commit `<next>` to surface step 2 explicitly. Without it, every customer
-hitting this setup will see the same 403 we did.
+Wizard reflects this 3-sub-step flow as of commit `<this commit>`. Marketplace SDK setup
+removed — it was a red herring discovered during debugging.
 
 **What we did NOT verify and should before declaring full readiness**:
 - `members.list` with app-auth — our run still returned 0 members despite the filter
@@ -187,6 +205,8 @@ hitting this setup will see the same 403 we did.
   Not blocking because messages.list works and that's where the value is.
 - Behaviour with very large spaces (>1k messages) — pagination handling.
 - Pub/Sub event delivery for bot-member spaces (Check 0.3 — Phase 3 work).
+- The Shared Marketplace App path's "no customer-side DWD" assumption — hypothesis only,
+  needs empirical confirmation once we publish via Google's review process.
 
 ## Phase 1 → 4 plan
 
