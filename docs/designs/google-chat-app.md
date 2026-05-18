@@ -331,7 +331,7 @@ Each step is a separately reviewable PR.
 
 - Create a dedicated GCP project (`holo-chat-app-prod`).
 - Enable Chat API + Workspace Events API.
-- Create a service account; download JSON; store in `WORKER_GOOGLE_CHAT_APP_CREDENTIALS_JSON`.
+- Create a service account; download JSON; store in `GOOGLE_CHAT_APP_SERVICE_ACCOUNT_JSON`.
 - Configure the Chat app (Application name, avatar, app URL, **interactive features ON**, HTTP endpoint = `${GATEWAY_PUBLIC_URL}/google-chat/events`).
 - Add app to our test Workspace.
 - Record the **project number** (audience) in `GOOGLE_CHAT_APP_PROJECT_NUMBER`.
