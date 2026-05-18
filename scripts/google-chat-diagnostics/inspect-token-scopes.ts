@@ -1,18 +1,15 @@
 /**
- * Phase 0, Check 0.1c: Introspect the minted access token to verify what
- * scopes Google actually grants for our SA + scope request, and what user/app
- * principal is on the token.
+ * Mint an app-auth token from the SA and call Google's tokeninfo endpoint to
+ * see which scopes Google actually granted (vs. what we requested), plus the
+ * audience and issued_to client_id.
  *
- * The token endpoint at tokeninfo returns:
- *   - granted scopes (vs. what we requested)
- *   - audience (project number)
- *   - issued_to (client id)
- *
- * Useful for confirming that chat.app.* scopes survived the token mint, vs.
- * being silently dropped because they're not granted on the SA/app yet.
+ * Use this when scopes appear to be silently dropped — Google does not error
+ * on unrecognized/ungranted scopes, it just omits them. If `chat.app.*` is
+ * missing from the granted list, the SA's client_id isn't authorized for
+ * those scopes in Admin Console → Domain-wide Delegation.
  *
  * Run:
- *   SA_JSON_PATH=/path/to/sa.json pnpm phase0:check-0.1c
+ *   SA_JSON_PATH=/path/to/sa.json pnpm chat:inspect-token-scopes
  */
 import { readFileSync } from 'node:fs';
 import {

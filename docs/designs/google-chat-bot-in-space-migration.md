@@ -133,7 +133,7 @@ Determines whether Phase 3 (real-time) is bundled or deferred.
 including all 3 messages posted **before** the bot joined. The load-bearing architectural
 assumption is confirmed: bot-in-space can read full history via app-auth.
 
-**What we ran** (see `scripts/phase0-verify/`):
+**What we ran** (see `scripts/google-chat-diagnostics/`):
 - **0.1** mints app-level token with `chat.app.*` scopes, calls `members.list` + `messages.list`
 - **0.1b** scope probe across 8 candidate scope variants
 - **0.1c** introspects the minted token via Google's tokeninfo endpoint
@@ -156,7 +156,7 @@ assumption is confirmed: bot-in-space can read full history via app-auth.
 
 Google's documentation implies the Marketplace install grants the `chat.app.*` scopes to the
 app. Empirically (verified 2026-05-18 by uninstalling the Marketplace listing while keeping
-DWD, then re-running check-0.1 — same PASS, 7 messages returned):
+DWD, then re-running verify-bot-access — same PASS, 7 messages returned):
 
 - **Marketplace install** grants the scopes to the app's *OAuth Web Application clients*
   (the `{app-id}-*` clients Google auto-creates). These are used for user-context OAuth flows.
@@ -166,7 +166,7 @@ DWD, then re-running check-0.1 — same PASS, 7 messages returned):
   the `chat.app.*` scopes. This alone is sufficient. Without it, every API call returns 403
   `"The administrator must grant the app the required OAuth authorization scope for this action"`,
   even though the token endpoint cheerfully mints tokens with those scopes (verified via
-  `tokeninfo` in check-0.1c).
+  `tokeninfo` in inspect-token-scopes).
 
 This DWD-with-app-scopes pattern is different from classic DWD because the SA still acts as
 itself (no impersonation). Google's docs don't describe it explicitly — discovered empirically.

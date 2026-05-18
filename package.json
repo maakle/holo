@@ -17,10 +17,8 @@
     "db:generate": "pnpm -F @holo/db generate",
     "db:studio": "pnpm -F @holo/db studio",
     "db:check": "pnpm -F @holo/db check",
-    "phase0:check-0.1": "pnpm -F @holo/db exec tsx ../../scripts/phase0-verify/check-0.1-prejoin-history.ts",
-    "phase0:check-0.1b": "pnpm -F @holo/db exec tsx ../../scripts/phase0-verify/check-0.1b-scope-probe.ts",
-    "phase0:check-0.1c": "pnpm -F @holo/db exec tsx ../../scripts/phase0-verify/check-0.1c-token-introspect.ts",
-    "phase0:check-0.1d": "pnpm -F @holo/db exec tsx ../../scripts/phase0-verify/check-0.1d-user-context.ts",
+    "chat:verify-bot-access": "pnpm -F @holo/db exec tsx ../../scripts/google-chat-diagnostics/verify-bot-access.ts",
+    "chat:inspect-token-scopes": "pnpm -F @holo/db exec tsx ../../scripts/google-chat-diagnostics/inspect-token-scopes.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

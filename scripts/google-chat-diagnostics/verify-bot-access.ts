@@ -1,32 +1,25 @@
 /**
- * Phase 0, Check 0.1: Can a Google Chat App read messages posted BEFORE it
- * joined a space?
+ * Verify a Google Chat bot can read messages in a space, including pre-join
+ * history. Mints an app-auth token from the SA, then calls members.list and
+ * messages.list against the target space.
  *
- * This is the load-bearing assumption for the bot-in-space migration. If the
- * bot cannot see pre-join history, every space loses its corporate memory at
- * the moment of connection — which is the whole point of the migration.
+ * Use this when debugging a broken install: it isolates the bot's access from
+ * any product code path and surfaces the exact API error.
  *
- * Setup (do BEFORE running this script):
- *   1. In your test Workspace, create a new space named e.g. "Holo Verify 0.1"
- *   2. As a HUMAN user, post 3 messages in the space:
- *        "msg 1 before bot"
- *        "msg 2 before bot"
- *        "msg 3 before bot"
- *   3. Wait ~30 seconds so the createTimes are clearly distinct.
- *   4. Add Holo's Chat App to the space via `@HoloApp` mention.
- *   5. As the same user, post one more message: "msg 4 after bot"
- *   6. Copy the space resource name from the URL bar
- *      (looks like spaces/AAAAAAAAAAA — the chunk after /chat/space/).
+ * Setup:
+ *   1. Create a test space (or pick an existing one the bot belongs to).
+ *   2. Post a few messages BEFORE adding the bot, then add the bot, then post
+ *      one more message — so you can tell pre- from post-join in the output.
+ *   3. Copy the space resource name from the URL (spaces/AAA…).
  *
- * Then run from the repo root:
+ * Run:
  *   SA_JSON_PATH=/path/to/sa.json \
- *   SPACE_NAME=spaces/AAAAAAAAAAA \
- *   pnpm phase0:check-0.1
+ *   SPACE_NAME=spaces/AAA \
+ *   pnpm chat:verify-bot-access
  *
- * Pass criteria: script reports ≥4 messages, with the bot's join time falling
- * between message 3 and message 4 in the timeline.
- * Fail criteria: script reports only 1 message ("msg 4 after bot") or returns
- * 403 PERMISSION_DENIED on the messages.list call.
+ * Pass: returns all messages including pre-join.
+ * Fail: returns only post-join messages, or 403 PERMISSION_DENIED — check
+ *   DWD-with-app-scopes grant for the SA's client_id in Admin Console.
  */
 import { readFileSync } from 'node:fs';
 import {
@@ -36,7 +29,7 @@ import {
 
 // App-auth read scopes that require Workspace admin OAuth grant (configured
 // via Admin Console → Security → API-Steuerung → App-Zugriff verwalten).
-// `chat.bot` alone does not allow messages.list — confirmed via check-0.1b.
+// `chat.bot` alone does not allow messages.list.
 const APP_READ_SCOPES = [
   'https://www.googleapis.com/auth/chat.bot',
   'https://www.googleapis.com/auth/chat.app.messages.readonly',
@@ -50,7 +43,7 @@ const SPACE_NAME = process.env.SPACE_NAME;
 if (!SA_JSON_PATH || !SPACE_NAME) {
   console.error('Required env vars: SA_JSON_PATH, SPACE_NAME');
   console.error('Example:');
-  console.error('  SA_JSON_PATH=~/holo-sa.json SPACE_NAME=spaces/AAA pnpm phase0:check-0.1');
+  console.error('  SA_JSON_PATH=~/holo-sa.json SPACE_NAME=spaces/AAA pnpm chat:verify-bot-access');
   process.exit(2);
 }
 
