@@ -121,6 +121,16 @@ export const GOOGLE_CHAT_SCOPES = [
   'email',
 ] as const;
 
+/**
+ * Scope used when authenticating as the Holo Chat App itself (no user
+ * impersonation). Reads are scoped to spaces where the bot is a member.
+ * Used by SA rows with `auth_mode = 'app'` — the bot-in-space model that
+ * replaces domain-wide delegation as the default for new connections.
+ */
+export const GOOGLE_CHAT_APP_SCOPES = [
+  'https://www.googleapis.com/auth/chat.bot',
+] as const;
+
 export const GOOGLE_SERVICE_ACCOUNT_SCOPES = {
   googledrive: GOOGLEDRIVE_SCOPES,
   'google-chat': GOOGLE_CHAT_SCOPES,
