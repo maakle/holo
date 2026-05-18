@@ -27,7 +27,11 @@ import { webcrawlStep } from './steps/webcrawl-step';
 // than @holo/connectors — the connectors barrel pulls the chunker package,
 // which transitively requires tree-sitter (a native node module) and breaks
 // the browser bundle. The two locations share the same source-of-truth.
-import { GOOGLEDRIVE_SCOPES, GOOGLE_CHAT_SCOPES } from '@holo/sync-providers';
+import {
+  GOOGLEDRIVE_SCOPES,
+  GOOGLE_CHAT_SCOPES,
+  GOOGLE_CHAT_APP_SCOPES,
+} from '@holo/sync-providers';
 import {
   slackChannelsStep,
   slackChannelsInitialState,
@@ -44,6 +48,7 @@ import {
   googleChatSpacesInitialState,
   type GoogleChatSpacesState,
 } from './steps/google-chat-spaces-step';
+import { googleChatAppInstallStep } from './steps/google-chat-app-install-step';
 import {
   googleDriveDrivesStep,
   googleDriveDrivesInitialState,
@@ -409,52 +414,25 @@ const airtableConfig: ConnectorWizardConfig = {
   ],
 };
 
+// Google Chat now defaults to bot-in-space mode (Marketplace install +
+// chat.app.* scopes). The DWD path remains in service-accountStep for
+// reconnects of legacy connections and can be installed via direct POST to
+// /api/connectors/google-chat/service-account without authMode: 'app'.
+// We keep GOOGLE_CHAT_SCOPES imported because the spaces picker step and
+// the legacy reconnect flow may still reference it.
+void GOOGLE_CHAT_SCOPES;
+void serviceAccountStep;
+
 const googleChatConfig: ConnectorWizardConfig<GoogleChatSpacesState> = {
   initialState: googleChatSpacesInitialState,
   steps: [
     {
       id: 'install',
-      label: 'Service account',
+      label: 'Install',
       size: 'wide',
       render: (ctx) =>
-        serviceAccountStep(ctx, {
-          scopes: GOOGLE_CHAT_SCOPES,
-          impersonationHint: 'holo@yourcompany.com',
-          apiToEnable: { label: 'Google Chat API', host: 'chat.googleapis.com' },
-          extraSteps: [
-            {
-              label: 'Configure a Chat app',
-              href: 'https://console.cloud.google.com/apis/api/chat.googleapis.com/hangouts-chat',
-              body:
-                'Open the Configuration tab and fill it in top-to-bottom — the fields below match the order on the page:',
-              fields: [
-                {
-                  label: 'Build as a Workspace Add-on',
-                  action: 'Uncheck.',
-                },
-                {
-                  label: 'App status',
-                  action: 'Select "LIVE — available to users in your domain".',
-                },
-                { label: 'App name', value: 'Holo' },
-                {
-                  label: 'Avatar URL',
-                  value:
-                    'https://raw.githubusercontent.com/maakle/holo/main/apps/web/public/logo.png',
-                },
-                {
-                  label: 'Description (≤40 chars)',
-                  value: 'Indexes Chat history for Holo search',
-                },
-                {
-                  label: 'Interactive features',
-                  action:
-                    'Turn OFF — Holo only reads via service account, no triggers needed.',
-                },
-                { label: 'Save', action: 'Click Save at the bottom of the page.' },
-              ],
-            },
-          ],
+        googleChatAppInstallStep(ctx, {
+          scopes: GOOGLE_CHAT_APP_SCOPES,
         }),
     },
     {
