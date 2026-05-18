@@ -97,10 +97,18 @@ export function LandingFooter() {
           <p className="text-[12px] text-text-subtle">
             © {new Date().getFullYear()} holo · Community Edition · MIT
           </p>
-          <p className="inline-flex items-center gap-2 text-[12px] text-text-subtle">
-            <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
-            All systems normal
-          </p>
+          <div className="flex items-center gap-5 text-[12px] text-text-subtle">
+            <Link href="/privacy" className="transition-colors hover:text-text">
+              Privacy
+            </Link>
+            <Link href="/terms" className="transition-colors hover:text-text">
+              Terms
+            </Link>
+            <span className="inline-flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
+              All systems normal
+            </span>
+          </div>
         </div>
       </div>
     </footer>
