@@ -32,6 +32,26 @@ const PLACEHOLDER_MESSAGE = 'holo is thinking…';
 export const ERROR_FALLBACK_TEXT = ERROR_MESSAGE;
 export const PLACEHOLDER_TEXT = PLACEHOLDER_MESSAGE;
 
+// Google Workspace Marketplace review requires an unsolicited welcome
+// message on ADDED_TO_SPACE / DM-start, distinct from the /help reply.
+// The two share no copy on purpose: the reviewer checks that both surfaces
+// exist and serve different intents (orientation vs. usage examples).
+const WELCOME_HEADLINE = `👋 Hi! I'm <b>Holo</b> — your team's knowledge agent in Google Chat.`;
+const WELCOME_BODY =
+  `I bring together what your team already knows — across Slack, Notion, Drive, GitHub, Linear and more — so you can find answers without leaving Chat.<br><br>` +
+  `<b>Try me:</b> @mention me in this space with a question, or send me a DM.<br><br>` +
+  `Type <b>/help</b> any time for examples and tips.`;
+
+const HELP_HEADLINE = `Here's how to use Holo:`;
+const HELP_BODY =
+  `<b>In a space:</b> @mention me with a question. Examples:<br>` +
+  `&nbsp;&nbsp;• @Holo what's our refund policy?<br>` +
+  `&nbsp;&nbsp;• @Holo find the latest design doc for billing<br>` +
+  `&nbsp;&nbsp;• @Holo summarize recent customer feedback<br><br>` +
+  `<b>In a DM:</b> just ask — no @mention needed.<br><br>` +
+  `Answers are grounded in your team's connected tools and respect each user's existing access. ` +
+  `Manage connections at <a href="https://holobase.dev">holobase.dev</a>.`;
+
 export function placeholderCard(): GoogleChatCardV2Message {
   return {
     cardsV2: [
@@ -98,6 +118,46 @@ export function errorCard(): GoogleChatCardV2Message {
         cardId: randomUUID(),
         card: {
           sections: [{ widgets: [{ textParagraph: { text: ERROR_MESSAGE } }] }],
+        },
+      },
+    ],
+  };
+}
+
+export function welcomeCard(): GoogleChatCardV2Message {
+  return {
+    cardsV2: [
+      {
+        cardId: randomUUID(),
+        card: {
+          sections: [
+            {
+              widgets: [
+                { textParagraph: { text: WELCOME_HEADLINE } },
+                { textParagraph: { text: WELCOME_BODY } },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+export function helpCard(): GoogleChatCardV2Message {
+  return {
+    cardsV2: [
+      {
+        cardId: randomUUID(),
+        card: {
+          sections: [
+            {
+              widgets: [
+                { textParagraph: { text: HELP_HEADLINE } },
+                { textParagraph: { text: HELP_BODY } },
+              ],
+            },
+          ],
         },
       },
     ],

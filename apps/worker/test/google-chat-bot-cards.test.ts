@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   answerCard,
   errorCard,
+  helpCard,
   placeholderCard,
   slackMrkdwnToCardsHtml,
+  welcomeCard,
 } from '../src/google-chat-bot/cards';
 import type { Source } from '../src/slack-bot/agent';
 
@@ -184,5 +186,34 @@ describe('slackMrkdwnToCardsHtml', () => {
     expect(out).toContain('<b>🧭 What it is</b>');
     expect(out).toContain('<b>bold thing</b>');
     expect(out).toContain('\n- Bullet');
+  });
+});
+
+describe('welcomeCard and helpCard', () => {
+  // Google Workspace Marketplace review checks that the bot greets on
+  // ADDED_TO_SPACE / first-DM AND supports /help, AND that the two surfaces
+  // serve different intents — a help reply is not a substitute for the
+  // welcome. Pin both shapes here so an accidental refactor doesn't merge
+  // them or accidentally drop the requirement.
+
+  it('welcome and help cards have distinct content', () => {
+    const welcomeText = JSON.stringify(welcomeCard());
+    const helpText = JSON.stringify(helpCard());
+    expect(welcomeText).not.toBe(helpText);
+  });
+
+  it('welcome card greets and points to /help without acting as /help itself', () => {
+    const card = welcomeCard();
+    const sectionText = JSON.stringify(card.cardsV2![0]!.card.sections);
+    expect(sectionText).toMatch(/Hi/i);
+    expect(sectionText).toMatch(/Holo/);
+    expect(sectionText).toMatch(/\/help/);
+  });
+
+  it('help card lists usage examples', () => {
+    const card = helpCard();
+    const sectionText = JSON.stringify(card.cardsV2![0]!.card.sections);
+    expect(sectionText).toMatch(/@Holo/);
+    expect(sectionText).toMatch(/DM/);
   });
 });

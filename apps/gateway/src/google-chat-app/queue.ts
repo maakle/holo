@@ -60,6 +60,16 @@ export type GoogleChatBotJob =
       threadName?: string;
       setupUrl: string;
       useSharedServiceAccount: true;
+    }
+  | {
+      // Unsolicited welcome on ADDED_TO_SPACE / first DM. Required by the
+      // Google Workspace Marketplace review: the app must greet on join
+      // and the greeting must be distinct from `/help`. No org context is
+      // needed — the bot was just added by Marketplace install or by a
+      // user @mention, so the central SA always has post permission.
+      kind: 'welcome';
+      spaceName: string;
+      useSharedServiceAccount: true;
     };
 
 let queue: Queue<GoogleChatBotJob> | null = null;

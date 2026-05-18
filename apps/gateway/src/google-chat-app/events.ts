@@ -63,8 +63,12 @@ async function getCustomAppAudience(
  *         so the bot is never silent.
  *   4. Enqueue mention/dm job carrying the resolved `organizationId`.
  *
- * Other event types (ADDED_TO_SPACE, REMOVED_FROM_SPACE, CARD_CLICKED):
- * ack 200, no work.
+ * For ADDED_TO_SPACE events (bot added to a space, or first DM opened):
+ * enqueue a `welcome` job that posts an unsolicited greeting via the shared
+ * SA. Google Workspace Marketplace review requires this and that the
+ * greeting is distinct from `/help`.
+ *
+ * Other event types (REMOVED_FROM_SPACE, CARD_CLICKED): ack 200, no work.
  */
 export function mountGoogleChatAppEvents(
   app: AnyHono,
@@ -149,6 +153,22 @@ async function handleGoogleChatEvent(
   // fields (e.g. `{ ok: true }`) makes Google log a parsing error and
   // surface "Holo reagiert nicht" in the client. Use `{}` for "no
   // immediate reply"; real replies are posted async via the Chat API.
+
+  if (envelope.type === 'ADDED_TO_SPACE' && envelope.space?.name) {
+    try {
+      await enqueueGoogleChatBotJob(opts.redisUrl, {
+        kind: 'welcome',
+        spaceName: envelope.space.name,
+        useSharedServiceAccount: true,
+      });
+    } catch (err) {
+      logger.error(
+        { err, spaceName: envelope.space.name },
+        'google-chat-app events: enqueue welcome failed',
+      );
+    }
+    return c.json({}, 200);
+  }
 
   if (envelope.type !== 'MESSAGE' || !envelope.message || !envelope.space) {
     logger.debug(

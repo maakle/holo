@@ -7,6 +7,7 @@ import { loadChatWorkspaceCreds } from './workspace.js';
 import { makeDefaultAgentRunner, type AgentImpl } from '../slack-bot/agent-runner.js';
 import { finalizeChatAnswer, finalizeChatError, postPlaceholder } from './finalize.js';
 import { makeChatPlaceholderProgress } from './progress.js';
+import { helpCard, welcomeCard } from './cards.js';
 
 /**
  * Job kinds mirror `SlackBotJob`. `mention` and `dm` route through the
@@ -48,6 +49,11 @@ export type GoogleChatBotJob =
       spaceName: string;
       threadName?: string;
       setupUrl: string;
+      useSharedServiceAccount: true;
+    }
+  | {
+      kind: 'welcome';
+      spaceName: string;
       useSharedServiceAccount: true;
     };
 
@@ -91,6 +97,35 @@ export async function handleGoogleChatBotJob(
       emoji: job.emoji,
     });
     return { ok: false, reason: 'reactions_not_implemented' };
+  }
+
+  if (job.kind === 'welcome') {
+    // ADDED_TO_SPACE / first-DM greeting. Uses the shared SA (the bot was
+    // just added; no per-org context is available yet, and the central
+    // app principal always has post permission on a space it was added
+    // to). Required for Google Workspace Marketplace review.
+    if (!deps.sharedServiceAccountJson) {
+      logError(
+        'google-chat-bot: welcome skipped — sharedServiceAccountJson unset on worker',
+      );
+      return { ok: false, reason: 'shared_sa_unset' };
+    }
+    const client = createGoogleChatAppApiClient({
+      serviceAccountJson: deps.sharedServiceAccountJson,
+      fetchImpl: deps.fetchImpl,
+    });
+    const res = await client.createMessage({
+      parent: job.spaceName,
+      body: welcomeCard(),
+    });
+    if (!res.ok) {
+      logError(
+        `google-chat-bot: welcome messages.create failed (parent=${job.spaceName} error=${res.error ?? 'unknown'})`,
+      );
+      return { ok: false, reason: 'welcome_post_failed' };
+    }
+    logInfo('google-chat-bot: welcome posted', { spaceName: job.spaceName });
+    return { ok: true };
   }
 
   if (job.kind === 'unbound-info') {
@@ -210,6 +245,30 @@ export async function handleGoogleChatBotJob(
     return { ok: true };
   }
 
+  // /help short-circuit. Both the slash-command form (`/help`) and the plain
+  // word `help` count — Google Workspace Marketplace review requires that a
+  // user can ask for help via a recognizable command. Distinct from the
+  // welcome message; reviewers check that both surfaces exist with
+  // different content.
+  if (isHelpCommand(query)) {
+    const res = await client.createMessage({
+      parent: job.spaceName,
+      body: {
+        ...helpCard(),
+        thread: threadName ? { name: threadName } : undefined,
+      },
+      messageReplyOption: threadName
+        ? 'REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD'
+        : undefined,
+    });
+    if (!res.ok) {
+      logError(
+        `google-chat-bot: help messages.create failed (parent=${job.spaceName} error=${res.error ?? 'unknown'})`,
+      );
+    }
+    return { ok: true };
+  }
+
   const placeholder = await postPlaceholder({
     client,
     spaceName: job.spaceName,
@@ -307,6 +366,11 @@ export async function handleGoogleChatBotJob(
   });
 
   return { ok: true };
+}
+
+function isHelpCommand(query: string): boolean {
+  const normalized = query.trim().toLowerCase();
+  return normalized === '/help' || normalized === 'help';
 }
 
 function buildUnboundInfoText({
