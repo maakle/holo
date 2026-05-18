@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
@@ -22,6 +22,7 @@ export function webcrawlStep<TState>(ctx: WizardContext<TState>) {
 function WebcrawlStep<TState>({ ctx }: { ctx: WizardContext<TState> }) {
   const { meta, connected, connectedAs, forceCredentialEntry } = ctx;
   const showConnectedBanner = connected && !forceCredentialEntry;
+  const isReconnect = Boolean(forceCredentialEntry);
 
   const [mode, setMode] = useState<Mode>('scrape');
   const [urlsText, setUrlsText] = useState('');
@@ -32,6 +33,61 @@ function WebcrawlStep<TState>({ ctx }: { ctx: WizardContext<TState> }) {
   const [excludePathsText, setExcludePathsText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // On reconnect (Manage → Reconnect), load the existing source(s) so the
+  // form pre-fills with whatever was last saved. The form is then a true
+  // edit surface — submit replaces the saved state (see `replace: true`
+  // below), so switching mode crawl↔scrape can't leave the old row behind.
+  useEffect(() => {
+    if (!isReconnect) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/connectors/${meta.id}/connect`, { method: 'GET' });
+        if (!res.ok) return;
+        const json = (await res.json().catch(() => ({}))) as {
+          sources?: Array<{ externalId: string; metadata: Record<string, unknown> | null }>;
+        };
+        if (cancelled || !json.sources || json.sources.length === 0) return;
+
+        // A crawl row pins the mode (one seed per connector — the wizard
+        // only writes a single crawl row). Otherwise treat everything as
+        // scrape URLs and concatenate them into the textarea.
+        const crawl = json.sources.find(
+          (s) => (s.metadata as { mode?: string } | null)?.mode === 'crawl',
+        );
+        if (crawl) {
+          const md = crawl.metadata as {
+            seedUrl?: string;
+            limit?: number;
+            maxDepth?: number;
+            includePaths?: string[];
+            excludePaths?: string[];
+          } | null;
+          setMode('crawl');
+          if (md?.seedUrl) setSeedUrl(md.seedUrl);
+          if (typeof md?.limit === 'number') setLimit(md.limit);
+          if (typeof md?.maxDepth === 'number') setMaxDepth(md.maxDepth);
+          if (md?.includePaths?.length) setIncludePathsText(md.includePaths.join('\n'));
+          if (md?.excludePaths?.length) setExcludePathsText(md.excludePaths.join('\n'));
+        } else {
+          const urls = json.sources
+            .map((s) => (s.metadata as { url?: string } | null)?.url ?? s.externalId)
+            .filter((u): u is string => typeof u === 'string' && u.length > 0);
+          if (urls.length > 0) {
+            setMode('scrape');
+            setUrlsText(urls.join('\n'));
+          }
+        }
+      } catch {
+        // Pre-fill is best-effort; a fetch failure just leaves the form
+        // blank, which matches the pre-fix behaviour.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isReconnect, meta.id]);
 
   const urls = parseLines(urlsText);
   const includePaths = parseLines(includePathsText);
@@ -46,9 +102,13 @@ function WebcrawlStep<TState>({ ctx }: { ctx: WizardContext<TState> }) {
     setBusy(true);
     setError(null);
     try {
+      // Reconnect submits replace the saved state — without this the
+      // server upserts by (org, provider, externalId), so e.g. switching
+      // from a crawl of midlane.com to a scrape of midlane.com/pricing
+      // would leave the original crawl row in place and keep syncing both.
       const body =
         mode === 'scrape'
-          ? { mode: 'scrape', urls }
+          ? { mode: 'scrape', urls, ...(isReconnect ? { replace: true } : {}) }
           : {
               mode: 'crawl',
               seedUrl: seedUrl.trim(),
@@ -56,6 +116,7 @@ function WebcrawlStep<TState>({ ctx }: { ctx: WizardContext<TState> }) {
               maxDepth,
               ...(includePaths.length > 0 ? { includePaths } : {}),
               ...(excludePaths.length > 0 ? { excludePaths } : {}),
+              ...(isReconnect ? { replace: true } : {}),
             };
       const res = await fetch(`/api/connectors/${meta.id}/connect`, {
         method: 'POST',

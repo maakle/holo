@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { schema } from '@holo/db';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
@@ -36,6 +37,10 @@ const scrapeRequestSchema = z.object({
   mode: z.literal('scrape'),
   /** One or more URLs; each becomes its own sources row. */
   urls: z.array(z.string().min(1)).min(1).max(20),
+  /** Reconnect flow: wipe all existing webcrawl sources for the org before
+   * inserting the new ones, so switching between scrape/crawl doesn't leave
+   * the old mode's row(s) behind. */
+  replace: z.boolean().optional(),
 });
 
 const crawlRequestSchema = z.object({
@@ -45,12 +50,23 @@ const crawlRequestSchema = z.object({
   maxDepth: z.number().int().min(0).max(5).default(2),
   includePaths: z.array(z.string()).max(20).optional(),
   excludePaths: z.array(z.string()).max(20).optional(),
+  replace: z.boolean().optional(),
 });
 
 const requestSchema = z.discriminatedUnion('mode', [
   scrapeRequestSchema,
   crawlRequestSchema,
 ]);
+
+// Users naturally type "midlane.com" without a scheme. Server-side prepend
+// `https://` rather than rejecting outright — the URL guard still validates
+// the resolved URL, so this is just a UX courtesy, not a relaxation of the
+// SSRF defence.
+function ensureScheme(raw: string): string {
+  const trimmed = raw.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
 
 export async function POST(req: Request) {
   try {
@@ -85,8 +101,9 @@ export async function POST(req: Request) {
     const validatedUrls: string[] = [];
     const inputUrls = body.mode === 'scrape' ? body.urls : [body.seedUrl];
     for (const u of inputUrls) {
+      const candidate = ensureScheme(u);
       try {
-        const parsedUrl = await assertPublicHttpUrl(u.trim());
+        const parsedUrl = await assertPublicHttpUrl(candidate);
         validatedUrls.push(parsedUrl.toString());
       } catch (err) {
         throw holoError({
@@ -117,6 +134,22 @@ export async function POST(req: Request) {
         ],
         set: { accessToken: '', status: 'active' },
       });
+
+    // Reconnect / edit flow: the form is the canonical state — drop any
+    // existing webcrawl sources for this org so switching mode (crawl →
+    // scrape or vice versa) doesn't leave the prior row behind. The
+    // upsert-by-externalId below would otherwise miss them because the
+    // externalId for crawl ("crawl:<url>") differs from scrape ("<url>").
+    if (body.replace) {
+      await db
+        .delete(schema.sources)
+        .where(
+          and(
+            eq(schema.sources.organizationId, orgId),
+            eq(schema.sources.provider, 'webcrawl'),
+          ),
+        );
+    }
 
     const createdSources: Array<{ externalId: string; name: string }> = [];
 
@@ -214,6 +247,48 @@ export async function POST(req: Request) {
             ? 400
             : 500;
       return NextResponse.json(e.toJSON(), { status });
+    }
+    console.error(e);
+    return NextResponse.json(
+      { code: 'HOLO_INTERNAL', problem: 'unexpected error', fix: 'Check server logs.' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * GET — return the existing webcrawl sources for the active org. The wizard
+ * calls this when the Reconnect button opens the form so the inputs pre-fill
+ * with whatever was last saved (scrape URLs, or the crawl seed + limits).
+ * Without it, reconnect would always start blank and the user would either
+ * have to retype everything or assume their old config is gone.
+ */
+export async function GET() {
+  try {
+    const { auth, db } = await getServerContext();
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) {
+      return NextResponse.json(
+        { code: 'HOLO_AUTH_NO_SESSION', problem: 'must be signed in', fix: 'Sign in first.' },
+        { status: 401 },
+      );
+    }
+    const orgId = resolveActiveOrgId(session);
+
+    const rows = await db
+      .select({ externalId: schema.sources.externalId, metadata: schema.sources.metadata })
+      .from(schema.sources)
+      .where(
+        and(
+          eq(schema.sources.organizationId, orgId),
+          eq(schema.sources.provider, 'webcrawl'),
+        ),
+      );
+
+    return NextResponse.json({ sources: rows });
+  } catch (e) {
+    if (e instanceof HoloError) {
+      return NextResponse.json(e.toJSON(), { status: 400 });
     }
     console.error(e);
     return NextResponse.json(
