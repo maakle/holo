@@ -129,10 +129,11 @@ export const GOOGLE_CHAT_SCOPES = [
  *
  * `chat.bot` alone is insufficient for `spaces.messages.list` (confirmed
  * empirically in Phase 0 — 403 ACCESS_TOKEN_SCOPE_INSUFFICIENT). The three
- * `chat.app.*` scopes require **Workspace Marketplace SDK setup + admin
- * install** (NOT OAuth Consent Screen registration — Google rejects them
- * there as invalid). See docs/designs/google-chat-bot-in-space-migration.md
- * Phase 0 verification notes.
+ * `chat.app.*` scopes require Workspace Admin → Domain-wide Delegation with
+ * the SA's client_id (the SA acts as itself, no `sub` claim — different
+ * from classic user-impersonation DWD). See
+ * docs/designs/google-chat-bot-in-space-migration.md Phase 0 verification
+ * notes.
  */
 export const GOOGLE_CHAT_APP_SCOPES = [
   'https://www.googleapis.com/auth/chat.bot',

@@ -101,6 +101,25 @@ export async function deleteWorkspace(
     meta: { name: org.name },
   });
 
+  // Pick the next active org BEFORE deletion so we can re-point the caller's
+  // session directly to it. Without this, we'd null `activeOrganizationId`
+  // and rely on the (app) layout to reconcile + redirect again — an extra
+  // round trip the user perceives as a flash/reload spike right after
+  // confirming the delete.
+  const homeOrgId = (session.user as { organizationId?: string }).organizationId;
+  let nextActiveOrgId: string | null =
+    homeOrgId && homeOrgId !== organizationId ? homeOrgId : null;
+  if (!nextActiveOrgId) {
+    const candidates = await db
+      .select({ organizationId: schema.member.organizationId })
+      .from(schema.member)
+      .where(
+        and(eq(schema.member.userId, userId), ne(schema.member.organizationId, organizationId)),
+      )
+      .limit(1);
+    nextActiveOrgId = candidates[0]?.organizationId ?? null;
+  }
+
   await db.transaction(async (tx) => {
     // Tables that reference organization.id without ON DELETE CASCADE.
     // Order matters where rows have child cascades inside the same delete.
@@ -159,6 +178,15 @@ export async function deleteWorkspace(
       .update(schema.session)
       .set({ activeOrganizationId: null })
       .where(eq(schema.session.activeOrganizationId, organizationId));
+
+    // Pin the caller's own session to the next valid org so the immediate
+    // redirect to /dashboard renders the new active workspace without the
+    // layout having to reconcile + bounce.
+    const sessionRow = session.session as { id: string };
+    await tx
+      .update(schema.session)
+      .set({ activeOrganizationId: nextActiveOrgId })
+      .where(eq(schema.session.id, sessionRow.id));
 
     // Remaining tables (member, invitation, sync_runs, github_installations,
     // oauth tokens/codes, slack_user_credentials, user_subjects_cache) all
