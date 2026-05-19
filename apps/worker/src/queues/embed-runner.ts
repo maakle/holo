@@ -20,17 +20,20 @@ export interface EmbedderClient {
 }
 
 /**
- * Routes a chunk to its embedding model. `github-code` always goes to
- * Voyage; everything else goes to whatever OpenAI tier the operator
- * has selected via `OPENAI_EMBEDDING_MODEL`. Mirrors the rule in
- * packages/embedder/src/router.ts. Kept local so the worker doesn't
- * pull a build-time dep on the full @holo/embedder runtime.
+ * Routes a chunk to its embedding model. Source-code chunks always go to
+ * Voyage; everything else goes to whatever OpenAI tier the operator has
+ * selected via `OPENAI_EMBEDDING_MODEL`. Mirrors the rule in
+ * packages/embedder/src/router.ts (`CODE_CHUNK_KINDS`) — keep both in sync.
+ * Kept local so the worker doesn't pull a build-time dep on the full
+ * @holo/embedder runtime.
  *
  * The openai tag is read from env on every call rather than cached so
  * tests can flip the env var per-case via `vi.stubEnv`.
  */
+const CODE_CHUNK_KINDS = new Set(['github-code', 'gitlab-code']);
+
 export function modelForChunkKind(kind: string): EmbeddingModel {
-  if (kind === 'github-code') return 'voyage-code-3';
+  if (CODE_CHUNK_KINDS.has(kind)) return 'voyage-code-3';
   return resolveOpenAiModel().tag;
 }
 

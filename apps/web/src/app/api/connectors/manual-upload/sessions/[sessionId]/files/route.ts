@@ -8,7 +8,7 @@ import {
   extToLanguage,
   isCodeExtension,
   shouldIndexByPath,
-} from '@holo/connectors/github/code-skip';
+} from '@holo/connectors/code-skip';
 import { schema } from '@holo/db';
 import { ErrorCode, holoError, HoloError } from '@holo/errors';
 import { getQueueByName } from '@/lib/sync-queue';

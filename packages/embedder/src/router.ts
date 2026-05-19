@@ -10,11 +10,20 @@ export interface RouterChunk {
   aclSubjects?: string[];
 }
 
+/**
+ * Chunk `kind`s that contain source code and should be embedded with a
+ * code-specialized model (voyage-code-3) instead of the prose default.
+ * Mirrored in `apps/worker/src/queues/embed-runner.ts:modelForChunkKind` —
+ * keep the two in sync. Manual-upload code files reuse `github-code` so the
+ * routing applies uniformly to anything tagged as source code.
+ */
+export const CODE_CHUNK_KINDS = new Set(['github-code', 'gitlab-code']);
+
 export function getEmbedderForChunkKind(
   kind: string,
   registry: EmbedderRegistry,
 ): Embedder {
-  return kind === 'github-code' ? registry.voyage : registry.openai;
+  return CODE_CHUNK_KINDS.has(kind) ? registry.voyage : registry.openai;
 }
 
 export interface EmbeddedChunk<C extends RouterChunk = RouterChunk> {

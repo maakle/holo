@@ -4,7 +4,7 @@ import { AlertCircle, Check, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { shouldIndexByPath } from '@holo/connectors/github/code-skip';
+import { shouldIndexByPath } from '@holo/connectors/code-skip';
 import {
   MANUAL_UPLOAD_MAX_FILE_BYTES,
   MANUAL_UPLOAD_SOURCE_TOOLS,
@@ -353,7 +353,7 @@ function UploadStep({ ctx }: { ctx: WizardContext<ManualUploadState> }) {
 
   return (
     <>
-      <div className="flex flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-3">
         <div
           onDragOver={(e) => {
             e.preventDefault();
