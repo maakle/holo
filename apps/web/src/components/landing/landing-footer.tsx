@@ -59,7 +59,7 @@ export function LandingFooter() {
             <HoloLogo wordmarkClassName="text-[20px]" logoClassName="h-6 w-6" />
           </Link>
           <p className="mt-3.5 max-w-[280px] text-[13px] leading-[1.55] text-text-muted">
-            The agent context layer. Open source · MIT · self-hostable.
+            The agent context layer. Open source · AGPL-3.0 · self-hostable.
           </p>
           <div className="mt-4.5 flex gap-2.5">
             {SOCIALS.map(({ Icon, href, label }) => (
@@ -95,7 +95,7 @@ export function LandingFooter() {
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-3 px-8 py-5">
           <p className="text-[12px] text-text-subtle">
-            © {new Date().getFullYear()} holo · Community Edition · MIT
+            © {new Date().getFullYear()} holo · Community Edition · AGPL-3.0
           </p>
           <div className="flex items-center gap-5 text-[12px] text-text-subtle">
             <Link href="/privacy" className="transition-colors hover:text-text">

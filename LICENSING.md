@@ -5,15 +5,15 @@ license that governs each set of files.
 
 | Edition | Who it's for | License | Location |
 |---|---|---|---|
-| **Community Edition (CE)** | Anyone — individuals, startups, in-house teams. Always free to self-host, fork, modify, and redistribute. | [MIT](./LICENSE) | Everything in this repo **except** `**/ee/**` |
+| **Community Edition (CE)** | Anyone — individuals, startups, in-house teams. Always free to self-host, fork, modify, and redistribute under the terms of AGPL-3.0. | [AGPL-3.0](./LICENSE) | Everything in this repo **except** `**/ee/**` |
 | **Enterprise Edition (EE)** | Companies that need the EE-only governance, identity, and customization surfaces. Free to evaluate and develop against; production use requires a paid subscription. | [Enterprise License](./LICENSE-EE) | Anything under a directory named `ee/` |
 
-If a file's path does not contain `/ee/`, it is MIT. If it does, it is EE.
-There is no third tier.
+If a file's path does not contain `/ee/`, it is AGPL-3.0. If it does, it is
+EE. There is no third tier.
 
 ---
 
-## Community Edition (MIT) — what's always free
+## Community Edition (AGPL-3.0) — what's always free
 
 The Community Edition is the entire context-layer product: connectors, hybrid
 search, MCP + REST gateway, the dashboard, the worker, OAuth provider, skill
@@ -41,8 +41,27 @@ Concretely:
 - **Multi-tenant organizations** (one or many orgs per deployment).
 
 If you can run `docker compose up` and serve agents from it, you are using CE.
-CE is MIT — keep it, fork it, ship a product on top of it, change it, do not
-ask permission.
+
+### What AGPL-3.0 means in practice
+
+AGPL-3.0 is the GNU Affero General Public License v3.0 — a copyleft open-source
+license approved by both the OSI and the FSF. The short version:
+
+- **Self-hosting for your company is fine.** Run holo on your own infrastructure
+  for your own users, modify it however you like, never publish a thing. AGPL
+  has nothing to say about purely internal use.
+- **If you offer holo (or a derivative) as a network service to third parties**
+  — i.e. you host it for users outside your organization — you must make the
+  full corresponding source code of the version you're running available to
+  those users under AGPL-3.0.
+- **Forks must stay under AGPL-3.0.** You can change the code, but you can't
+  relicense the result under a more permissive license.
+- **No trademark grant.** AGPL doesn't license the "Holo" name or logo; forks
+  intended for redistribution should use a different name.
+
+If you want to build a hosted commercial product on top of holo without the
+AGPL source-disclosure obligation, contact the maintainers about a commercial
+license.
 
 ---
 
@@ -76,8 +95,8 @@ sequencing):
   Holo as part of your own product.
 
 If a feature in the list above ever appears in `packages/`, `apps/`, or
-elsewhere **outside** an `ee/` directory, it is CE and MIT. The license is
-determined by the file path, not by the marketing position.
+elsewhere **outside** an `ee/` directory, it is CE and AGPL-3.0. The license
+is determined by the file path, not by the marketing position.
 
 ### How EE is enforced
 
@@ -99,15 +118,16 @@ deliberately low so customers can self-serve a trial.
 
 ## Contributions
 
-Contributions to CE files are accepted under MIT. Contributions to EE files
-require the same CLA but grant the maintainer the additional rights spelled
-out in `LICENSE-EE` § 3. See `CONTRIBUTING.md` for the contribution flow.
+Contributions to CE files are accepted under AGPL-3.0. Contributions to EE
+files require the same CLA but grant the maintainer the additional rights
+spelled out in `LICENSE-EE` § 3. See `CONTRIBUTING.md` for the contribution
+flow.
 
 ## Trademark
 
-"Holo" and the Holo logo are trademarks of the project maintainers. The MIT
-license on the CE source does not grant trademark rights — forks should
-choose a different name and logo if redistributed.
+"Holo" and the Holo logo are trademarks of the project maintainers. The
+AGPL-3.0 license on the CE source does not grant trademark rights — forks
+intended for redistribution should choose a different name and logo.
 
 ## Questions
 

@@ -20,7 +20,7 @@ The interface includes: `buildAuthorizeUrl`, `exchangeCode`, `refresh`, `fullSyn
 **Positive:**
 - Matches Dust and Onyx, the closest analogs at our scope.
 - Top connectors all have excellent first-party SDKs, so the framework's main value (raw HTTP abstraction) doesn't apply.
-- Avoids embedding Elastic License v2 code (Nango) in our MIT-licensed Community Edition distribution.
+- Avoids embedding Elastic License v2 code (Nango) in our AGPL-licensed Community Edition distribution.
 - Each connector is ~300–500 LOC, well within hand-maintenance budget.
 - The `NangoConnectorAdapter` escape hatch gives us Nango's catalog without committing the core stack.
 

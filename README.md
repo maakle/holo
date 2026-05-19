@@ -79,7 +79,7 @@ POST /v1/search { query, limit } → ranked chunks with snippet_url back to sour
 
 ## Architecture
 
-Three apps. 21 packages. 20 connectors. MIT (Community Edition).
+Three apps. 21 packages. 20 connectors. AGPL-3.0 (Community Edition).
 
 ```mermaid
 flowchart LR
@@ -246,7 +246,7 @@ Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) before opening a PR. First-time cont
 
 Holo ships in two editions in this same repo:
 
-- **Community Edition (CE)** — **[MIT](./LICENSE)**. Always free to self-host. Covers the entire core: all 20 connectors, hybrid search, MCP + REST gateway, OAuth provider, dashboard, worker, per-call audit log, skill synthesis + execution + marketplace, multi-tenant orgs, the CLI. If a file's path doesn't contain `/ee/`, it's CE and it's MIT.
+- **Community Edition (CE)** — **[AGPL-3.0](./LICENSE)**. Always free to self-host for your company. Covers the entire core: all 20 connectors, hybrid search, MCP + REST gateway, OAuth provider, dashboard, worker, per-call audit log, skill synthesis + execution + marketplace, multi-tenant orgs, the CLI. If a file's path doesn't contain `/ee/`, it's CE and it's AGPL-3.0. Building a hosted commercial product on top of holo without the AGPL source-disclosure obligation requires a commercial license — open an issue.
 - **Enterprise Edition (EE)** — **[commercial license](./LICENSE-EE)**. Lives under `**/ee/**`. Free to read, fork, and run in development; production use requires a paid subscription. EE surfaces (rolled out incrementally):
   - 👥 **Collaboration** — share chats and agents with members of your organization.
   - 🔐 **Single Sign-On** — Google OAuth, OIDC, SAML; SCIM for group sync and user provisioning.
@@ -260,7 +260,7 @@ Full edition breakdown, what's CE vs EE today, and the contribution rules for ea
 
 ## License
 
-- **Community Edition** — [MIT](./LICENSE)
+- **Community Edition** — [AGPL-3.0](./LICENSE)
 - **Enterprise Edition** — [commercial](./LICENSE-EE)
 
 See [`LICENSING.md`](./LICENSING.md) for the breakdown.

@@ -32,9 +32,9 @@ export default function TermsPage() {
 
       <Section title="The service">
         Holo is an open-source context layer for AI agents. These terms govern
-        use of the managed service. The underlying software is separately
-        licensed under MIT and can be self-hosted; self-hosted deployments are
-        not covered by these terms.
+        use of the managed service. The Community Edition of the underlying
+        software is separately licensed under AGPL-3.0 and can be self-hosted;
+        self-hosted deployments are not covered by these terms.
       </Section>
 
       <Section title="Accounts">
@@ -56,14 +56,16 @@ export default function TermsPage() {
       <Section title="Intellectual property">
         We retain all rights, title, and interest in the service, including the
         holobase.dev brand, the managed-service infrastructure, and any
-        improvements we make. The MIT-licensed source code is governed by the
-        MIT License and remains free for you to use, modify, and self-host.
+        improvements we make. The Community Edition source code is governed by
+        AGPL-3.0 and remains free for you to use, modify, and self-host under
+        the terms of that license. Enterprise Edition files (under
+        <code>**/ee/**</code>) are governed by a separate commercial license.
       </Section>
 
       <Section title="Acceptable use">
         You may not use the service to violate any law, infringe others&apos;
         rights, attack or attempt to circumvent the security of the service,
-        or reverse-engineer infrastructure beyond what the MIT-licensed source
+        or reverse-engineer infrastructure beyond what the AGPL-licensed source
         already discloses. You may not use the service to process data you are
         not authorized to access in the source systems.
       </Section>
