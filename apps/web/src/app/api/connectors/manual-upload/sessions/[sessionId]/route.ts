@@ -26,11 +26,11 @@ export const DELETE = withActiveOrg<{ sessionId: string }>(
         and(eq(schema.member.organizationId, orgId), eq(schema.member.userId, userId)),
       )
       .limit(1);
-    if (me?.role !== 'owner') {
+    if (me?.role !== 'owner' && me?.role !== 'admin') {
       throw holoError({
         code: ErrorCode.HOLO_AUTH_FORBIDDEN,
-        problem: 'deleting an upload session requires the org owner role',
-        fix: 'Ask your workspace owner to delete it.',
+        problem: 'deleting an upload session requires the workspace owner or admin role',
+        fix: 'Ask a workspace owner or admin to delete it.',
       });
     }
 

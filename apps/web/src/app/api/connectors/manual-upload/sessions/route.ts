@@ -38,7 +38,7 @@ function slugify(name: string): string {
   );
 }
 
-async function assertOwner(
+async function assertCanUpload(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
   orgId: string,
@@ -49,11 +49,11 @@ async function assertOwner(
     .from(schema.member)
     .where(and(eq(schema.member.organizationId, orgId), eq(schema.member.userId, userId)))
     .limit(1);
-  if (me?.role !== 'owner') {
+  if (me?.role !== 'owner' && me?.role !== 'admin') {
     throw holoError({
       code: ErrorCode.HOLO_AUTH_FORBIDDEN,
-      problem: 'manual upload requires the org owner role',
-      fix: 'Ask your workspace owner to upload, or have them grant you the owner role.',
+      problem: 'manual upload requires the workspace owner or admin role',
+      fix: 'Ask a workspace owner or admin to upload, or have them grant you the admin role.',
     });
   }
 }
@@ -62,7 +62,7 @@ export const POST = withActiveOrg(async ({ req, ctx, orgId, session }) => {
   const { db } = ctx;
   const userId = session.user.id;
 
-  await assertOwner(db, orgId, userId);
+  await assertCanUpload(db, orgId, userId);
 
   const body = (await req.json().catch(() => null)) as {
     name?: string;
