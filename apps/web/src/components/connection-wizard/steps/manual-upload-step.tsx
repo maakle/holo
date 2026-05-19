@@ -4,6 +4,7 @@ import { AlertCircle, Check, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { shouldIndexByPath } from '@holo/connectors/code-skip';
 import {
   MANUAL_UPLOAD_MAX_FILE_BYTES,
   MANUAL_UPLOAD_SOURCE_TOOLS,
@@ -83,9 +84,11 @@ function NameStep({ ctx }: { ctx: WizardContext<ManualUploadState> }) {
     <>
       <div className="flex flex-col gap-4">
         <p className="text-[13px] text-text-muted">
-          Drop a folder of <code className="font-mono text-[12px]">.md</code> files exported
-          from any tool. Holo chunks, embeds, and tags them — when the source tool is
-          known, retrieval treats imported files as native data from that connector.
+          Drop a folder — markdown exports, source code, configs, or docs.
+          Holo chunks, embeds, and tags everything; code files get the
+          code-tuned embedding model. <code className="font-mono text-[12px]">node_modules</code>,
+          {' '}<code className="font-mono text-[12px]">.git</code>, build output, lockfiles,
+          and binaries are skipped automatically.
         </p>
         <label className="flex flex-col gap-1">
           <span className="text-[12px] uppercase tracking-[0.04em] text-text-subtle">
@@ -115,11 +118,18 @@ function NameStep({ ctx }: { ctx: WizardContext<ManualUploadState> }) {
             disabled={busy}
             className="rounded-md border border-border bg-bg px-3 py-2 text-[13px] text-text focus:outline-hidden focus:focus-ring"
           >
-            {MANUAL_UPLOAD_SOURCE_TOOLS.map((t) => (
-              <option key={t} value={t}>
-                {sourceToolLabel(t)}
-              </option>
-            ))}
+            {/* Real connectors A→Z, then "Other" pinned to the bottom as the
+                opt-out tag. Sort by label (not id) so "Google Drive" lands
+                under G, not "googledrive". */}
+            {MANUAL_UPLOAD_SOURCE_TOOLS.filter((t) => t !== 'other')
+              .map((t) => ({ id: t, label: sourceToolLabel(t) }))
+              .sort((a, b) => a.label.localeCompare(b.label))
+              .map(({ id, label }) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            <option value="other">Other</option>
           </select>
           <span className="text-[12px] text-text-subtle">
             When set to a real connector, the agent sees these files as if they came from
@@ -258,8 +268,13 @@ function UploadStep({ ctx }: { ctx: WizardContext<ManualUploadState> }) {
         // limitation we accept for v1.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const relPath = (f as any).webkitRelativePath || f.name;
-        if (!relPath.toLowerCase().endsWith('.md')) {
-          rejected.push({ name: relPath, reason: 'not a .md file' });
+        // Mirror the server's allow/deny policy — skipping ignored files on
+        // the client avoids round-tripping 15k irrelevant files from a repo
+        // dump (node_modules/.git/dist/lockfiles/binaries) before the server
+        // rejects them. Same fn the route imports, so client and server can
+        // never drift.
+        if (!shouldIndexByPath(relPath)) {
+          rejected.push({ name: relPath, reason: 'ignored path or extension' });
           continue;
         }
         if (f.size > MANUAL_UPLOAD_MAX_FILE_BYTES) {
@@ -338,7 +353,7 @@ function UploadStep({ ctx }: { ctx: WizardContext<ManualUploadState> }) {
 
   return (
     <>
-      <div className="flex flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-3">
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -361,15 +376,18 @@ function UploadStep({ ctx }: { ctx: WizardContext<ManualUploadState> }) {
           <Upload className="h-5 w-5 text-text-muted" aria-hidden />
           <div className="text-[13px] text-text">Drop a folder, or click to pick one</div>
           <p className="text-[12px] text-text-subtle">
-            Only <code className="font-mono">.md</code> files are accepted. Up to{' '}
+            Code, docs, and config files (markdown, source code, YAML/JSON,
+            shell scripts). Up to{' '}
             {Math.round(MANUAL_UPLOAD_MAX_FILE_BYTES / 1024 / 1024)} MB per file. Folder
-            structure is preserved.
+            structure is preserved; build output and binaries are skipped.
           </p>
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".md,text/markdown"
+            // Intentionally no `accept` — folder picker would still surface
+            // every file regardless, and the path filter below decides what
+            // we actually ingest. Trust the picker; filter on the way in.
             // @ts-expect-error - non-standard attributes for folder picker
             webkitdirectory=""
             directory=""

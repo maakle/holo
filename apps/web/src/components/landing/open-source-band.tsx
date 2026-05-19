@@ -166,7 +166,7 @@ export function OpenSourceBand() {
             className="caption"
             style={{ color: '#71717a' }}
           >
-            Open source · MIT
+            Open source · AGPL-3.0
           </p>
           <h2
             className="mt-3.5 font-display font-semibold"

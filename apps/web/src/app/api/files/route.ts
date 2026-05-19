@@ -7,10 +7,12 @@
  *
  * RFC 0009 Phase 5.
  */
-import { sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { HoloFs } from '@holo/holofs';
+import { schema } from '@holo/db';
 import { getSubjectsForUser } from '@holo/user-subjects';
 import { holoError, ErrorCode } from '@holo/errors';
+import { emitAuditEvent } from '@holo/audit';
 import { withActiveOrg } from '@/lib/with-active-org';
 
 export const dynamic = 'force-dynamic';
@@ -178,4 +180,83 @@ export const GET = withActiveOrg(async ({ req, ctx, session, orgId }) => {
   });
 
   return { path, entries };
+});
+
+/**
+ * DELETE /api/files?path=/foo
+ *
+ * Soft-deletes every visible artifact under `path` for the active org.
+ * Hidden subtrees stay intact — we filter by the caller's ACL subjects
+ * the same way the listing does, so users can't blast away rows they
+ * couldn't see. Owner/admin only.
+ */
+export const DELETE = withActiveOrg(async ({ req, ctx, session, orgId }) => {
+  const path = req.nextUrl.searchParams.get('path');
+  if (!path || !path.startsWith('/') || path.includes('..')) {
+    throw holoError({
+      code: ErrorCode.HOLO_INVALID_INPUT,
+      problem: 'path query parameter is required and must be absolute',
+      fix: 'DELETE /api/files?path=/foo (no .. segments).',
+    });
+  }
+  if (path === '/') {
+    throw holoError({
+      code: ErrorCode.HOLO_INVALID_INPUT,
+      problem: 'refusing to delete the filesystem root',
+      fix: 'Pass a subpath like /manual-upload or /mintlify/handbook.',
+    });
+  }
+
+  const userId = session.user.id;
+  const { db } = ctx;
+
+  const [me] = await db
+    .select({ role: schema.member.role })
+    .from(schema.member)
+    .where(
+      and(eq(schema.member.organizationId, orgId), eq(schema.member.userId, userId)),
+    )
+    .limit(1);
+  if (me?.role !== 'owner' && me?.role !== 'admin') {
+    throw holoError({
+      code: ErrorCode.HOLO_AUTH_FORBIDDEN,
+      problem: 'deleting files requires the workspace owner or admin role',
+      fix: 'Ask a workspace owner or admin to delete it.',
+    });
+  }
+
+  const extraSubjects = await getSubjectsForUser(db, userId);
+  const userSubjects = [`org:${orgId}`, `user:${userId}`, ...extraSubjects];
+  const aclArrayLiteral = `{${userSubjects
+    .map((v) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`)
+    .join(',')}}`;
+
+  // Match both the folder itself ("/foo") and everything under it ("/foo/%").
+  // ACL re-check guarantees we never soft-delete an artifact the caller
+  // couldn't see via the listing endpoint.
+  const prefix = path.endsWith('/') ? path : path + '/';
+  const deleted = await db
+    .update(schema.sourceArtifacts)
+    .set({ deletedAt: sql`NOW()` })
+    .where(
+      and(
+        eq(schema.sourceArtifacts.organizationId, orgId),
+        isNull(schema.sourceArtifacts.deletedAt),
+        sql`(${schema.sourceArtifacts.path} = ${path} OR ${schema.sourceArtifacts.path} LIKE ${prefix + '%'})`,
+        sql`${schema.sourceArtifacts.aclSubjects} && ${aclArrayLiteral}::text[]`,
+      ),
+    )
+    .returning({ id: schema.sourceArtifacts.id });
+
+  emitAuditEvent({
+    db,
+    organizationId: orgId,
+    userId,
+    eventType: 'files.deleted',
+    resourceType: 'path',
+    resourceId: path,
+    meta: { path, artifactsDeleted: deleted.length },
+  });
+
+  return { ok: true, path, artifactsDeleted: deleted.length };
 });

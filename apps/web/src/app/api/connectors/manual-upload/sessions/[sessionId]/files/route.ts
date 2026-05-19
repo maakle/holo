@@ -4,6 +4,11 @@ import { and, eq } from 'drizzle-orm';
 // would balloon the route's server bundle). Mirrors the configs.tsx pattern
 // of preferring narrow client-safe imports from @holo packages.
 import { recursiveSplit } from '@holo/chunker/recursive-split';
+import {
+  extToLanguage,
+  isCodeExtension,
+  shouldIndexByPath,
+} from '@holo/connectors/code-skip';
 import { schema } from '@holo/db';
 import { ErrorCode, holoError, HoloError } from '@holo/errors';
 import { getQueueByName } from '@/lib/sync-queue';
@@ -40,8 +45,17 @@ interface EmbedJobPayload {
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const CHUNK_SIZE = 1200;
-const CHUNK_OVERLAP = 150;
+// Prose-tuned defaults (markdown, docs, transcripts) — small chunks because
+// retrieval over text is sentence-level and large chunks dilute embeddings.
+const PROSE_CHUNK_SIZE = 1200;
+const PROSE_CHUNK_OVERLAP = 150;
+
+// Code-tuned defaults — match what the GitHub connector's code chunker uses
+// ([packages/chunker/src/github-code.ts](../../../../../../packages/chunker/src/github-code.ts)),
+// so a file uploaded manually as code retrieves identically to one synced
+// natively. Bigger window keeps function/class scope together.
+const CODE_CHUNK_SIZE = 4800;
+const CODE_CHUNK_OVERLAP = 600;
 
 function chunkHash(kind: string, content: string): string {
   return createHash('sha256').update(`${kind}:${content}`).digest('hex');
@@ -168,11 +182,16 @@ export const POST = withActiveOrg<{ sessionId: string }>(
         fix: 'rel_path must be relative and must not contain ".." segments.',
       });
     }
-    if (!relPath.toLowerCase().endsWith('.md')) {
+    // Same allow/deny policy the GitHub connector uses for code indexing —
+    // rejects node_modules/.git/dist/etc. dirs, lockfiles, binary extensions,
+    // and files outside the code/doc/config allow-lists. Size + binary-content
+    // checks are enforced separately below via the 5 MB streaming cap and the
+    // strict UTF-8 decode.
+    if (!shouldIndexByPath(relPath)) {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
-        problem: 'only .md files are accepted',
-        fix: 'Filter your folder to markdown files before uploading.',
+        problem: `'${relPath}' is in an ignored directory or has an unsupported extension`,
+        fix: 'Filter out node_modules, build output, binaries, and lockfiles before uploading.',
       });
     }
 
@@ -183,15 +202,20 @@ export const POST = withActiveOrg<{ sessionId: string }>(
       return { artifactId: relPath, chunkCount: 0, skipped: 'empty' as const };
     }
 
+    // Code files get the larger chunk window + `kind: 'github-code'` so the
+    // embed-runner routes them to voyage-code-3 (see embed-runner.ts:33).
+    // Docs/config/text fall back to the prose-tuned defaults.
+    const isCode = isCodeExtension(relPath);
     const pieces = recursiveSplit(content, {
-      chunkSize: CHUNK_SIZE,
-      overlap: CHUNK_OVERLAP,
+      chunkSize: isCode ? CODE_CHUNK_SIZE : PROSE_CHUNK_SIZE,
+      overlap: isCode ? CODE_CHUNK_OVERLAP : PROSE_CHUNK_OVERLAP,
     });
     if (pieces.length === 0) {
       return { artifactId: relPath, chunkCount: 0, skipped: 'empty' as const };
     }
 
-    const kind = 'manual-upload-file';
+    const kind = isCode ? 'github-code' : 'manual-upload-file';
+    const language = isCode ? extToLanguage(relPath) : undefined;
     // Synthetic source-artifact id: stable per (session, relPath). The worker's
     // embed-insert path looks up source_artifacts by (sourceId, externalId)
     // so the same file re-uploaded within the same session is idempotent.
@@ -213,6 +237,9 @@ export const POST = withActiveOrg<{ sessionId: string }>(
         source_tool: sourceTool,
         chunk_index: i,
         chunk_count: pieces.length,
+        // Language is part of the github-code chunk contract — surface it so
+        // retrieval / UI / future re-chunking can branch on it.
+        ...(language ? { language } : {}),
         // The web app's path-fn registry uses session_slug + rel_path to
         // compute the HoloFs path; embed-insert reads from metadata.
       },

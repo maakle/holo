@@ -176,9 +176,9 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="Self-hosting">
-        Holo is MIT-licensed and can be self-hosted. When self-hosted, this
-        policy does not apply &mdash; your organization is the data controller
-        for your own deployment.
+        Holo&rsquo;s Community Edition is AGPL-3.0 and can be self-hosted. When
+        self-hosted, this policy does not apply &mdash; your organization is
+        the data controller for your own deployment.
       </Section>
 
       <Section title="Changes">

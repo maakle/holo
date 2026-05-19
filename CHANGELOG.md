@@ -1,13 +1,13 @@
 # Changelog
 
-## Unreleased — Dual-edition relicense (CE: MIT · EE: commercial)
+## Unreleased — Dual-edition relicense (CE: AGPL-3.0 · EE: commercial)
 
-Branch: `claude/add-licensing-editions-TRMkp`.
+Branch: `chore/relicense-agpl-plus-ee`.
 
 ### Changed (breaking)
 
-- **License is now dual: MIT for the Community Edition, commercial for the Enterprise Edition.** The whole repo was previously AGPL-3.0-or-later. CE — everything **not** under a `**/ee/**` directory — is now [MIT](./LICENSE), the permissive license used by the closest OSS analog (Onyx). EE — everything under `**/ee/**` — is governed by [`LICENSE-EE`](./LICENSE-EE), a paid commercial license for production use. Full breakdown in [`LICENSING.md`](./LICENSING.md).
-- **Contributor terms updated.** PRs to CE files are licensed under MIT. PRs to EE files grant the maintainer the additional relicensing rights spelled out in `LICENSE-EE` § 3. The CLA flow in `CONTRIBUTING.md` is unchanged.
+- **License is now dual: AGPL-3.0 for the Community Edition, commercial for the Enterprise Edition.** A prior unreleased change had moved CE to MIT; we reverted that. The intent of the dual-edition model is "self-host freely; pay if you want to build a hosted commercial product on top of the EE features," and AGPL expresses that better than MIT. CE — everything **not** under a `**/ee/**` directory — is now [AGPL-3.0](./LICENSE), the same license used by Cal.com, Plausible, and Mattermost for the same reason. EE — everything under `**/ee/**` — is governed by [`LICENSE-EE`](./LICENSE-EE), a paid commercial license for production use. Full breakdown in [`LICENSING.md`](./LICENSING.md).
+- **Contributor terms updated.** PRs to CE files are licensed under AGPL-3.0. PRs to EE files grant the maintainer the additional relicensing rights spelled out in `LICENSE-EE` § 3. The CLA flow in `CONTRIBUTING.md` is unchanged.
 
 ### Added
 
@@ -17,19 +17,18 @@ Branch: `claude/add-licensing-editions-TRMkp`.
 
 ### Migration notes
 
-- **No code moves in this commit.** Every file currently in the repo stays where it is and becomes MIT — the EE directories don't exist yet. As EE features land they'll be authored under `apps/<app>/src/.../ee/` and `packages/<pkg>/ee/` paths.
-- Downstream forks that previously relied on AGPL copyleft propagation should review whether MIT changes their obligations (it does — MIT does not require derivatives to remain open source). If you forked the project specifically *because* of AGPL, open an issue and let us know.
+- **No code moves in this commit.** Every file currently in the repo stays where it is and is governed by AGPL-3.0 — the EE directories don't exist yet. As EE features land they'll be authored under `apps/<app>/src/.../ee/` and `packages/<pkg>/ee/` paths.
+- AGPL-3.0 only requires source disclosure when you offer holo (or a modified version) as a network service to third parties. Internal self-hosting at your own company carries no source-disclosure obligation. If that's still a blocker, open an issue and tell us what model would work — a commercial CE license is available on request.
 - Audit log retention, exports, and SIEM hooks ("Query History" in EE marketing) build on the CE per-call audit log that already ships today. The CE audit log itself stays in CE.
-- The skill marketplace contribution license changes from AGPL-3.0 to MIT in line with the rest of CE — see [`docs/ROADMAP.md`](./docs/ROADMAP.md) v0.3.
 
 ### Files touched
 
-- `LICENSE` (replaced AGPL-3.0 with MIT)
-- `LICENSE-EE` (new)
-- `LICENSING.md` (new)
-- `README.md`, `CONTRIBUTING.md`, `DESIGN.md`, `CHANGELOG.md`
-- `apps/web/src/app/page.tsx` (Trust band + footer copyright + Licensing link)
-- `docs/ROADMAP.md`, `docs/launch/show-hn-draft.md`, `docs/designs/holo-v01-yc-prep.md`, `docs/decisions/0001-connector-port-interface.md`
+- `LICENSE` (replaced MIT with AGPL-3.0)
+- `LICENSE-EE` (updated cross-references from MIT to AGPL-3.0)
+- `LICENSING.md`, `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`
+- `apps/web/src/app/privacy/page.tsx`, `apps/web/src/app/terms/page.tsx`, `apps/web/src/app/sign-in/page.tsx`
+- `apps/web/src/components/landing/landing-footer.tsx`, `apps/web/src/components/landing/open-source-band.tsx`
+- `docs/ROADMAP.md`, `docs/launch/show-hn-draft.md`, `docs/designs/holo-v01-yc-prep.md`, `docs/decisions/0004-multi-agent-shared-context-wedge.md`
 
 ## v0.3 — Per-user OAuth ACL fan-out (unreleased)
 

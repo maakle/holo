@@ -14,7 +14,7 @@ export default async function FilesPathPage({ params }: PageProps) {
   const { auth } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/sign-in');
-  resolveActiveOrgId(session);
+  const activeOrgId = resolveActiveOrgId(session);
 
   const { path } = await params;
   // Decode each segment — the URL preserves `#` and `?` literals via the
@@ -23,5 +23,5 @@ export default async function FilesPathPage({ params }: PageProps) {
   const decoded = path.map((p) => decodeURIComponent(p));
   const fullPath = '/' + decoded.join('/');
 
-  return <FileExplorer initialPath={fullPath} />;
+  return <FileExplorer key={activeOrgId} initialPath={fullPath} />;
 }

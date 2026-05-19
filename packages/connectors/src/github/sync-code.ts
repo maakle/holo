@@ -7,7 +7,7 @@ import { githubCodeChunker } from '@holo/chunker';
 import type { TreeSitterRegistry } from '@holo/chunker';
 import { chunkHash } from '../shared/content-hash';
 import { ErrorCode, holoError } from '@holo/errors';
-import { shouldIndex, extToLanguage } from './code-skip';
+import { shouldIndex, extToLanguage } from '../code-skip';
 
 const execFileAsync = promisify(execFile);
 const BATCH_SIZE = 50;

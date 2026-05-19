@@ -191,7 +191,7 @@ Each step is independently shippable and reversible. Steps 2–4 are where ACL h
 | **Drag-into-chat falls out** | Path string is the handle; agent already knows `cat`. |
 | **Lower new-connector cost** | Add a chunker + path convention. No new MCP tool. |
 | **Engine-swap optionality** | When pgvector hits its ceiling, swap `search`'s backing engine without touching `bash` / `HoloFs` / the agent contract. |
-| **Apache-2.0 dependency** | just-bash license is compatible with Holo's MIT (Community) + commercial (Enterprise) split. |
+| **Apache-2.0 dependency** | just-bash license is compatible with Holo's AGPL-3.0 (Community) + commercial (Enterprise) split. |
 | **Positioning credibility (ADR-0004)** | "Bash for your synced context, with the ACLs you already have" is a sharper pitch than "MCP server with retrieval tools." Differentiates from Onyx/Dust/PipesHub's flat APIs. |
 
 ## Cons and risks

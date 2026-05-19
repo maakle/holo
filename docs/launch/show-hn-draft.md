@@ -41,7 +41,7 @@ Alternates if the above feels off:
 >
 > **3. Governance is real.** Ingestion-time allowlists (which channels / repos / spaces actually enter holo) are mandatory and enforced in the connector spec, not bolted on. Per-user OAuth ACL fan-out for Slack is shipped — agents see only the data the calling user can. Per-skill `toolAllowlist` enforcement is the next slice. Read-only replay diff lets you see exactly what context any past agent invocation used.
 >
-> **Self-host on day one.** If `docker compose up` doesn't work, it doesn't ship. Community Edition is MIT — keep it, fork it, ship a product on top of it. An optional Enterprise Edition (SSO, RBAC, query history, whitelabeling, custom-code hooks) lives under `**/ee/**` for teams that need it. There's no managed cloud yet — that lives behind v0.2 demand.
+> **Self-host on day one.** If `docker compose up` doesn't work, it doesn't ship. Community Edition is AGPL-3.0 — self-host freely, fork it, modify it. An optional Enterprise Edition (SSO, RBAC, query history, whitelabeling, custom-code hooks) lives under `**/ee/**` for teams that need it. There's no managed cloud yet — that lives behind v0.2 demand.
 >
 > **Quickstart:**
 >
@@ -92,8 +92,8 @@ No voiceover. End frame: repo URL + GitHub Discussions URL.
 **"How do you handle prompt-injection in retrieved Slack messages?"**
 > Today: ingestion-time allowlists are the v0.0/v0.1 defense — `#exec`, `#hiring`, `#legal` never enter holo at all, so an attacker who posts a malicious Slack message can only attack the data scope the agent already had access to. Per-user OAuth fan-out (Slack-only today, the rest in v0.3) tightens this further. v0.2 adds per-skill `toolAllowlist` so a `handle_pagerduty_incident` skill literally cannot call `post_to_slack` even if the model is convinced to.
 
-**"Why MIT + a separate Enterprise Edition?"**
-> The core (connectors, search, MCP gateway, audit log, skills) is MIT — same model as Onyx — because that's the part of the stack the OSS community legitimately needs to fork, ship on, and run forever without us. The EE surfaces (SSO, RBAC, query history, whitelabeling, custom-code policy hooks) are the parts companies pay for and the parts that fund the work. The split is by file path: anything outside `**/ee/**` is MIT and never moves. If you want to wrap holo (CE) in a commercial offering, do it — that's what MIT is for. If you want EE in production, talk to me.
+**"Why AGPL-3.0 + a separate Enterprise Edition?"**
+> The core (connectors, search, MCP gateway, audit log, skills) is AGPL-3.0 — same model as Cal.com, Plausible, Mattermost — because we want self-hosting to be friction-free for any company that wants to run holo for its own users, while keeping the door closed on someone wrapping the EE features in a commercial SaaS without contributing back. The EE surfaces (SSO, RBAC, query history, whitelabeling, custom-code policy hooks) are the parts companies pay for and the parts that fund the work. The split is by file path: anything outside `**/ee/**` is AGPL-3.0 and never moves. If AGPL is a blocker for your company, open an issue — a commercial CE license is available.
 
 **"How is this different from `@anthropic-ai/skills` packaging?"**
 > Skills *format* is the same — Anthropic's frontmatter + procedure + example tools. Holo just lives one tier down: it's the place every agent fetches context *into* the skills format from, plus the surface where you (eventually) browse and import community skills. Onyx-of-procedures, not a competitor to Anthropic's spec.

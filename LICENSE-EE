@@ -11,9 +11,9 @@ Copyright (c) 2026 Holo contributors. All rights reserved.
    any other files in this repository explicitly marked as Enterprise Edition
    (collectively, the "EE Software").
 
-   All other code in this repository is licensed under the MIT License — see
-   `LICENSE` and `LICENSING.md` for details. The EE Software is **not**
-   licensed under MIT.
+   All other code in this repository is licensed under the GNU Affero General
+   Public License v3.0 (AGPL-3.0) — see `LICENSE` and `LICENSING.md` for
+   details. The EE Software is **not** licensed under AGPL-3.0.
 
 2. COMMERCIAL LICENSE REQUIRED
 
@@ -52,8 +52,9 @@ Copyright (c) 2026 Holo contributors. All rights reserved.
    holder a perpetual, worldwide, non-exclusive, royalty-free, irrevocable
    license to use, reproduce, modify, distribute, sublicense, and relicense
    your contribution as part of the EE Software, including the right to
-   distribute it under different license terms (including the MIT License).
-   This is in addition to any contributor license agreement (CLA) you sign.
+   distribute it under different license terms (including AGPL-3.0 or other
+   open-source licenses). This is in addition to any contributor license
+   agreement (CLA) you sign.
 
 4. NO WARRANTY
 

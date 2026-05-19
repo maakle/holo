@@ -9,13 +9,15 @@
  * 429s, and the head-SHA cursor lets incremental runs short-circuit
  * unchanged repos entirely.
  *
- * Skip rules mirror what most code-search tools omit: binaries by
- * extension, vendored / generated paths, files larger than 256 KB, and
- * lockfiles. We accept the false-negative risk on edge cases (a 300 KB
- * SQL dump doesn't get indexed) over the cost of embedding noise.
+ * Skip rules + chunk params are shared with the GitHub connector via
+ * `./code-skip` so both code paths use the same allow/deny policy and the
+ * same code-tuned chunk window. The `kind: 'gitlab-code'` tag is routed to
+ * voyage-code-3 by both `packages/embedder/src/router.ts` and the worker's
+ * `embed-runner.ts:modelForChunkKind` — keep all three lists in sync.
  */
 import { recursiveSplit } from '@holo/chunker';
 import type { GitlabApiClient, GitlabRepoTreeEntry } from './api';
+import { extToLanguage, shouldIndexByPath } from '../code-skip';
 
 export interface GitlabCodeChunkPayload {
   externalId: string;
@@ -48,51 +50,15 @@ export interface RunGitlabCodeSyncOutput {
   headSha: string;
 }
 
-const MAX_FILE_BYTES = 256 * 1024;
-
-const SKIP_PATH_PREFIXES = [
-  'node_modules/',
-  'vendor/',
-  'dist/',
-  'build/',
-  '.next/',
-  '.git/',
-  '.cache/',
-  '__pycache__/',
-];
-
-const SKIP_EXTENSIONS = new Set([
-  'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'svg',
-  'pdf', 'zip', 'tar', 'gz', 'tgz', 'rar', '7z',
-  'mp3', 'mp4', 'mov', 'avi', 'webm', 'wav',
-  'woff', 'woff2', 'ttf', 'eot',
-  'jar', 'class', 'so', 'dll', 'exe', 'bin',
-  'pdb', 'lockb',
-]);
-
-const SKIP_FILENAMES = new Set([
-  'package-lock.json',
-  'yarn.lock',
-  'pnpm-lock.yaml',
-  'Cargo.lock',
-  'Gemfile.lock',
-  'composer.lock',
-  'poetry.lock',
-  'go.sum',
-]);
+// Bumped from 256 KB to 1 MB to match the GitHub connector's policy
+// (packages/connectors/src/github/code-skip.ts:MAX_FILE_SIZE). Per-file API
+// cost is higher than git clone, but uniform behavior across providers is
+// worth more than the marginal saving on the long-tail of >256 KB files.
+const MAX_FILE_BYTES = 1_000_000;
 
 function shouldSkip(entry: GitlabRepoTreeEntry): boolean {
   if (entry.type !== 'blob') return true;
-  for (const prefix of SKIP_PATH_PREFIXES) {
-    if (entry.path.startsWith(prefix) || entry.path.includes(`/${prefix}`)) return true;
-  }
-  if (SKIP_FILENAMES.has(entry.name)) return true;
-  const dotIdx = entry.name.lastIndexOf('.');
-  if (dotIdx >= 0) {
-    const ext = entry.name.slice(dotIdx + 1).toLowerCase();
-    if (SKIP_EXTENSIONS.has(ext)) return true;
-  }
-  return false;
+  return !shouldIndexByPath(entry.path);
 }
 
 export async function runGitlabCodeSync(
@@ -132,7 +98,11 @@ export async function runGitlabCodeSync(
 
     const breadcrumb = `${project.pathWithNamespace} / ${entry.path}`;
     const sourceArtifactId = `gitlab-code:${project.pathWithNamespace}:${entry.path}`;
-    const pieces = recursiveSplit(raw, { chunkSize: 1500, overlap: 200 });
+    const language = extToLanguage(entry.path);
+    // Code-tuned chunk window matches the GitHub connector's code chunker
+    // (packages/chunker/src/github-code.ts:68) so retrieval clusters GitLab
+    // and GitHub code identically.
+    const pieces = recursiveSplit(raw, { chunkSize: 4800, overlap: 600 });
     const chunks: GitlabCodeChunkPayload[] = pieces.map((text, idx) => ({
       externalId: `${sourceArtifactId}#${idx}`,
       kind: 'gitlab-code',
@@ -142,6 +112,7 @@ export async function runGitlabCodeSync(
         project_path: project.pathWithNamespace,
         file_path: entry.path,
         sha: branch.commit.id,
+        language,
         breadcrumb,
       },
       aclSubjects: acl,

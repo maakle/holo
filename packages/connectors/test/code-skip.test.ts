@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldIndex, extToLanguage } from '../../src/github/code-skip';
+import { shouldIndex, extToLanguage } from '../src/code-skip';
 
 const text = Buffer.from('hello world\n');
 const binary = Buffer.from([0x48, 0x65, 0x00, 0x6c, 0x6f]); // contains null byte

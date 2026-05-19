@@ -27,6 +27,10 @@ describe('getEmbedderForChunkKind', () => {
     expect(getEmbedderForChunkKind('github-code', registry).model).toBe('voyage-code-3');
   });
 
+  it('routes gitlab-code to voyage', () => {
+    expect(getEmbedderForChunkKind('gitlab-code', registry).model).toBe('voyage-code-3');
+  });
+
   it('routes prose kinds to openai', () => {
     for (const kind of [
       'github-pr',

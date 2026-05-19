@@ -46,8 +46,9 @@ function makeFakeInsert() {
 }
 
 describe('modelForChunkKind', () => {
-  it('routes github-code → voyage-code-3, others → openai-3-small', () => {
+  it('routes code kinds → voyage-code-3, others → openai-3-small', () => {
     expect(modelForChunkKind('github-code')).toBe('voyage-code-3');
+    expect(modelForChunkKind('gitlab-code')).toBe('voyage-code-3');
     expect(modelForChunkKind('github-prose')).toBe('openai-3-small');
     expect(modelForChunkKind('slack')).toBe('openai-3-small');
     expect(modelForChunkKind('notion')).toBe('openai-3-small');
