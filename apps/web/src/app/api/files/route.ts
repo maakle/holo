@@ -88,10 +88,16 @@ export const GET = withActiveOrg(async ({ req, ctx, session, orgId }) => {
   // gets one row; correlated subquery would also work but LATERAL keeps the
   // plan obvious. The chunk-level ACL re-check matches what HoloFs.readFile
   // does for defense in depth.
+  // Manual-upload sessions store the user-tagged source tool (e.g. 'hubspot',
+  // 'grain') in `sources.metadata.chunk_provider` while `sources.provider`
+  // stays the literal 'manual-upload'. Prefer the tag so the file-explorer's
+  // Source column reflects what the user labelled the data as. No other
+  // connector writes this metadata key, so for native syncs the COALESCE
+  // falls straight through to `s.provider` — behaviour unchanged.
   const enrichment = await ctx.db.execute<EnrichmentRow>(sql`
     SELECT sa.path,
            sa.kind,
-           COALESCE(s.provider, sa.kind) AS provider,
+           COALESCE(s.metadata->>'chunk_provider', s.provider, sa.kind) AS provider,
            sa.fetched_at,
            COALESCE(sz.size_bytes, 0) AS size_bytes
     FROM source_artifacts sa
