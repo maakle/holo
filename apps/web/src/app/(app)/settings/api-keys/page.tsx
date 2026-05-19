@@ -14,5 +14,8 @@ export default async function SettingsApiKeysPage() {
   const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/dashboard');
 
-  return <ApiTokens />;
+  // Key on orgId so a workspace switch (which triggers router.refresh on the
+  // server tree) remounts ApiTokens with fresh state instead of leaving the
+  // previous workspace's tokens cached in useState.
+  return <ApiTokens key={orgId} />;
 }

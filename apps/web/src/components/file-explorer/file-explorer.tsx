@@ -20,6 +20,7 @@ import {
   ChevronUpIcon,
   ChevronDownIcon,
   HomeIcon,
+  UploadIcon,
 } from 'lucide-react';
 import {
   Sheet,
@@ -29,6 +30,13 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { Markdown } from '@/components/ui/markdown';
+import { Button } from '@/components/ui/button';
+import { CONNECTORS } from '@/lib/connector-registry';
+import { ConnectionWizard } from '@/components/connection-wizard/connection-wizard';
+import { getWizardConfig } from '@/components/connection-wizard/configs';
+
+const MANUAL_UPLOAD_META = CONNECTORS.find((c) => c.id === 'manual-upload')!;
+const MANUAL_UPLOAD_CONFIG = getWizardConfig('manual-upload')!;
 
 const PAGE_SIZE = 50;
 
@@ -170,6 +178,10 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<SortState>({ column: 'name', direction: 'asc' });
+  const [uploadOpen, setUploadOpen] = useState(false);
+  // Bumped after the upload wizard closes so the directory listing re-fetches
+  // and any newly-ingested files show up without a full page reload.
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Viewer state — sheet slides in from the right when a file is clicked.
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -207,7 +219,7 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
         if (!ac.signal.aborted) setLoading(false);
       });
     return () => ac.abort();
-  }, [path]);
+  }, [path, refreshKey]);
 
   const segments = useMemo(() => pathSegments(path), [path]);
 
@@ -296,7 +308,26 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
             agents see via <code className="font-mono text-mono">bash</code>.
           </p>
         </div>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => setUploadOpen(true)}
+          className="shrink-0"
+        >
+          <UploadIcon size={14} />
+          Upload files
+        </Button>
       </header>
+      <ConnectionWizard
+        meta={MANUAL_UPLOAD_META}
+        config={MANUAL_UPLOAD_CONFIG}
+        open={uploadOpen}
+        onOpenChange={(next) => {
+          setUploadOpen(next);
+          if (!next) setRefreshKey((k) => k + 1);
+        }}
+        connected={false}
+      />
 
       <Breadcrumb segments={segments} onNavigate={navigateTo} />
 
