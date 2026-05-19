@@ -11,6 +11,7 @@
     "./shared": "./src/shared/index.ts",
     "./sync-intervals": "./src/sync-intervals.ts",
     "./github": "./src/github/index.ts",
+    "./github/code-skip": "./src/github/code-skip.ts",
     "./linear": "./src/linear/index.ts"
   },
   "scripts": {

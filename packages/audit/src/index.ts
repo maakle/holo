@@ -35,7 +35,8 @@ export type AuditEventType =
   | 'workspace.updated'
   | 'workspace.preferences.updated'
   | 'sample_data.installed'
-  | 'sample_data.removed';
+  | 'sample_data.removed'
+  | 'files.deleted';
 
 export interface EmitAuditEventInput {
   db: DB;

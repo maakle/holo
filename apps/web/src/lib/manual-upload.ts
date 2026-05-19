@@ -14,21 +14,26 @@
  * visually separate.
  */
 
+import { SYNC_PROVIDERS, type SyncProvider } from '@holo/sync-providers';
+import { CONNECTORS } from './connector-registry';
+
 export const MANUAL_UPLOAD_PROVIDER = 'manual-upload' as const;
 
-/** Source tools a user can pick for an upload session. */
+/**
+ * Source tools a user can pick for an upload session.
+ *
+ * Derived from `SYNC_PROVIDERS` so every connector Holo can sync is a valid
+ * tag — adding a new connector to `@holo/sync-providers` automatically
+ * surfaces it in the upload wizard's dropdown without a second list to keep
+ * in sync. `'other'` is the explicit opt-out that tags chunks as
+ * manual-upload instead of clustering them with a real connector's data.
+ */
 export const MANUAL_UPLOAD_SOURCE_TOOLS = [
-  'grain',
-  'pylon',
-  'hubspot',
-  'notion',
-  'github',
-  'slack',
-  'salesforce',
+  ...SYNC_PROVIDERS,
   'other',
 ] as const;
 
-export type ManualUploadSourceTool = (typeof MANUAL_UPLOAD_SOURCE_TOOLS)[number];
+export type ManualUploadSourceTool = SyncProvider | 'other';
 
 export function isManualUploadSourceTool(value: string): value is ManualUploadSourceTool {
   return (MANUAL_UPLOAD_SOURCE_TOOLS as readonly string[]).includes(value);
@@ -46,24 +51,11 @@ export function sourceToolToChunkProvider(tool: ManualUploadSourceTool): string 
 
 /** Display label for the source tool dropdown + manage drawer chip. */
 export function sourceToolLabel(tool: ManualUploadSourceTool): string {
-  switch (tool) {
-    case 'grain':
-      return 'Grain';
-    case 'pylon':
-      return 'Pylon';
-    case 'hubspot':
-      return 'HubSpot';
-    case 'notion':
-      return 'Notion';
-    case 'github':
-      return 'GitHub';
-    case 'slack':
-      return 'Slack';
-    case 'salesforce':
-      return 'Salesforce';
-    case 'other':
-      return 'Other';
-  }
+  if (tool === 'other') return 'Other';
+  // Connector registry is the single source of truth for human-readable
+  // names; falling back to the raw id keeps things resilient if a
+  // SYNC_PROVIDERS entry ever ships without a matching CONNECTORS row.
+  return CONNECTORS.find((c) => c.id === tool)?.displayName ?? tool;
 }
 
 /** Hard cap per uploaded file (server-enforced; client mirrors this). */

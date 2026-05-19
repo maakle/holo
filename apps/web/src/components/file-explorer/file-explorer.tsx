@@ -21,7 +21,10 @@ import {
   ChevronDownIcon,
   HomeIcon,
   UploadIcon,
+  MoreHorizontalIcon,
+  Trash2Icon,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Sheet,
   SheetContent,
@@ -29,6 +32,22 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import { Markdown } from '@/components/ui/markdown';
 import { Button } from '@/components/ui/button';
 import { CONNECTORS } from '@/lib/connector-registry';
@@ -189,6 +208,11 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
   const [openLoading, setOpenLoading] = useState(false);
   const [openError, setOpenError] = useState<ApiError | null>(null);
 
+  // Delete-folder confirm dialog. Stores the full path to delete so the
+  // dialog can show it after the row is removed from the listing.
+  const [confirmDelete, setConfirmDelete] = useState<{ name: string; path: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     setPath(initialPath);
   }, [initialPath]);
@@ -269,6 +293,37 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
     [router],
   );
 
+  const deleteFolder = useCallback(async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/files?path=${encodeURIComponent(confirmDelete.path)}`,
+        { method: 'DELETE' },
+      );
+      const body = (await res.json().catch(() => ({}))) as {
+        fix?: string;
+        problem?: string;
+        artifactsDeleted?: number;
+      };
+      if (!res.ok) {
+        toast.error(body.fix ?? body.problem ?? `HTTP ${res.status}`);
+        return;
+      }
+      toast.success(
+        `Deleted "${confirmDelete.name}" — ${body.artifactsDeleted ?? 0} file${
+          body.artifactsDeleted === 1 ? '' : 's'
+        }`,
+      );
+      setConfirmDelete(null);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setDeleting(false);
+    }
+  }, [confirmDelete]);
+
   const onRowClick = useCallback(
     async (entry: DirChild) => {
       if (entry.type === 'directory') {
@@ -332,11 +387,12 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
       <Breadcrumb segments={segments} onNavigate={navigateTo} />
 
       <div className="border border-border rounded-md overflow-hidden">
-        <div className="grid grid-cols-[1fr_140px_100px_180px] gap-4 px-4 py-2 text-caption text-text-subtle border-b border-border bg-surface">
+        <div className="grid grid-cols-[1fr_140px_100px_180px_40px] gap-4 px-4 py-2 text-caption text-text-subtle border-b border-border bg-surface">
           <SortHeader label="Name" column="name" sort={sort} onClick={onSortClick} />
           <SortHeader label="Source" column="source" sort={sort} onClick={onSortClick} />
           <SortHeader label="Size" column="size" sort={sort} onClick={onSortClick} />
           <SortHeader label="Synced" column="updatedAt" sort={sort} onClick={onSortClick} />
+          <span aria-hidden />
         </div>
 
         {loading && (
@@ -366,7 +422,7 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
               return (
                 <li
                   key={entry.name}
-                  className="grid grid-cols-[1fr_140px_100px_180px] gap-4 px-4 py-3 items-center border-b border-border last:border-b-0 hover:bg-surface cursor-pointer transition-colors"
+                  className="grid grid-cols-[1fr_140px_100px_180px_40px] gap-4 px-4 py-3 items-center border-b border-border last:border-b-0 hover:bg-surface cursor-pointer transition-colors"
                   onClick={() => onRowClick(entry)}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -392,6 +448,37 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
                   </div>
                   <div className="text-body-small text-text-muted tabular-nums">
                     {relativeTime(entry.updatedAt)}
+                  </div>
+                  <div
+                    className="flex justify-end"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {entry.type === 'directory' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-2 hover:text-text transition-colors"
+                            aria-label={`Actions for ${entry.name}`}
+                          >
+                            <MoreHorizontalIcon size={16} />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            destructive
+                            onSelect={() => {
+                              const folderPath =
+                                path === '/' ? `/${entry.name}` : `${path}/${entry.name}`;
+                              setConfirmDelete({ name: entry.name, path: folderPath });
+                            }}
+                          >
+                            <Trash2Icon size={14} aria-hidden />
+                            Delete folder
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </li>
               );
@@ -446,6 +533,40 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
           </div>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog
+        open={confirmDelete !== null}
+        onOpenChange={(next) => {
+          if (!next && !deleting) setConfirmDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete folder?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDelete ? (
+                <>
+                  This permanently removes <strong>{confirmDelete.name}</strong> and
+                  everything inside it. The agent will no longer retrieve them.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void deleteFolder();
+              }}
+              disabled={deleting}
+              className="bg-error text-white hover:bg-error/90"
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

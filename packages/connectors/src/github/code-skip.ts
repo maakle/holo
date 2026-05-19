@@ -43,9 +43,19 @@ const DENY_EXTENSIONS = new Set([
 
 const MAX_FILE_SIZE = 1_000_000; // 1 MB
 
-export function shouldIndex(filePath: string, fileSize: number, firstBytes: Uint8Array): boolean {
-  if (fileSize > MAX_FILE_SIZE) return false;
-
+/**
+ * Path-only policy check: deny dirs, deny filenames, deny/allow extensions.
+ * Pulled out of `shouldIndex` so callers that already enforce their own size
+ * + binary-content limits (e.g. the manual-upload route, which streams the
+ * body with a configurable byte cap and a strict UTF-8 decode) can reuse the
+ * exact same allow/deny policy without duplicating the lists.
+ *
+ * Returns `false` when the path is under a denied directory, matches a
+ * denied filename, has a denied extension, or has an extension outside the
+ * allow-list. Files with no extension pass (Dockerfile/Makefile etc.) so
+ * that `extToLanguage`'s filename lookup can still classify them.
+ */
+export function shouldIndexByPath(filePath: string): boolean {
   const parts = filePath.split('/');
   const filename = parts[parts.length - 1] ?? '';
 
@@ -58,14 +68,7 @@ export function shouldIndex(filePath: string, fileSize: number, firstBytes: Uint
   const dotIdx = filename.lastIndexOf('.');
   const ext = dotIdx > 0 ? filename.slice(dotIdx).toLowerCase() : '';
 
-  // Check compound extension first (.min.js, .min.css, .d.ts treated as .ts below)
   if (ext && DENY_EXTENSIONS.has(ext)) return false;
-
-  // Binary detection: null byte in first 8000 bytes
-  const limit = Math.min(firstBytes.length, 8000);
-  for (let i = 0; i < limit; i++) {
-    if (firstBytes[i] === 0) return false;
-  }
 
   if (ext) {
     const allowed =
@@ -73,6 +76,27 @@ export function shouldIndex(filePath: string, fileSize: number, firstBytes: Uint
       ALLOW_DOC_EXTENSIONS.has(ext) ||
       ALLOW_CONFIG_EXTENSIONS.has(ext);
     if (!allowed) return false;
+  }
+
+  return true;
+}
+
+/** Returns true when the file's extension is in `ALLOW_CODE_EXTENSIONS`. */
+export function isCodeExtension(filePath: string): boolean {
+  const filename = filePath.split('/').pop() ?? '';
+  const dotIdx = filename.lastIndexOf('.');
+  const ext = dotIdx > 0 ? filename.slice(dotIdx).toLowerCase() : '';
+  return ALLOW_CODE_EXTENSIONS.has(ext);
+}
+
+export function shouldIndex(filePath: string, fileSize: number, firstBytes: Uint8Array): boolean {
+  if (fileSize > MAX_FILE_SIZE) return false;
+  if (!shouldIndexByPath(filePath)) return false;
+
+  // Binary detection: null byte in first 8000 bytes
+  const limit = Math.min(firstBytes.length, 8000);
+  for (let i = 0; i < limit; i++) {
+    if (firstBytes[i] === 0) return false;
   }
 
   return true;
