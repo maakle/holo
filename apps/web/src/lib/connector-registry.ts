@@ -50,7 +50,8 @@ export interface ConnectorMeta {
     | 'microsoft-365'
     | 'asana'
     | 'stripe'
-    | 'salesforce';
+    | 'salesforce'
+    | 'manual-upload';
   displayName: string;
   description: string;
   category: ConnectorCategoryId;
@@ -62,7 +63,9 @@ export interface ConnectorMeta {
    * we want users to see is queued.
    */
   implemented: boolean;
-  flowType: 'oauth' | 'apikey' | 'service-account'; // oauth = redirect flow, apikey = inline form, service-account = paste JSON key + impersonation email
+  // oauth = redirect flow, apikey = inline form, service-account = paste JSON
+  // key + impersonation email, upload = folder picker (manual file upload).
+  flowType: 'oauth' | 'apikey' | 'service-account' | 'upload';
 }
 
 export const CONNECTORS: ConnectorMeta[] = [
@@ -213,6 +216,15 @@ export const CONNECTORS: ConnectorMeta[] = [
     category: 'payments',
     implemented: true,
     flowType: 'apikey',
+  },
+  {
+    id: 'manual-upload',
+    displayName: 'Manual Upload',
+    description:
+      'Drop a folder of .md files exported from any tool — Holo chunks, embeds, and tags them as if they came from the source connector.',
+    category: 'knowledge',
+    implemented: true,
+    flowType: 'upload',
   },
   // Coming soon — surfaced from docs/ROADMAP.md "Next connections to build".
   // Order here matches the visible category sort (alphabetical by display

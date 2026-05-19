@@ -181,6 +181,13 @@ export default async function ConnectionsPage({
   );
   if (githubConnected) connected.set('github', true);
   for (const sa of serviceAccountRows) connected.set(sa.provider, true);
+  // Manual upload has no credential row — a session is its own connector
+  // instance. Any sources row with provider='manual-upload' flips the tile
+  // to Connected; the drawer shows the per-session list.
+  const manualUploadSessionCount = sourceRows.filter(
+    (s) => s.provider === 'manual-upload',
+  ).length;
+  if (manualUploadSessionCount > 0) connected.set('manual-upload', true);
   const sourceName = new Map<string, string>(sourceRows.map((r) => [r.provider, r.name]));
   // For GitHub, fall back to the installation's account_login when no
   // source row exists yet (very brief window between install and first sync).

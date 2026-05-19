@@ -18,6 +18,12 @@ import type { ConnectorMeta } from '@/lib/connector-registry';
 import type { ConnectorWizardConfig } from './types';
 import { oauthInstallStep } from './steps/oauth-install-step';
 import { apiKeyStep } from './steps/api-key-step';
+import {
+  manualUploadInitialState,
+  manualUploadNameStep,
+  manualUploadStep,
+  type ManualUploadState,
+} from './steps/manual-upload-step';
 import { jiraCredentialsStep } from './steps/jira-credentials-step';
 import { serviceAccountStep } from './steps/service-account-step';
 import { firstSyncStep } from './steps/first-sync-step';
@@ -516,6 +522,18 @@ const confluenceConfig: ConnectorWizardConfig = {
   ],
 };
 
+// Manual `.md` folder upload. Step 1 collects the session name + the source
+// tool the files came from; step 2 is the folder picker + per-file progress.
+// No firstSync step — uploads are user-driven, the progress tree IS the
+// status surface, and there's no cron-scheduled re-sync to wait on.
+const manualUploadConfig: ConnectorWizardConfig<ManualUploadState> = {
+  initialState: manualUploadInitialState,
+  steps: [
+    { id: 'name', label: 'Name & tag', render: manualUploadNameStep },
+    { id: 'upload', label: 'Upload', size: 'wide', render: manualUploadStep },
+  ],
+};
+
 // Registry holds heterogeneous configs (each connector has its own state
 // shape). Consumers don't introspect the state from the outside — they hand
 // the config to <ConnectionWizard> which threads the type through.
@@ -547,6 +565,7 @@ const REGISTRY: Partial<Record<ConnectorMeta['id'], ConnectorWizardConfig<any>>>
   confluence: confluenceConfig,
   stripe: stripeConfig,
   teams: teamsConfig,
+  'manual-upload': manualUploadConfig,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
