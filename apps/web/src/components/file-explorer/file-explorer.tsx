@@ -23,6 +23,7 @@ import {
   UploadIcon,
   MoreHorizontalIcon,
   Trash2Icon,
+  Loader2Icon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -213,6 +214,13 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
   const [confirmDelete, setConfirmDelete] = useState<{ name: string; path: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Org-wide embed queue depth, polled every 3s. Drives the "Processing…"
+  // banner and auto-refreshes the listing when work drains — files only
+  // appear in source_artifacts once the worker finishes the embed job, so
+  // the user is otherwise staring at an empty folder while chunks land.
+  const [pendingJobs, setPendingJobs] = useState(0);
+  const [pendingChunks, setPendingChunks] = useState(0);
+
   useEffect(() => {
     setPath(initialPath);
   }, [initialPath]);
@@ -244,6 +252,33 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
       });
     return () => ac.abort();
   }, [path, refreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let prev = 0;
+    async function tick() {
+      try {
+        const r = await fetch('/api/embed-status', { cache: 'no-store' });
+        if (!r.ok) return;
+        const body = (await r.json()) as { pendingJobs: number; pendingChunks: number };
+        if (cancelled) return;
+        setPendingJobs(body.pendingJobs);
+        setPendingChunks(body.pendingChunks);
+        // Refresh the directory listing once the queue drains so newly
+        // indexed files appear without a manual reload.
+        if (prev > 0 && body.pendingJobs === 0) setRefreshKey((k) => k + 1);
+        prev = body.pendingJobs;
+      } catch {
+        // Network hiccup — banner just stays where it was; next tick recovers.
+      }
+    }
+    void tick();
+    const id = window.setInterval(tick, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   const segments = useMemo(() => pathSegments(path), [path]);
 
@@ -383,6 +418,24 @@ export function FileExplorer({ initialPath }: { initialPath: string }) {
         }}
         connected={false}
       />
+
+      {pendingJobs > 0 && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-2 rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-body-small text-text"
+        >
+          <Loader2Icon size={14} className="animate-spin text-accent shrink-0" aria-hidden />
+          <span>
+            Indexing {pendingJobs.toLocaleString()} file
+            {pendingJobs === 1 ? '' : 's'}
+            {pendingChunks > 0 ? ` · ${pendingChunks.toLocaleString()} chunks pending` : ''}
+            <span className="text-text-muted">
+              {' '}— folders appear here as the worker finishes each file.
+            </span>
+          </span>
+        </div>
+      )}
 
       <Breadcrumb segments={segments} onNavigate={navigateTo} />
 

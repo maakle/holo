@@ -60,12 +60,19 @@ function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+interface EmbedStatus {
+  pendingJobs: number;
+  pendingChunks: number;
+  bySource: Record<string, { pendingJobs: number; pendingChunks: number }>;
+}
+
 export function ManualUploadManageSheet({ meta, open, onOpenChange }: Props) {
   const router = useRouter();
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Session | null>(null);
+  const [embedStatus, setEmbedStatus] = useState<EmbedStatus | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -90,6 +97,34 @@ export function ManualUploadManageSheet({ meta, open, onOpenChange }: Props) {
 
   useEffect(() => {
     if (open) void load();
+  }, [open, load]);
+
+  // Poll embed depth while the sheet is open so each session row can show a
+  // "Processing N chunks" badge and the file/chunk totals refresh as soon as
+  // the worker finishes a batch. Stops as soon as the sheet closes.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    let prevPending = 0;
+    async function tick() {
+      try {
+        const r = await fetch('/api/embed-status', { cache: 'no-store' });
+        if (!r.ok) return;
+        const body = (await r.json()) as EmbedStatus;
+        if (cancelled) return;
+        setEmbedStatus(body);
+        if (prevPending > 0 && body.pendingJobs === 0) await load();
+        prevPending = body.pendingJobs;
+      } catch {
+        // Transient — next tick will recover.
+      }
+    }
+    void tick();
+    const id = window.setInterval(tick, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, [open, load]);
 
   async function deleteSession(s: Session) {
@@ -172,7 +207,9 @@ export function ManualUploadManageSheet({ meta, open, onOpenChange }: Props) {
                 </div>
               ) : (
                 <ul className="flex flex-col divide-y divide-border rounded-md border border-border bg-surface">
-                  {sessions.map((s) => (
+                  {sessions.map((s) => {
+                    const pending = embedStatus?.bySource[s.id];
+                    return (
                     <li key={s.id} className="flex items-start justify-between gap-3 px-4 py-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -180,6 +217,16 @@ export function ManualUploadManageSheet({ meta, open, onOpenChange }: Props) {
                             {s.name}
                           </span>
                           <Badge variant="neutral">{sourceToolLabel(s.sourceTool)}</Badge>
+                          {pending && pending.pendingJobs > 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/5 px-2 py-0.5 text-[11px] text-text">
+                              <Loader2 className="h-3 w-3 animate-spin text-accent" aria-hidden />
+                              Indexing {pending.pendingJobs.toLocaleString()} file
+                              {pending.pendingJobs === 1 ? '' : 's'}
+                              {pending.pendingChunks > 0
+                                ? ` · ${pending.pendingChunks.toLocaleString()} chunks`
+                                : ''}
+                            </span>
+                          ) : null}
                         </div>
                         <dl className="mt-1.5 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-[12px]">
                           <dt className="text-text-subtle">Uploaded</dt>
@@ -218,7 +265,8 @@ export function ManualUploadManageSheet({ meta, open, onOpenChange }: Props) {
                         )}
                       </Button>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
             </div>
