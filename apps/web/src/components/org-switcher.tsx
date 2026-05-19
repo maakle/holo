@@ -84,6 +84,11 @@ export function OrgSwitcher({
         return;
       }
       setOpen(false);
+      // Navigate to a workspace-safe route. Routes like /chat/[id],
+      // /observability/[id], /brief/[accountId], /skills/[slug], and
+      // /files/[...path] belong to the previous org and will 404 in the new
+      // one. /dashboard is always valid for any workspace.
+      router.replace('/dashboard');
       router.refresh();
     });
   }
