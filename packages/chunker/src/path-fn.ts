@@ -403,6 +403,34 @@ export const pathFns: Record<string, PathFn> = {
     return `/mintlify/api/${method}-${path}.md`;
   },
 
+  // Manual `.md` folder uploads. The connector framework isn't involved —
+  // the web's POST /api/connectors/manual-upload/sessions/[id]/files route
+  // chunks each file and enqueues an embed job directly. `session_slug` and
+  // `rel_path` are stamped on every chunk's metadata at upload time;
+  // chunks.provider on the resulting row is set to the user's chosen source
+  // tool (e.g. 'grain') when known so retrieval treats imported data as
+  // native, while the path lives under /manual-upload/ so the file explorer
+  // keeps imports visually distinct from live syncs.
+  'manual-upload-file': ({ metadata, externalId }) => {
+    const session = slug(metadata.session_slug, 'session');
+    const rel = (() => {
+      const raw = metadata.rel_path;
+      if (typeof raw !== 'string' || raw.length === 0) return slug(externalId, 'file');
+      // rel_path is the in-folder path as picked, e.g. "grain/2022-11-07/recording.md".
+      // Slug each segment, preserve the trailing extension on the file segment.
+      const parts = raw.split('/').filter(Boolean);
+      if (parts.length === 0) return slug(externalId, 'file');
+      const dirs = parts.slice(0, -1).map((p) => slug(p, 'folder'));
+      const last = parts[parts.length - 1]!;
+      const dot = last.lastIndexOf('.');
+      const stem = dot > 0 ? last.slice(0, dot) : last;
+      const ext = dot > 0 ? last.slice(dot) : '';
+      const file = slug(stem, 'file') + ext.toLowerCase();
+      return dirs.length > 0 ? `${dirs.join('/')}/${file}` : file;
+    })();
+    return `/manual-upload/${session}/${rel}`;
+  },
+
   // --- sample data (db/sample-data.ts) --------------------------------------
   // Star Wars seed. Lets the file explorer show real-shaped paths on a fresh
   // workspace before any connector is wired up.

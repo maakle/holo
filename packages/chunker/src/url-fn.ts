@@ -221,6 +221,10 @@ export const urlFns: Record<string, UrlFn> = {
   doc: () => null,
   message: () => null,
   issue: () => null,
+
+  // Manual uploads carry no remote URL — the user's local folder isn't
+  // addressable. Citations fall through to the dashboard's /files view.
+  'manual-upload-file': () => null,
 };
 
 function stripeDashboardUrl(

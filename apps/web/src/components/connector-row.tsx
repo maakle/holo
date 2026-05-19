@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SyncStatusBadge } from '@/components/sync-status-badge';
 import { ConnectorManageSheet } from '@/components/connector-manage-sheet';
+import { ManualUploadManageSheet } from '@/components/manual-upload-manage-sheet';
 import { ConnectionWizard } from '@/components/connection-wizard/connection-wizard';
 import { getWizardConfig } from '@/components/connection-wizard/configs';
 import { ConnectorLogo } from '@/components/connector-logo';
@@ -178,18 +179,28 @@ export function ConnectorRow({
         </div>
       </div>
       {!comingSoon && connected ? (
-        <ConnectorManageSheet
-          meta={meta}
-          open={showManage}
-          onOpenChange={setShowManage}
-          connectedAs={connectedAs}
-          lastSyncedAt={lastSyncedAt ?? null}
-          lastSyncStatus={lastSyncStatus ?? null}
-          allowlist={allowlist}
-          allowlistCount={allowlist.length}
-          githubDefaultAll={meta.id === 'github' && allowlist.length === 0}
-          slackDefaultAll={meta.id === 'slack' && allowlist.length === 0}
-        />
+        meta.id === 'manual-upload' ? (
+          // Manual upload has no remote sync to manage — the drawer lists
+          // upload sessions and lets the owner delete them individually.
+          <ManualUploadManageSheet
+            meta={meta}
+            open={showManage}
+            onOpenChange={setShowManage}
+          />
+        ) : (
+          <ConnectorManageSheet
+            meta={meta}
+            open={showManage}
+            onOpenChange={setShowManage}
+            connectedAs={connectedAs}
+            lastSyncedAt={lastSyncedAt ?? null}
+            lastSyncStatus={lastSyncStatus ?? null}
+            allowlist={allowlist}
+            allowlistCount={allowlist.length}
+            githubDefaultAll={meta.id === 'github' && allowlist.length === 0}
+            slackDefaultAll={meta.id === 'slack' && allowlist.length === 0}
+          />
+        )
       ) : null}
       {!comingSoon && config ? (
         <ConnectionWizard

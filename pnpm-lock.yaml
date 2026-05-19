@@ -135,6 +135,9 @@ importers:
       '@holo/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@holo/chunker':
+        specifier: workspace:*
+        version: link:../../packages/chunker
       '@holo/connector-framework':
         specifier: workspace:*
         version: link:../../packages/connector-framework
