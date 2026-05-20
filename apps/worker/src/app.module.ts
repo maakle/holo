@@ -33,6 +33,7 @@ import { SlackBotModule } from './slack-bot/slack-bot.module';
 import { GoogleChatBotModule } from './google-chat-bot/google-chat-bot.module';
 import { TeamsBotModule } from './teams-bot/teams-bot.module';
 import { ObservabilityModule } from './observability/observability.module';
+import { BillingModule } from './billing/billing.module';
 
 
 @Module({
@@ -63,6 +64,7 @@ import { ObservabilityModule } from './observability/observability.module';
     GoogleChatBotModule,
     TeamsBotModule,
     ObservabilityModule,
+    BillingModule,
     GithubCodeSyncModule,
     GithubProseSyncModule,
     GitlabCodeSyncModule,

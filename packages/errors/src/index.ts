@@ -6,6 +6,12 @@ export interface HoloErrorInput {
   cause?: string;
   fix: string;
   docs_url?: string;
+  /** Optional structured payload that travels with the error to the client.
+   *  Used by code paths (e.g. `HOLO_PLAN_LIMIT_REACHED`) that need to render
+   *  more than the standard problem+fix copy — the upgrade modal reads
+   *  current plan / limit / suggested upgrade target from here. Stay
+   *  serialisable: JSON-encoded into `toJSON()`. */
+  meta?: Record<string, unknown>;
 }
 
 export class HoloError extends Error {
@@ -14,6 +20,7 @@ export class HoloError extends Error {
   override readonly cause?: string;
   readonly fix: string;
   readonly docs_url?: string;
+  readonly meta?: Record<string, unknown>;
 
   constructor(input: HoloErrorInput) {
     super(`${input.code}: ${input.problem}`);
@@ -23,6 +30,7 @@ export class HoloError extends Error {
     this.cause = input.cause;
     this.fix = input.fix;
     this.docs_url = input.docs_url;
+    this.meta = input.meta;
   }
 
   toJSON() {
@@ -32,6 +40,7 @@ export class HoloError extends Error {
       ...(this.cause !== undefined && { cause: this.cause }),
       fix: this.fix,
       ...(this.docs_url !== undefined && { docs_url: this.docs_url }),
+      ...(this.meta !== undefined && { meta: this.meta }),
     };
   }
 }

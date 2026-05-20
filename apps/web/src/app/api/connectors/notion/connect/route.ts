@@ -9,6 +9,7 @@ import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
 import { enqueueInitialSync } from '@/lib/sync-queue';
+import { enforceConnectorLimit } from '@/lib/connector-gate';
 
 export async function POST(req: Request) {
   try {
@@ -40,6 +41,10 @@ export async function POST(req: Request) {
 
     const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
+
+    // Plan-limit gate: blocks the upsell trigger for free-tier orgs trying
+    // to add a 2nd connector. No-op for re-auth of an existing provider.
+    await enforceConnectorLimit(db, orgId, 'notion');
 
     // Upsert connector_credentials
     const existing = await db

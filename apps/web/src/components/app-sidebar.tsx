@@ -61,8 +61,14 @@ function buildSections(): NavSection[] {
 }
 
 function buildSettingsItems(eeEnabled: boolean): NavItem[] {
+  // Billing is hosted-only — hidden in self-hosted (HOLO_BILLING_ENABLED=false)
+  // installs because the page would render the disabled stub. The flag is
+  // read server-side in the page itself; we mirror the visibility here via a
+  // client-readable NEXT_PUBLIC env so the sidebar doesn't show a dead link.
+  const billingEnabled = process.env.NEXT_PUBLIC_HOLO_BILLING_ENABLED === 'true';
   return [
     { href: '/settings', label: 'General' },
+    ...(billingEnabled ? [{ href: '/settings/billing', label: 'Billing' }] : []),
     { href: '/settings/api-keys', label: 'API keys' },
     { href: '/settings/integrations', label: 'Customization' },
     { href: '/settings/team', label: 'Team' },

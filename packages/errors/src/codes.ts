@@ -34,6 +34,8 @@ export const ErrorCode = {
   HOLO_CLONE_FAILED: 'HOLO_CLONE_FAILED',
   HOLO_FETCH_FAILED: 'HOLO_FETCH_FAILED',
   HOLO_GLOB_TOO_BROAD: 'HOLO_GLOB_TOO_BROAD',
+  // Billing — connector-count gate on free/starter plans
+  HOLO_PLAN_LIMIT_REACHED: 'HOLO_PLAN_LIMIT_REACHED',
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];

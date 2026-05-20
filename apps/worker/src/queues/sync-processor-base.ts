@@ -4,6 +4,7 @@ import type { Job } from 'bullmq';
 import postgres, { type Sql } from 'postgres';
 import { createDb, type DB } from '@holo/db';
 import { recordAgentEvent } from '@holo/audit';
+import { debitConnectorSync } from '@holo/billing';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getWorkerPosthog } from '../posthog';
 import { runSyncJob, type SyncResult } from './sync-dispatch';
@@ -216,6 +217,24 @@ export abstract class SyncProcessorBase extends WorkerHost {
         });
       } catch (err) {
         this.logger.warn(`sync_runs ok update failed ${ctx}: ${(err as Error).message}`);
+      }
+      // Sync metering: charge the org for newly-indexed artifacts. Idempotent
+      // via the `(queueName, jobId)` reference — BullMQ retries that re-enter
+      // this success path don't double-debit. No-op when HOLO_BILLING_ENABLED
+      // is unset (self-hosted CE installs).
+      try {
+        await debitConnectorSync({
+          db: getDb(),
+          organizationId: job.data.organizationId,
+          provider,
+          artifactCount: result.artifactCount,
+          syncRunReference: `${this.queueName}:${jobId}`,
+          breakdown: result.breakdown ?? null,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `billing debit failed ${ctx}: ${(err as Error).message}`,
+        );
       }
       this.logger.log(`synced ${ctx} artifacts=${result.artifactCount}`);
       getWorkerPosthog().capture({

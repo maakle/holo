@@ -13,6 +13,7 @@
   "dependencies": {
     "@holo/agent-tools": "workspace:*",
     "@holo/audit": "workspace:*",
+    "@holo/billing": "workspace:*",
     "@holo/chunker": "workspace:*",
     "@holo/connector-framework": "workspace:*",
     "@holo/connectors": "workspace:*",

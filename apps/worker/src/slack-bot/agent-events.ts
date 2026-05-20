@@ -1,4 +1,5 @@
 import { recordAgentEvent } from '@holo/audit';
+import { debitLlmUsage } from '@holo/billing';
 import { type DB } from '@holo/db';
 
 export const PLACEHOLDER_TEXT = '_holo is thinking…_';
@@ -23,6 +24,18 @@ export function recordAgentEventForSlack(args: {
   const { db, organizationId, traceId, agentIdentity, event, fields } = args;
   if (event === 'model_call') {
     const model = typeof fields.model === 'string' ? fields.model : 'unknown';
+    const inputTokens =
+      typeof fields.inputTokens === 'number' ? fields.inputTokens : undefined;
+    const outputTokens =
+      typeof fields.outputTokens === 'number' ? fields.outputTokens : undefined;
+    const cacheCreationInputTokens =
+      typeof fields.cacheCreationInputTokens === 'number'
+        ? fields.cacheCreationInputTokens
+        : undefined;
+    const cacheReadInputTokens =
+      typeof fields.cacheReadInputTokens === 'number'
+        ? fields.cacheReadInputTokens
+        : undefined;
     recordAgentEvent({
       db,
       organizationId,
@@ -34,11 +47,31 @@ export function recordAgentEventForSlack(args: {
       metadata: {
         callIndex: fields.callIndex,
         stopReason: fields.stopReason,
-        inputTokens: fields.inputTokens,
-        outputTokens: fields.outputTokens,
-        cacheCreationInputTokens: fields.cacheCreationInputTokens,
-        cacheReadInputTokens: fields.cacheReadInputTokens,
+        inputTokens,
+        outputTokens,
+        cacheCreationInputTokens,
+        cacheReadInputTokens,
       },
+    });
+    // Bill the org for this LLM call. The reference id `${traceId}:${callIndex}`
+    // is unique per (Slack thread × model round-trip) so retries inside the
+    // agent loop don't double-debit. Fire-and-forget — debit failures are
+    // logged inside debitLlmUsage and never break the agent surface.
+    const callIndex = typeof fields.callIndex === 'number' ? fields.callIndex : 0;
+    void debitLlmUsage({
+      db,
+      organizationId,
+      model,
+      usage: {
+        ...(inputTokens !== undefined ? { inputTokens } : {}),
+        ...(outputTokens !== undefined ? { outputTokens } : {}),
+        ...(cacheCreationInputTokens !== undefined ? { cacheCreationInputTokens } : {}),
+        ...(cacheReadInputTokens !== undefined ? { cacheReadInputTokens } : {}),
+      },
+      referenceId: `slack:${traceId}:${callIndex}`,
+      metadata: { surface: 'slack', agentIdentity },
+    }).catch(() => {
+      // Billing must never break the agent surface; fall through silently.
     });
     return;
   }

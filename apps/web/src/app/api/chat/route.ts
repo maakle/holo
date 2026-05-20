@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { VercelAILLMClient, type LLMMessage } from '@holo/llm';
 import { getSubjectsForUser } from '@holo/user-subjects';
+import { debitLlmUsage } from '@holo/billing';
 import {
   runChatAgentLoop,
   type ChatAgentEvent,
@@ -191,6 +193,10 @@ export async function POST(req: Request) {
           userSubjects: [`org:${orgId}`, `user:${userId}`, ...extraSubjects],
         };
 
+        // Stable per-turn id used to derive the billing idempotency key.
+        // `${turnId}:${modelCall}` is unique per (org × turn × LLM round-trip),
+        // so stream retries that re-emit the same event don't double-debit.
+        const turnId = randomUUID();
         const result = await runChatAgentLoop({
           llm: new VercelAILLMClient({ apiKey: env.ANTHROPIC_API_KEY! }),
           model: CHAT_MODEL_ID,
@@ -199,6 +205,20 @@ export async function POST(req: Request) {
           wallClockMs: env.HOLO_CHAT_WALL_CLOCK_MS,
           onEvent: (event) => {
             send(event);
+            // Bill the org for this LLM call. No-op when HOLO_BILLING_ENABLED
+            // is off (self-hosted CE).
+            if (event.type === 'model_end' && event.usage) {
+              void debitLlmUsage({
+                db,
+                organizationId: orgId,
+                model: CHAT_MODEL_ID,
+                usage: event.usage,
+                referenceId: `web:${turnId}:${event.modelCall}`,
+                metadata: { surface: 'web', userId, conversationId },
+              }).catch((err) => {
+                console.error('[api/chat] billing debit failed', err);
+              });
+            }
           },
         });
 
