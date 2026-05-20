@@ -48,8 +48,12 @@ export const CHAT_SYSTEM_PROMPT = `You are holo, a knowledge assistant. You have
 
 Rules:
 - Ground every claim in a tool result. Do not invent facts.
-- Cite your sources. Each \`search\` tool result includes a \`citations\` array with 1-based \`index\` values. When you state a fact grounded in one of those results, append the matching bracket reference like \`[1]\` (or \`[2][3]\` for multiple). Do not invent indices and do not cite results you didn't use.
+- Cite sources INLINE with verbatim identifiers ONLY. Each \`search\` tool result includes a \`citations\` array with a \`label\` (e.g. "Pylon #19584", "PR #1234 · org/repo", "Grain — Title") and a \`url\`. When stating a fact, write the label inline and the URL as a markdown link when present, e.g. "TICKET-19584 confirmed this" or "see [the data residency doc](https://docs.kombo.dev/data-residency-compliance)".
+- NEVER write bracketed footnote numbers like \`[1]\`, \`[4]\`, \`[51]\` in the answer text. The structured claims envelope (emit_claims tool) handles index-based references separately — they belong only in that envelope's \`citation_indices\` field, never in the prose the user reads. Bracketed numbers in prose look like hallucinations to readers and add no value beyond the inline label.
+- Prefer the most authoritative source available. If a docs page directly answers the question, lead with that rather than a related call recording or ticket where someone asked the same question.
+- Do not punt when retrievable evidence exists. If your search results contain the answer, give a confident answer with citations. Reserve "I don't know" for cases where the search genuinely returned nothing relevant.
 - For questions about which sources / connectors / integrations are connected, call list_connections — never infer connections from search results, that misses providers whose content hasn't matched a query.
+- For questions that span tickets, calls, and docs (e.g. "who asked for X", "how does X work in tool Y"), run multiple targeted searches before answering. Don't stop at the first result if the question has breadth.
 - Keep answers concise. Use plain markdown if formatting helps.
 - If you cannot find an answer, say so directly.
 - This is an interactive web chat used to test the holo agent surface; explaining which tools you used is welcome when relevant.`;
@@ -63,7 +67,7 @@ export { CLAIMS_SUFFIX as CHAT_CLAIMS_SUFFIX } from './claims-protocol';
 
 const searchInput = z.object({
   q: z.string().min(1),
-  top_k: z.number().int().min(1).max(20).optional().default(8),
+  top_k: z.number().int().min(1).max(20).optional().default(12),
   provider: z.enum(['github', 'slack', 'notion', 'grain', 'pylon']).optional(),
 });
 
@@ -94,7 +98,7 @@ export const CHAT_TOOLS: ChatLocalTool[] = [
           type: 'integer',
           minimum: 1,
           maximum: 20,
-          default: 8,
+          default: 12,
           description: 'Maximum number of results.',
         },
         provider: {
@@ -414,7 +418,7 @@ export async function runChatAgentLoop(
     toolCtx: opts.toolCtx,
     initialMessages: opts.initialMessages,
     maxTokens: 4096,
-    maxToolCalls: opts.maxToolCalls ?? 12,
+    maxToolCalls: opts.maxToolCalls ?? 30,
     wallClockMs: opts.wallClockMs ?? 55_000,
     ...(opts.now ? { now: opts.now } : {}),
     ...(opts.onEvent ? { onEvent: opts.onEvent } : {}),
