@@ -14,6 +14,16 @@ RUN pnpm install --frozen-lockfile --filter "@holo/web..."
 
 FROM deps AS build
 COPY apps/web apps/web/
+# Next.js inlines NEXT_PUBLIC_* into the client bundle at build time, so
+# they must exist as env vars during `next build` — not just at runtime.
+# Railway auto-forwards matching service variables as --build-arg when
+# the Dockerfile declares them with ARG.
+ARG NEXT_PUBLIC_POSTHOG_KEY
+ARG NEXT_PUBLIC_POSTHOG_HOST
+ARG NEXT_PUBLIC_HOLO_BILLING_ENABLED
+ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
+ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
+ENV NEXT_PUBLIC_HOLO_BILLING_ENABLED=$NEXT_PUBLIC_HOLO_BILLING_ENABLED
 RUN pnpm -F @holo/web build
 # Bundle the DB migration runner into a single self-contained file so the
 # slim runtime image can run migrations as a Railway Pre-Deploy step

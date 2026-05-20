@@ -32,3 +32,4 @@ export {
   processExpiredTopups,
 } from './grants';
 export { recentLedgerActivity, type LedgerActivityRow } from './activity';
+export { listActiveTopupPackages, type TopupPackageRow } from './topups';

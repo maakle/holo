@@ -25,3 +25,4 @@ Numbering tracks the original "PRs 3–8" sequencing from the product-direction 
 | 0007 | Hallucination Guardrails | Draft |
 | 0008 | Quality Feedback Loop | Draft |
 | 0009 | Virtual filesystem over the context layer | Draft |
+| 0010 | Workspace Credit Pool Pricing | Accepted → [ADR 0007](../decisions/0007-workspace-credit-pool-pricing.md) |

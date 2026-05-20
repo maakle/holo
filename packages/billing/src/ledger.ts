@@ -25,6 +25,7 @@ export type LedgerReferenceKind =
   | 'sync_run'
   | 'subscription'
   | 'stripe_invoice'
+  | 'stripe_checkout'
   | 'manual';
 
 export interface WriteLedgerEntry {

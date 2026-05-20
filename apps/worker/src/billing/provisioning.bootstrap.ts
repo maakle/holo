@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { createDb } from '@holo/db';
 import { billingEnabled } from '@holo/billing';
-import { ensureStripeProductsForPlans } from '@holo/stripe';
+import { ensureStripeProductsForPlans, ensureStripeProductsForTopupPackages } from '@holo/stripe';
 
 /**
  * Worker boot hook: ensure every billing_plans row has a matching Stripe
@@ -29,9 +29,11 @@ export class StripeProvisioningBootstrap implements OnModuleInit {
     void (async () => {
       try {
         const db = createDb(databaseUrl);
-        const result = await ensureStripeProductsForPlans(db);
+        const planResult = await ensureStripeProductsForPlans(db);
+        const topupResult = await ensureStripeProductsForTopupPackages(db);
         this.logger.log(
-          `Stripe provisioning: ${result.provisioned} plan(s) provisioned, ${result.skipped} skipped`,
+          `Stripe provisioning: ${planResult.provisioned} plan(s) + ${topupResult.provisioned} top-up(s) provisioned, ` +
+            `${planResult.skipped + topupResult.skipped} skipped`,
         );
       } catch (err) {
         this.logger.error(

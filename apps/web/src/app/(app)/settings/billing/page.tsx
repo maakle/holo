@@ -8,6 +8,7 @@ import {
   getOrgBalance,
   getCurrentPeriodUsage,
   listPublicPlans,
+  listActiveTopupPackages,
   recentLedgerActivity,
   type SubscriptionWithPlan,
   type PlanRow,
@@ -20,14 +21,16 @@ import { PlanSummary } from './_components/plan-summary';
 import { BalanceCard } from './_components/balance-card';
 import { UsageBreakdown } from './_components/usage-breakdown';
 import { PlanGrid } from './_components/plan-grid';
+import { TopupCard } from './_components/topup-card';
 import { LedgerTable } from './_components/ledger-table';
+import { TopupFlash } from './_components/topup-flash';
 
 export const dynamic = 'force-dynamic';
 
 export default async function BillingSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ upgrade?: string; checkout?: string }>;
+  searchParams: Promise<{ upgrade?: string; checkout?: string; topup?: string }>;
 }) {
   if (!billingEnabled()) {
     return <BillingDisabled />;
@@ -40,12 +43,13 @@ export default async function BillingSettingsPage({
   const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/dashboard');
 
-  const [subscription, balance, period, plans, activity, sp, customerRow] =
+  const [subscription, balance, period, plans, topupPackages, activity, sp, customerRow] =
     await Promise.all([
       getCurrentSubscription(db, orgId),
       getOrgBalance(db, orgId),
       getCurrentPeriodUsage(db, orgId),
       listPublicPlans(db),
+      listActiveTopupPackages(db),
       recentLedgerActivity(db, orgId, 50),
       searchParams,
       db
@@ -58,6 +62,8 @@ export default async function BillingSettingsPage({
   const hasStripeCustomer = Boolean(customerRow[0]?.stripeCustomerId);
   const checkoutFlash: 'success' | 'cancel' | undefined =
     sp.checkout === 'success' ? 'success' : sp.checkout === 'cancel' ? 'cancel' : undefined;
+  const topupFlash: 'success' | 'cancel' | undefined =
+    sp.topup === 'success' ? 'success' : sp.topup === 'cancel' ? 'cancel' : undefined;
 
   return (
     <div className="space-y-10">
@@ -67,11 +73,13 @@ export default async function BillingSettingsPage({
         highlightUpgrade={sp.upgrade}
         checkoutFlash={checkoutFlash}
       />
+      <TopupFlash flash={topupFlash} />
       <BalanceCard
         balance={balance.balance}
         monthlyGrant={subscription?.plan.monthlyCredits ?? 0}
         debitsThisPeriod={period.total}
       />
+      <TopupCard packages={topupPackages} />
       <UsageBreakdown
         llmCredits={period.llmCredits}
         syncCredits={period.syncCredits}

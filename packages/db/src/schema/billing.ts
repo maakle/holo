@@ -44,6 +44,26 @@ export const billingPlans = pgTable('billing_plans', {
 });
 
 /**
+ * One-shot credit top-up packages. RFC 0010 / ADR 0007. Customers on any tier
+ * can buy a fixed-size bundle of credits at any time — credits added to the
+ * pool via a `topup` ledger row don't expire with the monthly grant.
+ *
+ * Each package row is its own Stripe Price keyed by `lookup_key = slug` and
+ * is **non-recurring** (one-shot `payment_intent`, not a subscription).
+ */
+export const creditTopupPackages = pgTable('credit_topup_packages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  slug: text('slug').notNull().unique(),
+  name: text('name').notNull(),
+  credits: bigint('credits', { mode: 'number' }).notNull(),
+  priceCents: integer('price_cents').notNull(),
+  stripePriceId: text('stripe_price_id'),
+  isActive: boolean('is_active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
  * One row per organisation. Cache of Stripe state; in PR 1 every org is on
  * `free` and `stripe_customer_id` / `stripe_subscription_id` are null.
  *

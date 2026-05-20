@@ -421,6 +421,20 @@
       "when": 1781222400000,
       "tag": "0060_stripe_webhook_events",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1781308800000,
+      "tag": "0061_pricing_model_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1781395200000,
+      "tag": "0062_credit_topup_packages",
+      "breakpoints": true
     }
   ]
 }

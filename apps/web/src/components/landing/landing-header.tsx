@@ -63,12 +63,6 @@ export function LandingHeader({ isAuthed }: { isAuthed: boolean }) {
           </a>
           <Link
             href={isAuthed ? '/dashboard' : '/sign-in'}
-            className="hidden h-8 items-center justify-center rounded-md px-2 text-[13px] font-medium text-text-muted transition-colors hover:text-text sm:inline-flex"
-          >
-            {isAuthed ? 'Dashboard' : 'Sign in'}
-          </Link>
-          <Link
-            href={isAuthed ? '/dashboard' : '/sign-in'}
             className="hidden h-9 items-center justify-center rounded-md bg-accent px-4 text-[13px] font-medium text-accent-fg transition-opacity hover:opacity-90 sm:inline-flex"
           >
             {isAuthed ? 'Open dashboard' : 'Get started'}
@@ -120,13 +114,6 @@ export function LandingHeader({ isAuthed }: { isAuthed: boolean }) {
                     <GithubMark className="h-3.5 w-3.5" />
                     <span className="text-text-muted">Star on GitHub</span>
                   </a>
-                  <Link
-                    href={isAuthed ? '/dashboard' : '/sign-in'}
-                    onClick={() => setOpen(false)}
-                    className="inline-flex h-9 items-center justify-center rounded-md px-3 text-[13px] font-medium text-text-muted hover:text-text"
-                  >
-                    {isAuthed ? 'Dashboard' : 'Sign in'}
-                  </Link>
                   <Link
                     href={isAuthed ? '/dashboard' : '/sign-in'}
                     onClick={() => setOpen(false)}

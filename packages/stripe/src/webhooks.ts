@@ -11,7 +11,7 @@ import type {
   StripeSubscription,
 } from './types';
 
-const { billingPlans, organizationSubscriptions, stripeWebhookEvents } = schema;
+const { billingPlans, organizationSubscriptions, stripeWebhookEvents, creditTopupPackages } = schema;
 
 /**
  * Verify the raw payload + Stripe signature header and return the parsed
@@ -113,6 +113,15 @@ async function onCheckoutCompleted(
   db: DB,
   session: StripeCheckoutSession,
 ): Promise<void> {
+  // Branch by Checkout mode. Top-ups are `mode: 'payment'` (one-shot) and
+  // carry `topup_package_slug` in metadata; plan subscriptions are
+  // `mode: 'subscription'` with a populated `session.subscription`.
+  const topupPackageSlug = session.metadata?.topup_package_slug as string | undefined;
+  if (topupPackageSlug) {
+    await onTopupCompleted(db, session, topupPackageSlug);
+    return;
+  }
+
   const organizationId =
     (session.metadata?.organization_id as string | undefined) ??
     (session.subscription
@@ -128,6 +137,53 @@ async function onCheckoutCompleted(
   // the source of truth, not a partial Checkout payload.
   const subscription = await getStripeClient().subscriptions.retrieve(subscriptionId);
   await applySubscriptionState(db, organizationId, subscription);
+}
+
+/**
+ * Credit top-up purchase cleared. Look up the package to confirm the credit
+ * amount (don't trust client metadata — `metadata.topup_credits` is a hint
+ * for observability only, the package row is the source of truth) and write
+ * a `topup` ledger row. Idempotent via the Stripe Checkout Session id.
+ */
+async function onTopupCompleted(
+  db: DB,
+  session: StripeCheckoutSession,
+  packageSlug: string,
+): Promise<void> {
+  const organizationId = session.metadata?.organization_id as string | undefined;
+  if (!organizationId) return;
+
+  const pkgRows = await db
+    .select()
+    .from(creditTopupPackages)
+    .where(eq(creditTopupPackages.slug, packageSlug))
+    .limit(1);
+  const pkg = pkgRows[0];
+  if (!pkg) {
+    // Package was deleted between checkout and webhook arrival. Don't credit
+    // arbitrary amounts from metadata — record nothing and surface in the
+    // event row's processingError via the surrounding try/catch.
+    throw holoError({
+      code: ErrorCode.HOLO_NOT_FOUND,
+      problem: `top-up package '${packageSlug}' not found at webhook time`,
+      fix: 'Re-create the package row or refund the customer manually.',
+    });
+  }
+
+  await writeLedgerEntry(db, {
+    organizationId,
+    kind: 'topup',
+    credits: Number(pkg.credits),
+    reason: 'topup_purchase',
+    referenceKind: 'stripe_checkout',
+    referenceId: session.id,
+    idempotencyKey: `topup:${session.id}`,
+    metadata: {
+      topup_package_slug: pkg.slug,
+      stripe_checkout_session_id: session.id,
+      amount_paid_cents: session.amount_total ?? pkg.priceCents,
+    },
+  });
 }
 
 async function onSubscriptionChanged(
