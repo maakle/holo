@@ -12,11 +12,14 @@ const { billingPlans, creditTopupPackages } = schema;
  * the same lookup_key (Stripe requires lookup_keys to be unique among active
  * prices) and create a fresh Price + Product graph.
  *
- * Re-pricing safety: existing customer subscriptions keep billing against the
- * archived price IDs — Stripe only blocks NEW subscriptions from using archived
- * prices. So updating `monthly_price_cents` in `billing_plans` (or
- * `price_cents` in `credit_topup_packages`) and rebooting workers safely
- * rotates the price for new signups without disturbing grandfathered customers.
+ * Re-pricing safety: existing customer subscriptions reference Prices by ID,
+ * not by `lookup_key`, so billing for grandfathered customers is unaffected
+ * by anything we do here. Stripe blocks archiving a Price that's the
+ * `default_price` of its Product (the common case for the first generation
+ * of plan rows), so instead of archiving we **rename the stale Price's
+ * `lookup_key`** to free the canonical slug for the new Price. The stale
+ * Price stays `active=true` — harmless because nothing references it by
+ * lookup_key any more, and future provisioning runs won't find it.
  *
  * `recurring` is passed through to support both monthly subscriptions (plans)
  * and one-shot purchases (top-ups). Set `recurring: null` for one-shot.
@@ -41,7 +44,9 @@ async function findOrCreatePrice(
   if (matchingPrice) return matchingPrice.id;
 
   for (const stale of existing.data) {
-    await stripe.prices.update(stale.id, { active: false });
+    await stripe.prices.update(stale.id, {
+      lookup_key: `${stale.lookup_key ?? args.lookupKey}-superseded-${Date.now()}`,
+    });
   }
   const price = await stripe.prices.create({
     currency: 'usd',
