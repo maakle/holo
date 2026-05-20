@@ -37,11 +37,16 @@ describe('AnthropicLLMClient', () => {
       ],
     });
 
-    const sent = (create.mock.calls[0] as Array<{ tools: Array<{ input_schema: unknown }> }>)[0];
+    const sent = (
+      create.mock.calls[0] as Array<{ tools: Array<{ input_schema: unknown; cache_control?: unknown }> }>
+    )[0];
     expect(sent.tools![0]!.input_schema).toEqual({
       type: 'object',
       properties: { a: { type: 'string' }, b: { type: 'string' } },
     });
+    // Sole tool is also the last tool, so it carries the cache breakpoint
+    // that covers the whole tools array.
+    expect(sent.tools![0]!.cache_control).toEqual({ type: 'ephemeral' });
   });
 
   it('surfaces usage (input/output/cache tokens) on the LLMResponse', async () => {
@@ -69,6 +74,50 @@ describe('AnthropicLLMClient', () => {
       cacheCreationInputTokens: 20,
       cacheReadInputTokens: 80,
     });
+  });
+
+  it('attaches ephemeral cache_control to system, last tool, and last message', async () => {
+    const { sdk, create } = makeFakeSdk({
+      stop_reason: 'end_turn',
+      content: [{ type: 'text', text: 'ok' }],
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+    const client = new AnthropicLLMClient({ apiKey: 'sk-test', sdk });
+
+    await client.complete({
+      model: 'claude-test',
+      maxTokens: 256,
+      system: 'be helpful',
+      messages: [
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: 'reply' },
+        { role: 'user', content: 'second' },
+      ],
+      tools: [
+        { name: 'a', description: '', inputSchema: { type: 'object' } },
+        { name: 'b', description: '', inputSchema: { type: 'object' } },
+      ],
+    });
+
+    const sent = (create.mock.calls[0] as Array<{
+      system: Array<{ text: string; cache_control?: unknown }>;
+      messages: Array<{ content: string | Array<{ cache_control?: unknown }> }>;
+      tools: Array<{ name: string; cache_control?: unknown }>;
+    }>)[0];
+
+    // System block carries the breakpoint.
+    expect(sent.system[0]!.cache_control).toEqual({ type: 'ephemeral' });
+
+    // Only the LAST tool is marked (the breakpoint covers the whole array).
+    expect(sent.tools[0]!.cache_control).toBeUndefined();
+    expect(sent.tools[1]!.cache_control).toEqual({ type: 'ephemeral' });
+
+    // The last message's content was promoted to a content-block array with
+    // cache_control on the last block.
+    const last = sent.messages[sent.messages.length - 1]!;
+    expect(Array.isArray(last.content)).toBe(true);
+    const blocks = last.content as Array<{ cache_control?: unknown }>;
+    expect(blocks[blocks.length - 1]!.cache_control).toEqual({ type: 'ephemeral' });
   });
 
   it('returns text + tool_use blocks and maps stop_reason', async () => {

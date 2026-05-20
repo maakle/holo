@@ -20,6 +20,16 @@ import { flattenForAnthropic } from './schema';
 
 type AnthropicProvider = ReturnType<typeof createAnthropic>;
 
+/**
+ * Anthropic prompt-cache breakpoint. Reads cost 10% of normal input tokens
+ * and writes cost 125%; net win as long as the cached prefix is reused at
+ * least once within the 5-minute TTL. Critical here because the agent loop
+ * re-sends the entire (system + tools + history) prefix on every iteration.
+ */
+const CACHE_CONTROL_EPHEMERAL = {
+  anthropic: { cacheControl: { type: 'ephemeral' as const } },
+};
+
 export interface VercelAILLMClientOptions {
   apiKey: string;
   /** Inject a pre-built provider instance (used in tests with a stub fetch). */
@@ -108,27 +118,63 @@ export class VercelAILLMClient implements LLMClient {
   }
 
   async complete(req: LLMRequest): Promise<LLMResponse> {
+    // Cache the LAST tool only — Anthropic caches everything up to a
+    // breakpoint, so one mark covers the whole tools array. Reused on every
+    // agent-loop iteration as long as the tool list is stable (it is).
     const tools = req.tools
       ? Object.fromEntries(
-          req.tools.map((t) => [
+          req.tools.map((t, i) => [
             t.name,
             defineTool({
               description: t.description,
               inputSchema: jsonSchema(flattenForAnthropic(t.inputSchema) as never),
+              ...(i === req.tools!.length - 1
+                ? { providerOptions: CACHE_CONTROL_EPHEMERAL }
+                : {}),
             }),
           ]),
         )
       : undefined;
 
+    // Cache the conversation prefix by marking the last message. Each
+    // agent-loop iteration adds one more turn, so this breakpoint advances
+    // and the prior prefix gets a cache hit on the next call.
+    const modelMessages = toModelMessages(req.messages);
+    if (modelMessages.length > 0) {
+      const last = modelMessages[modelMessages.length - 1]!;
+      modelMessages[modelMessages.length - 1] = {
+        ...last,
+        providerOptions: CACHE_CONTROL_EPHEMERAL,
+      } as ModelMessage;
+    }
+
+    // Pass system as a SystemModelMessage so we can attach cacheControl.
+    // The AI SDK serializes this to the same Anthropic `system` array
+    // format the top-level `system: string` shortcut produces, just with
+    // a cache_control entry on the block.
+    const messages: ModelMessage[] = req.system
+      ? [
+          {
+            role: 'system',
+            content: req.system,
+            providerOptions: CACHE_CONTROL_EPHEMERAL,
+          },
+          ...modelMessages,
+        ]
+      : modelMessages;
+
     const result = await generateText({
       model: this.provider(req.model),
-      ...(req.system ? { system: req.system } : {}),
-      messages: toModelMessages(req.messages),
+      messages,
       maxOutputTokens: req.maxTokens,
       ...(tools ? { tools } : {}),
       // Single round-trip: the orchestrator runs the tool loop, not the SDK.
       stopWhen: stepCountIs(1),
-    });
+      // We move the system prompt into `messages` so we can attach
+      // cacheControl to it. The system prompt is server-built (never user
+      // content), so the AI SDK's prompt-injection warning doesn't apply.
+      allowSystemInMessages: true,
+    } as Parameters<typeof generateText>[0] & { allowSystemInMessages?: boolean });
 
     const content: LLMResponse['content'] = [];
     for (const part of result.content) {
