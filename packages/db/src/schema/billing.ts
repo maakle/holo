@@ -9,7 +9,6 @@ import {
   boolean,
   numeric,
   index,
-  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { organization } from './auth';
 

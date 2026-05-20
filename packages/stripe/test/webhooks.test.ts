@@ -29,6 +29,8 @@ vi.mock('../src/env', () => ({
   }),
 }));
 
+import type Stripe from 'stripe';
+import type { DB } from '@holo/db';
 import { verifyStripeSignature, handleStripeEvent } from '../src/webhooks';
 
 describe('verifyStripeSignature', () => {
@@ -62,15 +64,19 @@ function stubDb(opts: {
   let lastWebhookInsertId: string | null = null;
   const writes: Array<{ table: string; op: string; values?: unknown }> = [];
 
-  const dbAny: any = {
-    insert: vi.fn((table: { _: { name: string } }) => {
-      const tableName = (table as unknown as { [k: string]: unknown })[
-        Symbol.for('drizzle:Name') as unknown as string
-      ] as string | undefined;
+  type InsertValues = { id?: string } & Record<string, unknown>;
+  const stub = {
+    insert: vi.fn((table: object) => {
+      const tableName = (table as Record<symbol, string>)[
+        Symbol.for('drizzle:Name')
+      ];
       return {
-        values: (vals: any) => {
-          if (tableName === 'stripe_webhook_events' || vals.id?.startsWith?.('evt_')) {
-            lastWebhookInsertId = vals.id;
+        values: (vals: InsertValues) => {
+          if (
+            tableName === 'stripe_webhook_events' ||
+            (typeof vals.id === 'string' && vals.id.startsWith('evt_'))
+          ) {
+            lastWebhookInsertId = vals.id ?? null;
           }
           writes.push({ table: tableName ?? 'unknown', op: 'insert', values: vals });
           return {
@@ -101,7 +107,11 @@ function stubDb(opts: {
       }),
     })),
   };
-  return { db: dbAny, writes };
+  // The handler only reaches into `.insert`, `.update`, `.select` — coerce
+  // through `unknown` because the real DB type carries Drizzle's full schema
+  // generics that we don't reconstruct in this stub.
+  const db = stub as unknown as DB;
+  return { db, writes };
 }
 
 describe('handleStripeEvent — idempotency', () => {
@@ -115,7 +125,7 @@ describe('handleStripeEvent — idempotency', () => {
       id: 'evt_abc',
       type: 'invoice.payment_failed',
       data: { object: { parent: null } },
-    } as any;
+    } as unknown as Stripe.Event;
     await handleStripeEvent(db, event);
     // Insert into stripe_webhook_events ran; no further work because invoice
     // had no subscription reference.
@@ -128,7 +138,7 @@ describe('handleStripeEvent — idempotency', () => {
       id: 'evt_abc',
       type: 'invoice.payment_failed',
       data: { object: { parent: null } },
-    } as any;
+    } as unknown as Stripe.Event;
     await handleStripeEvent(db, event);
     // After the dedupe insert returned empty, no follow-up writes happen.
     const followUp = writes.filter((w) => w.op !== 'insert');
