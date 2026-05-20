@@ -53,6 +53,38 @@ type ChatStreamEvent =
       code: string;
     };
 
+/**
+ * Translate an AI SDK upstream error into something a user can act on.
+ * The raw `AI_APICallError.message` is a wall of text including a sales link;
+ * we keep the diagnostic in the server log and surface a short summary plus
+ * the upstream `retry-after` (when present) to the client.
+ */
+function formatUpstreamLLMError(
+  e: unknown,
+): { problem: string; code: string } | null {
+  if (typeof e !== 'object' || e === null) return null;
+  const err = e as {
+    name?: string;
+    statusCode?: number;
+    responseHeaders?: Record<string, string>;
+  };
+  if (typeof err.statusCode !== 'number') return null;
+  if (err.statusCode === 429) {
+    const retryAfter = Number(err.responseHeaders?.['retry-after']);
+    const suffix = Number.isFinite(retryAfter) && retryAfter > 0
+      ? ` Try again in ${retryAfter}s.`
+      : ' Try again shortly.';
+    return {
+      code: 'HOLO_LLM_RATE_LIMITED',
+      problem: `Anthropic rate limit hit.${suffix}`,
+    };
+  }
+  return {
+    code: 'HOLO_LLM_UPSTREAM',
+    problem: `LLM upstream error (HTTP ${err.statusCode}).`,
+  };
+}
+
 function errorResponse(e: HoloError): Response {
   const status =
     e.code === 'HOLO_AUTH_NO_SESSION'
@@ -209,8 +241,23 @@ export async function POST(req: Request) {
         }
       } catch (e) {
         console.error('[api/chat] stream error', e);
-        const problem = e instanceof Error ? e.message : 'unexpected error';
-        send({ type: 'error', problem, code: 'HOLO_INTERNAL' });
+        const upstream = formatUpstreamLLMError(e);
+        const { problem, code } = upstream ?? {
+          problem: e instanceof Error ? e.message : 'unexpected error',
+          code: 'HOLO_INTERNAL',
+        };
+        try {
+          await persistAssistantTurn({
+            db,
+            conversationId,
+            text: `[error] ${problem}`,
+            toolCalls: [],
+            modelCalls: 0,
+          });
+        } catch (persistErr) {
+          console.error('[api/chat] failed to persist error turn', persistErr);
+        }
+        send({ type: 'error', problem, code });
       } finally {
         controller.close();
       }
