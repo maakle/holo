@@ -1,5 +1,9 @@
-import type { PlanRow } from '@holo/billing';
+'use client';
+
+import { useState, useTransition } from 'react';
+import { toast } from 'sonner';
 import { Check } from 'lucide-react';
+import type { PlanRow } from '@holo/billing';
 
 interface Props {
   plans: PlanRow[];
@@ -8,6 +12,7 @@ interface Props {
 }
 
 const SLUG_ORDER = ['free', 'starter', 'team', 'business'];
+const PURCHASABLE = new Set(['starter', 'team', 'business']);
 
 function formatCredits(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
@@ -24,6 +29,34 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
   const ordered = [...plans].sort(
     (a, b) => SLUG_ORDER.indexOf(a.slug) - SLUG_ORDER.indexOf(b.slug),
   );
+  const [busy, setBusy] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  async function startCheckout(planSlug: string) {
+    setBusy(planSlug);
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planSlug }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        url?: string;
+        fix?: string;
+        problem?: string;
+      };
+      if (!res.ok || !body.url) {
+        toast.error(body.fix ?? body.problem ?? 'Could not start checkout.');
+        return;
+      }
+      // Hand control to Stripe Checkout.
+      startTransition(() => {
+        window.location.href = body.url!;
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
     <section className="space-y-3">
@@ -32,6 +65,8 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
         {ordered.map((plan) => {
           const isCurrent = currentSlug === plan.slug;
           const isHighlight = highlightSlug === plan.slug;
+          const purchasable = PURCHASABLE.has(plan.slug);
+
           return (
             <div
               key={plan.id}
@@ -83,14 +118,39 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
                   <span>Star Wars sample dataset included</span>
                 </li>
               </ul>
-              <button
-                type="button"
-                disabled
-                title="Paid plans land in the next release"
-                className="mt-6 w-full rounded-md border border-border bg-surface px-3 py-2 text-[13px] text-text-muted opacity-60"
-              >
-                {isCurrent ? 'Current plan' : 'Coming soon'}
-              </button>
+              {isCurrent ? (
+                <button
+                  type="button"
+                  disabled
+                  className="mt-6 w-full rounded-md border border-border bg-surface px-3 py-2 text-[13px] text-text-muted opacity-60"
+                >
+                  Current plan
+                </button>
+              ) : purchasable ? (
+                <button
+                  type="button"
+                  onClick={() => startCheckout(plan.slug)}
+                  disabled={busy !== null}
+                  className={[
+                    'mt-6 w-full rounded-md px-3 py-2 text-[13px] font-medium transition-opacity',
+                    isHighlight
+                      ? 'bg-accent text-accent-fg hover:opacity-90'
+                      : 'border border-border bg-surface text-text hover:bg-surface-2',
+                    busy === plan.slug ? 'opacity-70' : '',
+                  ].join(' ')}
+                >
+                  {busy === plan.slug ? 'Opening Stripe…' : `Upgrade to ${plan.name}`}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  title="Contact us for Enterprise."
+                  className="mt-6 w-full rounded-md border border-border bg-surface px-3 py-2 text-[13px] text-text-muted opacity-60"
+                >
+                  {plan.slug === 'free' ? 'Free tier' : 'Contact sales'}
+                </button>
+              )}
             </div>
           );
         })}

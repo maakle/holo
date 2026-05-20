@@ -414,6 +414,13 @@
       "when": 1781136000000,
       "tag": "0059_billing_initial",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1781222400000,
+      "tag": "0060_stripe_webhook_events",
+      "breakpoints": true
     }
   ]
 }

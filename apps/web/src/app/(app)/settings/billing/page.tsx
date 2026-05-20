@@ -1,5 +1,7 @@
+import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { schema } from '@holo/db';
 import {
   billingEnabled,
   getCurrentSubscription,
@@ -25,7 +27,7 @@ export const dynamic = 'force-dynamic';
 export default async function BillingSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ upgrade?: string }>;
+  searchParams: Promise<{ upgrade?: string; checkout?: string }>;
 }) {
   if (!billingEnabled()) {
     return <BillingDisabled />;
@@ -38,18 +40,33 @@ export default async function BillingSettingsPage({
   const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/dashboard');
 
-  const [subscription, balance, period, plans, activity, sp] = await Promise.all([
-    getCurrentSubscription(db, orgId),
-    getOrgBalance(db, orgId),
-    getCurrentPeriodUsage(db, orgId),
-    listPublicPlans(db),
-    recentLedgerActivity(db, orgId, 50),
-    searchParams,
-  ]);
+  const [subscription, balance, period, plans, activity, sp, customerRow] =
+    await Promise.all([
+      getCurrentSubscription(db, orgId),
+      getOrgBalance(db, orgId),
+      getCurrentPeriodUsage(db, orgId),
+      listPublicPlans(db),
+      recentLedgerActivity(db, orgId, 50),
+      searchParams,
+      db
+        .select({ stripeCustomerId: schema.organizationSubscriptions.stripeCustomerId })
+        .from(schema.organizationSubscriptions)
+        .where(eq(schema.organizationSubscriptions.organizationId, orgId))
+        .limit(1),
+    ]);
+
+  const hasStripeCustomer = Boolean(customerRow[0]?.stripeCustomerId);
+  const checkoutFlash: 'success' | 'cancel' | undefined =
+    sp.checkout === 'success' ? 'success' : sp.checkout === 'cancel' ? 'cancel' : undefined;
 
   return (
     <div className="space-y-10">
-      <PlanSummary subscription={subscription} highlightUpgrade={sp.upgrade} />
+      <PlanSummary
+        subscription={subscription}
+        hasStripeCustomer={hasStripeCustomer}
+        highlightUpgrade={sp.upgrade}
+        checkoutFlash={checkoutFlash}
+      />
       <BalanceCard
         balance={balance.balance}
         monthlyGrant={subscription?.plan.monthlyCredits ?? 0}

@@ -9,7 +9,6 @@ import {
   boolean,
   numeric,
   index,
-  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { organization } from './auth';
 
@@ -168,5 +167,31 @@ export const creditLedger = pgTable(
       t.reason,
       t.createdAt.desc(),
     ),
+  }),
+);
+
+/**
+ * Idempotency log for Stripe webhook deliveries. Stripe guarantees at-least-once
+ * delivery; we de-dupe by event id (Stripe's `evt_*` identifier is the unique
+ * key here). Receiver: insert with ON CONFLICT DO NOTHING — if a row already
+ * exists for the id, skip processing entirely.
+ *
+ * `payload` is the raw event JSON so we can re-process or debug without a
+ * round-trip to Stripe. Keep it; the table is small (one row per inbound
+ * event) and the audit value outweighs the storage cost.
+ */
+export const stripeWebhookEvents = pgTable(
+  'stripe_webhook_events',
+  {
+    /** Stripe's `evt_*` event id; we use it as the PK. */
+    id: text('id').primaryKey(),
+    type: text('type').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+    processedAt: timestamp('processed_at', { withTimezone: true }),
+    processingError: text('processing_error'),
+  },
+  (t) => ({
+    typeReceivedIdx: index('stripe_webhook_events_type_received_idx').on(t.type, t.receivedAt.desc()),
   }),
 );

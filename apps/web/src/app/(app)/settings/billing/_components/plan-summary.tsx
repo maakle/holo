@@ -1,8 +1,13 @@
 import type { SubscriptionWithPlan } from '@holo/billing';
+import { ManageSubscriptionButton } from './manage-subscription-button';
 
 interface Props {
   subscription: SubscriptionWithPlan | null;
+  /** True when the org has a `stripe_customer_id`. Controls whether to render
+   *  the "Manage subscription" button (Stripe Customer Portal). */
+  hasStripeCustomer: boolean;
   highlightUpgrade?: string;
+  checkoutFlash?: 'success' | 'cancel';
 }
 
 function formatDate(d: Date): string {
@@ -13,7 +18,12 @@ function formatDate(d: Date): string {
   });
 }
 
-export function PlanSummary({ subscription, highlightUpgrade }: Props) {
+export function PlanSummary({
+  subscription,
+  hasStripeCustomer,
+  highlightUpgrade,
+  checkoutFlash,
+}: Props) {
   return (
     <header className="space-y-3">
       <h2 className="font-display text-h2 font-semibold tracking-tight">
@@ -23,6 +33,18 @@ export function PlanSummary({ subscription, highlightUpgrade }: Props) {
         Holo charges by usage — chat turns and ingested artifacts both burn
         credits from your monthly grant.
       </p>
+
+      {checkoutFlash === 'success' ? (
+        <div className="mt-4 rounded-md border border-success/40 bg-[color-mix(in_srgb,var(--success)_8%,transparent)] px-4 py-3 text-[13px] text-text">
+          Upgrade complete. Your new plan credits land within a minute (after
+          Stripe confirms the charge).
+        </div>
+      ) : null}
+      {checkoutFlash === 'cancel' ? (
+        <div className="mt-4 rounded-md border border-border bg-surface px-4 py-3 text-[13px] text-text-muted">
+          Upgrade cancelled. You're still on the {subscription?.plan.name ?? 'current'} plan.
+        </div>
+      ) : null}
 
       {subscription ? (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface px-4 py-3 text-[13px] tabular-nums">
@@ -38,9 +60,14 @@ export function PlanSummary({ subscription, highlightUpgrade }: Props) {
             Period {formatDate(subscription.currentPeriodStart)} →{' '}
             {formatDate(subscription.currentPeriodEnd)}
           </span>
-          <span className="ml-auto inline-flex items-center rounded-sm bg-surface-2 px-2 py-0.5 text-[12px] uppercase tracking-[0.04em] text-text-muted">
+          <span className="inline-flex items-center rounded-sm bg-surface-2 px-2 py-0.5 text-[12px] uppercase tracking-[0.04em] text-text-muted">
             {subscription.status}
           </span>
+          {hasStripeCustomer ? (
+            <div className="ml-auto">
+              <ManageSubscriptionButton />
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="mt-4 rounded-md border border-border bg-surface px-4 py-3 text-[13px] text-text-muted">
@@ -51,8 +78,8 @@ export function PlanSummary({ subscription, highlightUpgrade }: Props) {
 
       {highlightUpgrade ? (
         <p className="text-[13px] text-text-muted">
-          You came here from the upgrade prompt. Paid plans land in the next
-          release — pick a tile below to preview what you'd be on.
+          You came here from the upgrade prompt. Pick a paid tier below to
+          continue.
         </p>
       ) : null}
     </header>

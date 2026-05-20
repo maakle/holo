@@ -30,6 +30,7 @@
     "@holo/oauth-provider": "workspace:*",
     "@holo/retrieval-core": "workspace:^",
     "@holo/skills": "workspace:^",
+    "@holo/stripe": "workspace:*",
     "@holo/sync-providers": "workspace:*",
     "@holo/user-subjects": "workspace:*",
     "@radix-ui/react-alert-dialog": "^1.1.15",
