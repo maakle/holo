@@ -33,6 +33,24 @@ export interface Citation {
 }
 
 /**
+ * Resolve the effective provider for citation purposes. Manual-upload
+ * sessions tag themselves with the originating tool (e.g. 'pylon', 'grain')
+ * in `metadata.chunk_provider` while `source.provider` stays the literal
+ * 'manual-upload'. For citation labels and URL building we want to treat
+ * the chunk as if it came from the tagged native provider — otherwise
+ * everything uploaded via manual-upload gets a generic "document ·
+ * manual-upload" label even when the user explicitly tagged it.
+ *
+ * Native syncs leave `chunk_provider` unset, so they keep their own
+ * provider name.
+ */
+function effectiveProvider(result: SearchResult): string {
+  if (result.source.provider !== 'manual-upload') return result.source.provider;
+  const tag = result.source.metadata['chunk_provider'];
+  return typeof tag === 'string' && tag.length > 0 ? tag : 'manual-upload';
+}
+
+/**
  * Provider-aware deep link. Two layers:
  *   1. `result.snippetUrl` — chunker-set, points at the exact chunk (PR
  *      line, doc section). Most accurate; trust it when present.
@@ -44,11 +62,12 @@ export interface Citation {
  * The retrieval layer strips the `<provider>-` prefix from chunks.kind
  * before handing it to citation builders (so the local switch could match
  * `'pr'`/`'doc'`), but the url-fn registry is keyed on the full namespaced
- * kind. Reconstruct it here.
+ * kind. Reconstruct it here, using the effective provider so manual-upload
+ * chunks tagged as e.g. 'pylon' get the same URL treatment as a native sync.
  */
 export function buildCitationUrl(result: SearchResult): string | undefined {
   if (result.snippetUrl) return result.snippetUrl;
-  const fullKind = `${result.source.provider}-${result.source.artifactKind}`;
+  const fullKind = `${effectiveProvider(result)}-${result.source.artifactKind}`;
   const fromRegistry = computeSourceUrl({
     kind: fullKind,
     externalId: result.chunkId,
@@ -65,7 +84,7 @@ export function buildCitationUrl(result: SearchResult): string | undefined {
  */
 export function buildCitationLabel(result: SearchResult): string {
   const m = result.source.metadata;
-  const provider = result.source.provider;
+  const provider = effectiveProvider(result);
   const kind = result.source.artifactKind;
 
   // Provider-specific labels — same priority order as the URL builder.
