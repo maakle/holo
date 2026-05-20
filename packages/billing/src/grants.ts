@@ -1,4 +1,4 @@
-import { lt, eq, sql } from 'drizzle-orm';
+import { lt, eq, sql, and, isNull } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import { billingEnabled } from './env';
 import { writeLedgerEntry } from './ledger';
@@ -77,6 +77,10 @@ export async function processExpiredPeriods(db: DB): Promise<number> {
   if (!billingEnabled()) return 0;
 
   const now = new Date();
+  // Skip Stripe-managed subscriptions: their period rollover + grant is
+  // driven by the `invoice.payment_succeeded` webhook in packages/stripe,
+  // not by the cron. The cron is the source of truth for free-tier orgs
+  // and any plan that doesn't have a Stripe subscription cached yet.
   const due = await db
     .select({
       organizationId: organizationSubscriptions.organizationId,
@@ -87,7 +91,12 @@ export async function processExpiredPeriods(db: DB): Promise<number> {
     })
     .from(organizationSubscriptions)
     .innerJoin(billingPlans, eq(organizationSubscriptions.planId, billingPlans.id))
-    .where(lt(organizationSubscriptions.currentPeriodEnd, now));
+    .where(
+      and(
+        lt(organizationSubscriptions.currentPeriodEnd, now),
+        isNull(organizationSubscriptions.stripeSubscriptionId),
+      ),
+    );
 
   let processed = 0;
   for (const row of due) {

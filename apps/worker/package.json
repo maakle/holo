@@ -25,6 +25,7 @@
     "@holo/llm": "workspace:*",
     "@holo/retrieval-core": "workspace:*",
     "@holo/skills": "workspace:*",
+    "@holo/stripe": "workspace:*",
     "@holo/sync-providers": "workspace:*",
     "@holo/user-subjects": "workspace:*",
     "@nestjs/bullmq": "10.2.3",
