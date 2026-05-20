@@ -4,6 +4,7 @@ import { schema, type DB } from '@holo/db';
 import { verifySlackSignature } from '@holo/connectors';
 import { tryClaimSlackEvent } from './dedupe.js';
 import { enqueueSlackBotJob } from './queue.js';
+import type { Posthog } from '../posthog.js';
 import { logger } from '../logger.js';
 
 // Hono is parameterized by Variables; we don't need any of the gateway's
@@ -18,6 +19,7 @@ interface MountSlackEventsOptions {
   /** Signing secret for the shared Holo Slack app. Per-org custom apps store their own secret in slack_app_configs and resolve it on the per-tenant route. */
   signingSecret: string | undefined;
   redisUrl: string;
+  posthog?: Posthog;
 }
 
 interface SlackEventEnvelope {
@@ -209,6 +211,15 @@ async function handleSlackEvent(
         asker: event.user,
         text: event.text,
         slackAppConfigId,
+      });
+      opts.posthog?.capture({
+        distinctId: `slack:${event.user}`,
+        event: 'slack_bot_mentioned',
+        properties: {
+          team_id: envelope.team_id,
+          channel: event.channel,
+          custom_app: slackAppConfigId !== null,
+        },
       });
     } else if (
       event.type === 'message' &&

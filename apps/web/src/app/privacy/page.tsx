@@ -4,7 +4,7 @@ export const metadata = {
     'How holo handles the data you connect, index, and query through the platform.',
 };
 
-const LAST_UPDATED = 'May 18, 2026';
+const LAST_UPDATED = 'May 20, 2026';
 const CONTACT_EMAIL = 'privacy@holobase.dev';
 
 export default function PrivacyPage() {
@@ -107,6 +107,15 @@ export default function PrivacyPage() {
             configured for Gemini queries the index, and identity/authorization
             when you connect Google Workspace tools (Drive, Chat).
           </li>
+          <li>
+            <strong>PostHog (PostHog, Inc., EU region — hosted in Frankfurt,
+            Germany):</strong> first-party product analytics for the managed
+            holobase.dev service. Collects pseudonymous event data; for
+            signed-in users, your user ID, email, and active workspace are
+            attached so we can analyze usage by workspace. We do not enable
+            session replay, and we never send the content of your messages,
+            queries, or indexed sources to PostHog.
+          </li>
         </ul>
         <p className="mt-3">
           An up-to-date list is available on request at {CONTACT_EMAIL}.
@@ -148,10 +157,20 @@ export default function PrivacyPage() {
         Operational logs are retained for up to 90&nbsp;days.
       </Section>
 
-      <Section title="Cookies and tracking">
-        We use only the cookies strictly necessary to keep you signed in and
-        to operate the service. We do not run third-party analytics, marketing
-        pixels, or cross-site tracking.
+      <Section title="Cookies and analytics">
+        We use the cookies strictly necessary to keep you signed in and to
+        operate the service. On the managed holobase.dev service we
+        additionally use{' '}<strong>PostHog</strong> (EU region) for
+        first-party product analytics so we can understand how the product
+        is used and improve it &mdash; what pages and dashboard surfaces
+        people interact with, which connectors get configured, and whether
+        agents successfully reach the index. Analytics events are sent
+        through our own domain (first-party), and PostHog session replay is
+        disabled. We do not run marketing pixels, advertising trackers, or
+        cross-site tracking. PostHog is{' '}
+        <strong>off by default on self-hosted Holo deployments</strong>: the
+        operator opts in by setting a PostHog API key, and without one no
+        analytics traffic leaves the deployment.
       </Section>
 
       <Section title="Data breach notification">
@@ -178,7 +197,9 @@ export default function PrivacyPage() {
       <Section title="Self-hosting">
         Holo&rsquo;s Community Edition is AGPL-3.0 and can be self-hosted. When
         self-hosted, this policy does not apply &mdash; your organization is
-        the data controller for your own deployment.
+        the data controller for your own deployment. Product analytics
+        (PostHog) are disabled by default in self-hosted deployments; the
+        operator chooses whether to configure them.
       </Section>
 
       <Section title="Changes">

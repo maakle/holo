@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { TrackInView } from '@/components/landing/track-in-view';
 
 type GaugeData = {
   value: number;
@@ -183,6 +184,7 @@ const COMPARE: CompareRow[] = [
 export function BenchmarksBand() {
   return (
     <section className="border-b border-border">
+      <TrackInView section="benchmarks" />
       <div className="mx-auto max-w-[1280px] px-8 py-24">
         <div className="mb-14 max-w-[640px]">
           <p className="caption text-text-subtle">Benchmarks</p>

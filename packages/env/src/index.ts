@@ -132,6 +132,25 @@ const EnvSchema = z.object({
    * the `client_credentials` grant.
    */
   TEAMS_BOT_APP_SECRET: z.string().optional(),
+  /**
+   * PostHog product analytics. All three are optional — when unset every
+   * PostHog code path becomes a no-op and the apps boot identically to a
+   * vanilla self-host. Disclosed to end users in the Privacy Policy.
+   *
+   * NEXT_PUBLIC_POSTHOG_KEY: browser project key (must be public-prefixed
+   * to reach the client bundle). Disables client analytics when empty.
+   *
+   * NEXT_PUBLIC_POSTHOG_HOST: ingestion host. Defaults to the EU region
+   * (https://eu.i.posthog.com); override for the US region or a
+   * self-hosted PostHog instance.
+   *
+   * POSTHOG_API_KEY: server-side key used by posthog-node in the web
+   * server runtime, gateway, and worker. May be the same string as the
+   * public key — PostHog accepts either.
+   */
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
+  NEXT_PUBLIC_POSTHOG_HOST: z.string().optional(),
+  POSTHOG_API_KEY: z.string().optional(),
 }).refine(
   (env) =>
     env.EMAIL_PROVIDER !== 'resend' ||

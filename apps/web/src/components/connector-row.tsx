@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { ConnectorMeta } from '@/lib/connector-registry';
@@ -16,6 +16,7 @@ import {
   useHasLiveConnectorStatus,
   useOnDisconnectCompleted,
 } from '@/lib/connectors-status-store';
+import { trackEvent } from '@/lib/posthog/events';
 
 interface AllowlistEntry {
   pattern: string;
@@ -84,6 +85,18 @@ export function ConnectorRow({
   const connected = status === 'connected';
   const comingSoon = !meta.implemented;
 
+  // Fire `connector_connected` once when a row flips from disconnected →
+  // connected while the wizard is open. router.refresh() inside the wizard
+  // re-runs SSR which updates `status` here, so this captures OAuth,
+  // API-key, and service-account flows in one place.
+  const prevConnectedRef = useRef(connected);
+  useEffect(() => {
+    if (connected && !prevConnectedRef.current && wizardOpen) {
+      trackEvent('connector_connected', { provider: meta.id });
+    }
+    prevConnectedRef.current = connected;
+  }, [connected, wizardOpen, meta.id]);
+
   function setWizardOpen(open: boolean) {
     setWizardOpenState(open);
     if (typeof window !== 'undefined') {
@@ -126,6 +139,7 @@ export function ConnectorRow({
     setWizardInitialStepId(undefined);
     setWizardReconnect(false);
     setWizardOpen(true);
+    trackEvent('connector_wizard_opened', { provider: meta.id });
   }
 
   return (

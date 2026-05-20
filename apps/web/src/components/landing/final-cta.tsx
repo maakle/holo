@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { GithubMark } from '@/components/landing/brand-marks';
+import { TrackedLink } from '@/components/landing/tracked-link';
 
 const GITHUB_URL = 'https://github.com/maakle/holo';
 
@@ -52,19 +52,25 @@ export MCP_URL=http://localhost:3000/mcp`;
             locally, or sign in.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link
+            <TrackedLink
               href={isAuthed ? '/dashboard' : '/sign-in'}
+              event="cta"
+              location="final"
+              isAuthed={isAuthed}
               className="inline-flex h-11 items-center justify-center rounded-full bg-accent px-6 text-[14px] font-medium text-accent-fg transition-opacity hover:opacity-90"
             >
               {isAuthed ? 'Open dashboard' : 'Get started'}
-            </Link>
-            <a
+            </TrackedLink>
+            <TrackedLink
               href={GITHUB_URL}
+              external
+              event="github"
+              location="final"
               className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-surface px-6 text-[14px] font-medium text-text transition-colors hover:border-border-strong"
             >
               <GithubMark className="h-4 w-4" />
               View on GitHub
-            </a>
+            </TrackedLink>
           </div>
         </div>
 

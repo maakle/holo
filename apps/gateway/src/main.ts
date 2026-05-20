@@ -18,6 +18,7 @@ import { mountGoogleChatAppHealthz } from './google-chat-app/healthz.js';
 import { mountTeamsBotMessages } from './teams-bot/messages.js';
 import { mountTeamsBotHealthz } from './teams-bot/healthz.js';
 import { logger } from './logger.js';
+import { createPosthog } from './posthog.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -28,6 +29,7 @@ async function main() {
 
   const mcpPublicUrl = env.MCP_PUBLIC_URL;
   const webPublicUrl = env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL;
+  const posthog = createPosthog(env);
 
   const app = new Hono<{ Variables: McpSessionVars }>();
 
@@ -125,6 +127,7 @@ async function main() {
     db,
     signingSecret: env.SLACK_CONNECTOR_SIGNING_SECRET,
     redisUrl: env.REDIS_URL,
+    posthog,
   });
   mountSlackCommands(app, {
     db,
@@ -145,6 +148,7 @@ async function main() {
     sharedAudience: env.GOOGLE_CHAT_APP_PROJECT_NUMBER,
     redisUrl: env.REDIS_URL,
     webPublicUrl,
+    posthog,
   });
   mountGoogleChatAppHealthz(app, {
     audience: env.GOOGLE_CHAT_APP_PROJECT_NUMBER,
@@ -159,6 +163,7 @@ async function main() {
     db,
     sharedAppId: env.TEAMS_BOT_APP_ID,
     redisUrl: env.REDIS_URL,
+    posthog,
   });
   mountTeamsBotHealthz(app, {
     appId: env.TEAMS_BOT_APP_ID,
@@ -167,6 +172,7 @@ async function main() {
 
   mountMcp(app, {
     db,
+    posthog,
     middleware: createSessionMiddleware(db),
     async resolveContext(c) {
       const user = c.get('user');
@@ -207,6 +213,20 @@ async function main() {
   const port = env.MCP_PORT;
   serve({ fetch: app.fetch, port });
   logger.info({ port }, 'gateway listening');
+
+  // Flush queued PostHog events on graceful shutdown — otherwise the
+  // last second of activity gets dropped when the container exits.
+  const shutdown = async (signal: string) => {
+    logger.info({ signal }, 'gateway shutting down');
+    try {
+      await posthog.shutdown();
+    } catch (err) {
+      logger.warn({ err }, 'posthog shutdown failed');
+    }
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
 main().catch((e) => {

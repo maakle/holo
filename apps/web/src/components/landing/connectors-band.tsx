@@ -1,5 +1,6 @@
 import { ArrowRight, GitPullRequest, Plus } from 'lucide-react';
 import { ConnectorLogo } from '@/components/connector-logo';
+import { TrackInView } from '@/components/landing/track-in-view';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 
 const CONNECTORS: { id: ConnectorMeta['id']; name: string }[] = [
@@ -28,6 +29,7 @@ const CONNECTORS: { id: ConnectorMeta['id']; name: string }[] = [
 export function ConnectorsBand() {
   return (
     <section id="connectors" className="border-b border-border">
+      <TrackInView section="connectors" />
       <div className="mx-auto max-w-[1280px] px-8 py-24">
         <div className="grid items-start gap-16 lg:grid-cols-[1fr_1.6fr]">
           <div>

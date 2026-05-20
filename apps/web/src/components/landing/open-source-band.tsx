@@ -1,4 +1,5 @@
 import { ArrowRight, Eye, PlugZap, Puzzle } from 'lucide-react';
+import { TrackInView } from '@/components/landing/track-in-view';
 
 function IsoArchitecture() {
   return (
@@ -160,6 +161,7 @@ export function OpenSourceBand() {
       className="border-b border-[#1f1f24]"
       style={{ background: '#050507', color: '#fafaf7' }}
     >
+      <TrackInView section="open-source" />
       <div className="mx-auto grid max-w-[1280px] items-center gap-20 px-8 py-30 lg:grid-cols-[1fr_1.1fr]">
         <div>
           <p

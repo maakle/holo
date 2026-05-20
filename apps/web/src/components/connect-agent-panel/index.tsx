@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { trackEvent } from '@/lib/posthog/events';
 import {
   CONFIG_TABS,
   isConnectMode,
@@ -176,6 +177,14 @@ export function ConnectAgentPanel({ mcpUrl, gatewayBase, orgId }: Props) {
         setCopied(key);
         toast.success('Copied to clipboard');
         setTimeout(() => setCopied(null), 1500);
+        // The copy key encodes which install snippet — claude, cursor, etc.
+        // Bucket anything else (raw URL, token) into 'other'.
+        const client: 'claude' | 'cursor' | 'other' = key.startsWith('claude')
+          ? 'claude'
+          : key.startsWith('cursor')
+            ? 'cursor'
+            : 'other';
+        trackEvent('mcp_install_copied', { client });
       })
       .catch(() => {});
   }
