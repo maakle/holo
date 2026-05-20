@@ -4,6 +4,7 @@ import { Check, Copy, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { UpgradeModal, type PlanLimitInfo } from '@/components/upgrade-modal';
 import type { WizardContext } from '../types';
 
 interface Args {
@@ -52,6 +53,7 @@ function ApiKeyStep<TState>({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [planLimit, setPlanLimit] = useState<PlanLimitInfo | null>(null);
   const isUrl = args.kind === 'url';
 
   async function save() {
@@ -68,10 +70,28 @@ function ApiKeyStep<TState>({
         body: JSON.stringify({ token }),
       });
       const body = (await res.json().catch(() => ({}))) as {
+        code?: string;
         fix?: string;
         problem?: string;
+        meta?: {
+          currentPlanName?: string;
+          limit?: number;
+          currentCount?: number;
+          suggestedUpgradeSlug?: string;
+        };
       };
       if (!res.ok) {
+        // Plan-limit gate (HOLO_PLAN_LIMIT_REACHED): show the upgrade modal
+        // rather than an inline error so the user sees a route to upgrade.
+        if (body.code === 'HOLO_PLAN_LIMIT_REACHED' && body.meta) {
+          setPlanLimit({
+            currentPlanName: body.meta.currentPlanName ?? 'Free',
+            limit: body.meta.limit ?? 1,
+            currentCount: body.meta.currentCount ?? 1,
+            suggestedUpgradeSlug: body.meta.suggestedUpgradeSlug ?? 'starter',
+          });
+          return;
+        }
         setError(body.fix ?? body.problem ?? 'Connection failed');
         return;
       }
@@ -85,6 +105,13 @@ function ApiKeyStep<TState>({
 
   return (
     <>
+      <UpgradeModal
+        open={planLimit !== null}
+        onOpenChange={(o) => {
+          if (!o) setPlanLimit(null);
+        }}
+        info={planLimit}
+      />
       {showConnectedBanner ? (
         <div className="rounded-md border border-success/40 bg-[color-mix(in_srgb,var(--success,#16a34a)_8%,transparent)] px-3 py-2 text-[13px] text-text">
           <div className="flex items-center gap-2">

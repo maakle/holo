@@ -1,5 +1,6 @@
 import { Briefcase, MessageSquare, Search, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { TrackInView } from '@/components/landing/track-in-view';
 
 type UseCase = {
   Icon: LucideIcon;
@@ -43,6 +44,7 @@ const USE_CASES: UseCase[] = [
 export function UseCasesBand() {
   return (
     <section className="border-b border-border">
+      <TrackInView section="use-cases" />
       <div className="mx-auto max-w-[1280px] px-8 py-24">
         <div className="mb-12 max-w-[540px]">
           <p className="caption text-text-subtle">Use cases</p>

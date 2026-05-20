@@ -13,6 +13,7 @@
   "dependencies": {
     "@holo/agent-tools": "workspace:*",
     "@holo/audit": "workspace:*",
+    "@holo/billing": "workspace:*",
     "@holo/chunker": "workspace:*",
     "@holo/connector-framework": "workspace:*",
     "@holo/connectors": "workspace:*",
@@ -34,6 +35,7 @@
     "ioredis": "5.4.1",
     "nestjs-pino": "4.1.0",
     "pino": "9.5.0",
+    "posthog-node": "^5.34.6",
     "postgres": "3.4.9",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.1"

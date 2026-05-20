@@ -8,6 +8,7 @@ import { createHttpClient } from '@holo/connector-framework';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { enforceConnectorLimit } from '@/lib/connector-gate';
 import { enqueueInitialSync } from '@/lib/sync-queue';
 
 export async function POST(req: Request) {
@@ -40,6 +41,9 @@ export async function POST(req: Request) {
     const ident = await spec.testConnection({ api, tokens });
 
     const orgId = resolveActiveOrgId(session);
+
+    // Plan-limit gate (free → 1 connector). No-op for re-auth and for self-hosted CE.
+    await enforceConnectorLimit(db, orgId, 'linear');
     const userId = session.user.id;
 
     const existing = await db

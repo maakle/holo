@@ -38,6 +38,7 @@ pnpm dev
 - **Migration meta is checked in CI.** `pnpm db:check` enforces: contiguous `idx`, monotonic `when`, every `_journal.json` entry has a matching `<tag>.sql`, every `<tag>.sql` has a journal entry, and the latest entry has a snapshot. Run it locally before opening a migration PR. If you hit a numbering collision (two PRs grabbing the same `0034`), bump yours rather than introducing a `b` suffix — the suffixed style is grandfathered but warned-on.
 - **No `any`.** ESLint enforces `@typescript-eslint/no-explicit-any: error`. If a third-party type literally requires it (Hono generics, dynamic `import()`'s default-export reshape), add `// eslint-disable-next-line @typescript-eslint/no-explicit-any` with a one-line comment explaining why.
 - **Org-scoped routes use `withActiveOrg`.** New API routes under `apps/web/src/app/api/` should `export const GET = withActiveOrg(async ({ ctx, orgId, params }) => …)` instead of hand-rolling session lookup + `resolveActiveOrgId` + try/catch. The wrapper makes "no orgId" structurally impossible and centralizes `HoloError → status` mapping.
+- **Track new features in PostHog.** When you ship anything user-visible, add a corresponding event in the same PR. Web events go in `apps/web/src/lib/posthog/events.ts`; gateway/worker events use the helpers in `apps/gateway/src/posthog.ts` and `apps/worker/src/posthog.ts`. Full guide and current taxonomy: [`docs/analytics.md`](./docs/analytics.md).
 
 ## Commit and PR style
 

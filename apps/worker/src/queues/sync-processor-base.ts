@@ -4,7 +4,9 @@ import type { Job } from 'bullmq';
 import postgres, { type Sql } from 'postgres';
 import { createDb, type DB } from '@holo/db';
 import { recordAgentEvent } from '@holo/audit';
+import { debitConnectorSync } from '@holo/billing';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
+import { getWorkerPosthog } from '../posthog';
 import { runSyncJob, type SyncResult } from './sync-dispatch';
 import { getSyncRunner, awaitRegistrationReady } from './sync-runner-registry';
 import {
@@ -125,6 +127,16 @@ export abstract class SyncProcessorBase extends WorkerHost {
       }
       this.logger.warn(`sync_runs start insert failed ${ctx}: ${msg}`);
     }
+    getWorkerPosthog().capture({
+      distinctId: `org:${job.data.organizationId}`,
+      event: 'sync_job_started',
+      groups: { organization: job.data.organizationId },
+      properties: {
+        provider,
+        queue: this.queueName,
+        source_id: job.data.sourceId,
+      },
+    });
     // Debounced heartbeat: connectors call reportProgress freely (once per
     // page / repo / channel), but we coalesce to one DB write every ~1s and
     // skip writes when nothing changed since the last one. Final state on
@@ -206,7 +218,37 @@ export abstract class SyncProcessorBase extends WorkerHost {
       } catch (err) {
         this.logger.warn(`sync_runs ok update failed ${ctx}: ${(err as Error).message}`);
       }
+      // Sync metering: charge the org for newly-indexed artifacts. Idempotent
+      // via the `(queueName, jobId)` reference — BullMQ retries that re-enter
+      // this success path don't double-debit. No-op when HOLO_BILLING_ENABLED
+      // is unset (self-hosted CE installs).
+      try {
+        await debitConnectorSync({
+          db: getDb(),
+          organizationId: job.data.organizationId,
+          provider,
+          artifactCount: result.artifactCount,
+          syncRunReference: `${this.queueName}:${jobId}`,
+          breakdown: result.breakdown ?? null,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `billing debit failed ${ctx}: ${(err as Error).message}`,
+        );
+      }
       this.logger.log(`synced ${ctx} artifacts=${result.artifactCount}`);
+      getWorkerPosthog().capture({
+        distinctId: `org:${job.data.organizationId}`,
+        event: 'sync_job_succeeded',
+        groups: { organization: job.data.organizationId },
+        properties: {
+          provider,
+          queue: this.queueName,
+          duration_ms: Date.now() - startedAtMs,
+          artifact_count: result.artifactCount,
+          skip_reason: result.skipReason ?? null,
+        },
+      });
       recordAgentEvent(
         {
           db: getDb(),
@@ -258,6 +300,18 @@ export abstract class SyncProcessorBase extends WorkerHost {
         err instanceof HoloError
           ? err.problem
           : ((err as Error)?.message ?? String(err));
+      getWorkerPosthog().capture({
+        distinctId: `org:${job.data.organizationId}`,
+        event: 'sync_job_failed',
+        groups: { organization: job.data.organizationId },
+        properties: {
+          provider,
+          queue: this.queueName,
+          duration_ms: Date.now() - startedAtMs,
+          error_code: errorCode,
+          cancelled,
+        },
+      });
       recordAgentEvent(
         {
           db: getDb(),

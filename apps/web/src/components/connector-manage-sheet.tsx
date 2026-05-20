@@ -10,6 +10,7 @@ import {
   useConnectorStatus,
 } from '@/lib/connectors-status-store';
 import type { ConnectorMeta } from '@/lib/connector-registry';
+import { trackEvent } from '@/lib/posthog/events';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -264,6 +265,7 @@ export function ConnectorManageSheet({
       }
       setConfirmingDisconnect(false);
       onOpenChange(false);
+      trackEvent('connector_disconnected', { provider: meta.id });
       if (body.disconnecting) {
         // Optimistic: the route already completed the bounded fast bits
         // (token revoke / remote uninstall / credential row deletion). The

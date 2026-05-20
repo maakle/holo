@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { authClient } from '@holo/auth/client';
 import { cn } from '@/lib/utils';
+import { trackEvent } from '@/lib/posthog/events';
 
 export type OrgSummary = { id: string; name: string; slug: string };
 
@@ -84,6 +85,7 @@ export function OrgSwitcher({
         return;
       }
       setOpen(false);
+      trackEvent('workspace_switched', { fromOrgId: activeOrgId, toOrgId: orgId });
       // Navigate to a workspace-safe route. Routes like /chat/[id],
       // /observability/[id], /brief/[accountId], /skills/[slug], and
       // /files/[...path] belong to the previous org and will 404 in the new

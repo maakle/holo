@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "better-auth": "1.6.9",
+    "@holo/billing": "workspace:*",
     "@holo/db": "workspace:*",
     "@holo/env": "workspace:*",
     "@holo/errors": "workspace:*",

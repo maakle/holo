@@ -2,6 +2,7 @@ import './globals.css';
 import type { ReactNode } from 'react';
 import { Toaster } from 'sonner';
 import { ThemeScript } from '@/components/theme-script';
+import { PostHogProvider } from '@/components/posthog-provider';
 
 export const metadata = {
   title: 'holo — the context layer for AI-native companies',
@@ -27,8 +28,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body className="min-h-screen bg-bg text-text antialiased">
-        {children}
-        <Toaster position="bottom-right" theme="system" closeButton richColors />
+        <PostHogProvider>
+          {children}
+          <Toaster position="bottom-right" theme="system" closeButton richColors />
+        </PostHogProvider>
       </body>
     </html>
   );

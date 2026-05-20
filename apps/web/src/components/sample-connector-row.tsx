@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { SampleManageSheet } from '@/components/sample-manage-sheet';
 import { notifySampleDataChanged } from '@/lib/sample-data-events';
 import { updateOrgPreferences } from '@/app/(app)/settings/actions';
+import { trackEvent } from '@/lib/posthog/events';
 
 interface Props {
   installed: boolean;
@@ -65,6 +66,7 @@ export function SampleConnectorRow({
         return;
       }
       notifySampleDataChanged(true);
+      trackEvent('sample_data_seeded', {});
       router.refresh();
     } catch {
       setError('Network error.');

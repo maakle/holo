@@ -242,6 +242,8 @@ The implementation is preserved in the repo (`packages/skills/`, `packages/disco
 
 Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) before opening a PR. First-time contributors will be prompted to sign the [`CLA`](./CLA.md). Good first issues tagged `good-first-issue`.
 
+When you ship a user-visible feature, also add a PostHog event for it — see [`docs/analytics.md`](./docs/analytics.md). Analytics are optional: leave the `POSTHOG_*` env vars unset and the whole stack runs with zero outbound analytics traffic.
+
 ## Editions
 
 Holo ships in two editions in this same repo:
