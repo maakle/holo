@@ -8,10 +8,10 @@ import { isEnterpriseEnabled } from '@/lib/ee/license';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SettingsIntegrationsPage() {
+export default async function SettingsAdvancedPage() {
   const { auth, db } = await getServerContext();
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect('/sign-in?callbackURL=/settings/integrations');
+  if (!session) redirect('/sign-in?callbackURL=/settings/advanced');
 
   const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/dashboard');
@@ -33,8 +33,8 @@ export default async function SettingsIntegrationsPage() {
     return (
       <div className="rounded-lg border border-border bg-surface px-4 py-6 text-[13px] text-text-muted">
         {eeEnabled
-          ? 'Only workspace owners can manage customization.'
-          : 'Customization is an Enterprise feature.'}
+          ? 'Only workspace owners can manage advanced settings.'
+          : 'Advanced settings are an Enterprise feature.'}
       </div>
     );
   }
@@ -42,7 +42,7 @@ export default async function SettingsIntegrationsPage() {
   return (
     <section className="space-y-3">
       <h2 className="text-[15px] font-medium">
-        Customization <span className="caption ml-2">Enterprise</span>
+        Advanced <span className="caption ml-2">Enterprise</span>
       </h2>
       <a
         href="/ee/integrations/slack-app"

@@ -70,7 +70,7 @@ function buildSettingsItems(eeEnabled: boolean): NavItem[] {
     { href: '/settings', label: 'General' },
     ...(billingEnabled ? [{ href: '/settings/billing', label: 'Billing' }] : []),
     { href: '/settings/api-keys', label: 'API keys' },
-    { href: '/settings/integrations', label: 'Customization' },
+    { href: '/settings/advanced', label: 'Advanced' },
     { href: '/settings/team', label: 'Team' },
     ...(eeEnabled ? [{ href: '/settings/audit-log', label: 'Audit log' }] : []),
   ];
