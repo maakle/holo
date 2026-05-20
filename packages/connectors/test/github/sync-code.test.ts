@@ -1,10 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
+import { execFile } from 'node:child_process';
+import { mkdtempSync, rmSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
 import {
   runGithubCodeSync,
+  realGitShell,
   type RunGithubCodeSyncInput,
   type GitShell,
   type GithubCodeEmbedEnqueueFn,
 } from '../../src/github/sync-code';
+
+const execFileAsync = promisify(execFile);
 
 function mockShell(overrides: Partial<GitShell> = {}): GitShell {
   return {
@@ -163,6 +171,39 @@ describe('runGithubCodeSync', () => {
       baseInput({ gitShell: shell, enqueueEmbed: vi.fn(), existingHashes: hashes }),
     );
     expect(r2.artifactCount).toBe(0);
+  });
+
+  describe('realGitShell.hasClone', () => {
+    it('returns false when .git directory is missing HEAD/config (partial tmpfiles cleanup)', async () => {
+      // Reproduces the production failure where /tmp cleaners deleted regular
+      // files inside .git but left subdirectories intact. `stat('.git')` would
+      // succeed but `git -C dir fetch` then dies with "not a git repository"
+      // on every subsequent sync until someone wipes the dir by hand.
+      const dir = mkdtempSync(join(tmpdir(), 'holo-clone-test-'));
+      try {
+        await execFileAsync('git', ['-C', dir, 'init', '--quiet']);
+        unlinkSync(join(dir, '.git', 'HEAD'));
+        unlinkSync(join(dir, '.git', 'config'));
+
+        expect(await realGitShell.hasClone(dir)).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('returns true for a healthy git repo', async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'holo-clone-test-'));
+      try {
+        await execFileAsync('git', ['-C', dir, 'init', '--quiet']);
+        expect(await realGitShell.hasClone(dir)).toBe(true);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('returns false when the directory does not exist', async () => {
+      expect(await realGitShell.hasClone('/tmp/holo-clone-test-does-not-exist-xyz')).toBe(false);
+    });
   });
 
   it('returns headSha in output', async () => {

@@ -16,6 +16,13 @@ type SourceRow = {
   provider: string;
 };
 
+// Provider kinds that legitimately exist as source rows but have no recurring
+// background sync: `sample` is seed data loaded once per org, `manual-upload`
+// ingests at upload time. Warning on every boot for these creates noise — the
+// scheduler still warns on genuinely-unknown providers (typos, retired
+// connectors with orphaned rows) so misregistrations stay loud.
+const NON_SYNC_PROVIDERS: ReadonlySet<string> = new Set(['sample', 'manual-upload']);
+
 let cachedSql: Sql | null = null;
 
 function getSql(): Sql {
@@ -158,7 +165,15 @@ export class SyncSchedulerService implements OnModuleInit {
 
   private async scheduleSource(s: SourceRow): Promise<void> {
     if (!isSyncProvider(s.provider)) {
-      this.logger.warn(`unknown provider '${s.provider}' for source ${s.id}; skipping schedule`);
+      if (NON_SYNC_PROVIDERS.has(s.provider)) {
+        this.logger.debug(
+          `non-sync provider '${s.provider}' for source ${s.id}; skipping schedule`,
+        );
+      } else {
+        this.logger.warn(
+          `unknown provider '${s.provider}' for source ${s.id}; skipping schedule`,
+        );
+      }
       return;
     }
     const intervalMs = SYNC_INTERVAL_MS_BY_PROVIDER[s.provider];

@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFile as fsReadFile, stat } from 'node:fs/promises';
+import { readFile as fsReadFile } from 'node:fs/promises';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { githubCodeChunker } from '@holo/chunker';
@@ -148,9 +148,14 @@ export const realGitShell: GitShell = {
     // probe the filesystem before assuming an incremental fetch will work —
     // otherwise `git -C <missing-dir>` errors permanently until the cursor
     // is manually cleared.
+    //
+    // Ask git directly rather than stat'ing `.git`: tmpfiles cleaners can
+    // prune `.git/HEAD` and `.git/config` while leaving the `.git` directory
+    // behind, which `stat` would happily report as a clone. Fetch then dies
+    // with "fatal: not a git repository" forever.
     try {
-      const s = await stat(join(dir, '.git'));
-      return s.isDirectory() || s.isFile();
+      await execFileAsync('git', ['-C', dir, 'rev-parse', '--git-dir']);
+      return true;
     } catch {
       return false;
     }
