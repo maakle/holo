@@ -18,7 +18,7 @@
     "@holo/db": "workspace:*",
     "@holo/errors": "workspace:*",
     "drizzle-orm": "0.45.2",
-    "stripe": "^18.4.0"
+    "stripe": "^22.1.1"
   },
   "devDependencies": {
     "typescript": "5.6.3",
