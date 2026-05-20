@@ -9,6 +9,7 @@ import { MAX_CRAWL_LIMIT } from '@holo/connectors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { enforceConnectorLimit } from '@/lib/connector-gate';
 import { enqueueInitialSync } from '@/lib/sync-queue';
 
 /**
@@ -93,6 +94,9 @@ export async function POST(req: Request) {
     const body = parsed.data;
     const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
+
+    // Plan-limit gate (free → 1 connector). No-op for re-auth and self-hosted CE.
+    await enforceConnectorLimit(db, orgId, 'webcrawl');
 
     // Validate every URL up front. assertPublicHttpUrl resolves DNS and
     // rejects private addresses — that's our SSRF defence. Doing this

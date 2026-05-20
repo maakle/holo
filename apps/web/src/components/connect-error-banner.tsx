@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 
@@ -15,7 +16,6 @@ export function ConnectErrorBanner({ code, fix }: Props) {
 
   function dismiss() {
     setDismissed(true);
-    // Strip the query params so a refresh doesn't re-render the banner.
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
       url.searchParams.delete('connect_error');
@@ -24,10 +24,22 @@ export function ConnectErrorBanner({ code, fix }: Props) {
     }
   }
 
+  const isPlanLimit = code === 'HOLO_PLAN_LIMIT_REACHED';
+
   return (
     <div className="relative rounded-md border border-error/30 bg-[color-mix(in_srgb,var(--error)_10%,transparent)] p-4 pr-10 text-[13px]">
-      <div className="font-medium text-error">{code}</div>
+      <div className="font-medium text-error">
+        {isPlanLimit ? "You've hit your plan's connector limit" : code}
+      </div>
       {fix ? <div className="mt-1 text-error/80">{fix}</div> : null}
+      {isPlanLimit ? (
+        <Link
+          href="/settings/billing"
+          className="mt-2 inline-block text-accent underline-offset-2 hover:underline"
+        >
+          View plans →
+        </Link>
+      ) : null}
       <button
         type="button"
         onClick={dismiss}

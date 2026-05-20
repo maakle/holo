@@ -239,6 +239,19 @@ export async function provisionPersonalOrgOnSignup(
   // CreateWorkspaceForm — every workspace should have demo data by default.
   await ensureSampleData(db, newOrg!.id, { embed: opts.embedSampleChunks });
 
+  // Seed the free-tier subscription + initial credit grant so /settings/billing
+  // shows live data on first login. No-op when HOLO_BILLING_ENABLED is off.
+  // Lazy-imported to keep @holo/auth's static dep graph slim and avoid a
+  // cycle if billing ever depends on auth state.
+  try {
+    const { seedInitialSubscriptionAndGrant } = await import('@holo/billing');
+    await seedInitialSubscriptionAndGrant(db, newOrg!.id);
+  } catch {
+    // Billing seed failures are non-fatal — the user can still sign in and
+    // browse the workspace; a missing subscription row just means /settings/billing
+    // renders zeros until the next renewal cron tick.
+  }
+
   return { created: true, organizationId: newOrg!.id };
 }
 

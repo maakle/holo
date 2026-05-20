@@ -6,6 +6,7 @@ import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { enforceConnectorLimit } from '@/lib/connector-gate';
 import { enqueueInitialSync } from '@/lib/sync-queue';
 
 /**
@@ -39,6 +40,9 @@ export async function POST() {
       });
     }
     const orgId = resolveActiveOrgId(session);
+
+    // Plan-limit gate (free → 1 connector). No-op for re-auth and for self-hosted CE.
+    await enforceConnectorLimit(db, orgId, 'teams');
     const userId = session.user.id;
 
     if (!env.TEAMS_BOT_APP_ID || !env.TEAMS_BOT_APP_SECRET) {

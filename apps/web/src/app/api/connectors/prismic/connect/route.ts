@@ -11,6 +11,7 @@ import {
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { enforceConnectorLimit } from '@/lib/connector-gate';
 import { enqueueInitialSync } from '@/lib/sync-queue';
 
 /**
@@ -132,6 +133,9 @@ export async function POST(req: Request) {
     const typeCount = Object.keys(repository.types ?? {}).length;
     const name = `${repo}.prismic.io`;
     const orgId = resolveActiveOrgId(session);
+
+    // Plan-limit gate (free → 1 connector). No-op for re-auth and for self-hosted CE.
+    await enforceConnectorLimit(db, orgId, 'prismic');
     const userId = session.user.id;
 
     // One connector_credentials row per (org, user). Token slot is empty

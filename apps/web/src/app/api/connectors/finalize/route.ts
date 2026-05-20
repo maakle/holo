@@ -6,6 +6,7 @@ import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { enqueueInitialSync } from '@/lib/sync-queue';
+import { enforceConnectorLimit } from '@/lib/connector-gate';
 
 /**
  * Finishes an OAuth/install flow on the BETTER_AUTH_URL origin where the
@@ -160,6 +161,11 @@ export async function GET(req: Request) {
     const orgId = grant.claimedOrganizationId;
     const userId = grant.claimedUserId;
     const payload = JSON.parse(grant.payload) as GrantPayload;
+
+    // Plan-limit gate. Catches the OAuth-flow connectors (slack, github,
+    // gitlab, salesforce) at the bind-to-session step. Re-auth of an existing
+    // provider is allowed (count doesn't move). No-op for self-hosted CE.
+    await enforceConnectorLimit(db, orgId, payload.provider);
 
     if (payload.provider === 'slack') {
       await commitOAuthCredential(db, {
