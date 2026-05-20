@@ -1,10 +1,15 @@
-import type Stripe from 'stripe';
 import { eq } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import { writeLedgerEntry } from '@holo/billing';
 import { holoError, ErrorCode } from '@holo/errors';
 import { getStripeClient } from './client';
 import { readStripeEnv } from './env';
+import type {
+  StripeCheckoutSession,
+  StripeEvent,
+  StripeInvoice,
+  StripeSubscription,
+} from './types';
 
 const { billingPlans, organizationSubscriptions, stripeWebhookEvents } = schema;
 
@@ -20,7 +25,7 @@ const { billingPlans, organizationSubscriptions, stripeWebhookEvents } = schema;
 export function verifyStripeSignature(args: {
   rawBody: string;
   signature: string;
-}): Stripe.Event {
+}): StripeEvent {
   const stripe = getStripeClient();
   const { webhookSecret } = readStripeEnv();
   try {
@@ -44,7 +49,7 @@ export function verifyStripeSignature(args: {
  * writes, subscription updates) is itself idempotent so multiple deliveries
  * converge to the same end state.
  */
-export async function handleStripeEvent(db: DB, event: Stripe.Event): Promise<void> {
+export async function handleStripeEvent(db: DB, event: StripeEvent): Promise<void> {
   // 1. Record + dedupe.
   const insert = await db
     .insert(stripeWebhookEvents)
@@ -61,20 +66,20 @@ export async function handleStripeEvent(db: DB, event: Stripe.Event): Promise<vo
   try {
     switch (event.type) {
       case 'checkout.session.completed':
-        await onCheckoutCompleted(db, event.data.object as Stripe.Checkout.Session);
+        await onCheckoutCompleted(db, event.data.object as StripeCheckoutSession);
         break;
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
-        await onSubscriptionChanged(db, event.data.object as Stripe.Subscription);
+        await onSubscriptionChanged(db, event.data.object as StripeSubscription);
         break;
       case 'customer.subscription.deleted':
-        await onSubscriptionDeleted(db, event.data.object as Stripe.Subscription);
+        await onSubscriptionDeleted(db, event.data.object as StripeSubscription);
         break;
       case 'invoice.payment_succeeded':
-        await onInvoicePaid(db, event.data.object as Stripe.Invoice);
+        await onInvoicePaid(db, event.data.object as StripeInvoice);
         break;
       case 'invoice.payment_failed':
-        await onInvoiceFailed(db, event.data.object as Stripe.Invoice);
+        await onInvoiceFailed(db, event.data.object as StripeInvoice);
         break;
       default:
         // Ignore everything else; Stripe sends many event types we don't care about.
@@ -106,7 +111,7 @@ export async function handleStripeEvent(db: DB, event: Stripe.Event): Promise<vo
  */
 async function onCheckoutCompleted(
   db: DB,
-  session: Stripe.Checkout.Session,
+  session: StripeCheckoutSession,
 ): Promise<void> {
   const organizationId =
     (session.metadata?.organization_id as string | undefined) ??
@@ -127,7 +132,7 @@ async function onCheckoutCompleted(
 
 async function onSubscriptionChanged(
   db: DB,
-  subscription: Stripe.Subscription,
+  subscription: StripeSubscription,
 ): Promise<void> {
   const organizationId = (subscription.metadata?.organization_id as string | undefined) ?? null;
   if (!organizationId) return;
@@ -136,7 +141,7 @@ async function onSubscriptionChanged(
 
 async function onSubscriptionDeleted(
   db: DB,
-  subscription: Stripe.Subscription,
+  subscription: StripeSubscription,
 ): Promise<void> {
   const organizationId = (subscription.metadata?.organization_id as string | undefined) ?? null;
   if (!organizationId) return;
@@ -169,7 +174,7 @@ async function onSubscriptionDeleted(
  *
  * Idempotency key shape mirrors PR 1: `grant:<org_id>:<period_start_iso>`.
  */
-async function onInvoicePaid(db: DB, invoice: Stripe.Invoice): Promise<void> {
+async function onInvoicePaid(db: DB, invoice: StripeInvoice): Promise<void> {
   const subscriptionId = extractSubscriptionId(invoice);
   if (!subscriptionId) return;
   const subscription = await getStripeClient().subscriptions.retrieve(subscriptionId);
@@ -179,7 +184,7 @@ async function onInvoicePaid(db: DB, invoice: Stripe.Invoice): Promise<void> {
   await applySubscriptionState(db, organizationId, subscription);
 }
 
-async function onInvoiceFailed(db: DB, invoice: Stripe.Invoice): Promise<void> {
+async function onInvoiceFailed(db: DB, invoice: StripeInvoice): Promise<void> {
   const subscriptionId = extractSubscriptionId(invoice);
   if (!subscriptionId) return;
   const subscription = await getStripeClient().subscriptions.retrieve(subscriptionId);
@@ -197,7 +202,7 @@ async function onInvoiceFailed(db: DB, invoice: Stripe.Invoice): Promise<void> {
  * root and onto `invoice.parent.subscription_details.subscription`. Wrap the
  * lookup here so handlers stay readable.
  */
-function extractSubscriptionId(invoice: Stripe.Invoice): string | null {
+function extractSubscriptionId(invoice: StripeInvoice): string | null {
   const sub = invoice.parent?.subscription_details?.subscription;
   if (!sub) return null;
   return typeof sub === 'string' ? sub : sub.id;
@@ -214,7 +219,7 @@ function extractSubscriptionId(invoice: Stripe.Invoice): string | null {
 async function applySubscriptionState(
   db: DB,
   organizationId: string,
-  subscription: Stripe.Subscription,
+  subscription: StripeSubscription,
 ): Promise<void> {
   const planSlug = subscription.metadata?.plan_slug as string | undefined;
   if (!planSlug) return;
@@ -274,7 +279,7 @@ async function applySubscriptionState(
 }
 
 async function readSubscriptionMetadata(
-  subscription: string | Stripe.Subscription,
+  subscription: string | StripeSubscription,
 ): Promise<{ organizationId: string | null; planSlug: string | null }> {
   if (typeof subscription === 'string') {
     const fetched = await getStripeClient().subscriptions.retrieve(subscription);
@@ -294,7 +299,7 @@ function stripeTimestampToDate(unix: number): Date {
 }
 
 function mapStripeStatus(
-  status: Stripe.Subscription.Status,
+  status: StripeSubscription["status"],
 ): 'active' | 'trialing' | 'past_due' | 'canceled' | 'unbilled' {
   switch (status) {
     case 'active':

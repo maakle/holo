@@ -29,9 +29,9 @@ vi.mock('../src/env', () => ({
   }),
 }));
 
-import type Stripe from 'stripe';
 import type { DB } from '@holo/db';
 import { verifyStripeSignature, handleStripeEvent } from '../src/webhooks';
+import type { StripeEvent } from '../src/types';
 
 describe('verifyStripeSignature', () => {
   beforeEach(() => {
@@ -125,7 +125,7 @@ describe('handleStripeEvent — idempotency', () => {
       id: 'evt_abc',
       type: 'invoice.payment_failed',
       data: { object: { parent: null } },
-    } as unknown as Stripe.Event;
+    } as unknown as StripeEvent;
     await handleStripeEvent(db, event);
     // Insert into stripe_webhook_events ran; no further work because invoice
     // had no subscription reference.
@@ -138,7 +138,7 @@ describe('handleStripeEvent — idempotency', () => {
       id: 'evt_abc',
       type: 'invoice.payment_failed',
       data: { object: { parent: null } },
-    } as unknown as Stripe.Event;
+    } as unknown as StripeEvent;
     await handleStripeEvent(db, event);
     // After the dedupe insert returned empty, no follow-up writes happen.
     const followUp = writes.filter((w) => w.op !== 'insert');
