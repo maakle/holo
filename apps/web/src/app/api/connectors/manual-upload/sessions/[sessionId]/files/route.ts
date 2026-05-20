@@ -61,6 +61,89 @@ function chunkHash(kind: string, content: string): string {
   return createHash('sha256').update(`${kind}:${content}`).digest('hex');
 }
 
+/**
+ * Extract provider-specific identifiers (issue number, recording id, file
+ * path) and a canonical URL from the upload's relative path, based on the
+ * session's `chunk_provider` tag.
+ *
+ * Why this exists: manual-upload chunks otherwise carry only `session_slug`
+ * and `rel_path`. The citation pipeline (`packages/agent-tools/src/citations.ts`)
+ * looks for provider-specific keys like `issue_number` / `recording_id` /
+ * `file_path` to produce nice labels (`Pylon #8183`, `apps/.../foo.ts`) and the
+ * URL-fn registry needs them to build clickable links. Stamping them here at
+ * upload time means a manually-uploaded ticket cites identically to one synced
+ * natively via a connector.
+ *
+ * Patterns assume the conventional folder shapes the matching exporters
+ * produce. Unknown / unmatched paths return an empty object — the chunk still
+ * gets indexed, just without the enrichment, falling back to the generic
+ * citation label as before.
+ */
+function extractProviderMetadataFromPath(
+  chunkProvider: string,
+  relPath: string,
+  sourceMeta: { repo_full_name?: string } & Record<string, unknown>,
+): Record<string, unknown> {
+  switch (chunkProvider) {
+    case 'pylon': {
+      // Match the Pylon export's `tickets/<date>-ticket-<id>/<file>` and
+      // permissive variants (`ticket_8183.md`, `pylon-19584.md`, etc.).
+      const m = relPath.match(/(?:ticket|pylon)[-_]?(\d+)/i);
+      if (!m) return {};
+      const issueNumber = Number(m[1]);
+      if (!Number.isFinite(issueNumber)) return {};
+      return {
+        issue_number: issueNumber,
+        url: `https://app.usepylon.com/issues?issueNumber=${issueNumber}`,
+      };
+    }
+    case 'grain': {
+      // Match `grain/<recording-id>/...` or filenames containing a UUID-like
+      // recording id. Recording IDs are URL-safe slugs Grain emits; accept any
+      // hex/alphanumeric/dash blob of length >= 8 to be permissive.
+      const folderMatch = relPath.match(/(?:^|\/)grain\/([A-Za-z0-9-]{8,})(?:\/|$)/);
+      const recId = folderMatch?.[1]
+        ?? relPath.match(/recording[-_]?([A-Za-z0-9-]{8,})/i)?.[1];
+      if (!recId) return {};
+      return {
+        recording_id: recId,
+        url: `https://grain.com/share/recording/${recId}`,
+      };
+    }
+    case 'github': {
+      // For GitHub the relevant identifier IS the file path. Strip a leading
+      // `codebase/` or `github/` segment (the convention our exporters use) so
+      // the remainder matches what the native GitHub connector stamps as
+      // `file_path` (repo-relative path).
+      const filePath = relPath.replace(/^(?:codebase|github)\//, '');
+      if (!filePath) return {};
+      const out: Record<string, unknown> = { file_path: filePath };
+      // If the upload session knows the repo (set on the source metadata when
+      // creating the upload), we can also build the github.com blob URL.
+      // Without it, the citation label still gets the file path inline and the
+      // URL stays null — meaningfully better than the generic fallback.
+      const repo = typeof sourceMeta.repo_full_name === 'string' ? sourceMeta.repo_full_name : null;
+      if (repo) {
+        out['repo_full_name'] = repo;
+        out['url'] = `https://github.com/${repo}/blob/HEAD/${filePath}`;
+      }
+      return out;
+    }
+    case 'notion': {
+      // Notion page IDs are 32-char hex; accept dashed UUIDs too.
+      const m = relPath.match(/([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9-]{27,35})/i);
+      const pageId = m?.[1];
+      if (!pageId) return {};
+      return {
+        notion_page_id: pageId,
+        url: `https://www.notion.so/${pageId.replace(/-/g, '')}`,
+      };
+    }
+    default:
+      return {};
+  }
+}
+
 async function readBoundedText(
   body: ReadableStream<Uint8Array> | null,
   cap: number,
@@ -222,6 +305,17 @@ export const POST = withActiveOrg<{ sessionId: string }>(
     const syntheticArtifactId = relPath;
     const orgSubject = `org:${orgId}`;
 
+    // When the upload is tagged as a known native tool (pylon/grain/github/notion),
+    // extract provider-specific identifiers from the relative path and stamp a
+    // canonical URL. This is what lets the citation pipeline render
+    // "Pylon #8183" labels and clickable `usepylon.com` / `grain.com` /
+    // `github.com` URLs instead of generic "file · manual-upload" citations.
+    // The patterns assume the conventional folder layouts produced by the
+    // matching exporters (`tickets/<date>-ticket-<id>/...`, `grain/<id>/...`,
+    // `codebase/<repo-rooted file path>`); upload paths that don't match the
+    // patterns just skip the extraction and fall through to the generic label.
+    const providerMeta = extractProviderMetadataFromPath(chunkProvider, relPath, meta);
+
     const chunks: ChunkInsertPayload[] = pieces.map((piece: string, i: number) => ({
       kind,
       content: piece,
@@ -240,6 +334,10 @@ export const POST = withActiveOrg<{ sessionId: string }>(
         // Language is part of the github-code chunk contract — surface it so
         // retrieval / UI / future re-chunking can branch on it.
         ...(language ? { language } : {}),
+        // Provider-specific identifiers + canonical URL extracted from the
+        // upload path (see `extractProviderMetadataFromPath`). Empty for
+        // unknown / unmatched chunk providers.
+        ...providerMeta,
         // The web app's path-fn registry uses session_slug + rel_path to
         // compute the HoloFs path; embed-insert reads from metadata.
       },
