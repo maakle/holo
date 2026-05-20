@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import type {
@@ -11,6 +12,7 @@ import {
   type AgentLoopToolCall,
 } from '@holo/agent-tools';
 import { CLAIMS_SUFFIX } from '@holo/agent-tools';
+import { checkCreditPool } from '@holo/billing';
 import type { LLMClient, LLMStopReason, LLMUsage } from '@holo/llm';
 import { resolveAnthropicAgentModel } from '@holo/llm';
 
@@ -410,6 +412,22 @@ async function buildSlackSources(
 }
 
 export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
+  // Refuse new agent runs when the org is out of credits. Return a synthetic
+  // AgentResult with a clear admin-facing message instead of throwing — the
+  // handler posts the answer as-is to Slack, so the user gets a friendly
+  // "buy more credits" prompt instead of a generic error fallback.
+  const creditDecision = await checkCreditPool(deps.db, deps.organizationId);
+  if (!creditDecision.allowed) {
+    return {
+      answerId: randomUUID(),
+      answer:
+        "This workspace is out of holo credits, so I can't take new questions. " +
+        'Ask an admin to buy a top-up or upgrade the plan at /settings/billing.',
+      sources: [],
+      claims: [],
+    };
+  }
+
   // RFC-0007: same claims protocol the web chat uses. Slack can't render
   // confidence chips, so the user-visible signal is the "Note: I couldn't
   // verify N claims" footer that `appendUnverifiedNoteIfNeeded` (applied

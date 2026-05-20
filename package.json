@@ -8,6 +8,7 @@
   },
   "packageManager": "pnpm@9.12.0",
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "eslint . && node eslint-plugin-local/test/no-bare-throw-error.test.js",

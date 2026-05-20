@@ -506,6 +506,9 @@ importers:
       '@holo/db':
         specifier: workspace:*
         version: link:../db
+      '@holo/errors':
+        specifier: workspace:*
+        version: link:../errors
       '@holo/llm':
         specifier: workspace:*
         version: link:../llm

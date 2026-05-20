@@ -30,8 +30,9 @@ export function PlanSummary({
         Billing
       </h2>
       <p className="text-[15px] leading-6 text-text-muted">
-        Holo charges by usage — chat turns and ingested artifacts both burn
-        credits from your monthly grant.
+        One workspace, one shared credit pool. Each tier comes with a monthly
+        grant; buy a top-up any time to add more credits without changing
+        plans.
       </p>
 
       {checkoutFlash === 'success' ? (

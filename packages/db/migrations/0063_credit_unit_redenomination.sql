@@ -1,0 +1,26 @@
+-- Credit unit redenomination (RFC 0010 / ADR 0007).
+--
+-- Divide every credit_prices.credits_per_unit by 100 so a typical chat debits
+-- ~200 credits instead of ~20,100. Plan grants (e.g. Starter 250K) stay the
+-- same, so each grant now buys ~100× more chats — matching the figures the
+-- RFC promised the customer ("Starter pool 250K = ~1,250 chats").
+--
+-- This is a unit change, not a price change in dollars. Customer monthly
+-- bills are unchanged. The motivation is purely psychological: "20,100 credits
+-- per chat" on the activity screen makes users hesitate to ask questions;
+-- "~200 credits per chat" doesn't.
+--
+-- Effect on existing customers:
+--   - Their remaining balance is now worth ~100× more in chat terms — a
+--     modest, intentional gift to grandfathered customers. Acceptable cost
+--     because the customer base is small and the gesture is one-time.
+--   - Historical debits in `credit_ledger` keep their old (pre-divide)
+--     numbers. The activity log will show a visible step-down in per-chat
+--     cost at the cutover — which is the point of the change.
+--
+-- The pricing module (`packages/billing/src/pricing.ts`) is purely DB-driven
+-- — no code change needed. The new rates take effect on the next debit after
+-- this migration applies. Existing debits stay as written (the ledger is
+-- append-only).
+
+UPDATE "credit_prices" SET credits_per_unit = credits_per_unit / 100;

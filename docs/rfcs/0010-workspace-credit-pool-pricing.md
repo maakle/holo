@@ -159,36 +159,35 @@ The first cut of B1.2 added a `billing_plan_variants` table with Light / Heavy /
 - New `LedgerReferenceKind` value `stripe_checkout` (distinct from recurring `stripe_invoice`).
 - **Done.** UI ("Buy more credits" button) ships in W4 (new).
 
-#### B2. Credit unit redenomination migration
+#### B2. Credit unit redenomination ✅ shipped 2026-05-21
 **Area:** `area:billing` · **Estimate:** 0.5d
-- Drizzle migration `00NN_credit_unit_redenomination.sql` — multiply `org_credit_balances.pool_size`, `consumed`, and every row in `credit_ledger.amount` by 100.
-- Migration `_journal.json` entry (per `feedback_drizzle_handauthored_migrations.md` — Drizzle's runner ignores SQL not registered in the journal).
-- Update `creditUnitDollarRatio` constant in `packages/credits/src/constants.ts`.
-- **Done when:** existing test fixtures still pass with `× 100` applied; usage screens render unchanged dollar amounts.
+- Migration `0063_credit_unit_redenomination.sql` — `UPDATE credit_prices SET credits_per_unit = credits_per_unit / 100`. Pricing is purely DB-driven (`packages/billing/src/pricing.ts`), so no code change was needed.
+- Approach: keep plan grants (250K / 2M / 10M) the same and *divide rates* — a chat now debits ~200 credits instead of ~20,100, matching the RFC headline figures. Reverses the RFC's original "multiply" framing, which would have grown the displayed numbers rather than shrinking them.
+- Effect on existing customers: remaining pool balance is worth ~100× more in chat terms (modest one-time windfall). Historical ledger debits stay at their pre-divide numbers — the activity log shows a visible step-down at the cutover, which is the point.
+- **Done.**
 
-#### B3. Credit ledger category column
-**Area:** `area:billing` · **Estimate:** 0.5d
-- Add `category` enum `('sync', 'run')` to `credit_ledger`.
-- Backfill from existing debits: `sync` = anything sourced from `packages/sync-scheduler`; `run` = anything sourced from `packages/agent-tools` or `packages/chat`.
-- Update both call sites to set the category on new debits.
-- **Done when:** new debits land with non-null categories and the backfill SQL is in the migration journal.
+#### ~~B3. Credit ledger category column~~ — deferred
+B3 was scoped to enable a two-meter (sync vs run) display in W2. Since W2 is also deferred and the pool exhaustion guard in B4 doesn't distinguish categories, B3 stays parked. Revisit when W2 ships.
 
-#### B4. Pool exhaustion + read-only mode
+#### B4. Pool exhaustion guard ✅ shipped 2026-05-21
 **Area:** `area:billing` · **Estimate:** 1d
-- Middleware in `apps/api/src/middleware/credit-guard.ts` that returns `HOLO_CREDIT_POOL_EXHAUSTED` on any `category='run'` write when the pool is at zero.
-- `category='sync'` pauses sync scheduler runs with the same error.
-- Dashboard reads remain allowed.
-- **Done when:** integration test in `packages/credits/test/exhaustion.test.ts` covers both paths.
+- `assertSufficientCredits(db, orgId)` and `checkCreditPool(db, orgId)` in `packages/billing/src/limits.ts`. New `ErrorCode.HOLO_CREDIT_POOL_EXHAUSTED` in `packages/errors/src/codes.ts`.
+- Gated at three entry points:
+  - `apps/web/src/app/api/chat/route.ts` — throws → 402 response with the fix message in the body.
+  - `apps/worker/src/slack-bot/agent.ts::runAgent` — returns a synthetic `AgentResult` with an admin-facing "buy more credits" message. **All three bot platforms (Slack / Teams / Google Chat) inherit this** because they share `makeDefaultAgentRunner` → `runAgent` (so D1 is covered here for free).
+  - `apps/worker/src/queues/sync-processor-base.ts` — short-circuits with `skipReason: 'credit_pool_exhausted'` before `startSyncRun` writes anything.
+- 9 unit tests in `packages/billing/test/exhaustion.test.ts` cover allowed / blocked / negative-balance / billing-disabled paths for both functions.
+- Existing in-flight operations aren't preempted; only the *next* attempt is blocked. Final debits may push balance briefly negative — intentional (we don't refund LLM providers for partial work).
+- **Done.**
 
 ### Web app — billing UI
 
-#### W1. New tier picker page
-**Area:** `area:web` · **Estimate:** 1d
-- Rewrite `apps/web/app/settings/billing/page.tsx` with the 4-tier card layout per the table above.
-- Annual / monthly toggle.
-- "Talk to sales" CTA on Business + Enterprise.
-- Match `DESIGN.md` tokens; no ad-hoc hex or radius values.
-- **Done when:** `/settings/billing` renders all four tiers and the upgrade CTA hits the new Stripe products from B1.1.
+#### W1. Tier picker copy + "Most popular" badge ✅ shipped 2026-05-21
+**Area:** `area:web` · **Estimate:** 0.5d
+- The plan-grid was already dynamic — it pulled rows from `billing_plans where is_public = true` and rendered prices/credits straight from the DB, so the new $99 / $499 / $1,999 ladder landed on the page the moment B1.1's migration applied. No layout rewrite needed.
+- Touch-ups: updated `PlanSummary` tagline to describe the new pool + top-up model. Added a "Most popular" badge to the Team tier in `PlanGrid` (highest-converting tier on this ladder; one of the three accent-color uses allowed per `DESIGN.md`).
+- **Deferred:** annual / monthly toggle. That needs new Stripe Prices (`-annual` lookup_key) per tier + provisioning updates + checkout-flow changes — full B1.x-sized work; not worth it until we see customers asking for it.
+- **Done.**
 
 #### W4. "Buy more credits" top-up UI
 **Area:** `area:web` · **Estimate:** 0.5d
@@ -213,11 +212,11 @@ The first cut of B1.2 added a `billing_plan_variants` table with Light / Heavy /
 
 ### Bot destinations
 
-#### D1. Pool-exhausted + trial-expired bot responses
+#### D1. Pool-exhausted bot responses ✅ shipped 2026-05-21 (via B4)
 **Area:** `area:connectors` · **Estimate:** 0.5d each (Slack / Teams / Google Chat = 1.5d total)
-- All three bot destinations check `credit-guard` before responding to a new message.
-- If exhausted/expired: post the templated message with an admin CTA link to `/settings/billing`.
-- **Done when:** unit tests in `packages/connectors/test/{slack,teams,googleChat}-bot-states.test.ts` cover both states.
+- All three bot destinations route through `makeDefaultAgentRunner` → `apps/worker/src/slack-bot/agent.ts::runAgent`. The pool-exhausted guard added in B4 lives at that single chokepoint, so Slack / Teams / Google Chat all surface the same admin-facing "out of credits, buy a top-up at /settings/billing" message without per-platform code.
+- **Trial-expired** branch deferred until W3 ships the trial mechanic.
+- **Done.**
 
 #### D2. Reachable-headcount detection
 **Area:** `area:connectors` · **Estimate:** 1d
@@ -272,3 +271,4 @@ The first cut of B1.2 added a `billing_plan_variants` table with Light / Heavy /
 | 2026-05-20 | Initial draft. Move from per-seat-ish tiered pricing ($20–$200) to workspace credit-pool model (Free trial / $99 / $499 / $1,999 / custom) | Current pricing leaves 5–50× ARR on the table at scale; trial is unusable (one chat exhausts free tier); per-seat shape doesn't match the bot deployment model |
 | 2026-05-20 | All 7 open questions resolved; status moved to Accepted; ADR 0007 cut | Walked through each tradeoff in session; recommendations held up under second-look |
 | 2026-05-20 | Replaced pool-size variants with one-shot credit top-ups (B1.3 supersedes B1.2) | Variants over-built for stage: 9 Stripe SKUs + forced customer commitment + schema/UI fan-out across 5 tickets. Top-ups ship in hours, are reversible, and the upgrade story still works via top-up-fatigue driving tier upgrades. Revisit variants once usage data justifies. |
+| 2026-05-21 | B2, B4, W1, D1 all shipped. Mid-month upgrade grants now scoped to `invoice.billing_reason ∈ {subscription_create, subscription_cycle}` (Option B) so customers can't double-dip on credits when changing tiers mid-cycle | Browser-visible work done; pool-exhausted state is the load-bearing remaining safety; D1 fell out for free because all three bot platforms share `runAgent`; W1 stayed light (existing grid was already dynamic). B3 + W2 + W3 + D2 + D3 + M1 + M2 + T1 + T2 remain on the backlog as polish. |

@@ -13,6 +13,7 @@ interface Props {
 
 const SLUG_ORDER = ['free', 'starter', 'team', 'business'];
 const PURCHASABLE = new Set(['starter', 'team', 'business']);
+const POPULAR_SLUG = 'team';
 
 function formatCredits(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
@@ -85,6 +86,10 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
                 {isCurrent ? (
                   <span className="inline-flex items-center rounded-sm bg-surface-2 px-2 py-0.5 text-[11px] uppercase tracking-[0.06em] text-text-muted">
                     Current
+                  </span>
+                ) : plan.slug === POPULAR_SLUG ? (
+                  <span className="inline-flex items-center rounded-sm bg-accent/10 px-2 py-0.5 text-[11px] uppercase tracking-[0.06em] text-accent">
+                    Most popular
                   </span>
                 ) : null}
               </div>

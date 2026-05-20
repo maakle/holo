@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+# Repo-managed pre-commit hook. Enabled via `core.hooksPath` set by the
+# root `prepare` script in package.json — runs on every `pnpm install`.
+#
+# Add new checks here. Keep them fast: anything slower than ~1s belongs
+# in CI, not pre-commit.
+
+if git diff --cached --name-only --diff-filter=ACMR | grep -q '^packages/db/migrations/'; then
+  echo "→ packages/db/migrations changed — running pnpm db:check"
+  pnpm -F @holo/db check || {
+    echo
+    echo "✗ Migration meta check failed. See packages/db/scripts/check-migrations.ts"
+    echo "  and CONTRIBUTING.md § 'Adding a migration' for the recipe."
+    exit 1
+  }
+fi

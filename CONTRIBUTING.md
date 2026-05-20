@@ -47,6 +47,35 @@ pnpm dev
 - **Tests for new behavior.** Unit for pure logic, integration for anything touching DB or queues.
 - **PR description must include:** what, why, how to test, screenshots if UI.
 
+## Adding a migration
+
+**Always start from `pnpm db:generate`.** Do not hand-author the `.sql`, `_journal.json`, or `meta/*_snapshot.json` files from scratch — drizzle-kit produces all three atomically and getting one out of step silently breaks future migrations.
+
+The recipe:
+
+1. Edit `packages/db/src/schema/*.ts` to reflect the desired schema.
+2. Run `pnpm db:generate`. This produces:
+   - `packages/db/migrations/<NNNN>_<tag>.sql` — the diff SQL
+   - A new entry appended to `packages/db/migrations/meta/_journal.json`
+   - `packages/db/migrations/meta/<idx>_snapshot.json` — the baseline drizzle will diff against for the *next* migration
+3. Hand-edit the generated `.sql` if you need things drizzle can't express (seeds, custom indexes, `IF NOT EXISTS` wrappers around drizzle's `CREATE`s for idempotency). Do **not** edit the snapshot — it must match the schema TS exactly.
+4. Run `pnpm db:check` locally. The repo-managed pre-commit hook (`.githooks/pre-commit`) also runs this whenever `packages/db/migrations/**` is touched; enable it via `pnpm install` once per clone (`prepare` script sets `core.hooksPath`).
+5. Commit the `.sql`, `_journal.json`, and the new snapshot together.
+
+**Naming convention (footgun).** Three numbers refer to the same migration and they don't line up:
+
+| Surface | Example | Source |
+|---|---|---|
+| SQL filename | `0062_credit_topup_packages.sql` | drizzle's per-migration counter (1-indexed in this repo by historical accident) |
+| Journal `idx` | `61` | 0-indexed position in `_journal.json.entries` |
+| Snapshot filename | `meta/0061_snapshot.json` | matches `idx`, zero-padded — **not** the tag prefix |
+
+For tag `0062_*`, the snapshot is `0061_snapshot.json`. Always one less than the tag prefix. `pnpm db:generate` names it correctly — you only need to know this if you're hand-recovering a missing snapshot (rare; see the "If you skipped `db:generate`" note below).
+
+**If two PRs grab the same number.** Bump yours rather than introducing a `b` suffix. The `0011b_*` / `0014b_*` style is grandfathered but warned-on by `pnpm db:check`.
+
+**If you skipped `db:generate` and only have the `.sql`.** Run `pnpm db:generate` anyway — it will produce a spurious follow-up migration based on schema vs. last snapshot. Delete that `.sql`, revert the journal entry it added, and rename the new `meta/<n>_snapshot.json` to match the actual latest `idx`. (Or: just don't get into this state — step 1 of the recipe exists for a reason.)
+
 ## Adding a connector
 
 The most common contribution path. Shape:

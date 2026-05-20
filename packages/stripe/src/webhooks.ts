@@ -238,6 +238,20 @@ async function onInvoicePaid(db: DB, invoice: StripeInvoice): Promise<void> {
   if (!organizationId) return;
 
   await applySubscriptionState(db, organizationId, subscription);
+
+  // Grant the period's credits ONLY for first-payment + true monthly renewals.
+  // Mid-period upgrades fire `invoice.payment_succeeded` with
+  // `billing_reason: 'subscription_update'` for the prorated upgrade fee —
+  // those shouldn't trigger a fresh full-month grant, because the customer's
+  // billing period anchor didn't move. Idempotency key is the Stripe invoice
+  // id, so each invoice = exactly one grant attempt across all retries.
+  if (
+    invoice.billing_reason !== 'subscription_create' &&
+    invoice.billing_reason !== 'subscription_cycle'
+  ) {
+    return;
+  }
+  await issueMonthlyGrantForInvoice(db, organizationId, subscription, invoice);
 }
 
 async function onInvoiceFailed(db: DB, invoice: StripeInvoice): Promise<void> {
@@ -309,29 +323,55 @@ async function applySubscriptionState(
       updatedAt: new Date(),
     })
     .where(eq(organizationSubscriptions.organizationId, organizationId));
+}
 
-  // Issue the period's grant. The idempotency key includes the period start
-  // so each billing cycle gets exactly one grant even if multiple webhooks
-  // converge (e.g. `subscription.updated` + `invoice.payment_succeeded`).
-  if (
-    Number(plan.monthlyCredits) > 0 &&
-    (status === 'active' || status === 'trialing')
-  ) {
-    await writeLedgerEntry(db, {
-      organizationId,
-      kind: 'grant',
-      credits: Number(plan.monthlyCredits),
-      reason: 'monthly_grant',
-      referenceKind: 'stripe_invoice',
-      referenceId: subscription.id,
-      idempotencyKey: `grant:${organizationId}:${periodStart.toISOString()}`,
-      metadata: {
-        plan_slug: plan.slug,
-        period_start: periodStart.toISOString(),
-        stripe_subscription_id: subscription.id,
-      },
-    });
-  }
+/**
+ * Write the monthly credit grant tied to a specific Stripe invoice. Called
+ * only from `onInvoicePaid` for `billing_reason ∈ {subscription_create,
+ * subscription_cycle}` — mid-period upgrades (which fire with
+ * `subscription_update`) are skipped so customers don't double-dip on
+ * credits when changing tiers mid-cycle.
+ *
+ * Idempotency key = the Stripe invoice id, so each invoice triggers at most
+ * one grant across all webhook retries.
+ */
+async function issueMonthlyGrantForInvoice(
+  db: DB,
+  organizationId: string,
+  subscription: StripeSubscription,
+  invoice: StripeInvoice,
+): Promise<void> {
+  const planSlug = subscription.metadata?.plan_slug as string | undefined;
+  if (!planSlug) return;
+
+  const planRows = await db
+    .select()
+    .from(billingPlans)
+    .where(eq(billingPlans.slug, planSlug))
+    .limit(1);
+  const plan = planRows[0];
+  if (!plan) return;
+  if (Number(plan.monthlyCredits) <= 0) return;
+
+  const item = subscription.items.data[0];
+  const periodStart = item ? stripeTimestampToDate(item.current_period_start) : new Date();
+
+  await writeLedgerEntry(db, {
+    organizationId,
+    kind: 'grant',
+    credits: Number(plan.monthlyCredits),
+    reason: 'monthly_grant',
+    referenceKind: 'stripe_invoice',
+    referenceId: invoice.id ?? subscription.id,
+    idempotencyKey: `grant:invoice:${invoice.id ?? subscription.id}`,
+    metadata: {
+      plan_slug: plan.slug,
+      period_start: periodStart.toISOString(),
+      stripe_subscription_id: subscription.id,
+      stripe_invoice_id: invoice.id,
+      billing_reason: invoice.billing_reason,
+    },
+  });
 }
 
 async function readSubscriptionMetadata(

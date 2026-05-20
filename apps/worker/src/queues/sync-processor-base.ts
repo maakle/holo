@@ -4,7 +4,7 @@ import type { Job } from 'bullmq';
 import postgres, { type Sql } from 'postgres';
 import { createDb, type DB } from '@holo/db';
 import { recordAgentEvent } from '@holo/audit';
-import { debitConnectorSync } from '@holo/billing';
+import { debitConnectorSync, checkCreditPool } from '@holo/billing';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getWorkerPosthog } from '../posthog';
 import { runSyncJob, type SyncResult } from './sync-dispatch';
@@ -102,6 +102,19 @@ export abstract class SyncProcessorBase extends WorkerHost {
     const sql = getSql();
     const startedAtMs = Date.now();
     const provider = providerForQueue(this.queueName);
+
+    // Refuse new sync runs when the org is out of credits. Return early with
+    // a `credit_pool_exhausted` skipReason so the dashboard surfaces "paused
+    // — buy more credits" rather than "failed". Existing in-flight runs
+    // aren't interrupted (BullMQ doesn't preempt running jobs).
+    const db = getDb();
+    const creditDecision = await checkCreditPool(db, job.data.organizationId);
+    if (!creditDecision.allowed) {
+      this.logger.log(
+        `skipping ${ctx}: org credit pool exhausted (balance=${creditDecision.balance}) — buy a top-up at /settings/billing`,
+      );
+      return { artifactCount: 0, newCursor: null, skipReason: 'credit_pool_exhausted' };
+    }
     // Best-effort run-history write. If the insert itself blows up (DB down,
     // FK violation against a deleted source), we'd rather still attempt the
     // sync than refuse to start — the BullMQ history is the fallback.

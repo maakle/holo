@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { VercelAILLMClient, type LLMMessage } from '@holo/llm';
 import { getSubjectsForUser } from '@holo/user-subjects';
-import { debitLlmUsage } from '@holo/billing';
+import { debitLlmUsage, assertSufficientCredits } from '@holo/billing';
 import {
   runChatAgentLoop,
   type ChatAgentEvent,
@@ -95,7 +95,9 @@ function errorResponse(e: HoloError): Response {
         ? 400
         : e.code === 'HOLO_ENV_INVALID'
           ? 503
-          : 400;
+          : e.code === 'HOLO_CREDIT_POOL_EXHAUSTED'
+            ? 402
+            : 400;
   return new Response(JSON.stringify(e.toJSON()), {
     status,
     headers: { 'content-type': 'application/json' },
@@ -141,6 +143,13 @@ export async function POST(req: Request) {
 
     const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
+
+    // Refuse new agent runs when the org is out of credits. Existing in-flight
+    // streams are unaffected (this only gates the *next* run); their final
+    // debit may push the balance briefly negative, which is intentional —
+    // we don't refund the LLM provider for partial work.
+    await assertSufficientCredits(db, orgId);
+
     const conversationId = await attachUserTurnToConversation({
       db,
       organizationId: orgId,

@@ -25,7 +25,13 @@ export {
   type PlanRow,
   type SubscriptionWithPlan,
 } from './plans';
-export { canAddConnector, type ConnectorGateDecision } from './limits';
+export {
+  canAddConnector,
+  checkCreditPool,
+  assertSufficientCredits,
+  type ConnectorGateDecision,
+  type CreditPoolDecision,
+} from './limits';
 export {
   seedInitialSubscriptionAndGrant,
   processExpiredPeriods,

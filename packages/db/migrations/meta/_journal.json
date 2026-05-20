@@ -435,6 +435,13 @@
       "when": 1781395200000,
       "tag": "0062_credit_topup_packages",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1781481600000,
+      "tag": "0063_credit_unit_redenomination",
+      "breakpoints": true
     }
   ]
 }
