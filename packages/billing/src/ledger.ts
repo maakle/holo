@@ -203,7 +203,7 @@ export async function getCurrentPeriodUsage(
         FROM credit_ledger
         WHERE organization_id = ${organizationId}
           AND kind = 'debit'
-          AND created_at >= ${periodStart}
+          AND created_at >= ${periodStart.toISOString()}
         GROUP BY reason`,
   );
   const list = (rows as { rows?: unknown[] }).rows ?? (rows as unknown[]);

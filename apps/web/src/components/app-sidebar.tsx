@@ -173,7 +173,7 @@ function MainPanel({
     <div
       className="flex w-1/2 shrink-0 flex-col"
       aria-hidden={inert}
-      {...(inert ? { inert: '' as unknown as boolean } : {})}
+      inert={inert}
     >
       <div className="px-2 pt-3 pb-2">
         <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
@@ -237,7 +237,7 @@ function SettingsPanel({
     <div
       className="flex w-1/2 shrink-0 flex-col"
       aria-hidden={inert}
-      {...(inert ? { inert: '' as unknown as boolean } : {})}
+      inert={inert}
     >
       <div className="px-2 pt-3 pb-2">
         <Link

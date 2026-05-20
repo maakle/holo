@@ -29,6 +29,7 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
   const ordered = [...plans].sort(
     (a, b) => SLUG_ORDER.indexOf(a.slug) - SLUG_ORDER.indexOf(b.slug),
   );
+  const currentIndex = currentSlug ? SLUG_ORDER.indexOf(currentSlug) : -1;
   const [busy, setBusy] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -61,7 +62,7 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
   return (
     <section className="space-y-3">
       <h3 className="text-[15px] font-medium text-text">Plans</h3>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
         {ordered.map((plan) => {
           const isCurrent = currentSlug === plan.slug;
           const isHighlight = highlightSlug === plan.slug;
@@ -95,7 +96,7 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
                   </span>
                 ) : null}
               </div>
-              <ul className="mt-5 space-y-2 text-[13px] text-text-muted">
+              <ul className="mt-5 mb-6 space-y-2 text-[13px] text-text-muted">
                 <li className="flex gap-2">
                   <Check className="h-4 w-4 shrink-0 text-text-subtle" aria-hidden />
                   <span>
@@ -122,7 +123,7 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
                 <button
                   type="button"
                   disabled
-                  className="mt-6 w-full rounded-md border border-border bg-surface px-3 py-2 text-[13px] text-text-muted opacity-60"
+                  className="mt-auto w-full rounded-md border border-border bg-surface px-3 py-2 text-[13px] text-text-muted opacity-60"
                 >
                   Current plan
                 </button>
@@ -132,21 +133,25 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
                   onClick={() => startCheckout(plan.slug)}
                   disabled={busy !== null}
                   className={[
-                    'mt-6 w-full rounded-md px-3 py-2 text-[13px] font-medium transition-opacity',
+                    'mt-auto w-full rounded-md px-3 py-2 text-[13px] font-medium transition-opacity',
                     isHighlight
                       ? 'bg-accent text-accent-fg hover:opacity-90'
                       : 'border border-border bg-surface text-text hover:bg-surface-2',
                     busy === plan.slug ? 'opacity-70' : '',
                   ].join(' ')}
                 >
-                  {busy === plan.slug ? 'Opening Stripe…' : `Upgrade to ${plan.name}`}
+                  {busy === plan.slug
+                    ? 'Opening Stripe…'
+                    : currentIndex >= 0 && SLUG_ORDER.indexOf(plan.slug) < currentIndex
+                      ? `Downgrade to ${plan.name}`
+                      : `Upgrade to ${plan.name}`}
                 </button>
               ) : (
                 <button
                   type="button"
                   disabled
                   title="Contact us for Enterprise."
-                  className="mt-6 w-full rounded-md border border-border bg-surface px-3 py-2 text-[13px] text-text-muted opacity-60"
+                  className="mt-auto w-full rounded-md border border-border bg-surface px-3 py-2 text-[13px] text-text-muted opacity-60"
                 >
                   {plan.slug === 'free' ? 'Free tier' : 'Contact sales'}
                 </button>

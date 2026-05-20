@@ -91,7 +91,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <AppSidebar {...sidebarProps} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppTopbar leading={<MobileNav {...sidebarProps} />} />
-        <main className="min-h-0 flex-1 overflow-y-auto px-6 lg:px-10">
+        <main className="min-h-0 flex-1 overflow-y-auto px-6 lg:px-10 [scrollbar-gutter:stable]">
           <div className="mx-auto w-full max-w-[1280px] py-8 lg:py-10 [&:has([data-fullwidth])]:max-w-none [&:has([data-fullheight])]:flex [&:has([data-fullheight])]:h-full [&:has([data-fullheight])]:flex-col">{children}</div>
         </main>
       </div>
