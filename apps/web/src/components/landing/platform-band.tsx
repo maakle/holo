@@ -1,4 +1,5 @@
 import { Plus, Search, ShieldCheck, Terminal, Zap } from 'lucide-react';
+import { TrackInView } from '@/components/landing/track-in-view';
 
 type SearchHit = {
   source: string;
@@ -185,6 +186,7 @@ const PILLARS = [
 export function PlatformBand() {
   return (
     <section id="platform" className="border-b border-border">
+      <TrackInView section="platform" />
       <div className="mx-auto max-w-[1280px] px-8 py-24">
         <div className="mb-12 max-w-[540px]">
           <p className="caption text-text-subtle">The holo platform</p>

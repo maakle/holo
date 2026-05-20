@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Cloud, Lock, Minus, PackageOpen, Plus, ScrollText, Shield } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { TrackInView } from '@/components/landing/track-in-view';
 
 type Tab = {
   id: string;
@@ -67,6 +68,7 @@ export function SecurityBand() {
   const SelIcon = sel.Icon;
   return (
     <section id="security" className="border-b border-border">
+      <TrackInView section="security" />
       <div className="mx-auto max-w-[1280px] px-8 py-24">
         <div className="mb-12 max-w-[540px]">
           <p className="caption text-text-subtle">Enterprise ready</p>

@@ -1,9 +1,9 @@
-import Link from 'next/link';
 import Image from 'next/image';
 import { Activity, Plug, Star } from 'lucide-react';
 import { InstallPill } from '@/components/install-pill';
 import { ConnectorLogo } from '@/components/connector-logo';
 import { GithubMark } from '@/components/landing/brand-marks';
+import { TrackedLink } from '@/components/landing/tracked-link';
 import type { ConnectorMeta } from '@/lib/connector-registry';
 
 const GITHUB_URL = 'https://github.com/maakle/holo';
@@ -223,22 +223,28 @@ export function LandingHero({
             </span>
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link
+            <TrackedLink
               href={isAuthed ? '/dashboard' : '/sign-in'}
+              event="cta"
+              location="hero"
+              isAuthed={isAuthed}
               className="inline-flex h-11 items-center justify-center rounded-full bg-accent px-6 text-[14px] font-medium text-accent-fg transition-opacity hover:opacity-90"
             >
               {isAuthed ? 'Open dashboard' : 'Get started'}
-            </Link>
-            <a
+            </TrackedLink>
+            <TrackedLink
               href={GITHUB_URL}
+              external
+              event="github"
+              location="hero"
               className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-surface px-6 text-[14px] font-medium text-text transition-colors hover:border-border-strong"
             >
               <GithubMark className="h-4 w-4" />
               View on GitHub
-            </a>
+            </TrackedLink>
           </div>
           <div className="mt-7 flex flex-wrap items-center gap-4">
-            <InstallPill command={installCommand} />
+            <InstallPill command={installCommand} trackLocation="hero" />
             <span className="text-[12px] text-text-subtle">
               localhost:3000 in 60 seconds
             </span>

@@ -1,5 +1,6 @@
 import { Activity, Bot, MousePointer2, Rewind, SearchX, Siren, Sparkles, Workflow } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { TrackInView } from '@/components/landing/track-in-view';
 
 type ObsItem = {
   Icon: LucideIcon;
@@ -73,6 +74,7 @@ const FILTERS = [
 export function ObservabilityBand() {
   return (
     <section className="border-b border-border">
+      <TrackInView section="observability" />
       <div className="mx-auto max-w-[1280px] px-8 py-24">
         <div className="grid items-start gap-14 lg:grid-cols-[1fr_1.2fr]">
           <div className="lg:sticky lg:top-24 lg:self-start">

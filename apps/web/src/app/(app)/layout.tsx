@@ -7,6 +7,7 @@ import { getServerContext } from '@/lib/server-context';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppTopbar } from '@/components/app-topbar';
 import { MobileNav } from '@/components/mobile-nav';
+import { PostHogIdentify } from '@/components/posthog-identify';
 import { isEnterpriseEnabled } from '@/lib/ee/license';
 
 export const dynamic = 'force-dynamic';
@@ -54,6 +55,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   }
 
   const activeOrgId = sessionActive!;
+  const activeOrg = memberOrgs.find((o) => o.id === activeOrgId)!;
 
   const sampleSourceRows = await db
     .select({ id: schema.sources.id })
@@ -78,6 +80,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen bg-bg text-text">
+      <PostHogIdentify
+        userId={session.user.id}
+        email={session.user.email}
+        name={session.user.name ?? null}
+        orgId={activeOrg.id}
+        orgName={activeOrg.name}
+        orgSlug={activeOrg.slug}
+      />
       <AppSidebar {...sidebarProps} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppTopbar leading={<MobileNav {...sidebarProps} />} />

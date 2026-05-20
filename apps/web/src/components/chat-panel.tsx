@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Markdown } from '@/components/ui/markdown';
+import { trackEvent } from '@/lib/posthog/events';
 
 interface ToolCallTrace {
   id: string;
@@ -138,6 +139,10 @@ export function ChatPanel({
       toast.error('ANTHROPIC_API_KEY is not configured on the server.');
       return;
     }
+    trackEvent('chat_message_sent', {
+      messageLength: question.trim().length,
+      hasAttachments: false,
+    });
     const userTurn: ChatTurn = {
       id: crypto.randomUUID(),
       role: 'user',

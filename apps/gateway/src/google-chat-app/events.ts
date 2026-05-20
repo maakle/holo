@@ -8,6 +8,7 @@ import {
 } from '@holo/connectors';
 import { tryClaimGoogleChatEvent } from './dedupe.js';
 import { enqueueGoogleChatBotJob } from './queue.js';
+import type { Posthog } from '../posthog.js';
 import { logger } from '../logger.js';
 
 // Same convention as the Slack handlers — handlers don't read gateway
@@ -31,6 +32,7 @@ interface MountGoogleChatEventsOptions {
    * URL and just nudges the asker to talk to their admin.
    */
   webPublicUrl: string | undefined;
+  posthog?: Posthog;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -265,6 +267,14 @@ async function handleGoogleChatEvent(
         'google-chat-app events: unknown space type, ack',
       );
     }
+    opts.posthog?.capture({
+      distinctId: `gchat:${asker || spaceName}`,
+      event: 'google_chat_app_messaged',
+      groups: { organization: resolved.organizationId },
+      properties: {
+        space_type: envelope.space.type,
+      },
+    });
   } catch (err) {
     logger.error(
       { err },

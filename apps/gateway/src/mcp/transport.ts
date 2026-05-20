@@ -11,6 +11,7 @@ import { listTools, type ToolContext } from './registry.js';
 import { checkToolAllowed } from '../middleware/allowlist.js';
 import type { McpSessionVars } from '../middleware/session.js';
 import { logger } from '../logger.js';
+import type { Posthog } from '../posthog.js';
 
 function logEvent(
   ctx: ToolContext,
@@ -43,6 +44,7 @@ export interface MountMcpOpts {
     c: Context<{ Variables: McpSessionVars }>,
     next: Next,
   ) => Promise<void | Response>;
+  posthog?: Posthog;
 }
 
 const SESSION_IDLE_MS = 30 * 60 * 1000; // 30 minutes
@@ -55,7 +57,7 @@ interface SessionEntry {
 
 const sessions = new Map<string, SessionEntry>();
 
-function buildServer(getCtx: () => ToolContext): Server {
+function buildServer(getCtx: () => ToolContext, posthog?: Posthog): Server {
   const server = new Server(
     { name: 'holo-mcp', version: '0.1.0' },
     { capabilities: { tools: { listChanged: false } } },
@@ -117,6 +119,18 @@ function buildServer(getCtx: () => ToolContext): Server {
         errorCode,
         latencyMs,
       });
+      posthog?.capture({
+        distinctId: ctx.userId ?? `org:${ctx.organizationId}`,
+        event: 'mcp_tool_invoked',
+        groups: { organization: ctx.organizationId },
+        properties: {
+          tool_name: req.params.name,
+          ok: false,
+          error_code: errorCode,
+          latency_ms: latencyMs,
+          agent_identity: ctx.agentIdentity ?? null,
+        },
+      });
       throw err;
     };
 
@@ -172,6 +186,17 @@ function buildServer(getCtx: () => ToolContext): Server {
         outputJson: result as Record<string, unknown>,
         latencyMs,
       });
+      posthog?.capture({
+        distinctId: ctx.userId ?? `org:${ctx.organizationId}`,
+        event: 'mcp_tool_invoked',
+        groups: { organization: ctx.organizationId },
+        properties: {
+          tool_name: req.params.name,
+          ok: true,
+          latency_ms: latencyMs,
+          agent_identity: ctx.agentIdentity ?? null,
+        },
+      });
       return { content: [{ type: 'text', text: JSON.stringify(result) }] };
     } catch (err) {
       return logFailure(err);
@@ -221,12 +246,21 @@ export function mountMcp(app: Hono<{ Variables: McpSessionVars }>, opts: MountMc
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sid) => {
           sessions.set(sid, { transport: created, ctxRef, lastUsed: Date.now() });
+          opts.posthog?.capture({
+            distinctId:
+              ctxRef.current.userId ?? `org:${ctxRef.current.organizationId}`,
+            event: 'mcp_session_started',
+            groups: { organization: ctxRef.current.organizationId },
+            properties: {
+              agent_identity: ctxRef.current.agentIdentity ?? null,
+            },
+          });
         },
       });
       created.onclose = () => {
         if (created.sessionId) sessions.delete(created.sessionId);
       };
-      const server = buildServer(() => ctxRef.current);
+      const server = buildServer(() => ctxRef.current, opts.posthog);
       await server.connect(created);
       transport = created;
     }

@@ -4,6 +4,7 @@ import { schema, type DB } from '@holo/db';
 import { verifyTeamsJwt, type TeamsActivity } from '@holo/connectors';
 import { tryClaimTeamsActivity } from './dedupe.js';
 import { enqueueTeamsBotJob } from './queue.js';
+import type { Posthog } from '../posthog.js';
 import { logger } from '../logger.js';
 
 // Handlers don't read gateway session vars, so accept the full app and
@@ -22,6 +23,7 @@ interface MountTeamsBotMessagesOptions {
    */
   sharedAppId: string | undefined;
   redisUrl: string;
+  posthog?: Posthog;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -211,6 +213,15 @@ async function routeMessageActivity(
         'teams-bot messages: unknown conversation type, ack',
       );
     }
+    opts.posthog?.capture({
+      distinctId: `teams:${asker || tenantId}`,
+      event: 'teams_bot_messaged',
+      properties: {
+        tenant_id: tenantId,
+        conversation_type: conversationType,
+        custom_app: ctx.teamsAppConfigId !== null,
+      },
+    });
   } catch (err) {
     // Never let an enqueue failure cause a Microsoft retry storm. Log
     // and ack; alerting on dropped events lands in a follow-up.

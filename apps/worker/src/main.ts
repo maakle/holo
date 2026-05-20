@@ -8,6 +8,7 @@ import { holoError, ErrorCode } from '@holo/errors';
 import { AppModule } from './app.module';
 import { setEmbedderClient } from './queues/embed';
 import { setBackfillEmbedderClient } from './queues/embed-backfill';
+import { getWorkerPosthog } from './posthog';
 import type { EmbedderClient } from './queues/embed-runner';
 import type { EmbeddingModel } from './queues/embed-insert';
 
@@ -64,6 +65,22 @@ async function bootstrap() {
   });
   app.useLogger(app.get(Logger));
   console.log('apps/worker started; heartbeat scheduled every 60s');
+
+  // Flush queued PostHog events before exit. No-op when PostHog isn't
+  // configured.
+  const shutdown = async (signal: string) => {
+    console.log(`worker shutting down (${signal})`);
+    try {
+      await getWorkerPosthog().shutdown();
+    } catch (err) {
+      console.error('posthog shutdown failed', err);
+    }
+    await app.close();
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+
   await new Promise(() => {});
 }
 

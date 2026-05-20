@@ -3,7 +3,7 @@ export const metadata = {
   description: 'The terms governing use of the holo managed service at holobase.dev.',
 };
 
-const LAST_UPDATED = 'May 18, 2026';
+const LAST_UPDATED = 'May 20, 2026';
 const CONTACT_EMAIL = 'support@holobase.dev';
 
 export default function TermsPage() {
@@ -74,6 +74,15 @@ export default function TermsPage() {
         Holo connects to third-party tools at your direction and forwards
         retrieved context to the LLM providers your agents use. Your use of
         those services remains governed by their own terms.
+      </Section>
+
+      <Section title="Usage analytics">
+        On the managed holobase.dev service we collect first-party product
+        analytics through PostHog (EU region) to understand and improve the
+        product. We do not enable session replay, and we do not send the
+        content of your messages, queries, or indexed sources. See the
+        Privacy Policy for details. Self-hosted deployments do not use any
+        analytics unless the operator explicitly configures them.
       </Section>
 
       <Section title="Data processing addendum">

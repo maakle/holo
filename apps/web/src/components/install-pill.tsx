@@ -3,13 +3,15 @@
 import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { trackEvent, type LandingLocation } from '@/lib/posthog/events';
 
 type Props = {
   command: string;
   className?: string;
+  trackLocation?: LandingLocation;
 };
 
-export function InstallPill({ command, className }: Props) {
+export function InstallPill({ command, className, trackLocation }: Props) {
   const [copied, setCopied] = useState(false);
 
   async function onCopy() {
@@ -17,6 +19,9 @@ export function InstallPill({ command, className }: Props) {
       await navigator.clipboard.writeText(command);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
+      if (trackLocation) {
+        trackEvent('landing_install_copy', { location: trackLocation });
+      }
     } catch {
       // Clipboard may be unavailable in non-secure contexts; fall back silently.
     }
