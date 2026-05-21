@@ -105,19 +105,6 @@ const EnvSchema = z.object({
    */
   HOLO_CHAT_WALL_CLOCK_MS: z.coerce.number().int().min(5_000).default(110_000),
   /**
-   * Closed-beta signup gate. When `true`, new users (first OAuth login or
-   * first email-OTP verification) must have their email in the
-   * `allowed_signup_emails` table or signup is rejected with
-   * `HOLO_AUTH_NOT_ALLOWLISTED`. Off by default so self-hosters get open
-   * signup; the hosted holobase.dev deployment flips this on while in
-   * private beta. Existing users (with an `account` row) are never
-   * affected — only first-time signups are checked.
-   */
-  HOLO_SIGNUP_ALLOWLIST_ENABLED: z
-    .enum(['true', 'false'])
-    .default('false')
-    .transform((v) => v === 'true'),
-  /**
    * Shared Holo Microsoft Teams bot — Microsoft App ID (GUID) from the
    * Azure AD app registration. Used as both the JWT audience for inbound
    * verification on the shared `/teams-bot/messages` route AND the

@@ -456,6 +456,13 @@
       "when": 1781654400000,
       "tag": "0065_redenominate_credits_small_unit",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1781740800000,
+      "tag": "0066_drop_allowed_signup_emails",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,6 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { authClient, signIn } from '@holo/auth/client';
 import { Button } from '@/components/ui/button';
-import { BetaAccessDialog } from '@/components/beta-access-dialog';
 
 // Validate ?callbackURL=… to a same-origin relative path. Rejects absolute
 // URLs (open-redirect) and schemeless protocol-relative URLs ("//evil.com").
@@ -13,18 +12,6 @@ function safeCallbackURL(raw: string | null): string {
   if (!raw.startsWith('/')) return '/dashboard';
   if (raw.startsWith('//')) return '/dashboard';
   return raw;
-}
-
-// Closed-beta signup gate (server: HOLO_SIGNUP_ALLOWLIST_ENABLED). Better
-// Auth surfaces the rejection three ways:
-//   1. `error.message` from `sendVerificationOtp` (blocked at OTP request via
-//      the top-level hooks.before middleware)
-//   2. `error.message` from `signIn.emailOtp` (blocked at user.create.before
-//      during verify, if the OTP request slipped through)
-//   3. `?error=HOLO_AUTH_NOT_ALLOWLISTED` on the OAuth callback redirect
-// All three feed this detector, which opens the lead-gen dialog.
-function isClosedBetaError(raw: string | null | undefined): boolean {
-  return Boolean(raw?.includes('HOLO_AUTH_NOT_ALLOWLISTED'));
 }
 
 type Step = 'email' | 'otp';
@@ -41,35 +28,12 @@ export function SignInForm() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [betaDialogOpen, setBetaDialogOpen] = useState(false);
 
-  // OAuth callback redirects here with `?error=HOLO_AUTH_NOT_ALLOWLISTED`
-  // when the user.create.before hook rejects the signup. Open the dialog
-  // on mount and strip the param so a refresh doesn't keep re-opening it.
   useEffect(() => {
     const errParam = searchParams.get('error');
-    if (isClosedBetaError(errParam)) {
-      setBetaDialogOpen(true);
-      const url = new URL(window.location.href);
-      url.searchParams.delete('error');
-      url.searchParams.delete('error_description');
-      window.history.replaceState({}, '', url.toString());
-    } else if (errParam) {
-      setError(errParam);
-    }
+    if (errParam) setError(errParam);
     // Intentionally on-mount only — searchParams won't change without a nav.
   }, []);
-
-  // Route a raw auth error to either the dialog (closed-beta) or the inline
-  // error message (everything else). Centralizes the branch so each handler
-  // doesn't repeat the check.
-  function surfaceAuthError(raw: string | undefined | null, fallback: string) {
-    if (isClosedBetaError(raw)) {
-      setBetaDialogOpen(true);
-      return;
-    }
-    setError(raw ?? fallback);
-  }
 
   async function handleGithub() {
     setBusy(true);
@@ -77,10 +41,10 @@ export function SignInForm() {
     try {
       const res = await signIn.social({ provider: 'github', callbackURL });
       if (res && 'error' in res && res.error) {
-        surfaceAuthError(res.error.message, 'Sign-in failed.');
+        setError(res.error.message ?? 'Sign-in failed.');
       }
     } catch (e) {
-      surfaceAuthError((e as Error).message, 'Sign-in failed.');
+      setError((e as Error).message ?? 'Sign-in failed.');
     } finally {
       setBusy(false);
     }
@@ -106,13 +70,13 @@ export function SignInForm() {
         type: 'sign-in',
       });
       if ('error' in res && res.error) {
-        surfaceAuthError(res.error.message, 'Could not send code.');
+        setError(res.error.message ?? 'Could not send code.');
         return;
       }
       setStep('otp');
       setInfo(`We sent a 6-digit code to ${submittedEmail}. It expires in 5 minutes.`);
     } catch (e) {
-      surfaceAuthError((e as Error).message, 'Could not send code.');
+      setError((e as Error).message ?? 'Could not send code.');
     } finally {
       setBusy(false);
     }
@@ -125,12 +89,12 @@ export function SignInForm() {
     try {
       const res = await signIn.emailOtp({ email, otp });
       if ('error' in res && res.error) {
-        surfaceAuthError(res.error.message, 'Invalid or expired code.');
+        setError(res.error.message ?? 'Invalid or expired code.');
         return;
       }
       window.location.href = callbackURL;
     } catch (e) {
-      surfaceAuthError((e as Error).message, 'Invalid or expired code.');
+      setError((e as Error).message ?? 'Invalid or expired code.');
     } finally {
       setBusy(false);
     }
@@ -226,12 +190,6 @@ export function SignInForm() {
 
       {info ? <p className="text-[13px] text-text-muted">{info}</p> : null}
       {error ? <p className="text-[13px] text-error">{error}</p> : null}
-
-      <BetaAccessDialog
-        open={betaDialogOpen}
-        onOpenChange={setBetaDialogOpen}
-        defaultEmail={email}
-      />
     </div>
   );
 }
