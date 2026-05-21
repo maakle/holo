@@ -16,9 +16,9 @@ EE. There is no third tier.
 ## Community Edition (AGPL-3.0) — what's always free
 
 The Community Edition is the entire context-layer product: connectors, hybrid
-search, MCP + REST gateway, the dashboard, the worker, OAuth provider, skill
-synthesis and execution, and per-call audit logging. Everything required to
-run Holo against your own data and serve every agent on your team is in CE.
+search, MCP + REST gateway, the dashboard, the worker, OAuth provider, and
+skill synthesis and execution. Everything required to run Holo against your
+own data and serve every agent on your team is in CE.
 
 Concretely:
 
@@ -31,14 +31,19 @@ Concretely:
 - **MCP gateway** (`POST /mcp`) and **REST/OpenAPI** (`/v1/*`).
 - **OAuth 2.1 + PKCE provider** with Dynamic Client Registration for MCP
   clients.
-- **Per-call audit log** — every tool invocation is attributable via the
-  `@holo/audit` event store. CE ships the immutable event store and the API
-  to query it; the dashboard surface and long-retention, exportable Query
-  History live in EE.
+- **Agent observability** — the last-100-invocations view, side-by-side
+  query/result diff, and per-skill execution history. Enough to debug and
+  understand what your agents are doing day-to-day. The compliance-grade
+  per-call audit log (tamper-evident hash chain, long retention, SIEM
+  exports) lives in EE.
 - **Skill synthesis + execution + marketplace publish** (`packages/skills`).
 - **`@holo/cli`** for one-command self-host.
 - **Single sign-in via email OTP and GitHub OAuth** (Better Auth).
-- **Multi-tenant organizations** (one or many orgs per deployment).
+- **Multi-tenant organizations** (one or many orgs per deployment). Invites,
+  removals, and an owner role for the org creator are CE; invited users join
+  as full collaborators (`admin`) so a self-hosted team isn't gated on the
+  org creator for every action. Differentiated roles — restricted "member"
+  tiers, custom roles, per-resource scoping — are EE; see RBAC below.
 
 If you can run `docker compose up` and serve agents from it, you are using CE.
 
@@ -80,13 +85,20 @@ sequencing):
   object.
 - 🔐 **Single Sign-On.** SSO via Google OAuth, OIDC, or SAML. Group syncing
   and just-in-time user provisioning via SCIM.
-- 🛡️ **Role-Based Access Control.** RBAC for sensitive resources — which
-  members can see which agents, invoke which actions, edit which skills.
+- 🛡️ **Role-Based Access Control.** Differentiated roles and per-resource
+  scoping — restricted "member" tiers below admin, custom roles, and
+  RBAC for sensitive resources (which members can see which agents,
+  invoke which actions, edit which skills). CE invites everyone as a
+  full collaborator under the org owner; EE is what you reach for when
+  some members need less than full access.
 - 📊 **Analytics.** Usage graphs broken down by team, LLM provider, agent,
   skill, and connector. Costs, calls, latencies, error rates.
-- 🕵️ **Query History.** Long-retention, exportable audit of every agent and
-  human query — who asked what, what context was used, what was returned.
-  Built on the CE audit log; adds retention windows, exports, and SIEM hooks.
+- 🕵️ **Per-call audit log + Query History.** Tamper-evident hash chain
+  over every tool invocation; long-retention, exportable audit of every
+  agent and human query — who asked what, what context was used, what was
+  returned. Configurable retention windows, exports, and SIEM hooks. CE
+  ships agent observability for day-to-day debugging; EE is what you need
+  for compliance.
 - 💻 **Custom code.** Run custom pre- and post-processing on queries and
   results — strip PII, reject sensitive queries, apply company-specific
   policy, plug in custom analyses.

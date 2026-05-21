@@ -39,7 +39,7 @@ const TABS: Tab[] = [
     id: 'core',
     Icon: PackageOpen,
     title: 'MIT core. Enterprise add-ons.',
-    body: 'Community edition ships every primitive — search, MCP gateway, audit log, multi-tenant orgs. EE adds SSO/SCIM, RBAC, custom hooks, whitelabeling.',
+    body: 'Community edition ships every primitive — search, MCP gateway, agent observability, multi-tenant orgs. EE adds SSO/SCIM, RBAC, per-call audit log, custom hooks, whitelabeling.',
     meta: 'no closed core · same binary',
   },
   {

@@ -68,7 +68,7 @@ export default async function DashboardPage({
             <QuickAction href="/skills" icon={Sparkles} label="Label a skill" hint="Turn artifacts into procedures" />
             <QuickAction href="/connect-agent" icon={Activity} label="Connect your agent" hint="Point any MCP client at holo" />
             {eeEnabled ? (
-              <QuickAction href="/settings/audit-log" icon={ScrollText} label="Review audit log" hint="Security & data-access events" />
+              <QuickAction href="/ee/audit" icon={ScrollText} label="Review audit log" hint="Security & data-access events" />
             ) : null}
           </CardContent>
         </Card>

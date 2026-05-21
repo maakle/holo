@@ -30,7 +30,7 @@ async function action(_prev: State, formData: FormData): Promise<State> {
   return result;
 }
 
-export function InviteForm() {
+export function InviteForm({ canAssignRoles }: { canAssignRoles: boolean }) {
   const [, formAction, pending] = useActionState(action, INITIAL);
 
   return (
@@ -49,24 +49,28 @@ export function InviteForm() {
           className={`${inputClass} w-full`}
         />
       </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="caption text-text-subtle">Role</span>
-        <div className="relative">
-          <select
-            name="role"
-            defaultValue="member"
-            disabled={pending}
-            className={`${inputClass} w-full appearance-none pr-8`}
-          >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
-          <ChevronDown
-            className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted"
-            aria-hidden
-          />
-        </div>
-      </label>
+      {canAssignRoles ? (
+        <label className="flex flex-col gap-1.5">
+          <span className="caption text-text-subtle">Role</span>
+          <div className="relative">
+            <select
+              name="role"
+              defaultValue="member"
+              disabled={pending}
+              className={`${inputClass} w-full appearance-none pr-8`}
+            >
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted"
+              aria-hidden
+            />
+          </div>
+        </label>
+      ) : (
+        <input type="hidden" name="role" value="admin" />
+      )}
       <Button type="submit" variant="primary" disabled={pending} className="sm:self-end">
         <Mail className="h-3.5 w-3.5" />
         {pending ? 'Sending…' : 'Send invite'}
