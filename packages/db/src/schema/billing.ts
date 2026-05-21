@@ -19,7 +19,7 @@ import { organization } from './auth';
  *
  * `features` JSONB shape:
  *   { maxConnectors: number | null,           // null = unlimited
- *     maxStoredArtifacts: number | null,      // null = unlimited; cap on chunks rows
+ *     maxStoredChunks: number | null,         // null = unlimited; cap on chunks rows
  *     syncIntervalTier: 'standard' | 'priority',
  *     sampleDataIncluded: boolean }
  *
@@ -28,7 +28,7 @@ import { organization } from './auth';
  * `metadata.sample = true`. The free tier therefore gets the sample + one
  * real connector slot.
  *
- * `maxStoredArtifacts` is the per-plan ceiling on rows in the `chunks` table
+ * `maxStoredChunks` is the per-plan ceiling on rows in the `chunks` table
  * (one row per embedding vector). It closes the downgrade loophole where a
  * customer would ingest under a higher tier then drop to Free and keep the
  * indexed corpus. New ingestion stops at the cap; existing chunks remain
@@ -43,7 +43,7 @@ export const billingPlans = pgTable('billing_plans', {
   stripePriceId: text('stripe_price_id'),
   features: jsonb('features').$type<{
     maxConnectors: number | null;
-    maxStoredArtifacts?: number | null;
+    maxStoredChunks?: number | null;
     syncIntervalTier?: 'standard' | 'priority';
     sampleDataIncluded?: boolean;
   }>().notNull().default({ maxConnectors: null }),

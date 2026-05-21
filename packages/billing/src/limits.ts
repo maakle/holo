@@ -140,7 +140,7 @@ export type StorageQuotaDecision =
 
 /**
  * Decide whether the org can ingest `deltaCount` more chunks under its plan's
- * `maxStoredArtifacts` ceiling. Called from the sync processor (before a run
+ * `maxStoredChunks` ceiling. Called from the sync processor (before a run
  * starts; `deltaCount = 0`, asks "am I already over?") and from
  * `insertEmbeddedChunks` (defensive secondary check with the batch size,
  * asks "can I fit this batch?").
@@ -148,7 +148,7 @@ export type StorageQuotaDecision =
  * Returns `allowed: true` (with `limit: null`) when:
  *   - billing is disabled (`HOLO_BILLING_ENABLED=false`)
  *   - the org has no subscription row yet
- *   - the plan's `maxStoredArtifacts` is `null` (unlimited)
+ *   - the plan's `maxStoredChunks` is `null` (unlimited)
  *
  * The chunk count uses an index-only scan against `chunks_org_idx` — fast
  * even on 10M-row orgs (low milliseconds). No materialised cache.
@@ -162,10 +162,10 @@ export async function checkStorageQuota(
   const sub = await getCurrentSubscription(db, organizationId);
   if (!sub) return { allowed: true, currentCount: 0, limit: null };
   // Resolve via the slug-keyed defaults: if a legacy plan row is missing
-  // `maxStoredArtifacts` (because migration 0067 hasn't reached this env),
+  // `maxStoredChunks` (because migrations 0067/0069 haven't reached this env),
   // we still enforce the canonical cap. Explicit `null` on the row — e.g.
   // enterprise — means intentionally unlimited and is honoured.
-  const limit = resolveStorageCap(sub.plan.slug, sub.plan.features.maxStoredArtifacts);
+  const limit = resolveStorageCap(sub.plan.slug, sub.plan.features.maxStoredChunks);
   if (limit === null) return { allowed: true, currentCount: 0, limit: null };
 
   const rows = await db

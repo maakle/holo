@@ -21,8 +21,8 @@ function formatCount(n: number): string {
 }
 
 /**
- * "Indexed items" card — counterpart to BalanceCard. Surfaces the plan's
- * `maxStoredArtifacts` ceiling vs. the org's actual `chunks` row count, with
+ * "Indexed chunks" card — counterpart to BalanceCard. Surfaces the plan's
+ * `maxStoredChunks` ceiling vs. the org's actual `chunks` row count, with
  * a progress bar and graduated warnings.
  *
  * Visual rules (DESIGN.md):
@@ -31,8 +31,8 @@ function formatCount(n: number): string {
  *     bar already owns the page's single accent use.
  *   - Status row colour shifts: muted < 80%, warning ≥ 80%, error at 100%.
  *
- * "Item" = one row in the `chunks` table (one embedding vector). The footer
- * tooltip explains the unit since it's not obvious from the UI alone.
+ * One chunk = one row in the `chunks` table (one embedding vector). The
+ * footer tooltip explains the unit since it's not obvious from the UI alone.
  */
 export function StorageCard({
   currentCount,
@@ -47,7 +47,7 @@ export function StorageCard({
 
   return (
     <section className="space-y-3">
-      <h3 className="text-[15px] font-medium text-text">Indexed items</h3>
+      <h3 className="text-[15px] font-medium text-text">Indexed chunks</h3>
       <div className="rounded-md border border-border bg-surface p-6">
         <div className="flex items-baseline gap-2">
           <div className="font-mono text-[36px] leading-[44px] font-medium tabular-nums text-text">
@@ -76,7 +76,7 @@ export function StorageCard({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[260px] text-[12px] leading-relaxed">
-                Each item is one chunk in the search index. A typical Notion page is 5–20 chunks; a long PDF is ~150.
+                One chunk is one row in your search index. A typical Notion page is 5–20 chunks; a long PDF is ~150.
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -102,7 +102,7 @@ export function StorageCard({
         {atCap ? (
           <div className="mt-5 rounded-md border border-danger/40 bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] px-4 py-3 text-[13px] text-text">
             <span className="font-medium">Storage full.</span> New ingestion is
-            paused; existing items stay queryable.
+            paused; existing chunks stay queryable.
             {suggestedUpgradeSlug ? (
               <>
                 {' '}

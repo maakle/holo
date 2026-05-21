@@ -129,7 +129,7 @@ export abstract class SyncProcessorBase extends WorkerHost {
     }
 
     // Refuse new sync runs when the org is already at its plan's
-    // `maxStoredArtifacts` ceiling. `deltaCount=0` here — we ask "are you
+    // `maxStoredChunks` ceiling. `deltaCount=0` here — we ask "are you
     // already over?", not "can this run fit?" (the run size is unknown until
     // the connector emits chunks). A second, batch-sized check happens in
     // the embed processor so a single fat batch can't push the org past

@@ -27,7 +27,7 @@ function makeDb(currentCount: number): DB {
   return { select: () => builder } as unknown as DB;
 }
 
-function mockPlan(slug: 'free' | 'starter' | 'team' | 'enterprise', maxStoredArtifacts: number | null | undefined) {
+function mockPlan(slug: 'free' | 'starter' | 'team' | 'enterprise', maxStoredChunks: number | null | undefined) {
   (getCurrentSubscription as ReturnType<typeof vi.fn>).mockResolvedValue({
     organizationId: orgId,
     status: 'active',
@@ -43,7 +43,7 @@ function mockPlan(slug: 'free' | 'starter' | 'team' | 'enterprise', maxStoredArt
       monthlyPriceCents: 0,
       features: {
         maxConnectors: null,
-        maxStoredArtifacts,
+        maxStoredChunks,
       },
       isPublic: true,
     },

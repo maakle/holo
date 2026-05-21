@@ -125,22 +125,22 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
                   <span>
                     {(() => {
                       // Fall back to the slug-keyed default if the DB row is
-                      // missing `maxStoredArtifacts` (legacy seed rows from
+                      // missing `maxStoredChunks` (legacy seed rows from
                       // pre-0067 migrations). Same source of truth the gate
                       // uses, so what we advertise matches what we enforce.
                       const cap = resolveStorageCap(
                         plan.slug,
-                        plan.features.maxStoredArtifacts,
+                        plan.features.maxStoredChunks,
                       );
                       return cap === null ? (
-                        'Unlimited indexed items'
+                        'Unlimited chunks'
                       ) : (
                         <>
                           Up to{' '}
                           <span className="tabular-nums text-text">
                             {formatCredits(cap)}
                           </span>{' '}
-                          indexed items
+                          chunks
                         </>
                       );
                     })()}

@@ -477,6 +477,13 @@
       "when": 1781913600000,
       "tag": "0068_email_log",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1782000000000,
+      "tag": "0069_rename_max_stored_artifacts",
+      "breakpoints": true
     }
   ]
 }

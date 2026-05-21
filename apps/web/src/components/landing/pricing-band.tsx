@@ -14,9 +14,9 @@ type HostedPlan = {
   credits: string;
   connectors: string;
   /** Cap on chunks stored in the search index (one row per embedding
-   *  vector). Indexed-items cap and connector cap are independent levers —
+   *  vector). Chunk cap and connector cap are independent levers —
    *  see packages/billing/src/limits.ts. */
-  indexedItems: string;
+  chunks: string;
   blurb: string;
   popular?: boolean;
 };
@@ -29,7 +29,7 @@ const HOSTED_PLANS: HostedPlan[] = [
     cadence: '14-day trial',
     credits: '250',
     connectors: '1 connector',
-    indexedItems: '10K indexed items',
+    chunks: '10K chunks',
     blurb: 'Kick the tires on the hosted version. No credit card.',
   },
   {
@@ -39,7 +39,7 @@ const HOSTED_PLANS: HostedPlan[] = [
     cadence: '/mo',
     credits: '2,500',
     connectors: '5 connectors',
-    indexedItems: '100K indexed items',
+    chunks: '100K chunks',
     blurb: 'For solo builders and small teams running a handful of agents.',
   },
   {
@@ -49,7 +49,7 @@ const HOSTED_PLANS: HostedPlan[] = [
     cadence: '/mo',
     credits: '20,000',
     connectors: 'Unlimited connectors',
-    indexedItems: '1M indexed items',
+    chunks: '1M chunks',
     blurb: 'For engineering teams in production. Standard sync intervals.',
     popular: true,
   },
@@ -60,7 +60,7 @@ const HOSTED_PLANS: HostedPlan[] = [
     cadence: '/mo',
     credits: '100,000',
     connectors: 'Unlimited connectors',
-    indexedItems: '10M indexed items',
+    chunks: '10M chunks',
     blurb: 'High-volume workloads. Priority sync intervals. Same binary.',
   },
 ];
@@ -222,7 +222,7 @@ export function PricingBand() {
                       className="h-4 w-4 shrink-0 text-text-subtle"
                       aria-hidden
                     />
-                    <span>{plan.indexedItems}</span>
+                    <span>{plan.chunks}</span>
                   </li>
                 </ul>
                 <Link

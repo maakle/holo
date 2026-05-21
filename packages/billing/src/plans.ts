@@ -8,7 +8,7 @@ export type PlanFeatures = {
   /** Ceiling on rows in the `chunks` table (= embedding vectors stored).
    *  `null` = unlimited. Closes the downgrade loophole — new ingestion is
    *  paused at the cap, existing chunks remain queryable. */
-  maxStoredArtifacts?: number | null;
+  maxStoredChunks?: number | null;
   syncIntervalTier?: 'standard' | 'priority';
   sampleDataIncluded?: boolean;
 };

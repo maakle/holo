@@ -4,7 +4,7 @@
  * PlanGrid, the landing page PricingBand). The DB `billing_plans.features`
  * JSONB is the authoritative store, but a row created by an older migration
  * (or one that hasn't been re-seeded) may be missing the
- * `maxStoredArtifacts` key. We fall back to these defaults so:
+ * `maxStoredChunks` key. We fall back to these defaults so:
  *
  *   - the UI never falsely advertises "Unlimited"
  *   - the gate stays armed even if a migration is pending

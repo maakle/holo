@@ -22,7 +22,7 @@ export interface StorageCapReachedProps {
 
 /**
  * Sent the first time an org's sync is paused because its `chunks` row count
- * crossed `maxStoredArtifacts`. Idempotency key shape:
+ * crossed `maxStoredChunks`. Idempotency key shape:
  *   `storage_cap_reached:<org_id>:<period_start_iso>`
  * so a fresh email goes out each billing period if the org is still over
  * — but they're not spammed within a period.
@@ -40,7 +40,7 @@ export function StorageCapReached({
   suggestedUpgradePlanName,
   upgradeUrl,
 }: StorageCapReachedProps) {
-  const preview = `${organizationName} has reached its ${currentPlanName} plan limit on indexed items — new ingestion is paused.`;
+  const preview = `${organizationName} has reached its ${currentPlanName} plan limit on indexed chunks — new ingestion is paused.`;
   return (
     <Html>
       <Head />
@@ -59,7 +59,7 @@ export function StorageCapReached({
             <Text style={paragraph}>
               <strong style={{ color: '#0A0A0A' }}>{organizationName}</strong> has hit the{' '}
               <strong style={{ color: '#0A0A0A' }}>{currentPlanName}</strong> plan&apos;s
-              limit on indexed items —{' '}
+              limit on indexed chunks —{' '}
               <strong style={{ color: '#0A0A0A' }}>{currentCount.toLocaleString('en-US')}</strong>{' '}
               of {limit.toLocaleString('en-US')} used. New connector syncs are paused;
               your existing index stays fully searchable.
