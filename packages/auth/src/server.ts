@@ -1,5 +1,4 @@
 import { betterAuth } from 'better-auth';
-import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { emailOTP, organization } from 'better-auth/plugins';
 import { and, eq } from 'drizzle-orm';
@@ -21,7 +20,6 @@ export interface CreateAuthOpts {
     | 'EMAIL_PROVIDER'
     | 'RESEND_API_KEY'
     | 'EMAIL_FROM'
-    | 'HOLO_SIGNUP_ALLOWLIST_ENABLED'
   >;
   defaultOrganizationId: string;
   /**
@@ -141,37 +139,6 @@ function slugifyOrgName(s: string): string {
   return cleaned || 'workspace';
 }
 
-/**
- * Closed-beta signup gate. Throws a Better Auth `APIError` (which propagates
- * to the client as `error.message` on email-OTP signup and as
- * `?error=…&error_description=…` on the OAuth callback redirect) when the
- * email isn't in `allowed_signup_emails`.
- *
- * Only runs on first signup — existing users have an `account` row already
- * and never re-enter the `user.create.before` hook. We intentionally do NOT
- * fall back to "empty table = open signup" because truncating the table by
- * mistake would silently lift the gate. Use HOLO_SIGNUP_ALLOWLIST_ENABLED
- * to flip the gate, not row count.
- */
-export async function assertEmailAllowlisted(db: DB, email: string): Promise<void> {
-  const normalized = email.trim().toLowerCase();
-  const rows = await db
-    .select({ email: schema.allowedSignupEmails.email })
-    .from(schema.allowedSignupEmails)
-    .where(eq(schema.allowedSignupEmails.email, normalized))
-    .limit(1);
-  if (rows[0]) return;
-  // Message is a stable machine-readable code, not the user-facing copy.
-  // On OAuth callback failures Better Auth shoves `error.message` into the
-  // redirect URL (`?error=<message_with_spaces_as_underscores>`); on email-OTP
-  // the client reads `error.message` directly. The UI translates this code
-  // to the closed-beta sentence in both cases.
-  throw new APIError('FORBIDDEN', {
-    code: ErrorCode.HOLO_AUTH_NOT_ALLOWLISTED,
-    message: ErrorCode.HOLO_AUTH_NOT_ALLOWLISTED,
-  });
-}
-
 export type ProvisionResult =
   | { created: true; organizationId: string }
   | { created: false; reason: 'pending_invite' | 'existing_member' };
@@ -287,36 +254,6 @@ export function createAuth({ db, env, defaultOrganizationId, embedSampleChunks }
     onAPIError: {
       errorURL: '/sign-in',
     },
-    // Closed-beta gate, second layer. The `user.create.before` hook above
-    // blocks at user creation, but email-OTP issues the code BEFORE creating
-    // the user — so without this middleware a non-allowlisted email would
-    // still receive an OTP email (we'd pay for the send and the user would
-    // see "we sent you a code" before getting blocked at verify time).
-    // This intercepts the send-verification-otp request itself and rejects
-    // immediately so the dialog fires before any email goes out.
-    //
-    // OAuth signups don't hit this path — they're already blocked correctly
-    // at `user.create.before` (no prior side-effect like an email send).
-    hooks: env.HOLO_SIGNUP_ALLOWLIST_ENABLED
-      ? {
-          before: createAuthMiddleware(async (ctx) => {
-            if (ctx.path !== '/email-otp/send-verification-otp') return;
-            const body = (ctx.body ?? {}) as { email?: string; type?: string };
-            // Only gate sign-in (which doubles as signup on first login).
-            // Future email-change / reset paths intentionally fall through.
-            if (body.type !== 'sign-in') return;
-            if (!body.email) return;
-            // Existing users are not gated — only first signups.
-            const existing = await db
-              .select({ id: schema.user.id })
-              .from(schema.user)
-              .where(eq(schema.user.email, body.email.toLowerCase()))
-              .limit(1);
-            if (existing[0]) return;
-            await assertEmailAllowlisted(db, body.email);
-          }),
-        }
-      : undefined,
     advanced: {
       database: {
         generateId: () => crypto.randomUUID(),
@@ -333,16 +270,6 @@ export function createAuth({ db, env, defaultOrganizationId, embedSampleChunks }
     databaseHooks: {
       user: {
         create: {
-          // Gate first-time signups against the closed-beta allowlist.
-          // Throwing here aborts the insert; OAuth callbacks surface as
-          // `?error=FORBIDDEN&error_description=…`, email-OTP signup as
-          // `error.message` on the client.
-          before: env.HOLO_SIGNUP_ALLOWLIST_ENABLED
-            ? async (incoming) => {
-                const u = incoming as { email?: string };
-                if (u.email) await assertEmailAllowlisted(db, u.email);
-              }
-            : undefined,
           // See provisionPersonalOrgOnSignup for behavior + invariants.
           after: async (createdUser) => {
             const u = createdUser as { id: string; email: string; name?: string | null };
