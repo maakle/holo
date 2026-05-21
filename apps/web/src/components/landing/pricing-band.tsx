@@ -250,9 +250,7 @@ export function PricingBand() {
               </p>
             </div>
             <a
-              href={`${GITHUB_URL}/discussions`}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="mailto:sales@holobase.dev?subject=Holo%20Enterprise%20inquiry"
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 text-[13px] font-medium text-text transition-colors hover:border-border-strong"
             >
               Contact sales
