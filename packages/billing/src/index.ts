@@ -37,6 +37,10 @@ export {
   type StorageQuotaDecision,
 } from './limits';
 export {
+  resolveStorageCap,
+  PLAN_DEFAULT_STORAGE_CAP,
+} from './plan-defaults';
+export {
   seedInitialSubscriptionAndGrant,
   processExpiredPeriods,
   processExpiredTopups,
