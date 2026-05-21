@@ -442,6 +442,13 @@
       "when": 1781481600000,
       "tag": "0063_credit_unit_redenomination",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1781568000000,
+      "tag": "0064_trial_ends_at",
+      "breakpoints": true
     }
   ]
 }

@@ -21,9 +21,11 @@ export {
 export {
   getCurrentSubscription,
   listPublicPlans,
+  deriveTrialState,
   type PlanFeatures,
   type PlanRow,
   type SubscriptionWithPlan,
+  type TrialState,
 } from './plans';
 export {
   canAddConnector,

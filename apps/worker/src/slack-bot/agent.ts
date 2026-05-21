@@ -418,6 +418,13 @@ export async function runAgent(deps: RunAgentDeps): Promise<AgentResult> {
   // "buy more credits" prompt instead of a generic error fallback.
   const creditDecision = await checkCreditPool(deps.db, deps.organizationId);
   if (!creditDecision.allowed) {
+    const { getWorkerPosthog } = await import('../posthog.js');
+    getWorkerPosthog().capture({
+      distinctId: `org:${deps.organizationId}`,
+      event: 'holo.pool.exhausted',
+      groups: { organization: deps.organizationId },
+      properties: { surface: 'bot_agent', balance: creditDecision.balance },
+    });
     return {
       answerId: randomUUID(),
       answer:

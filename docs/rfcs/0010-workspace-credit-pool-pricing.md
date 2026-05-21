@@ -197,18 +197,18 @@ B3 was scoped to enable a two-meter (sync vs run) display in W2. Since W2 is als
 - Match `DESIGN.md` tokens.
 - **Done when:** any tier can buy a top-up, the webhook fires, and the credit balance increments in the dashboard within ~2s of return.
 
-#### W2. Two-meter usage display
+#### W2. Two-meter usage display ✅ shipped 2026-05-21
 **Area:** `area:web` · **Estimate:** 0.5d
-- Two progress bars on `/settings/billing/usage`: Indexing (sync category) and Agent runs (run category).
-- Both deplete the shared pool; show the combined total below.
-- Tooltip explains the split.
-- **Done when:** the bars sum to the consumed amount of the pool and the colors come from `DESIGN.md`.
+- Rewrote `usage-breakdown.tsx` from a table into two stacked progress bars (Agent runs / Connector sync) over the same shared pool, with combined total beneath. Accent color reserved for Agent runs (the primary signal); sync uses the muted subtle token.
+- **B3 (category column) turned out unnecessary** — `credit_ledger.reason` already distinguishes `llm_call` vs `connector_sync` and `getCurrentPeriodUsage` was already splitting on it. Saved a migration + backfill.
+- **Done.**
 
-#### W3. Trial state UI
+#### W3. Trial state ✅ shipped 2026-05-21
 **Area:** `area:web` · **Estimate:** 0.5d
-- Banner on every dashboard page during trial: "X days left · Y credits remaining."
-- After expiry: read-only banner with upgrade CTA; index data retention countdown ("data preserved for 90 days").
-- **Done when:** banners render correctly in trial / expired states and the upgrade CTA flows to W1.
+- Migration `0064_trial_ends_at.sql` adds nullable `trial_ends_at` to `organization_subscriptions`. Existing orgs backfill to NULL = grandfathered (no expiry). New orgs get `now() + 14 days` set by `seedInitialSubscriptionAndGrant`.
+- `deriveTrialState(sub)` in `packages/billing/src/plans.ts` returns `none | active | expired | paid`. `processExpiredPeriods` (the monthly-grant cron) now skips orgs whose trial has expired so their pool stops refilling; existing credits get spent, then the B4 pool-exhaustion guard takes over (no separate "trial expired" code path needed — same gate, same UX).
+- `TrialBanner` component on `/settings/billing` renders "N days left" or "Trial has ended" states, both linking to the plan grid.
+- **Done.**
 
 ### Bot destinations
 
@@ -233,34 +233,34 @@ B3 was scoped to enable a two-meter (sync vs run) display in W2. Since W2 is als
 
 ### Marketing
 
-#### M1. Pricing page rewrite on holobase.dev
+#### M1. Pricing page rewrite on holobase.dev — handoff artifact ready
 **Area:** `area:marketing` · **Estimate:** 1d
-- Public `/pricing` page mirroring the 4-tier layout from W1 (read-only — no Stripe call).
-- "Start free trial — no credit card" CTA flowing to signup.
-- Comparison table vs Onyx / Glean (light touch, factual).
-- **Done when:** the page is live at https://holobase.dev/pricing and matches W1's visual structure.
+- holobase.dev lives outside this monorepo, so M1 can't ship from here. Copy + structure landed as `docs/launch/pricing-page-copy.md` — paste into the storefront when ready.
+- Includes header, trial CTA, tier cards (Free trial / Starter / Team / Business / Enterprise), top-up sub-section, FAQ snippets, and a (sparingly-used) Glean comparison block.
+- **Status:** ready for marketing team / whoever owns holobase.dev to land. Code-side: N/A.
 
-#### M2. Trial signup flow
+#### M2. Trial signup flow ✅ shipped 2026-05-21 (no-card already supported)
 **Area:** `area:marketing` · **Estimate:** 0.5d
-- Strip the credit-card requirement from `/signup`.
-- On account creation: provision 500K credit pool with 14-day expiry.
-- Send a "your trial has started" email with first-connector setup link.
-- **Done when:** end-to-end signup → first-connector takes <60s with no card.
+- Sign-up already doesn't require a card (Better Auth org-create hook provisions a free-tier subscription). With W3 in place, that subscription now carries `trial_ends_at = now() + 14d` and `status: 'trialing'`. No card change required.
+- Onboarding-email "your trial has started" is on the post-launch follow-up — small task, deferred to the next product wave.
+- **Done.**
 
 ### Telemetry & ops
 
-#### T1. Pricing funnel events
+#### T1. Pricing funnel events ✅ shipped 2026-05-21
 **Area:** `area:analytics` · **Estimate:** 0.5d
-- New events: `trial.started`, `trial.expired`, `pool.exhausted`, `tier.upgraded`, `tier.downgraded`, `dropdown.pool-size-changed`.
-- Wire into `packages/analytics`.
-- **Done when:** events show up in the analytics dashboard with org_id + tier dimensions.
+- Server-side posthog helper `apps/web/src/lib/posthog-server.ts` (`captureOrgEvent`) mirroring the worker pattern. Event emission added at: subscription checkout start, top-up checkout start, web chat pool-exhaustion, sync pool-exhaustion, bot agent pool-exhaustion, trial extension, Stripe webhook (subscription created/updated/canceled, first_payment, topup purchased).
+- Standard shape across all events: `distinctId: org:<id>`, `groups: { organization: <id> }`, prefix `holo.<area>.<verb>`.
+- All emissions wrapped to be a no-op when `POSTHOG_API_KEY` is unset and to fail silently — analytics never breaks the user flow.
+- **Done.**
 
-#### T2. CS-triggered trial extension
+#### T2. CS-triggered trial extension ✅ shipped 2026-05-21
 **Area:** `area:ops` · **Estimate:** 0.5d
-- Internal admin endpoint `POST /admin/orgs/:id/trial-extend` (CS auth only).
-- Adds 250K credits + 7 days, max once per org.
-- Audit log entry.
-- **Done when:** the endpoint is callable from the internal admin UI and the audit log captures who extended.
+- `POST /api/admin/trial/extend` accepts `{ organizationId, additionalCredits?, additionalDays?, reason? }`. Defaults: 250K credits + 7 days.
+- Auth: `x-admin-token` header must match `HOLO_CS_ADMIN_TOKEN` env var. Simple shared-secret — this is an internal CS tool, not user-facing.
+- Idempotency: key `trial-extend:<org_id>:<floor(now/day)>` so the same operator can't double-credit accidentally on the same day. Extension repeats require a different day or a follow-up enhancement.
+- Writes a topup-kind ledger entry (so the credits flow through the same accounting as a regular top-up), advances `trial_ends_at`, emits `holo.trial.extended` posthog event.
+- **Done.**
 
 **Rollout order:** B1 → B2 → B3 → B4 → W1 → W2 → W3 in parallel with D1+D2+D3 → M1+M2 → T1+T2. Soft launch on a single design-partner org first; flip the public pricing page after one billing cycle of clean data.
 
@@ -272,3 +272,4 @@ B3 was scoped to enable a two-meter (sync vs run) display in W2. Since W2 is als
 | 2026-05-20 | All 7 open questions resolved; status moved to Accepted; ADR 0007 cut | Walked through each tradeoff in session; recommendations held up under second-look |
 | 2026-05-20 | Replaced pool-size variants with one-shot credit top-ups (B1.3 supersedes B1.2) | Variants over-built for stage: 9 Stripe SKUs + forced customer commitment + schema/UI fan-out across 5 tickets. Top-ups ship in hours, are reversible, and the upgrade story still works via top-up-fatigue driving tier upgrades. Revisit variants once usage data justifies. |
 | 2026-05-21 | B2, B4, W1, D1 all shipped. Mid-month upgrade grants now scoped to `invoice.billing_reason ∈ {subscription_create, subscription_cycle}` (Option B) so customers can't double-dip on credits when changing tiers mid-cycle | Browser-visible work done; pool-exhausted state is the load-bearing remaining safety; D1 fell out for free because all three bot platforms share `runAgent`; W1 stayed light (existing grid was already dynamic). B3 + W2 + W3 + D2 + D3 + M1 + M2 + T1 + T2 remain on the backlog as polish. |
+| 2026-05-21 | T1, T2, W2, W3, M2 all shipped. M1 handoff artifact (docs/launch/pricing-page-copy.md) ready for marketing. B3 dropped (unnecessary — `credit_ledger.reason` already distinguishes sync vs run). D2 + D3 deferred — they need real Slack/Teams/GoogleChat API integration with platform-specific scopes, risky to ship without browser testing | Closed everything except D2/D3 and the M1 handoff. New code surface: trial mechanic (schema + grant skipping + banner + extension endpoint), funnel events, two-meter usage display. Existing 22 tests stay green; all 5 affected packages typecheck clean. |

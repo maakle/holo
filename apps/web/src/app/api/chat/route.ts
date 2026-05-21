@@ -12,6 +12,7 @@ import {
 } from '@holo/agent-tools/chat';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { captureOrgEvent } from '@/lib/posthog-server';
 import { CHAT_MODEL_ID } from '@/lib/chat-model';
 import { attachUserTurnToConversation, persistAssistantTurn } from './conversation';
 
@@ -148,7 +149,18 @@ export async function POST(req: Request) {
     // streams are unaffected (this only gates the *next* run); their final
     // debit may push the balance briefly negative, which is intentional —
     // we don't refund the LLM provider for partial work.
-    await assertSufficientCredits(db, orgId);
+    try {
+      await assertSufficientCredits(db, orgId);
+    } catch (err) {
+      if (err instanceof HoloError && err.code === 'HOLO_CREDIT_POOL_EXHAUSTED') {
+        captureOrgEvent({
+          organizationId: orgId,
+          event: 'holo.pool.exhausted',
+          properties: { surface: 'web_chat' },
+        });
+      }
+      throw err;
+    }
 
     const conversationId = await attachUserTurnToConversation({
       db,

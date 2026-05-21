@@ -61,7 +61,7 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
   }
 
   return (
-    <section className="space-y-3">
+    <section id="plans" className="space-y-3 scroll-mt-8">
       <h3 className="text-[15px] font-medium text-text">Plans</h3>
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
         {ordered.map((plan) => {

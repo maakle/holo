@@ -5,6 +5,7 @@ import { billingEnabled } from '@holo/billing';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { captureOrgEvent } from '@/lib/posthog-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -67,6 +68,17 @@ export async function POST(req: Request): Promise<Response> {
       ownerEmail,
       successUrl: `${origin}/settings/billing?checkout=success`,
       cancelUrl: `${origin}/settings/billing?checkout=cancel`,
+    });
+
+    captureOrgEvent({
+      organizationId,
+      event: 'holo.checkout.started',
+      properties: {
+        surface: 'web',
+        kind: 'subscription',
+        plan_slug: parsed.data.planSlug,
+        checkout_session_id: result.sessionId,
+      },
     });
 
     return Response.json({ url: result.url });

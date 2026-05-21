@@ -113,6 +113,12 @@ export abstract class SyncProcessorBase extends WorkerHost {
       this.logger.log(
         `skipping ${ctx}: org credit pool exhausted (balance=${creditDecision.balance}) — buy a top-up at /settings/billing`,
       );
+      getWorkerPosthog().capture({
+        distinctId: `org:${job.data.organizationId}`,
+        event: 'holo.pool.exhausted',
+        groups: { organization: job.data.organizationId },
+        properties: { surface: 'sync', queue: this.queueName, balance: creditDecision.balance },
+      });
       return { artifactCount: 0, newCursor: null, skipReason: 'credit_pool_exhausted' };
     }
     // Best-effort run-history write. If the insert itself blows up (DB down,

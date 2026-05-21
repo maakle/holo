@@ -1,4 +1,4 @@
-import { lt, eq, sql, and, isNull } from 'drizzle-orm';
+import { lt, eq, sql, and, isNull, or, gt } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import { billingEnabled } from './env';
 import { writeLedgerEntry } from './ledger';
@@ -35,14 +35,20 @@ export async function seedInitialSubscriptionAndGrant(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
   );
 
+  // Every new org gets a 14-day trial. Existing orgs grandfathered via the
+  // migration (trial_ends_at = NULL) stay on the legacy forever-free tier.
+  // RFC 0010 / ADR 0007.
+  const trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
   await db
     .insert(organizationSubscriptions)
     .values({
       organizationId,
       planId: plan.id,
-      status: 'unbilled',
+      status: 'trialing',
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
+      trialEndsAt,
     })
     .onConflictDoNothing({ target: organizationSubscriptions.organizationId });
 
@@ -95,6 +101,13 @@ export async function processExpiredPeriods(db: DB): Promise<number> {
       and(
         lt(organizationSubscriptions.currentPeriodEnd, now),
         isNull(organizationSubscriptions.stripeSubscriptionId),
+        // Skip orgs whose trial has expired — they shouldn't get fresh
+        // monthly credits. Grandfathered (trial_ends_at = NULL) and
+        // still-trialing orgs continue to receive grants.
+        or(
+          isNull(organizationSubscriptions.trialEndsAt),
+          gt(organizationSubscriptions.trialEndsAt, now),
+        ),
       ),
     );
 

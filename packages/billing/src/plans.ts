@@ -25,7 +25,40 @@ export interface SubscriptionWithPlan {
   currentPeriodStart: Date;
   currentPeriodEnd: Date;
   cancelAtPeriodEnd: boolean;
+  /** Free-trial expiry (RFC 0010 / ADR 0007 — W3). NULL for grandfathered
+   *  orgs that signed up before the trial mechanic, or for paid customers. */
+  trialEndsAt: Date | null;
+  /** Stripe subscription id when the org has converted to a paid plan. */
+  stripeSubscriptionId: string | null;
   plan: PlanRow;
+}
+
+/**
+ * Derived trial state for the dashboard banner + bot/agent gates.
+ *
+ *   - `none`    — grandfathered org with no trial (trial_ends_at IS NULL on
+ *                 the legacy free tier).
+ *   - `active`  — within the trial window, on the free plan, no paid sub.
+ *   - `expired` — trial_ends_at is in the past, still on free, no paid sub.
+ *                 Once existing credits run out, pool-exhaustion guard kicks
+ *                 in (B4) and refuses new ops.
+ *   - `paid`    — converted to a paid Stripe subscription; trial irrelevant.
+ */
+export type TrialState =
+  | { kind: 'none' }
+  | { kind: 'active'; endsAt: Date; daysRemaining: number }
+  | { kind: 'expired'; endsAt: Date }
+  | { kind: 'paid' };
+
+export function deriveTrialState(sub: SubscriptionWithPlan | null, now: Date = new Date()): TrialState {
+  if (!sub) return { kind: 'none' };
+  if (sub.stripeSubscriptionId) return { kind: 'paid' };
+  if (sub.plan.slug !== 'free') return { kind: 'paid' };
+  if (!sub.trialEndsAt) return { kind: 'none' };
+  if (sub.trialEndsAt <= now) return { kind: 'expired', endsAt: sub.trialEndsAt };
+  const msRemaining = sub.trialEndsAt.getTime() - now.getTime();
+  const daysRemaining = Math.max(0, Math.ceil(msRemaining / (24 * 60 * 60 * 1000)));
+  return { kind: 'active', endsAt: sub.trialEndsAt, daysRemaining };
 }
 
 /** Look up an organisation's current subscription joined with its plan. */
@@ -40,6 +73,8 @@ export async function getCurrentSubscription(
       currentPeriodStart: organizationSubscriptions.currentPeriodStart,
       currentPeriodEnd: organizationSubscriptions.currentPeriodEnd,
       cancelAtPeriodEnd: organizationSubscriptions.cancelAtPeriodEnd,
+      trialEndsAt: organizationSubscriptions.trialEndsAt,
+      stripeSubscriptionId: organizationSubscriptions.stripeSubscriptionId,
       planId: billingPlans.id,
       slug: billingPlans.slug,
       name: billingPlans.name,
@@ -60,6 +95,8 @@ export async function getCurrentSubscription(
     currentPeriodStart: row.currentPeriodStart,
     currentPeriodEnd: row.currentPeriodEnd,
     cancelAtPeriodEnd: row.cancelAtPeriodEnd,
+    trialEndsAt: row.trialEndsAt,
+    stripeSubscriptionId: row.stripeSubscriptionId,
     plan: {
       id: row.planId,
       slug: row.slug,

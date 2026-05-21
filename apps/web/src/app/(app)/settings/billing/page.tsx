@@ -10,6 +10,7 @@ import {
   listPublicPlans,
   listActiveTopupPackages,
   recentLedgerActivity,
+  deriveTrialState,
   type SubscriptionWithPlan,
   type PlanRow,
   type LedgerActivityRow,
@@ -24,6 +25,7 @@ import { PlanGrid } from './_components/plan-grid';
 import { TopupCard } from './_components/topup-card';
 import { LedgerTable } from './_components/ledger-table';
 import { TopupFlash } from './_components/topup-flash';
+import { TrialBanner } from './_components/trial-banner';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +66,7 @@ export default async function BillingSettingsPage({
     sp.checkout === 'success' ? 'success' : sp.checkout === 'cancel' ? 'cancel' : undefined;
   const topupFlash: 'success' | 'cancel' | undefined =
     sp.topup === 'success' ? 'success' : sp.topup === 'cancel' ? 'cancel' : undefined;
+  const trialState = deriveTrialState(subscription);
 
   return (
     <div className="space-y-10">
@@ -73,6 +76,7 @@ export default async function BillingSettingsPage({
         highlightUpgrade={sp.upgrade}
         checkoutFlash={checkoutFlash}
       />
+      <TrialBanner trial={trialState} />
       <TopupFlash flash={topupFlash} />
       <BalanceCard
         balance={balance.balance}

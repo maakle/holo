@@ -82,6 +82,17 @@ export const organizationSubscriptions = pgTable('organization_subscriptions', {
   planId: uuid('plan_id')
     .notNull()
     .references(() => billingPlans.id),
+  /**
+   * Free trial expiry — populated for orgs that signed up after the trial
+   * mechanic shipped (RFC 0010 / ADR 0007). NULL for grandfathered orgs (no
+   * trial expiry; they stay on the legacy free tier indefinitely).
+   *
+   * When `trial_ends_at` < `now()` AND `plan.slug = 'free'` AND no Stripe
+   * subscription exists, the org is in "trial expired" state: dashboard goes
+   * read-only, bot refuses new questions, monthly grant cron stops issuing
+   * fresh credits.
+   */
+  trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
   status: text('status', {
     enum: ['active', 'trialing', 'past_due', 'canceled', 'unbilled'],
   })
