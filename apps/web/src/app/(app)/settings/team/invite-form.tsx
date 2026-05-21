@@ -69,7 +69,7 @@ export function InviteForm({ canAssignRoles }: { canAssignRoles: boolean }) {
           </div>
         </label>
       ) : (
-        <input type="hidden" name="role" value="member" />
+        <input type="hidden" name="role" value="admin" />
       )}
       <Button type="submit" variant="primary" disabled={pending} className="sm:self-end">
         <Mail className="h-3.5 w-3.5" />

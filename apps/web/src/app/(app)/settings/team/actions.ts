@@ -35,16 +35,17 @@ export async function inviteMember(formData: FormData): Promise<{
 }> {
   const parsed = inviteMemberSchema.safeParse({
     email: formData.get('email'),
-    role: formData.get('role') ?? 'member',
+    role: formData.get('role') ?? 'admin',
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid input.' };
   }
-  // Multi-role invites are EE — CE always invites as plain member regardless
-  // of what the client posted. Matches the role-selector being hidden in CE
-  // (see invite-form.tsx) and the LICENSING.md positioning of RBAC as EE.
+  // Multi-role invites are EE — CE always invites as admin (full collaborator,
+  // matching n8n's CE posture) regardless of what the client posted. The
+  // owner role is reserved for the org creator. See invite-form.tsx for the
+  // matching client behaviour and LICENSING.md for the RBAC positioning.
   const { email } = parsed.data;
-  const role = isEnterpriseEnabled() ? parsed.data.role : 'member';
+  const role = isEnterpriseEnabled() ? parsed.data.role : 'admin';
 
   const { auth, db} = await getServerContext();
   const reqHeaders = await headers();
