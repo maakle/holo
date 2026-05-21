@@ -1,10 +1,40 @@
-# Holo
+<div align="center">
+  <img src="./apps/web/public/logo.png" alt="Holo" width="140" height="140" />
+  <h1>Holo</h1>
+  <p><em>The agent context layer for your company.</em></p>
+</div>
 
-> **The agent context layer for your company.** Connect your tools once. Holo unifies the data, learns the procedures your team actually runs, and exposes them as callable tools over MCP and OpenAPI — so any agent (Claude, Cursor, ChatGPT, your own) plugs into the same foundation, with scoped access and full observability.
+<p align="center">
+  <a href="https://github.com/maakle/holo/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/maakle/holo/ci.yml?branch=main&label=ci" alt="CI" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/CE-AGPL--3.0-blue" alt="Community Edition: AGPL-3.0" /></a>
+  <a href="./LICENSE-EE"><img src="https://img.shields.io/badge/EE-commercial-black" alt="Enterprise Edition: commercial" /></a>
+  <img src="https://img.shields.io/badge/status-pre--alpha-orange" alt="Status: pre-alpha" />
+  <a href="./docs"><img src="https://img.shields.io/badge/docs-%2Fdocs-blue" alt="Documentation" /></a>
+  <a href="https://github.com/maakle/holo/stargazers"><img src="https://img.shields.io/github/stars/maakle/holo?style=social" alt="GitHub stars" /></a>
+</p>
+
+> Connect your tools once. Holo unifies the data, learns the procedures your team actually runs, and exposes them as callable tools over MCP and OpenAPI — so any agent (Claude, Cursor, ChatGPT, your own) plugs into the same foundation, with scoped access and full observability.
 >
 > **Bring your own agent. Layer today. Agent OS tomorrow.**
 
 **Status:** Pre-alpha. **20 connectors live** (GitHub, GitLab, Slack, Notion, Grain, Pylon, HubSpot, Linear, Mintlify Docs, Prismic CMS, Zendesk Help Center, Webcrawl/Firecrawl, Google Drive, Airtable, Google Chat, Asana, Jira, Confluence, Stripe, Salesforce), hybrid RRF search, MCP + REST/OpenAPI, DCR OAuth provider, observability + audit + skill marketplace shipped. Not yet ready for production traffic; internal dogfood underway.
+
+---
+
+## Table of contents
+
+- [How it works](#how-it-works)
+- [The name](#the-name)
+- [Why this exists](#why-this-exists)
+- [What teams build on Holo](#what-teams-build-on-holo)
+- [Architecture](#architecture)
+- [Quickstart (self-host)](#quickstart-self-host)
+- [Deploy (Railway)](#deploy-railway)
+- [Development](#development)
+- [Roadmap and vision](#roadmap-and-vision)
+- [Contributing](#contributing)
+- [Editions](#editions)
+- [License](#license)
 
 ---
 
@@ -227,6 +257,9 @@ Two GitHub OAuth apps are required (login + connector); see [decision 0001](./do
 
 The MVP is intentionally narrow: **connect tools → unify into a substrate → expose via MCP and OpenAPI → bring your own agent (Claude, Cursor, ChatGPT, Slack bot, etc.)**. Anything beyond that is parked.
 
+<details>
+<summary>What's stubbed out today and why — click to expand</summary>
+
 Specifically, the following surfaces ship as **501 stubs** today and are deferred to a post-launch milestone:
 
 - **Skills** (`/skills`) — manual artifact labeling and Claude-driven skill synthesis from labeled examples
@@ -237,6 +270,8 @@ Specifically, the following surfaces ship as **501 stubs** today and are deferre
 The implementation is preserved in the repo (`packages/skills/`, `packages/discovery/`, `apps/web/src/lib/synthesize-and-persist.ts`, `apps/web/src/lib/discovery-db.ts`, the `procedure_*` tables) so re-enabling is route-handler restoration, not a re-build. The plan that produced the auto-discovery code is at [`docs/superpowers/plans/2026-05-05-procedure-auto-discovery.md`](./docs/superpowers/plans/2026-05-05-procedure-auto-discovery.md). Full implementation history is on the `feat/procedure-auto-discovery` branch through commit `38f49de`.
 
 **Why deferred:** the auto-discovery loop only pays off once the substrate has rich cross-connector signal (Slack threads referencing PRs, Grain calls tagged to HubSpot deals, etc.). MVP design partners' data is mostly single-connector — the algorithm is correct but starves for input. We'd rather ship the substrate, expose it via MCP/OpenAPI, watch agents use it for a quarter, and let the procedure layer emerge from real usage instead of synthesizing it speculatively.
+
+</details>
 
 ## Contributing
 
