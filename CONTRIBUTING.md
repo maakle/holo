@@ -62,6 +62,14 @@ The recipe:
 4. Run `pnpm db:check` locally. The repo-managed pre-commit hook (`.githooks/pre-commit`) also runs this whenever `packages/db/migrations/**` is touched; enable it via `pnpm install` once per clone (`prepare` script sets `core.hooksPath`).
 5. Commit the `.sql`, `_journal.json`, and the new snapshot together.
 
+**Data migrations (use this instead of `db:generate`).** For changes drizzle-kit can't see as a schema diff — JSONB sub-key renames, backfills, data corrections, `CREATE INDEX CONCURRENTLY`, RLS policies, view/function bodies, triggers — use the scaffolding script:
+
+```bash
+pnpm db:new-data-migration <snake_case_slug>
+```
+
+It writes the `.sql` stub, appends the journal entry (correct `idx`, monotonic `when`, matching tag), and copies the previous snapshot as the new baseline. Then fill in the SQL, edit any affected `src/schema/*.ts`, run `pnpm db:check && pnpm db:migrate`. Never hand-edit the journal or snapshot directly — getting any one of the three out of step silently breaks the next `pnpm db:generate`.
+
 **Naming convention (footgun).** Three numbers refer to the same migration and they don't line up:
 
 | Surface | Example | Source |
