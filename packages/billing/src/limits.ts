@@ -1,11 +1,11 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { schema, type DB } from '@holo/db';
 import { holoError, ErrorCode } from '@holo/errors';
 import { billingEnabled } from './env';
 import { getOrgBalance } from './ledger';
 import { getCurrentSubscription } from './plans';
 
-const { connectorCredentials } = schema;
+const { connectorCredentials, chunks } = schema;
 
 export type ConnectorGateDecision =
   | { allowed: true }
@@ -123,4 +123,67 @@ export async function assertSufficientCredits(
     problem: 'workspace is out of credits',
     fix: 'Buy a top-up at /settings/billing or upgrade your plan to restore service.',
   });
+}
+
+export type StorageQuotaDecision =
+  | { allowed: true; currentCount: number; limit: number | null }
+  | {
+      allowed: false;
+      reason: 'storage_cap';
+      currentCount: number;
+      limit: number;
+      currentPlanSlug: string;
+      currentPlanName: string;
+      suggestedUpgradeSlug: string;
+    };
+
+/**
+ * Decide whether the org can ingest `deltaCount` more chunks under its plan's
+ * `maxStoredArtifacts` ceiling. Called from the sync processor (before a run
+ * starts; `deltaCount = 0`, asks "am I already over?") and from
+ * `insertEmbeddedChunks` (defensive secondary check with the batch size,
+ * asks "can I fit this batch?").
+ *
+ * Returns `allowed: true` (with `limit: null`) when:
+ *   - billing is disabled (`HOLO_BILLING_ENABLED=false`)
+ *   - the org has no subscription row yet
+ *   - the plan's `maxStoredArtifacts` is `null` (unlimited)
+ *
+ * The chunk count uses an index-only scan against `chunks_org_idx` — fast
+ * even on 10M-row orgs (low milliseconds). No materialised cache.
+ */
+export async function checkStorageQuota(
+  db: DB,
+  organizationId: string,
+  deltaCount = 0,
+): Promise<StorageQuotaDecision> {
+  if (!billingEnabled()) return { allowed: true, currentCount: 0, limit: null };
+  const sub = await getCurrentSubscription(db, organizationId);
+  if (!sub) return { allowed: true, currentCount: 0, limit: null };
+  const limit = sub.plan.features.maxStoredArtifacts ?? null;
+  if (limit === null) return { allowed: true, currentCount: 0, limit: null };
+
+  const rows = await db
+    .select({ count: sql<string>`count(*)::text` })
+    .from(chunks)
+    .where(eq(chunks.organizationId, organizationId));
+  const currentCount = Number(rows[0]?.count ?? 0);
+
+  if (currentCount + deltaCount <= limit) {
+    return { allowed: true, currentCount, limit };
+  }
+  return {
+    allowed: false,
+    reason: 'storage_cap',
+    currentCount,
+    limit,
+    currentPlanSlug: sub.plan.slug,
+    currentPlanName: sub.plan.name,
+    suggestedUpgradeSlug:
+      sub.plan.slug === 'free'
+        ? 'starter'
+        : sub.plan.slug === 'starter'
+          ? 'team'
+          : 'business',
+  };
 }

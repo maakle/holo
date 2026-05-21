@@ -463,6 +463,20 @@
       "when": 1781740800000,
       "tag": "0066_drop_allowed_signup_emails",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1781827200000,
+      "tag": "0067_storage_caps",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1781913600000,
+      "tag": "0068_email_log",
+      "breakpoints": true
     }
   ]
 }

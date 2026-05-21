@@ -3,12 +3,6 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "target": "ES2022",
-    "isolatedModules": false,
     "jsx": "react-jsx",
     "jsxImportSource": "react"
   },

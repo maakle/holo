@@ -121,6 +121,23 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
                 </li>
                 <li className="flex gap-2">
                   <Check className="h-4 w-4 shrink-0 text-text-subtle" aria-hidden />
+                  <span>
+                    {plan.features.maxStoredArtifacts === null
+                    || plan.features.maxStoredArtifacts === undefined ? (
+                      'Unlimited indexed items'
+                    ) : (
+                      <>
+                        Up to{' '}
+                        <span className="tabular-nums text-text">
+                          {formatCredits(plan.features.maxStoredArtifacts)}
+                        </span>{' '}
+                        indexed items
+                      </>
+                    )}
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-text-subtle" aria-hidden />
                   <span>Star Wars sample dataset included</span>
                 </li>
               </ul>
