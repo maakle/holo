@@ -14,6 +14,7 @@ const FOOTER_GROUPS: { title: string; links: { label: string; href: string }[] }
       { label: 'Procedures', href: '#platform' },
       { label: 'Observability', href: '#observability' },
       { label: 'Security', href: '#security' },
+      { label: 'Pricing', href: '#pricing' },
     ],
   },
   {
