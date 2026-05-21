@@ -159,11 +159,25 @@ The first cut of B1.2 added a `billing_plan_variants` table with Light / Heavy /
 - New `LedgerReferenceKind` value `stripe_checkout` (distinct from recurring `stripe_invoice`).
 - **Done.** UI ("Buy more credits" button) ships in W4 (new).
 
-#### B2. Credit unit redenomination ✅ shipped 2026-05-21
+#### B2. Credit unit redenomination ✅ shipped 2026-05-21 (two passes)
 **Area:** `area:billing` · **Estimate:** 0.5d
-- Migration `0063_credit_unit_redenomination.sql` — `UPDATE credit_prices SET credits_per_unit = credits_per_unit / 100`. Pricing is purely DB-driven (`packages/billing/src/pricing.ts`), so no code change was needed.
-- Approach: keep plan grants (250K / 2M / 10M) the same and *divide rates* — a chat now debits ~200 credits instead of ~20,100, matching the RFC headline figures. Reverses the RFC's original "multiply" framing, which would have grown the displayed numbers rather than shrinking them.
-- Effect on existing customers: remaining pool balance is worth ~100× more in chat terms (modest one-time windfall). Historical ledger debits stay at their pre-divide numbers — the activity log shows a visible step-down at the cutover, which is the point.
+
+**Pass 1 — migration `0063_credit_unit_redenomination.sql`** divided only `credit_prices.credits_per_unit` by 100. Per-chat dropped to ~200, but plan grants (2M for Team), top-ups (1M for Medium), and historical balances (millions) were left at their old magnitudes. Net UX: the "200 credits per chat" headline matched RFC, but every other surface still showed million-scale numbers — the psychological win didn't land.
+
+**Pass 2 — migration `0065_redenominate_credits_small_unit.sql`** finished the job: divides `credit_prices.credits_per_unit`, `billing_plans.monthly_credits`, `credit_topup_packages.credits`, AND the entire historical `credit_ledger` by another 100, consistently. After both passes:
+
+| Surface | Before any redenom | After 0063 only | After 0063 + 0065 |
+|---|---|---|---|
+| Per chat | ~20,100 | ~200 | **~2–14** (varies by chat size) |
+| Team plan grant | 2M / mo | 2M / mo | **20K / mo** |
+| Business plan grant | 10M / mo | 10M / mo | **100K / mo** |
+| Medium top-up | 1M credits | 1M credits | **10K credits** |
+| Typical balance | 4.5M | 4.5M | **45K** |
+| Stripe dollar prices | $99 / $499 / $1,999 + $50 / $200 / $500 top-ups | **unchanged** | **unchanged** |
+
+Ledger normally being append-only: the `credit_ledger` `UPDATE` is the documented exception, made acceptable because a credit-unit change can't be modelled cleanly as a compensating entry (every row needs adjusting, and the UX cost of mixing two units in the activity log outweighs the architectural rule).
+
+**Tradeoff:** per-chat cost loses some granularity at the new scale because `Math.ceil` floors each token bucket to ≥1 credit. Small + moderate chats both round to ~2–3 credits; heavy chats (200K input + 100K output) still cost ~28 credits, so cheap-vs-expensive still shows up — just less linear at the small end. RFC chat-count promises (Team = 10K chats/mo) hold within ~30% depending on average chat size.
 - **Done.**
 
 #### ~~B3. Credit ledger category column~~ — deferred
@@ -273,3 +287,4 @@ B3 was scoped to enable a two-meter (sync vs run) display in W2. Since W2 is als
 | 2026-05-20 | Replaced pool-size variants with one-shot credit top-ups (B1.3 supersedes B1.2) | Variants over-built for stage: 9 Stripe SKUs + forced customer commitment + schema/UI fan-out across 5 tickets. Top-ups ship in hours, are reversible, and the upgrade story still works via top-up-fatigue driving tier upgrades. Revisit variants once usage data justifies. |
 | 2026-05-21 | B2, B4, W1, D1 all shipped. Mid-month upgrade grants now scoped to `invoice.billing_reason ∈ {subscription_create, subscription_cycle}` (Option B) so customers can't double-dip on credits when changing tiers mid-cycle | Browser-visible work done; pool-exhausted state is the load-bearing remaining safety; D1 fell out for free because all three bot platforms share `runAgent`; W1 stayed light (existing grid was already dynamic). B3 + W2 + W3 + D2 + D3 + M1 + M2 + T1 + T2 remain on the backlog as polish. |
 | 2026-05-21 | T1, T2, W2, W3, M2 all shipped. M1 handoff artifact (docs/launch/pricing-page-copy.md) ready for marketing. B3 dropped (unnecessary — `credit_ledger.reason` already distinguishes sync vs run). D2 + D3 deferred — they need real Slack/Teams/GoogleChat API integration with platform-specific scopes, risky to ship without browser testing | Closed everything except D2/D3 and the M1 handoff. New code surface: trial mechanic (schema + grant skipping + banner + extension endpoint), funnel events, two-meter usage display. Existing 22 tests stay green; all 5 affected packages typecheck clean. |
+| 2026-05-21 | Migration `0065_redenominate_credits_small_unit.sql`: finishes B2 by dividing plan grants, top-up sizes, and historical ledger by 100 (in addition to 0063's rate divide). Customer's 4.5M balance → 45K, plans display 250/2.5K/20K/100K, top-ups 2K/10K/30K | First pass of B2 only divided per-call rates, which left the dashboard showing big plan/balance numbers — defeated the psychological win. This pass normalizes every credit-denominated surface to the small scale at the cost of some per-chat granularity (ceil floor). Stripe dollar prices unchanged. |
