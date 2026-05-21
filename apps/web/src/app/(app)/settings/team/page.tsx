@@ -4,6 +4,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { schema } from '@holo/db';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { isEnterpriseEnabled } from '@/lib/ee/license';
 import { Badge } from '@/components/ui/badge';
 import { InviteForm } from './invite-form';
 import { InviteLinkCard } from './invite-link-card';
@@ -87,7 +88,7 @@ export default async function TeamPage() {
         </p>
       </section>
 
-      {canManage && <InviteForm />}
+      {canManage && <InviteForm canAssignRoles={isEnterpriseEnabled()} />}
       {canManage && <InviteLinkCard initialUrl={inviteLinkUrl} />}
 
       <section className="space-y-3">

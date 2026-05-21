@@ -39,7 +39,10 @@ Concretely:
 - **Skill synthesis + execution + marketplace publish** (`packages/skills`).
 - **`@holo/cli`** for one-command self-host.
 - **Single sign-in via email OTP and GitHub OAuth** (Better Auth).
-- **Multi-tenant organizations** (one or many orgs per deployment).
+- **Multi-tenant organizations** (one or many orgs per deployment). Invites,
+  removals, and an owner role for the org creator are CE; multi-role
+  assignment (member/admin) on top of the basic owner is EE — see RBAC
+  below.
 
 If you can run `docker compose up` and serve agents from it, you are using CE.
 
@@ -81,8 +84,11 @@ sequencing):
   object.
 - 🔐 **Single Sign-On.** SSO via Google OAuth, OIDC, or SAML. Group syncing
   and just-in-time user provisioning via SCIM.
-- 🛡️ **Role-Based Access Control.** RBAC for sensitive resources — which
-  members can see which agents, invoke which actions, edit which skills.
+- 🛡️ **Role-Based Access Control.** Multi-role membership (member/admin
+  on top of the basic owner) and, ultimately, RBAC for sensitive
+  resources — which members can see which agents, invoke which actions,
+  edit which skills. CE ships invites and a single owner role; EE adds
+  the role selector and finer-grained permissions.
 - 📊 **Analytics.** Usage graphs broken down by team, LLM provider, agent,
   skill, and connector. Costs, calls, latencies, error rates.
 - 🕵️ **Per-call audit log + Query History.** Tamper-evident hash chain

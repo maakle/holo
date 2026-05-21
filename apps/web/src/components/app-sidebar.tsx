@@ -72,7 +72,7 @@ function buildSettingsItems(eeEnabled: boolean): NavItem[] {
     { href: '/settings/api-keys', label: 'API keys' },
     { href: '/settings/advanced', label: 'Advanced' },
     { href: '/settings/team', label: 'Team' },
-    ...(eeEnabled ? [{ href: '/settings/audit-log', label: 'Audit log' }] : []),
+    ...(eeEnabled ? [{ href: '/ee/audit', label: 'Audit log' }] : []),
   ];
 }
 
@@ -110,7 +110,13 @@ export function SidebarBody({
   eeEnabled,
 }: SidebarProps) {
   const pathname = usePathname();
-  const inSettings = pathname === '/settings' || pathname.startsWith('/settings/');
+  // EE-gated settings live under /ee/ but still belong in the Settings nav panel
+  // from the user's POV. Add new EE settings paths here as they ship.
+  const inSettings =
+    pathname === '/settings' ||
+    pathname.startsWith('/settings/') ||
+    pathname === '/ee/audit' ||
+    pathname.startsWith('/ee/audit/');
 
   return (
     <>

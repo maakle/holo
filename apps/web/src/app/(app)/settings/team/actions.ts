@@ -9,6 +9,7 @@ import { holoError, ErrorCode } from '@holo/errors';
 import { emitAuditEvent } from '@holo/audit';
 import { getServerContext } from '@/lib/server-context';
 import { resolveActiveOrgId } from '@/lib/active-org';
+import { isEnterpriseEnabled } from '@/lib/ee/license';
 import {
   inviteMemberSchema,
   cancelInvitationSchema,
@@ -39,7 +40,11 @@ export async function inviteMember(formData: FormData): Promise<{
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid input.' };
   }
-  const { email, role } = parsed.data;
+  // Multi-role invites are EE — CE always invites as plain member regardless
+  // of what the client posted. Matches the role-selector being hidden in CE
+  // (see invite-form.tsx) and the LICENSING.md positioning of RBAC as EE.
+  const { email } = parsed.data;
+  const role = isEnterpriseEnabled() ? parsed.data.role : 'member';
 
   const { auth, db} = await getServerContext();
   const reqHeaders = await headers();

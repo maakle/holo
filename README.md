@@ -287,7 +287,7 @@ Holo ships in two editions in this same repo:
 - **Enterprise Edition (EE)** — **[commercial license](./LICENSE-EE)**. Lives under `**/ee/**`. Free to read, fork, and run in development; production use requires a paid subscription. EE surfaces (rolled out incrementally):
   - 👥 **Collaboration** — share chats and agents with members of your organization.
   - 🔐 **Single Sign-On** — Google OAuth, OIDC, SAML; SCIM for group sync and user provisioning.
-  - 🛡️ **Role-Based Access Control** — RBAC over agents, actions, skills, and connectors.
+  - 🛡️ **Role-Based Access Control** — multi-role membership (member/admin on top of CE's basic owner) and finer-grained RBAC over agents, actions, skills, and connectors.
   - 📊 **Analytics** — usage broken down by team, LLM, agent, skill, and connector.
   - 🕵️ **Per-call audit log + Query History** — tamper-evident hash chain over every tool invocation; long-retention, exportable audit of every agent and human query; configurable retention, SIEM hooks.
   - 💻 **Custom code** — pre/post-processing hooks to strip PII, reject sensitive queries, or run custom analysis.
