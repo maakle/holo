@@ -1,6 +1,7 @@
 interface Props {
   llmCredits: number;
   syncCredits: number;
+  monthlyGrant: number;
 }
 
 function fmt(n: number): string {
@@ -9,19 +10,22 @@ function fmt(n: number): string {
 
 /**
  * Two-meter usage display (RFC 0010 / ADR 0007 — W2). Shows agent runs and
- * connector sync as separate progress bars over the same shared pool, so the
- * "I connected Slack and burned my whole month's budget" panic is impossible:
- * users see exactly which category is consuming credits.
+ * connector sync as separate progress bars over the monthly pool, so users
+ * see exactly which category is consuming credits and how much of the budget
+ * each has burned.
  *
- * Bars are scaled to the same denominator (total spent this period) so their
- * widths visually represent the *share* of consumption, not absolute pool
- * usage. The combined total is shown beneath so the absolute number stays
- * one click away.
+ * Bars scale to the monthly grant so a small absolute number reads as a
+ * small bar — preventing the false "you're maxed out" signal that share-of-mix
+ * scaling produced when only one category had any activity.
  */
-export function UsageBreakdown({ llmCredits, syncCredits }: Props) {
+export function UsageBreakdown({ llmCredits, syncCredits, monthlyGrant }: Props) {
   const total = llmCredits + syncCredits;
-  const llmRatio = total > 0 ? llmCredits / total : 0;
-  const syncRatio = total > 0 ? syncCredits / total : 0;
+  const llmRatio = monthlyGrant > 0 ? Math.min(llmCredits / monthlyGrant, 1) : 0;
+  const syncRatio = monthlyGrant > 0 ? Math.min(syncCredits / monthlyGrant, 1) : 0;
+  const totalRatio = Math.min(llmRatio + syncRatio, 1);
+  const llmShare = totalRatio > 0 ? (llmRatio / (llmRatio + syncRatio)) * totalRatio : 0;
+  const syncShare = totalRatio > 0 ? (syncRatio / (llmRatio + syncRatio)) * totalRatio : 0;
+  const totalPct = (totalRatio * 100).toFixed(1);
 
   return (
     <section className="space-y-3">
@@ -41,9 +45,20 @@ export function UsageBreakdown({ llmCredits, syncCredits }: Props) {
           ratio={syncRatio}
           accent="bg-text-subtle"
         />
-        <div className="flex justify-between border-t border-border pt-3 text-[12px] tabular-nums text-text-muted">
-          <span>Total this period</span>
-          <span className="text-text">{fmt(total)} credits</span>
+        <div className="border-t border-border pt-4">
+          <div className="flex items-baseline justify-between">
+            <span className="text-[13px] font-medium text-text">Total this period</span>
+            <span className="text-[13px] tabular-nums text-text">
+              {fmt(total)}
+              <span className="ml-1 text-text-muted">
+                / {fmt(monthlyGrant)} credits ({totalPct}%)
+              </span>
+            </span>
+          </div>
+          <div className="mt-2 flex h-1.5 w-full overflow-hidden rounded-sm bg-surface-2">
+            <div className="h-full bg-accent" style={{ width: `${llmShare * 100}%` }} />
+            <div className="h-full bg-text-subtle" style={{ width: `${syncShare * 100}%` }} />
+          </div>
         </div>
       </div>
     </section>

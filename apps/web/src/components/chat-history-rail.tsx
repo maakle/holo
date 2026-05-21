@@ -1,5 +1,6 @@
 'use client';
 
+import { X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState, useTransition } from 'react';
@@ -75,7 +76,7 @@ export function ChatHistoryRail({
               <li key={c.id} className="group relative">
                 <Link
                   href={href}
-                  className={`flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-[13px] leading-5 transition-colors duration-micro ${
+                  className={`flex items-center rounded-sm py-1.5 pl-2 pr-9 text-[13px] leading-5 transition-colors duration-micro ${
                     active
                       ? 'bg-surface-2 text-text'
                       : 'text-text-muted hover:bg-surface-2 hover:text-text'
@@ -91,9 +92,9 @@ export function ChatHistoryRail({
                   }}
                   disabled={deletingId === c.id}
                   aria-label={`Delete conversation: ${c.title}`}
-                  className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-sm px-1.5 py-0.5 text-[12px] leading-none text-text-subtle hover:bg-bg hover:text-text group-hover:inline-flex disabled:opacity-50"
+                  className="absolute right-1 top-1/2 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-sm text-text-subtle hover:bg-bg hover:text-text group-hover:inline-flex disabled:opacity-50"
                 >
-                  ×
+                  <X aria-hidden className="h-4 w-4" />
                 </button>
               </li>
             );

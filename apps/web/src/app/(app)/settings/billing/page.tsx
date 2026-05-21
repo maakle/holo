@@ -87,6 +87,7 @@ export default async function BillingSettingsPage({
       <UsageBreakdown
         llmCredits={period.llmCredits}
         syncCredits={period.syncCredits}
+        monthlyGrant={subscription?.plan.monthlyCredits ?? 0}
       />
       <PlanGrid
         plans={plans satisfies PlanRow[]}
