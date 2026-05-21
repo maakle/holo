@@ -3,7 +3,8 @@
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Check } from 'lucide-react';
-import { resolveStorageCap, type PlanRow } from '@holo/billing';
+import { resolveStorageCap } from '@holo/billing/plan-defaults';
+import type { PlanRow } from '@holo/billing';
 
 interface Props {
   plans: PlanRow[];

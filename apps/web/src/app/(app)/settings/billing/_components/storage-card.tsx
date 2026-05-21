@@ -1,3 +1,12 @@
+'use client';
+
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+
 interface Props {
   currentCount: number;
   limit: number | null;
@@ -56,9 +65,21 @@ export function StorageCard({
         </div>
         <p className="mt-2 text-[13px] text-text-muted">
           chunks in your search index ·{' '}
-          <span title="Each item is one chunk in the search index. A typical Notion page is 5–20 chunks; a long PDF is ~150." className="underline decoration-text-subtle decoration-dotted underline-offset-2">
-            what counts?
-          </span>
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="cursor-help underline decoration-text-subtle decoration-dotted underline-offset-2 hover:decoration-text-muted"
+                >
+                  what counts?
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[260px] text-[12px] leading-relaxed">
+                Each item is one chunk in the search index. A typical Notion page is 5–20 chunks; a long PDF is ~150.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </p>
 
         {!isUnlimited ? (
