@@ -49,6 +49,12 @@
       "problemMatcher": []
     },
     {
+      "label": "DB: Check Migrations",
+      "type": "shell",
+      "command": "pnpm db:check",
+      "problemMatcher": []
+    },
+    {
       "label": "DB: Open Studio",
       "type": "shell",
       "command": "pnpm db:studio",
