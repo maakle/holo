@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Check } from 'lucide-react';
-import type { PlanRow } from '@holo/billing';
+import { resolveStorageCap, type PlanRow } from '@holo/billing';
 
 interface Props {
   plans: PlanRow[];
@@ -122,18 +122,27 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
                 <li className="flex gap-2">
                   <Check className="h-4 w-4 shrink-0 text-text-subtle" aria-hidden />
                   <span>
-                    {plan.features.maxStoredArtifacts === null
-                    || plan.features.maxStoredArtifacts === undefined ? (
-                      'Unlimited indexed items'
-                    ) : (
-                      <>
-                        Up to{' '}
-                        <span className="tabular-nums text-text">
-                          {formatCredits(plan.features.maxStoredArtifacts)}
-                        </span>{' '}
-                        indexed items
-                      </>
-                    )}
+                    {(() => {
+                      // Fall back to the slug-keyed default if the DB row is
+                      // missing `maxStoredArtifacts` (legacy seed rows from
+                      // pre-0067 migrations). Same source of truth the gate
+                      // uses, so what we advertise matches what we enforce.
+                      const cap = resolveStorageCap(
+                        plan.slug,
+                        plan.features.maxStoredArtifacts,
+                      );
+                      return cap === null ? (
+                        'Unlimited indexed items'
+                      ) : (
+                        <>
+                          Up to{' '}
+                          <span className="tabular-nums text-text">
+                            {formatCredits(cap)}
+                          </span>{' '}
+                          indexed items
+                        </>
+                      );
+                    })()}
                   </span>
                 </li>
                 <li className="flex gap-2">

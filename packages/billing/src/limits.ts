@@ -4,6 +4,7 @@ import { holoError, ErrorCode } from '@holo/errors';
 import { billingEnabled } from './env';
 import { getOrgBalance } from './ledger';
 import { getCurrentSubscription } from './plans';
+import { resolveStorageCap } from './plan-defaults';
 
 const { connectorCredentials, chunks } = schema;
 
@@ -160,7 +161,11 @@ export async function checkStorageQuota(
   if (!billingEnabled()) return { allowed: true, currentCount: 0, limit: null };
   const sub = await getCurrentSubscription(db, organizationId);
   if (!sub) return { allowed: true, currentCount: 0, limit: null };
-  const limit = sub.plan.features.maxStoredArtifacts ?? null;
+  // Resolve via the slug-keyed defaults: if a legacy plan row is missing
+  // `maxStoredArtifacts` (because migration 0067 hasn't reached this env),
+  // we still enforce the canonical cap. Explicit `null` on the row — e.g.
+  // enterprise — means intentionally unlimited and is honoured.
+  const limit = resolveStorageCap(sub.plan.slug, sub.plan.features.maxStoredArtifacts);
   if (limit === null) return { allowed: true, currentCount: 0, limit: null };
 
   const rows = await db
