@@ -61,7 +61,7 @@ const SELF_HOST_FEATURES = [
   'All 20 connectors',
   'Hybrid retrieval (pgvector + tsvector)',
   'MCP + REST + OpenAPI gateway',
-  'Per-call audit log',
+  'Agent observability',
   'OAuth 2.1 + PKCE provider',
   'Multi-tenant orgs',
 ];
@@ -104,8 +104,8 @@ export function PricingBand() {
             </h3>
             <p className="mt-3 max-w-[440px] text-[14px] leading-[1.6] text-text-muted">
               Deploy holo on your own infrastructure under AGPL-3.0. Every connector, the
-              MCP gateway, hybrid retrieval, and the audit log are included. There is no
-              closed core.
+              MCP gateway, hybrid retrieval, and agent observability are included. There
+              is no closed core.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a
@@ -209,13 +209,6 @@ export function PricingBand() {
                     />
                     <span>{plan.connectors}</span>
                   </li>
-                  <li className="flex gap-2">
-                    <Check
-                      className="h-4 w-4 shrink-0 text-text-subtle"
-                      aria-hidden
-                    />
-                    <span>Sample dataset included</span>
-                  </li>
                 </ul>
                 <Link
                   href="/sign-in"
@@ -244,8 +237,8 @@ export function PricingBand() {
                 </span>
               </div>
               <p className="mt-2 max-w-[640px] text-[13.5px] leading-[1.55] text-text-muted">
-                For organizations that need SSO/SCIM, RBAC, custom pre/post-processing,
-                whitelabeling, or long-retention query history. Same binary, gated by the
+                For organizations that need SSO/SCIM, RBAC, per-call audit log,
+                custom pre/post-processing, or whitelabeling. Same binary, gated by the
                 Enterprise license. Available on hosted or self-hosted.
               </p>
             </div>
@@ -272,8 +265,9 @@ export function PricingBand() {
             <p className="mt-2 text-[13.5px] leading-[1.6] text-text-muted">
               The Community Edition is{' '}
               <span className="text-text">AGPL-3.0</span> — free to self-host, fork,
-              and modify. Enterprise add-ons (SSO, RBAC, custom code, whitelabeling)
-              live under <span className="font-mono text-[12.5px] text-text">ee/</span>{' '}
+              and modify. Enterprise add-ons (SSO, RBAC, per-call audit log, custom
+              code, whitelabeling) live under{' '}
+              <span className="font-mono text-[12.5px] text-text">ee/</span>{' '}
               directories and require a paid commercial license for production use.
               Both editions live in the same repo; the path determines the license.
             </p>

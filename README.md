@@ -283,13 +283,13 @@ When you ship a user-visible feature, also add a PostHog event for it — see [`
 
 Holo ships in two editions in this same repo:
 
-- **Community Edition (CE)** — **[AGPL-3.0](./LICENSE)**. Always free to self-host for your company. Covers the entire core: all 20 connectors, hybrid search, MCP + REST gateway, OAuth provider, dashboard, worker, per-call audit log, skill synthesis + execution + marketplace, multi-tenant orgs, the CLI. If a file's path doesn't contain `/ee/`, it's CE and it's AGPL-3.0. Building a hosted commercial product on top of holo without the AGPL source-disclosure obligation requires a commercial license — open an issue.
+- **Community Edition (CE)** — **[AGPL-3.0](./LICENSE)**. Always free to self-host for your company. Covers the entire core: all 20 connectors, hybrid search, MCP + REST gateway, OAuth provider, dashboard, worker, agent observability, skill synthesis + execution + marketplace, multi-tenant orgs, the CLI. If a file's path doesn't contain `/ee/`, it's CE and it's AGPL-3.0. Building a hosted commercial product on top of holo without the AGPL source-disclosure obligation requires a commercial license — open an issue.
 - **Enterprise Edition (EE)** — **[commercial license](./LICENSE-EE)**. Lives under `**/ee/**`. Free to read, fork, and run in development; production use requires a paid subscription. EE surfaces (rolled out incrementally):
   - 👥 **Collaboration** — share chats and agents with members of your organization.
   - 🔐 **Single Sign-On** — Google OAuth, OIDC, SAML; SCIM for group sync and user provisioning.
   - 🛡️ **Role-Based Access Control** — RBAC over agents, actions, skills, and connectors.
   - 📊 **Analytics** — usage broken down by team, LLM, agent, skill, and connector.
-  - 🕵️ **Query History** — long-retention, exportable audit of every agent and human query.
+  - 🕵️ **Per-call audit log + Query History** — tamper-evident hash chain over every tool invocation; long-retention, exportable audit of every agent and human query; configurable retention, SIEM hooks.
   - 💻 **Custom code** — pre/post-processing hooks to strip PII, reject sensitive queries, or run custom analysis.
   - 🎨 **Whitelabeling** — custom name, logo, banners, brand color, and domain.
 
