@@ -25,7 +25,8 @@ export type LandingSection =
   | 'observability'
   | 'security'
   | 'use-cases'
-  | 'benchmarks';
+  | 'benchmarks'
+  | 'pricing';
 
 export type WebEventMap = {
   // ── Landing ────────────────────────────────────────────────────────────

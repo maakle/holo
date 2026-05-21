@@ -17,6 +17,7 @@ const GITHUB_URL = 'https://github.com/maakle/holo';
 const NAV_LINKS: { href: string; label: string; external?: boolean }[] = [
   { href: '#platform', label: 'Product' },
   { href: '#connectors', label: 'Connectors' },
+  { href: '#pricing', label: 'Pricing' },
   { href: '#open-source', label: 'Open source' },
   { href: `${GITHUB_URL}#readme`, label: 'Docs', external: true },
 ];

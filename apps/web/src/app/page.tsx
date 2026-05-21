@@ -10,6 +10,7 @@ import { OpenSourceBand } from '@/components/landing/open-source-band';
 import { UseCasesBand } from '@/components/landing/use-cases-band';
 import { ObservabilityBand } from '@/components/landing/observability-band';
 import { SecurityBand } from '@/components/landing/security-band';
+import { PricingBand } from '@/components/landing/pricing-band';
 import { FinalCTA } from '@/components/landing/final-cta';
 import { LandingFooter } from '@/components/landing/landing-footer';
 
@@ -36,6 +37,7 @@ export default async function Home() {
       <UseCasesBand />
       <ObservabilityBand />
       <SecurityBand />
+      <PricingBand />
       <FinalCTA isAuthed={isAuthed} installCommand={installCommand} />
       <LandingFooter />
     </div>
