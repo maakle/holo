@@ -2,9 +2,15 @@ import { Logger } from '@nestjs/common';
 import { WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import postgres, { type Sql } from 'postgres';
-import { createDb, type DB } from '@holo/db';
+import { eq, and } from 'drizzle-orm';
+import { createDb, schema as dbSchema, type DB } from '@holo/db';
 import { recordAgentEvent } from '@holo/audit';
-import { debitConnectorSync, checkCreditPool } from '@holo/billing';
+import {
+  debitConnectorSync,
+  checkCreditPool,
+  checkStorageQuota,
+} from '@holo/billing';
+import { sendStorageCapReachedEmail } from '@holo/email';
 import { holoError, ErrorCode, HoloError } from '@holo/errors';
 import { getWorkerPosthog } from '../posthog';
 import { runSyncJob, type SyncResult } from './sync-dispatch';
@@ -120,6 +126,44 @@ export abstract class SyncProcessorBase extends WorkerHost {
         properties: { surface: 'sync', queue: this.queueName, balance: creditDecision.balance },
       });
       return { artifactCount: 0, newCursor: null, skipReason: 'credit_pool_exhausted' };
+    }
+
+    // Refuse new sync runs when the org is already at its plan's
+    // `maxStoredArtifacts` ceiling. `deltaCount=0` here — we ask "are you
+    // already over?", not "can this run fit?" (the run size is unknown until
+    // the connector emits chunks). A second, batch-sized check happens in
+    // the embed processor so a single fat batch can't push the org past
+    // the cap. Pre-cap content remains queryable.
+    const storageDecision = await checkStorageQuota(db, job.data.organizationId);
+    if (!storageDecision.allowed) {
+      this.logger.log(
+        `skipping ${ctx}: storage cap reached (${storageDecision.currentCount}/${storageDecision.limit}) — upgrade from ${storageDecision.currentPlanSlug}`,
+      );
+      getWorkerPosthog().capture({
+        distinctId: `org:${job.data.organizationId}`,
+        event: 'holo.storage.cap_reached',
+        groups: { organization: job.data.organizationId },
+        properties: {
+          surface: 'sync',
+          queue: this.queueName,
+          current_plan: storageDecision.currentPlanSlug,
+          limit: storageDecision.limit,
+          current_count: storageDecision.currentCount,
+        },
+      });
+      // Fire-and-forget the owner notification. Idempotent per billing
+      // period so an org sitting over cap for weeks gets one email per
+      // period, not one per blocked sync tick. Failures are logged but
+      // never fail the sync skip — email is informational, not on the
+      // critical path.
+      void notifyStorageCapReached(db, this.logger, {
+        organizationId: job.data.organizationId,
+        currentCount: storageDecision.currentCount,
+        limit: storageDecision.limit,
+        currentPlanName: storageDecision.currentPlanName,
+        suggestedUpgradeSlug: storageDecision.suggestedUpgradeSlug,
+      });
+      return { artifactCount: 0, newCursor: null, skipReason: 'storage_cap_reached' };
     }
     // Best-effort run-history write. If the insert itself blows up (DB down,
     // FK violation against a deleted source), we'd rather still attempt the
@@ -381,5 +425,84 @@ export abstract class SyncProcessorBase extends WorkerHost {
     } finally {
       clearInterval(cancelPoll);
     }
+  }
+}
+
+/**
+ * Email the org owner that ingestion has been paused at the storage cap.
+ * Idempotency key includes the current period start so a fresh email goes
+ * out once per billing cycle if the org is still over cap, but we don't
+ * spam them every 4–24 hours when a sync tick re-trips the gate.
+ *
+ * All failures are logged + swallowed — email is informational, never on
+ * the sync critical path.
+ */
+async function notifyStorageCapReached(
+  db: DB,
+  logger: Logger,
+  args: {
+    organizationId: string;
+    currentCount: number;
+    limit: number;
+    currentPlanName: string;
+    suggestedUpgradeSlug: string;
+  },
+): Promise<void> {
+  try {
+    const { organization, user, member, organizationSubscriptions, billingPlans } = dbSchema;
+    // Look up the owner's email + org name + period start. Single round trip
+    // (sub-second on warm caches) — if any of these are missing we bail
+    // without sending.
+    const ownerRows = await db
+      .select({
+        email: user.email,
+        orgName: organization.name,
+        periodStart: organizationSubscriptions.currentPeriodStart,
+      })
+      .from(member)
+      .innerJoin(user, eq(user.id, member.userId))
+      .innerJoin(organization, eq(organization.id, member.organizationId))
+      .innerJoin(
+        organizationSubscriptions,
+        eq(organizationSubscriptions.organizationId, member.organizationId),
+      )
+      .where(and(eq(member.organizationId, args.organizationId), eq(member.role, 'owner')))
+      .orderBy(member.createdAt)
+      .limit(1);
+    const ownerRow = ownerRows[0];
+    if (!ownerRow) return;
+
+    const suggestedUpgradePlan = await db
+      .select({ name: billingPlans.name })
+      .from(billingPlans)
+      .where(eq(billingPlans.slug, args.suggestedUpgradeSlug))
+      .limit(1);
+    const upgradeName = suggestedUpgradePlan[0]?.name ?? 'a paid plan';
+
+    const base = process.env.BETTER_AUTH_URL?.replace(/\/+$/, '') ?? '';
+    const upgradeUrl = `${base}/settings/billing?upgrade=${args.suggestedUpgradeSlug}#plans`;
+
+    await sendStorageCapReachedEmail(db, {
+      to: ownerRow.email,
+      subject: `Your search index is full — ${ownerRow.orgName} on Holo`,
+      organizationId: args.organizationId,
+      idempotencyKey: `storage_cap_reached:${args.organizationId}:${ownerRow.periodStart.toISOString()}`,
+      metadata: {
+        current_count: args.currentCount,
+        limit: args.limit,
+        current_plan: args.currentPlanName,
+        suggested_upgrade: args.suggestedUpgradeSlug,
+      },
+      template: {
+        organizationName: ownerRow.orgName,
+        currentPlanName: args.currentPlanName,
+        currentCount: args.currentCount,
+        limit: args.limit,
+        suggestedUpgradePlanName: upgradeName,
+        upgradeUrl,
+      },
+    });
+  } catch (err) {
+    logger.warn(`storage-cap email failed for org ${args.organizationId}: ${(err as Error).message}`);
   }
 }

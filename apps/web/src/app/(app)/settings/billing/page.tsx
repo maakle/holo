@@ -11,6 +11,7 @@ import {
   listActiveTopupPackages,
   recentLedgerActivity,
   deriveTrialState,
+  checkStorageQuota,
   type SubscriptionWithPlan,
   type PlanRow,
   type LedgerActivityRow,
@@ -20,6 +21,7 @@ import { resolveActiveOrgId } from '@/lib/active-org';
 import { BillingDisabled } from './_components/billing-disabled';
 import { PlanSummary } from './_components/plan-summary';
 import { BalanceCard } from './_components/balance-card';
+import { StorageCard } from './_components/storage-card';
 import { UsageBreakdown } from './_components/usage-breakdown';
 import { PlanGrid } from './_components/plan-grid';
 import { TopupCard } from './_components/topup-card';
@@ -45,21 +47,31 @@ export default async function BillingSettingsPage({
   const orgId = resolveActiveOrgId(session);
   if (!orgId) redirect('/dashboard');
 
-  const [subscription, balance, period, plans, topupPackages, activity, sp, customerRow] =
-    await Promise.all([
-      getCurrentSubscription(db, orgId),
-      getOrgBalance(db, orgId),
-      getCurrentPeriodUsage(db, orgId),
-      listPublicPlans(db),
-      listActiveTopupPackages(db),
-      recentLedgerActivity(db, orgId, 50),
-      searchParams,
-      db
-        .select({ stripeCustomerId: schema.organizationSubscriptions.stripeCustomerId })
-        .from(schema.organizationSubscriptions)
-        .where(eq(schema.organizationSubscriptions.organizationId, orgId))
-        .limit(1),
-    ]);
+  const [
+    subscription,
+    balance,
+    period,
+    plans,
+    topupPackages,
+    activity,
+    sp,
+    customerRow,
+    storageDecision,
+  ] = await Promise.all([
+    getCurrentSubscription(db, orgId),
+    getOrgBalance(db, orgId),
+    getCurrentPeriodUsage(db, orgId),
+    listPublicPlans(db),
+    listActiveTopupPackages(db),
+    recentLedgerActivity(db, orgId, 50),
+    searchParams,
+    db
+      .select({ stripeCustomerId: schema.organizationSubscriptions.stripeCustomerId })
+      .from(schema.organizationSubscriptions)
+      .where(eq(schema.organizationSubscriptions.organizationId, orgId))
+      .limit(1),
+    checkStorageQuota(db, orgId),
+  ]);
 
   const hasStripeCustomer = Boolean(customerRow[0]?.stripeCustomerId);
   const checkoutFlash: 'success' | 'cancel' | undefined =
@@ -82,6 +94,22 @@ export default async function BillingSettingsPage({
         balance={balance.balance}
         monthlyGrant={subscription?.plan.monthlyCredits ?? 0}
         debitsThisPeriod={period.total}
+      />
+      <StorageCard
+        currentCount={storageDecision.currentCount}
+        limit={storageDecision.limit}
+        currentPlanName={subscription?.plan.name ?? 'Free'}
+        suggestedUpgradeSlug={
+          storageDecision.allowed
+            ? subscription?.plan.slug === 'free'
+              ? 'starter'
+              : subscription?.plan.slug === 'starter'
+                ? 'team'
+                : subscription?.plan.slug === 'team'
+                  ? 'business'
+                  : null
+            : storageDecision.suggestedUpgradeSlug
+        }
       />
       <TopupCard packages={topupPackages} />
       <UsageBreakdown

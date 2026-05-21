@@ -5,6 +5,10 @@ const { billingPlans, organizationSubscriptions } = schema;
 
 export type PlanFeatures = {
   maxConnectors: number | null;
+  /** Ceiling on rows in the `chunks` table (= embedding vectors stored).
+   *  `null` = unlimited. Closes the downgrade loophole — new ingestion is
+   *  paused at the cap, existing chunks remain queryable. */
+  maxStoredArtifacts?: number | null;
   syncIntervalTier?: 'standard' | 'priority';
   sampleDataIncluded?: boolean;
 };

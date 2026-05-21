@@ -31,8 +31,10 @@ export {
   canAddConnector,
   checkCreditPool,
   assertSufficientCredits,
+  checkStorageQuota,
   type ConnectorGateDecision,
   type CreditPoolDecision,
+  type StorageQuotaDecision,
 } from './limits';
 export {
   seedInitialSubscriptionAndGrant,

@@ -6,3 +6,4 @@ export * from './oauth';
 export * from './agent';
 export * from './feedback';
 export * from './billing';
+export * from './email';
