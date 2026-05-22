@@ -33,6 +33,6 @@ WHERE slug = 'team';
 --> statement-breakpoint
 
 INSERT INTO "billing_plans" (slug, name, monthly_credits, monthly_price_cents, features, is_public) VALUES
-  ('team', 'Team', 2000000, 49900,
+  ('team', 'Team', 20000, 49900,
    '{"maxConnectors":null, "syncIntervalTier":"standard", "sampleDataIncluded":true, "maxStoredChunks":500000}'::jsonb,
    true);
