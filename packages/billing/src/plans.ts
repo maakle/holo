@@ -19,6 +19,10 @@ export interface PlanRow {
   name: string;
   monthlyCredits: number;
   monthlyPriceCents: number;
+  /** Annual list price (charged upfront). `null` means this plan doesn't
+   *  offer annual billing. The credit grant on annual is 12 × monthlyCredits
+   *  issued at the start of each annual period. */
+  annualPriceCents: number | null;
   features: PlanFeatures;
   isPublic: boolean;
 }
@@ -84,6 +88,7 @@ export async function getCurrentSubscription(
       name: billingPlans.name,
       monthlyCredits: billingPlans.monthlyCredits,
       monthlyPriceCents: billingPlans.monthlyPriceCents,
+      annualPriceCents: billingPlans.annualPriceCents,
       features: billingPlans.features,
       isPublic: billingPlans.isPublic,
     })
@@ -107,6 +112,7 @@ export async function getCurrentSubscription(
       name: row.name,
       monthlyCredits: Number(row.monthlyCredits),
       monthlyPriceCents: row.monthlyPriceCents,
+      annualPriceCents: row.annualPriceCents,
       features: row.features as PlanFeatures,
       isPublic: row.isPublic,
     },
@@ -125,6 +131,7 @@ export async function listPublicPlans(db: DB): Promise<PlanRow[]> {
     name: row.name,
     monthlyCredits: Number(row.monthlyCredits),
     monthlyPriceCents: row.monthlyPriceCents,
+    annualPriceCents: row.annualPriceCents,
     features: row.features as PlanFeatures,
     isPublic: row.isPublic,
   }));

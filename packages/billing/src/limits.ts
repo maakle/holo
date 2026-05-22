@@ -189,6 +189,8 @@ export async function checkStorageQuota(
         ? 'starter'
         : sub.plan.slug === 'starter'
           ? 'team'
-          : 'business',
+          : sub.plan.slug === 'team'
+            ? 'scale'
+            : 'business',
   };
 }

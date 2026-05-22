@@ -19,6 +19,11 @@ export async function createCheckoutSessionForPlan(args: {
   db: DB;
   organizationId: string;
   planSlug: string;
+  /** 'monthly' bills `monthlyPriceCents` every month. 'annual' bills
+   *  `annualPriceCents` upfront for the whole year (~15% off list) and
+   *  the webhook handler grants 12× monthlyCredits at the start of each
+   *  annual period. */
+  billingInterval: 'monthly' | 'annual';
   ownerEmail: string;
   /** Where Stripe sends the user after a successful charge.
    *  Use a server-side route that polls until the webhook has updated state,
@@ -27,7 +32,7 @@ export async function createCheckoutSessionForPlan(args: {
   successUrl: string;
   cancelUrl: string;
 }): Promise<{ url: string; sessionId: string }> {
-  const { db, organizationId, planSlug, ownerEmail, successUrl, cancelUrl } = args;
+  const { db, organizationId, planSlug, billingInterval, ownerEmail, successUrl, cancelUrl } = args;
   const stripe = getStripeClient();
 
   const planRows = await db
@@ -40,14 +45,21 @@ export async function createCheckoutSessionForPlan(args: {
     throw holoError({
       code: ErrorCode.HOLO_NOT_FOUND,
       problem: `plan '${planSlug}' not found`,
-      fix: 'Check the plan slug. Valid slugs: starter, team, business.',
+      fix: 'Check the plan slug. Valid slugs: starter, team, scale, business.',
     });
   }
-  if (plan.monthlyPriceCents <= 0 || !plan.stripePriceId) {
+  const priceId =
+    billingInterval === 'annual' ? plan.stripeAnnualPriceId : plan.stripePriceId;
+  const intervalAmount =
+    billingInterval === 'annual' ? plan.annualPriceCents : plan.monthlyPriceCents;
+  if (!intervalAmount || intervalAmount <= 0 || !priceId) {
     throw holoError({
       code: ErrorCode.HOLO_INVALID_INPUT,
-      problem: `plan '${planSlug}' is not purchasable via checkout`,
-      fix: 'Free and Enterprise plans are not self-serve. Pick Starter / Team / Business.',
+      problem: `plan '${planSlug}' has no ${billingInterval} price configured`,
+      fix:
+        billingInterval === 'annual'
+          ? 'This plan is monthly-only today. Pick a different plan or contact sales.'
+          : 'Free and Enterprise plans are not self-serve. Pick Starter / Team / Scale / Business.',
     });
   }
 
@@ -60,7 +72,7 @@ export async function createCheckoutSessionForPlan(args: {
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
-    line_items: [{ price: plan.stripePriceId, quantity: 1 }],
+    line_items: [{ price: priceId, quantity: 1 }],
     success_url: successUrl,
     cancel_url: cancelUrl,
     allow_promotion_codes: true,
@@ -70,11 +82,13 @@ export async function createCheckoutSessionForPlan(args: {
     metadata: {
       organization_id: organizationId,
       plan_slug: planSlug,
+      billing_interval: billingInterval,
     },
     subscription_data: {
       metadata: {
         organization_id: organizationId,
         plan_slug: planSlug,
+        billing_interval: billingInterval,
       },
     },
   });

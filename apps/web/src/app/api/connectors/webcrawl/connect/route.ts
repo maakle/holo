@@ -95,7 +95,7 @@ export async function POST(req: Request) {
     const orgId = resolveActiveOrgId(session);
     const userId = session.user.id;
 
-    // Plan-limit gate (free → 1 connector). No-op for re-auth and self-hosted CE.
+    // Plan-limit gate (free → 2 connectors). No-op for re-auth and self-hosted CE.
     await enforceConnectorLimit(db, orgId, 'webcrawl');
 
     // Validate every URL up front. assertPublicHttpUrl resolves DNS and

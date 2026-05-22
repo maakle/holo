@@ -27,7 +27,10 @@ function makeDb(currentCount: number): DB {
   return { select: () => builder } as unknown as DB;
 }
 
-function mockPlan(slug: 'free' | 'starter' | 'team' | 'enterprise', maxStoredChunks: number | null | undefined) {
+function mockPlan(
+  slug: 'free' | 'starter' | 'team' | 'scale' | 'enterprise',
+  maxStoredChunks: number | null | undefined,
+) {
   (getCurrentSubscription as ReturnType<typeof vi.fn>).mockResolvedValue({
     organizationId: orgId,
     status: 'active',
@@ -41,6 +44,7 @@ function mockPlan(slug: 'free' | 'starter' | 'team' | 'enterprise', maxStoredChu
       name: slug.charAt(0).toUpperCase() + slug.slice(1),
       monthlyCredits: 0,
       monthlyPriceCents: 0,
+      annualPriceCents: null,
       features: {
         maxConnectors: null,
         maxStoredChunks,
@@ -91,8 +95,8 @@ describe('checkStorageQuota (billing PR 3)', () => {
   });
 
   it('blocks when already over cap (deltaCount=0)', async () => {
-    mockPlan('free', 10_000);
-    const decision = await checkStorageQuota(makeDb(15_000), orgId);
+    mockPlan('free', 25_000);
+    const decision = await checkStorageQuota(makeDb(30_000), orgId);
     expect(decision.allowed).toBe(false);
     if (!decision.allowed) {
       expect(decision.suggestedUpgradeSlug).toBe('starter');
@@ -110,7 +114,7 @@ describe('checkStorageQuota (billing PR 3)', () => {
 
   it('allows when feature key is undefined (legacy plan rows pre-migration)', async () => {
     mockPlan('team', undefined);
-    const decision = await checkStorageQuota(makeDb(500_000), orgId, 1000);
+    const decision = await checkStorageQuota(makeDb(100_000), orgId, 1000);
     expect(decision.allowed).toBe(true);
   });
 
@@ -118,7 +122,7 @@ describe('checkStorageQuota (billing PR 3)', () => {
     delete process.env.HOLO_BILLING_ENABLED;
     resetBillingEnabledCache();
     // getCurrentSubscription should NOT be called.
-    mockPlan('free', 10_000);
+    mockPlan('free', 25_000);
     const decision = await checkStorageQuota(makeDb(1_000_000), orgId);
     expect(decision.allowed).toBe(true);
     expect((getCurrentSubscription as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
@@ -130,9 +134,16 @@ describe('checkStorageQuota (billing PR 3)', () => {
     expect(decision.allowed).toBe(true);
   });
 
-  it('suggests business when team is full', async () => {
-    mockPlan('team', 1_000_000);
-    const decision = await checkStorageQuota(makeDb(1_000_001), orgId);
+  it('suggests scale when team is full', async () => {
+    mockPlan('team', 500_000);
+    const decision = await checkStorageQuota(makeDb(500_001), orgId);
+    if (decision.allowed) throw new Error('expected blocked');
+    expect(decision.suggestedUpgradeSlug).toBe('scale');
+  });
+
+  it('suggests business when scale is full', async () => {
+    mockPlan('scale', 2_000_000);
+    const decision = await checkStorageQuota(makeDb(2_000_001), orgId);
     if (decision.allowed) throw new Error('expected blocked');
     expect(decision.suggestedUpgradeSlug).toBe('business');
   });

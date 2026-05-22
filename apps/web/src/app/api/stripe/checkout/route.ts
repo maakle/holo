@@ -11,7 +11,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({
-  planSlug: z.enum(['starter', 'team', 'business']),
+  planSlug: z.enum(['starter', 'team', 'scale', 'business']),
+  billingInterval: z.enum(['monthly', 'annual']).default('monthly'),
 });
 
 /**
@@ -46,7 +47,7 @@ export async function POST(req: Request): Promise<Response> {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
         problem: `invalid request: ${parsed.error.message}`,
-        fix: 'Send { planSlug: "starter" | "team" | "business" }.',
+        fix: 'Send { planSlug: "starter" | "team" | "scale" | "business", billingInterval?: "monthly" | "annual" }.',
       });
     }
 
@@ -65,6 +66,7 @@ export async function POST(req: Request): Promise<Response> {
       db,
       organizationId,
       planSlug: parsed.data.planSlug,
+      billingInterval: parsed.data.billingInterval,
       ownerEmail,
       successUrl: `${origin}/settings/billing?checkout=success`,
       cancelUrl: `${origin}/settings/billing?checkout=cancel`,
@@ -77,6 +79,7 @@ export async function POST(req: Request): Promise<Response> {
         surface: 'web',
         kind: 'subscription',
         plan_slug: parsed.data.planSlug,
+        billing_interval: parsed.data.billingInterval,
         checkout_session_id: result.sessionId,
       },
     });

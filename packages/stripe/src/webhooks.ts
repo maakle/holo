@@ -355,11 +355,21 @@ async function issueMonthlyGrantForInvoice(
 
   const item = subscription.items.data[0];
   const periodStart = item ? stripeTimestampToDate(item.current_period_start) : new Date();
+  const periodEnd = item ? stripeTimestampToDate(item.current_period_end) : periodStart;
+
+  // Annual subscriptions get a full year of credits upfront. We detect them
+  // by period duration rather than reading subscription.items[0].price.recurring
+  // to avoid an extra Stripe API round-trip — a Stripe billing period > 60
+  // days is unambiguously annual (monthly periods are 28–31 days at most).
+  const periodDays = (periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24);
+  const isAnnual = periodDays > 60;
+  const creditMultiplier = isAnnual ? 12 : 1;
+  const billingInterval = isAnnual ? 'annual' : 'monthly';
 
   await writeLedgerEntry(db, {
     organizationId,
     kind: 'grant',
-    credits: Number(plan.monthlyCredits),
+    credits: Number(plan.monthlyCredits) * creditMultiplier,
     reason: 'monthly_grant',
     referenceKind: 'stripe_invoice',
     referenceId: invoice.id ?? subscription.id,
@@ -370,6 +380,8 @@ async function issueMonthlyGrantForInvoice(
       stripe_subscription_id: subscription.id,
       stripe_invoice_id: invoice.id,
       billing_reason: invoice.billing_reason,
+      billing_interval: billingInterval,
+      credit_multiplier: creditMultiplier,
     },
   });
 }

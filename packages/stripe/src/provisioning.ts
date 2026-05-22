@@ -31,7 +31,7 @@ async function findOrCreatePrice(
     unitAmount: number;
     productName: string;
     metadata: Record<string, string>;
-    recurring: { interval: 'month' } | null;
+    recurring: { interval: 'month' | 'year' } | null;
   },
 ): Promise<string> {
   const existing = await stripe.prices.list({
@@ -82,7 +82,7 @@ export async function ensureStripeProductsForPlans(db: DB): Promise<{
   skipped: number;
 }> {
   const stripe = getStripeClient();
-  const plans = await db.select().from(billingPlans).where(isNull(billingPlans.stripePriceId));
+  const plans = await db.select().from(billingPlans);
   let provisioned = 0;
   let skipped = 0;
 
@@ -92,19 +92,35 @@ export async function ensureStripeProductsForPlans(db: DB): Promise<{
       continue;
     }
 
-    const priceId = await findOrCreatePrice(stripe, {
-      lookupKey: plan.slug,
-      unitAmount: plan.monthlyPriceCents,
-      productName: `Holo — ${plan.name}`,
-      metadata: { plan_slug: plan.slug },
-      recurring: { interval: 'month' },
-    });
+    if (!plan.stripePriceId) {
+      const priceId = await findOrCreatePrice(stripe, {
+        lookupKey: plan.slug,
+        unitAmount: plan.monthlyPriceCents,
+        productName: `Holo — ${plan.name}`,
+        metadata: { plan_slug: plan.slug, billing_interval: 'monthly' },
+        recurring: { interval: 'month' },
+      });
+      await db
+        .update(billingPlans)
+        .set({ stripePriceId: priceId })
+        .where(eq(billingPlans.id, plan.id));
+      provisioned += 1;
+    }
 
-    await db
-      .update(billingPlans)
-      .set({ stripePriceId: priceId })
-      .where(eq(billingPlans.id, plan.id));
-    provisioned += 1;
+    if (plan.annualPriceCents && !plan.stripeAnnualPriceId) {
+      const annualPriceId = await findOrCreatePrice(stripe, {
+        lookupKey: `${plan.slug}-annual`,
+        unitAmount: plan.annualPriceCents,
+        productName: `Holo — ${plan.name}`,
+        metadata: { plan_slug: plan.slug, billing_interval: 'annual' },
+        recurring: { interval: 'year' },
+      });
+      await db
+        .update(billingPlans)
+        .set({ stripeAnnualPriceId: annualPriceId })
+        .where(eq(billingPlans.id, plan.id));
+      provisioned += 1;
+    }
   }
 
   return { provisioned, skipped };

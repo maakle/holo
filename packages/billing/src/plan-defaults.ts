@@ -9,13 +9,15 @@
  *   - the UI never falsely advertises "Unlimited"
  *   - the gate stays armed even if a migration is pending
  *
- * Keep these in sync with the seed values in
- * `packages/db/migrations/0067_storage_caps.sql`. If you tune one, tune both.
+ * Keep these in sync with the values seeded by the latest pricing migration
+ * (currently `0070_free_expansion_team_chunk_cap.sql`). If you tune one,
+ * tune both.
  */
 export const PLAN_DEFAULT_STORAGE_CAP: Record<string, number | null> = {
-  free: 10_000,
+  free: 25_000,
   starter: 100_000,
-  team: 1_000_000,
+  team: 500_000,
+  scale: 2_000_000,
   business: 10_000_000,
   enterprise: null,
 };

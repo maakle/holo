@@ -15,9 +15,10 @@ describe('resolveStorageCap', () => {
   it('falls back to the slug default when the row value is undefined', () => {
     // The common case: legacy `billing_plans` row from before migration 0067
     // where the JSONB key is simply missing.
-    expect(resolveStorageCap('free', undefined)).toBe(10_000);
+    expect(resolveStorageCap('free', undefined)).toBe(25_000);
     expect(resolveStorageCap('starter', undefined)).toBe(100_000);
-    expect(resolveStorageCap('team', undefined)).toBe(1_000_000);
+    expect(resolveStorageCap('team', undefined)).toBe(500_000);
+    expect(resolveStorageCap('scale', undefined)).toBe(2_000_000);
     expect(resolveStorageCap('business', undefined)).toBe(10_000_000);
   });
 
