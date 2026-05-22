@@ -27,7 +27,10 @@ function makeDb(currentCount: number): DB {
   return { select: () => builder } as unknown as DB;
 }
 
-function mockPlan(slug: 'free' | 'starter' | 'team' | 'enterprise', maxStoredChunks: number | null | undefined) {
+function mockPlan(
+  slug: 'free' | 'starter' | 'team' | 'scale' | 'enterprise',
+  maxStoredChunks: number | null | undefined,
+) {
   (getCurrentSubscription as ReturnType<typeof vi.fn>).mockResolvedValue({
     organizationId: orgId,
     status: 'active',
@@ -130,9 +133,16 @@ describe('checkStorageQuota (billing PR 3)', () => {
     expect(decision.allowed).toBe(true);
   });
 
-  it('suggests business when team is full', async () => {
+  it('suggests scale when team is full', async () => {
     mockPlan('team', 500_000);
     const decision = await checkStorageQuota(makeDb(500_001), orgId);
+    if (decision.allowed) throw new Error('expected blocked');
+    expect(decision.suggestedUpgradeSlug).toBe('scale');
+  });
+
+  it('suggests business when scale is full', async () => {
+    mockPlan('scale', 2_000_000);
+    const decision = await checkStorageQuota(makeDb(2_000_001), orgId);
     if (decision.allowed) throw new Error('expected blocked');
     expect(decision.suggestedUpgradeSlug).toBe('business');
   });

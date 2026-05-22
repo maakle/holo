@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({
-  planSlug: z.enum(['starter', 'team', 'business']),
+  planSlug: z.enum(['starter', 'team', 'scale', 'business']),
 });
 
 /**
@@ -46,7 +46,7 @@ export async function POST(req: Request): Promise<Response> {
       throw holoError({
         code: ErrorCode.HOLO_INVALID_INPUT,
         problem: `invalid request: ${parsed.error.message}`,
-        fix: 'Send { planSlug: "starter" | "team" | "business" }.',
+        fix: 'Send { planSlug: "starter" | "team" | "scale" | "business" }.',
       });
     }
 

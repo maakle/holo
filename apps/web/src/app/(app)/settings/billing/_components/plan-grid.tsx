@@ -12,8 +12,8 @@ interface Props {
   highlightSlug?: string | null;
 }
 
-const SLUG_ORDER = ['free', 'starter', 'team', 'business'];
-const PURCHASABLE = new Set(['starter', 'team', 'business']);
+const SLUG_ORDER = ['free', 'starter', 'team', 'scale', 'business'];
+const PURCHASABLE = new Set(['starter', 'team', 'scale', 'business']);
 const POPULAR_SLUG = 'team';
 
 function formatCredits(n: number): string {
@@ -64,7 +64,7 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
   return (
     <section id="plans" className="space-y-3 scroll-mt-8">
       <h3 className="text-[15px] font-medium text-text">Plans</h3>
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {ordered.map((plan) => {
           const isCurrent = currentSlug === plan.slug;
           const isHighlight = highlightSlug === plan.slug;

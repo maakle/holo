@@ -18,6 +18,7 @@ describe('resolveStorageCap', () => {
     expect(resolveStorageCap('free', undefined)).toBe(25_000);
     expect(resolveStorageCap('starter', undefined)).toBe(100_000);
     expect(resolveStorageCap('team', undefined)).toBe(500_000);
+    expect(resolveStorageCap('scale', undefined)).toBe(2_000_000);
     expect(resolveStorageCap('business', undefined)).toBe(10_000_000);
   });
 

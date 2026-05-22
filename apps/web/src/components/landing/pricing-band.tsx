@@ -7,7 +7,7 @@ const GITHUB_URL = 'https://github.com/maakle/holo';
 const LICENSING_URL = `${GITHUB_URL}/blob/main/LICENSING.md`;
 
 type HostedPlan = {
-  slug: 'free' | 'starter' | 'team' | 'business';
+  slug: 'free' | 'starter' | 'team' | 'scale' | 'business';
   name: string;
   price: string;
   cadence?: string;
@@ -52,6 +52,16 @@ const HOSTED_PLANS: HostedPlan[] = [
     chunks: '500K chunks',
     blurb: 'For engineering teams in production. Standard sync intervals.',
     popular: true,
+  },
+  {
+    slug: 'scale',
+    name: 'Scale',
+    price: '$999',
+    cadence: '/mo',
+    credits: '50,000',
+    connectors: 'Unlimited connectors',
+    chunks: '2M chunks',
+    blurb: 'For teams that have outgrown Team but aren’t at Business volume yet.',
   },
   {
     slug: 'business',
@@ -169,7 +179,7 @@ export function PricingBand() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {HOSTED_PLANS.map((plan) => (
               <div
                 key={plan.slug}
