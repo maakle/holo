@@ -41,7 +41,7 @@ export async function POST() {
     }
     const orgId = resolveActiveOrgId(session);
 
-    // Plan-limit gate (free → 1 connector). No-op for re-auth and for self-hosted CE.
+    // Plan-limit gate (free → 2 connectors). No-op for re-auth and for self-hosted CE.
     await enforceConnectorLimit(db, orgId, 'teams');
     const userId = session.user.id;
 

@@ -484,6 +484,13 @@
       "when": 1782000000000,
       "tag": "0069_rename_max_stored_artifacts",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1782086400000,
+      "tag": "0070_free_expansion_team_chunk_cap",
+      "breakpoints": true
     }
   ]
 }
