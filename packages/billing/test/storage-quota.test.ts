@@ -44,6 +44,7 @@ function mockPlan(
       name: slug.charAt(0).toUpperCase() + slug.slice(1),
       monthlyCredits: 0,
       monthlyPriceCents: 0,
+      annualPriceCents: null,
       features: {
         maxConnectors: null,
         maxStoredChunks,

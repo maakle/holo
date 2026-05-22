@@ -40,7 +40,14 @@ export const billingPlans = pgTable('billing_plans', {
   name: text('name').notNull(),
   monthlyCredits: bigint('monthly_credits', { mode: 'number' }).notNull(),
   monthlyPriceCents: integer('monthly_price_cents').notNull(),
+  /** Annual list price (charged upfront, single invoice). NULL on plans that
+   *  don't offer annual billing (free, enterprise). Convention: ~15% off
+   *  monthly × 12. The credit grant is 12 × `monthlyCredits` issued at the
+   *  start of each annual period — the webhook handler detects the interval
+   *  from the Stripe subscription's period duration. */
+  annualPriceCents: integer('annual_price_cents'),
   stripePriceId: text('stripe_price_id'),
+  stripeAnnualPriceId: text('stripe_annual_price_id'),
   features: jsonb('features').$type<{
     maxConnectors: number | null;
     maxStoredChunks?: number | null;

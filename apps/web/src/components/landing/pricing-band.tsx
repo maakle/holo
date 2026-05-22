@@ -1,79 +1,10 @@
-import Link from 'next/link';
 import { ArrowRight, Check, Scale } from 'lucide-react';
 import { GithubMark } from '@/components/landing/brand-marks';
 import { TrackInView } from '@/components/landing/track-in-view';
+import { PricingHostedPlans } from '@/components/landing/pricing-hosted-plans';
 
 const GITHUB_URL = 'https://github.com/maakle/holo';
 const LICENSING_URL = `${GITHUB_URL}/blob/main/LICENSING.md`;
-
-type HostedPlan = {
-  slug: 'free' | 'starter' | 'team' | 'scale' | 'business';
-  name: string;
-  price: string;
-  cadence?: string;
-  credits: string;
-  connectors: string;
-  /** Cap on chunks stored in the search index (one row per embedding
-   *  vector). Chunk cap and connector cap are independent levers —
-   *  see packages/billing/src/limits.ts. */
-  chunks: string;
-  blurb: string;
-  popular?: boolean;
-};
-
-const HOSTED_PLANS: HostedPlan[] = [
-  {
-    slug: 'free',
-    name: 'Free',
-    price: '$0',
-    cadence: '14-day trial',
-    credits: '250',
-    connectors: '2 connectors',
-    chunks: '25K chunks',
-    blurb: 'Kick the tires on the hosted version. No credit card.',
-  },
-  {
-    slug: 'starter',
-    name: 'Starter',
-    price: '$99',
-    cadence: '/mo',
-    credits: '2,500',
-    connectors: '5 connectors',
-    chunks: '100K chunks',
-    blurb: 'For solo builders and small teams running a handful of agents.',
-  },
-  {
-    slug: 'team',
-    name: 'Team',
-    price: '$499',
-    cadence: '/mo',
-    credits: '20,000',
-    connectors: 'Unlimited connectors',
-    chunks: '500K chunks',
-    blurb: 'For engineering teams in production. Standard sync intervals.',
-    popular: true,
-  },
-  {
-    slug: 'scale',
-    name: 'Scale',
-    price: '$999',
-    cadence: '/mo',
-    credits: '50,000',
-    connectors: 'Unlimited connectors',
-    chunks: '2M chunks',
-    blurb: 'For teams that have outgrown Team but aren’t at Business volume yet.',
-  },
-  {
-    slug: 'business',
-    name: 'Business',
-    price: '$1,999',
-    cadence: '/mo',
-    credits: '100,000',
-    connectors: 'Unlimited connectors',
-    chunks: '10M chunks',
-    blurb: 'High-volume workloads. Priority sync intervals. Same binary.',
-  },
-];
 
 const SELF_HOST_FEATURES = [
   'All 20 connectors',
@@ -179,76 +110,7 @@ export function PricingBand() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            {HOSTED_PLANS.map((plan) => (
-              <div
-                key={plan.slug}
-                className={[
-                  'flex flex-col rounded-md border bg-surface p-5',
-                  plan.popular ? 'border-accent' : 'border-border',
-                ].join(' ')}
-              >
-                <div className="flex items-baseline justify-between">
-                  <h4 className="font-display text-[18px] font-semibold text-text">
-                    {plan.name}
-                  </h4>
-                  {plan.popular ? (
-                    <span className="inline-flex items-center rounded-sm bg-accent/10 px-2 py-0.5 text-[11px] uppercase tracking-[0.06em] text-accent">
-                      Most popular
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-3 flex items-baseline gap-1.5">
-                  <span className="font-mono text-[28px] leading-none tabular-nums text-text">
-                    {plan.price}
-                  </span>
-                  {plan.cadence ? (
-                    <span className="text-[13px] text-text-muted">{plan.cadence}</span>
-                  ) : null}
-                </div>
-                <p className="mt-4 text-[13px] leading-[1.55] text-text-muted">
-                  {plan.blurb}
-                </p>
-                <ul className="mt-5 mb-6 space-y-2 text-[13px] text-text-muted">
-                  <li className="flex gap-2">
-                    <Check
-                      className="h-4 w-4 shrink-0 text-text-subtle"
-                      aria-hidden
-                    />
-                    <span>
-                      <span className="tabular-nums text-text">{plan.credits}</span>{' '}
-                      credits / month
-                    </span>
-                  </li>
-                  <li className="flex gap-2">
-                    <Check
-                      className="h-4 w-4 shrink-0 text-text-subtle"
-                      aria-hidden
-                    />
-                    <span>{plan.connectors}</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <Check
-                      className="h-4 w-4 shrink-0 text-text-subtle"
-                      aria-hidden
-                    />
-                    <span>{plan.chunks}</span>
-                  </li>
-                </ul>
-                <Link
-                  href="/sign-in"
-                  className={[
-                    'mt-auto inline-flex h-10 w-full items-center justify-center rounded-md px-3 text-[13px] font-medium transition-opacity',
-                    plan.popular
-                      ? 'bg-accent text-accent-fg hover:opacity-90'
-                      : 'border border-border bg-surface text-text hover:bg-surface-2',
-                  ].join(' ')}
-                >
-                  {plan.slug === 'free' ? 'Start free trial' : `Choose ${plan.name}`}
-                </Link>
-              </div>
-            ))}
-          </div>
+          <PricingHostedPlans />
 
           {/* Enterprise row */}
           <div className="mt-4 grid gap-4 rounded-md border border-border bg-surface p-6 lg:grid-cols-[1fr_auto] lg:items-center">

@@ -33,7 +33,12 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
   );
   const currentIndex = currentSlug ? SLUG_ORDER.indexOf(currentSlug) : -1;
   const [busy, setBusy] = useState<string | null>(null);
+  const [interval, setInterval] = useState<'monthly' | 'annual'>('annual');
   const [, startTransition] = useTransition();
+
+  const showAnnualToggle = ordered.some(
+    (p) => p.annualPriceCents !== null && p.annualPriceCents !== undefined,
+  );
 
   async function startCheckout(planSlug: string) {
     setBusy(planSlug);
@@ -41,7 +46,7 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planSlug }),
+        body: JSON.stringify({ planSlug, billingInterval: interval }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         url?: string;
@@ -63,7 +68,45 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
 
   return (
     <section id="plans" className="space-y-3 scroll-mt-8">
-      <h3 className="text-[15px] font-medium text-text">Plans</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-[15px] font-medium text-text">Plans</h3>
+        {showAnnualToggle ? (
+          <div
+            role="tablist"
+            aria-label="Billing interval"
+            className="inline-flex rounded-md border border-border bg-surface p-0.5"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={interval === 'monthly'}
+              onClick={() => setInterval('monthly')}
+              className={[
+                'h-7 rounded-[5px] px-2.5 text-[12px] font-medium transition-colors',
+                interval === 'monthly'
+                  ? 'bg-surface-2 text-text'
+                  : 'text-text-muted hover:text-text',
+              ].join(' ')}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={interval === 'annual'}
+              onClick={() => setInterval('annual')}
+              className={[
+                'h-7 rounded-[5px] px-2.5 text-[12px] font-medium transition-colors',
+                interval === 'annual'
+                  ? 'bg-surface-2 text-text'
+                  : 'text-text-muted hover:text-text',
+              ].join(' ')}
+            >
+              Annual <span className="ml-1 text-[10.5px] text-accent">−15%</span>
+            </button>
+          </div>
+        ) : null}
+      </div>
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {ordered.map((plan) => {
           const isCurrent = currentSlug === plan.slug;
@@ -94,14 +137,30 @@ export function PlanGrid({ plans, currentSlug, highlightSlug }: Props) {
                   </span>
                 ) : null}
               </div>
-              <div className="mt-3 font-mono text-[28px] leading-none tabular-nums text-text">
-                {formatPrice(plan.monthlyPriceCents)}
-                {plan.monthlyPriceCents > 0 ? (
-                  <span className="ml-1 text-[13px] font-normal text-text-muted">
-                    /mo
-                  </span>
-                ) : null}
-              </div>
+              {(() => {
+                const onAnnual =
+                  interval === 'annual' && plan.annualPriceCents !== null && plan.annualPriceCents > 0;
+                const displayCents = onAnnual
+                  ? Math.round((plan.annualPriceCents as number) / 12)
+                  : plan.monthlyPriceCents;
+                return (
+                  <>
+                    <div className="mt-3 font-mono text-[28px] leading-none tabular-nums text-text">
+                      {formatPrice(displayCents)}
+                      {displayCents > 0 ? (
+                        <span className="ml-1 text-[13px] font-normal text-text-muted">
+                          {onAnnual ? '/mo billed annually' : '/mo'}
+                        </span>
+                      ) : null}
+                    </div>
+                    {onAnnual ? (
+                      <p className="mt-1 text-[11.5px] text-text-subtle tabular-nums">
+                        ${((plan.annualPriceCents as number) / 100).toLocaleString('en-US')} / year
+                      </p>
+                    ) : null}
+                  </>
+                );
+              })()}
               <ul className="mt-5 mb-6 space-y-2 text-[13px] text-text-muted">
                 <li className="flex gap-2">
                   <Check className="h-4 w-4 shrink-0 text-text-subtle" aria-hidden />
