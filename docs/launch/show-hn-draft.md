@@ -71,7 +71,7 @@ Alternates if the above feels off:
 Target: under 180 seconds, no narration audio, just on-screen captions and clean keystrokes.
 
 1. **0:00–0:20 — `npx @holo/cli@latest init`** in an empty directory. Show the prompts: Anthropic key, GitHub OAuth. Show the generated `.env` and `docker-compose.yml`.
-2. **0:20–0:40 — `docker compose up -d`** + open `http://localhost:3000`. Sign in with GitHub. Connect Slack and one GitHub repo on the Connections page.
+2. **0:20–0:40 — `docker compose --profile app up -d`** + open `http://localhost:3000`. Sign in with GitHub. Connect Slack and one GitHub repo on the Connections page.
 3. **0:40–1:30 — Watch a sync land.** Connections page shows the first sync running, then "✓ N documents." Switch to the dashboard charts (sync throughput + agent invocations) so they're populated.
 4. **1:30–2:10 — Wire up an agent.** Open the "Connect your agent" page, copy the Claude Desktop config blob, paste it into Claude Desktop. Run `search` from Claude Desktop — return chunks from the just-indexed Slack channel.
 5. **2:10–2:40 — Replay diff.** In the holo dashboard, open the Observability tab. Click the invocation that just happened. Side-by-side input/output view.

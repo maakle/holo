@@ -57,8 +57,8 @@ else
   step "Using existing .env"
 fi
 
-step "Booting holo (docker compose up -d) — first run pulls images and may take a minute"
-docker compose up -d
+step "Booting holo (docker compose --profile app up -d) — first run pulls images and may take a minute"
+docker compose --profile app up -d
 
 printf "\n"
 ok "holo is starting"

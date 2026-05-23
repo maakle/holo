@@ -169,6 +169,6 @@ export async function initCommand(_args: string[], opts: InitOptions = {}): Prom
     if (!ghClientSecret) missing.push('GITHUB_LOGIN_CLIENT_SECRET');
     console.log(`  ${stepNum++}. Fill in ${missing.join(', ')} in .env`);
   }
-  console.log(`  ${stepNum++}. Run: docker compose up -d`);
+  console.log(`  ${stepNum++}. Run: docker compose --profile app up -d`);
   console.log(`  ${stepNum++}. Open: http://localhost:3000`);
 }

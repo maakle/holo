@@ -16,11 +16,13 @@ Thanks for thinking about contributing. Holo is in early active development. The
 git clone https://github.com/your-org/holo.git
 cd holo
 pnpm install
-cp .env.example .env
-docker compose up -d postgres redis
-pnpm db:migrate
-pnpm dev
+pnpm bootstrap     # generates .env with random secrets, starts postgres + redis, runs migrations
+pnpm dev       # runs web + gateway + worker locally with hot reload
 ```
+
+`pnpm bootstrap` is idempotent — safe to re-run. To reset the database, run `docker compose down -v && pnpm bootstrap`.
+
+Before `pnpm dev` boots, [scripts/check-env.mjs](./scripts/check-env.mjs) validates that every boot-required env var is filled in. If `.env` is missing GitHub OAuth credentials (which `pnpm bootstrap` doesn't generate — you need to create the OAuth app), it tells you exactly what to add.
 
 ## Project shape
 

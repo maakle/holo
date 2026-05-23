@@ -53,7 +53,7 @@ export async function doctorCommand(): Promise<void> {
 
   console.log('');
   if (allPass) {
-    console.log('✓ All checks passed. Run `docker compose up -d` to start holo.');
+    console.log('✓ All checks passed. Run `docker compose --profile app up -d` to start holo.');
   } else {
     console.log('✗ Some checks failed. Fix the issues above and run `holo doctor` again.');
     process.exit(1);

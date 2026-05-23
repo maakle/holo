@@ -1,3 +1,7 @@
+# Two startup modes:
+#   docker compose up -d                  → infra only (postgres + redis). Pair with `pnpm dev`.
+#   docker compose --profile app up -d    → full stack (infra + web/gateway/worker). Self-host / quickstart.
+# Services tagged with `profiles: ["app"]` are skipped unless the profile is active.
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -30,6 +34,7 @@ services:
       retries: 10
 
   migrate:
+    profiles: ["app"]
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
@@ -40,6 +45,7 @@ services:
       postgres: { condition: service_healthy }
 
   worker:
+    profiles: ["app"]
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
@@ -63,6 +69,7 @@ services:
       redis: { condition: service_healthy }
 
   gateway:
+    profiles: ["app"]
     build:
       context: .
       dockerfile: apps/gateway/Dockerfile
@@ -73,6 +80,7 @@ services:
       migrate: { condition: service_completed_successfully }
 
   web:
+    profiles: ["app"]
     build:
       context: .
       dockerfile: apps/web/Dockerfile

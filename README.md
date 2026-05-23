@@ -175,9 +175,11 @@ Full reasoning, alternatives, and migration paths in [`docs/ARCHITECTURE.md`](./
 mkdir my-holo && cd my-holo
 npx @holo/cli init
 # fill the placeholders the wizard prints in .env, then:
-docker compose up -d
+docker compose --profile app up -d
 open http://localhost:3000
 ```
+
+> **Why `--profile app`?** Plain `docker compose up -d` brings up just the infra (postgres + redis), which is what you want for local development. `--profile app` adds the three application containers (`web`, `gateway`, `worker`) on top — the right mode for self-hosting.
 
 **Requirements:** Docker 24+, Node 20+ (only for `npx`).
 
@@ -236,12 +238,14 @@ Full env reference: [`.env.example`](./.env.example).
 ```bash
 git clone https://github.com/maakle/holo.git
 cd holo && pnpm install
-cp .env.example .env
-# Generate secrets + fill in the two GitHub OAuth apps' IDs/secrets
-docker compose up -d postgres redis
-pnpm db:migrate
-pnpm dev
+pnpm bootstrap           # generates .env with random secrets, starts postgres + redis, runs migrations
+# Add GitHub OAuth credentials to .env (sign-in + connector — see CONTRIBUTING.md)
+pnpm dev             # web + gateway + worker, hot reload
 ```
+
+`pnpm bootstrap` is idempotent and handles first-run plumbing. `pnpm dev` runs [scripts/check-env.mjs](./scripts/check-env.mjs) first, so missing env vars fail fast with a clear message instead of mid-boot stack traces.
+
+Prefer cloud dev? The repo ships a [`.devcontainer/`](./.devcontainer/devcontainer.json) — open in GitHub Codespaces or VS Code Dev Containers and `pnpm bootstrap` runs automatically.
 
 Two GitHub OAuth apps are required (login + connector); see [decision 0001](./docs/decisions/0001-connector-port-interface.md) for why the split is intentional. Full setup notes in [`CONTRIBUTING.md`](./CONTRIBUTING.md). Per-connector OAuth setup (Slack, GitHub, etc.) lives in [`docs/connectors/`](./docs/connectors/).
 
