@@ -211,7 +211,14 @@ async function main() {
   });
 
   const port = env.MCP_PORT;
-  serve({ fetch: app.fetch, port });
+  // Bind to IPv6 unspecified (::) so the socket accepts BOTH IPv4 and IPv6
+  // connections in dual-stack mode. Railway's private networking resolves
+  // service hostnames (e.g. `gateway.railway.internal`) to IPv6 addresses;
+  // the default `0.0.0.0` bind is IPv4-only and rejects them with
+  // ECONNREFUSED. Public ingress (Railway edge → container) still works
+  // through the dual-stack socket. Docker/compose and local dev are
+  // unaffected — `::` accepts loopback traffic on both stacks.
+  serve({ fetch: app.fetch, port, hostname: '::' });
   logger.info({ port }, 'gateway listening');
 
   // Flush queued PostHog events on graceful shutdown — otherwise the
