@@ -113,6 +113,6 @@ describe('MCP_PUBLIC_URL derivation', () => {
       WEB_PUBLIC_URL: undefined,
       MCP_PUBLIC_URL: undefined,
     });
-    expect(env.MCP_PUBLIC_URL).toBe('http://localhost:3000');
+    expect(env.MCP_PUBLIC_URL).toBe(COMPLETE_ENV.BETTER_AUTH_URL);
   });
 });
