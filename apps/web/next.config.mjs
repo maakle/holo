@@ -41,9 +41,16 @@ const nextConfig = {
       { source: '/slack/:path*', destination: `${GATEWAY}/slack/:path*` },
       { source: '/teams-bot/:path*', destination: `${GATEWAY}/teams-bot/:path*` },
       { source: '/google-chat-app/:path*', destination: `${GATEWAY}/google-chat-app/:path*` },
-      // RFC 9728 protected-resource metadata served by the gateway. MUST
-      // come before the well-known catch-all below, which would otherwise
-      // route to the web's local /well-known/* handler.
+      // RFC 9728 protected-resource metadata is served by the gateway only
+      // (no equivalent route in the web app), so it MUST be proxied here.
+      // Order matters: this specific rule must precede the well-known catch-all
+      // below, which would otherwise route it to the web's local handler.
+      //
+      // Note: /.well-known/oauth-authorization-server (RFC 8414) is
+      // intentionally NOT proxied — the web app has its own canonical handler
+      // at apps/web/src/app/well-known/oauth-authorization-server/route.ts
+      // that derives the issuer from WEB_PUBLIC_URL. The catch-all rewrite
+      // below reaches it correctly.
       {
         source: '/.well-known/oauth-protected-resource',
         destination: `${GATEWAY}/.well-known/oauth-protected-resource`,
