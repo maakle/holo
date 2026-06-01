@@ -12,22 +12,58 @@ const nextConfig = {
   // normalization; opt out so the reverse proxy works.
   skipTrailingSlashRedirect: true,
   allowedDevOrigins: [
-    'holo-app.maakle.com',
+    'holo.maakle.com',
   ],
-  // Next.js App Router doesn't serve routes from dot-prefixed directories,
-  // so the OAuth metadata file lives under /well-known/* and is exposed at
-  // its RFC-mandated /.well-known/* path via this rewrite.
-  //
-  // /ingest/* proxies PostHog ingestion through Holo's own origin so
-  // browser-side analytics survive ad blockers that target *.posthog.com.
-  // When PostHog is not configured these routes simply 502 if hit, which
-  // never happens because posthog-js isn't initialized.
   async rewrites() {
+    // Keep this fallback in sync with the GATEWAY_INTERNAL_URL default in
+    // packages/env/src/index.ts. Next.js loads next.config.mjs outside the
+    // @holo/env runtime, so the fallback is duplicated here intentionally.
+    const GATEWAY = process.env.GATEWAY_INTERNAL_URL || 'http://localhost:8080';
     return [
+      // --- Gateway proxies (single-origin mode) ---
+      // The gateway is bound to GATEWAY_INTERNAL_URL (docker network or
+      // localhost) and reached publicly via these path prefixes on the web
+      // origin. Two-origin operators can ignore this and point clients at
+      // a separate hostname; these rewrites do no harm in that case.
+      //
+      // MCP transport — bidirectional Streamable HTTP. Next.js passes
+      // through SSE/chunked responses without buffering.
+      { source: '/mcp', destination: `${GATEWAY}/mcp` },
+      { source: '/mcp/:path*', destination: `${GATEWAY}/mcp/:path*` },
+      // REST API surface (search, skills, accounts, feedback).
+      { source: '/v1/:path*', destination: `${GATEWAY}/v1/:path*` },
+      // OpenAPI surface (auto-generated spec + Scalar docs page).
+      { source: '/openapi.json', destination: `${GATEWAY}/openapi.json` },
+      { source: '/docs', destination: `${GATEWAY}/docs` },
+      { source: '/docs/:path*', destination: `${GATEWAY}/docs/:path*` },
+      // Third-party webhook surfaces — paths are part of the signed payload
+      // contract; do not rewrite the path itself.
+      { source: '/slack/:path*', destination: `${GATEWAY}/slack/:path*` },
+      { source: '/teams-bot/:path*', destination: `${GATEWAY}/teams-bot/:path*` },
+      { source: '/google-chat-app/:path*', destination: `${GATEWAY}/google-chat-app/:path*` },
+      // RFC 9728 protected-resource metadata is served by the gateway only
+      // (no equivalent route in the web app), so it MUST be proxied here.
+      // Order matters: this specific rule must precede the well-known catch-all
+      // below, which would otherwise route it to the web's local handler.
+      //
+      // Note: /.well-known/oauth-authorization-server (RFC 8414) is
+      // intentionally NOT proxied — the web app has its own canonical handler
+      // at apps/web/src/app/well-known/oauth-authorization-server/route.ts
+      // that derives the issuer from WEB_PUBLIC_URL. The catch-all rewrite
+      // below reaches it correctly.
+      {
+        source: '/.well-known/oauth-protected-resource',
+        destination: `${GATEWAY}/.well-known/oauth-protected-resource`,
+      },
+
+      // --- Existing rules ---
+      // App Router can't serve dot-prefixed dirs; expose /well-known/* at
+      // /.well-known/*. Order matters: specific gateway proxies above win.
       {
         source: '/.well-known/:path*',
         destination: '/well-known/:path*',
       },
+      // PostHog reverse-proxy (browser analytics survive ad blockers).
       {
         source: '/ingest/static/:path*',
         destination: `${POSTHOG_ASSETS_HOST}/static/:path*`,

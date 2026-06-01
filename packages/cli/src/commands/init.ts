@@ -142,7 +142,8 @@ export async function initCommand(_args: string[], opts: InitOptions = {}): Prom
     `ANTHROPIC_API_KEY=${anthropicKey || '<REPLACE_ME>'}`,
     `GITHUB_LOGIN_CLIENT_ID=${ghClientId || '<REPLACE_ME>'}`,
     `GITHUB_LOGIN_CLIENT_SECRET=${ghClientSecret || '<REPLACE_ME>'}`,
-    `MCP_PUBLIC_URL=http://localhost:8080`,
+    // MCP_PUBLIC_URL is derived from WEB_PUBLIC_URL in single-origin mode.
+    // Set it explicitly only when publishing the gateway on a separate host.
     `WEB_PUBLIC_URL=http://localhost:3000`,
     '',
   ];

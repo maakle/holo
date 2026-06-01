@@ -89,7 +89,20 @@ const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   ANTHROPIC_API_KEY: z.string().optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  MCP_PUBLIC_URL: z.url().default('http://localhost:8080'),
+  /**
+   * Base URL agents use to reach the MCP gateway. In single-origin mode
+   * (the default) this equals WEB_PUBLIC_URL; the Next.js app proxies
+   * `/mcp` and friends to the gateway internally. If WEB_PUBLIC_URL is
+   * also unset, falls back to BETTER_AUTH_URL. Set explicitly only when
+   * publishing the gateway on a separate hostname.
+   */
+  MCP_PUBLIC_URL: z.url().optional(),
+  /**
+   * Where the Next.js web app proxies gateway-bound requests internally
+   * (Next.js rewrites). In Docker this is the compose service hostname;
+   * in local dev it's the gateway's published port. Never exposed publicly.
+   */
+  GATEWAY_INTERNAL_URL: z.url().default('http://localhost:8080'),
   WEB_PUBLIC_URL: z.url().optional(),
   MCP_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
   /**
@@ -149,7 +162,14 @@ const EnvSchema = z.object({
   },
 );
 
-export type Env = z.infer<typeof EnvSchema>;
+// MCP_PUBLIC_URL is optional in the schema but always populated by parseEnv's
+// post-parse derivation (WEB_PUBLIC_URL → BETTER_AUTH_URL). The intersection
+// preserves that guarantee for callers without touching the Zod schema.
+//
+// Note: some web-app call sites still use defensive `?.` access on
+// env.MCP_PUBLIC_URL. They predate this guarantee and are harmless dead-code
+// guards; not cleaned up in this commit to keep the diff scoped.
+export type Env = z.infer<typeof EnvSchema> & { MCP_PUBLIC_URL: string };
 
 export function parseEnv(raw: Record<string, string | undefined>): Env {
   const result = EnvSchema.safeParse(raw);
@@ -164,5 +184,11 @@ export function parseEnv(raw: Record<string, string | undefined>): Env {
       fix: 'Verify your .env file matches .env.example. Generate secrets with `openssl rand -base64 32`.',
     });
   }
-  return result.data;
+  const env = result.data;
+  // Single-origin convenience: MCP_PUBLIC_URL defaults to WEB_PUBLIC_URL,
+  // then to BETTER_AUTH_URL (which is required and always set in dev/prod).
+  if (!env.MCP_PUBLIC_URL) {
+    env.MCP_PUBLIC_URL = env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL;
+  }
+  return env as Env;
 }

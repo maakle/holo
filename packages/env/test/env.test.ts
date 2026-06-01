@@ -72,3 +72,47 @@ describe('parseEnv', () => {
     expect(env.EMAIL_FROM).toBe('Holo <noreply@example.com>');
   });
 });
+
+describe('GATEWAY_INTERNAL_URL', () => {
+  it('parses when set to a valid URL', () => {
+    const env = parseEnv({
+      ...COMPLETE_ENV,
+      GATEWAY_INTERNAL_URL: 'http://gateway:8080',
+    });
+    expect(env.GATEWAY_INTERNAL_URL).toBe('http://gateway:8080');
+  });
+
+  it('defaults to http://localhost:8080 when unset', () => {
+    const env = parseEnv(COMPLETE_ENV);
+    expect(env.GATEWAY_INTERNAL_URL).toBe('http://localhost:8080');
+  });
+});
+
+describe('MCP_PUBLIC_URL derivation', () => {
+  it('defaults to WEB_PUBLIC_URL when MCP_PUBLIC_URL is unset', () => {
+    const env = parseEnv({
+      ...COMPLETE_ENV,
+      WEB_PUBLIC_URL: 'https://holo.example.com',
+      MCP_PUBLIC_URL: undefined,
+    });
+    expect(env.MCP_PUBLIC_URL).toBe('https://holo.example.com');
+  });
+
+  it('keeps MCP_PUBLIC_URL when explicitly set (two-origin mode)', () => {
+    const env = parseEnv({
+      ...COMPLETE_ENV,
+      WEB_PUBLIC_URL: 'https://holo.example.com',
+      MCP_PUBLIC_URL: 'https://gateway.example.com',
+    });
+    expect(env.MCP_PUBLIC_URL).toBe('https://gateway.example.com');
+  });
+
+  it('falls back to BETTER_AUTH_URL when neither is set (dev default)', () => {
+    const env = parseEnv({
+      ...COMPLETE_ENV,
+      WEB_PUBLIC_URL: undefined,
+      MCP_PUBLIC_URL: undefined,
+    });
+    expect(env.MCP_PUBLIC_URL).toBe(COMPLETE_ENV.BETTER_AUTH_URL);
+  });
+});

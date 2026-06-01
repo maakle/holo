@@ -11,6 +11,7 @@
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
     "bootstrap": "node scripts/setup.mjs",
     "check:env": "node scripts/check-env.mjs",
+    "verify:gateway": "node scripts/verify-mcp-sse.mjs",
     "build": "turbo run build",
     "dev": "node scripts/check-env.mjs && turbo run dev",
     "lint": "eslint . && node eslint-plugin-local/test/no-bare-throw-error.test.js",

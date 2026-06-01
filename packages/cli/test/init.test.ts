@@ -67,6 +67,9 @@ describe('initCommand', () => {
     expect(env).toMatch(/^ANTHROPIC_API_KEY=<REPLACE_ME>$/m);
     expect(env).toMatch(/^GITHUB_LOGIN_CLIENT_ID=<REPLACE_ME>$/m);
     expect(env).toMatch(/^GITHUB_LOGIN_CLIENT_SECRET=<REPLACE_ME>$/m);
+
+    expect(env).toContain('WEB_PUBLIC_URL=http://localhost:3000');
+    expect(env).not.toContain('MCP_PUBLIC_URL=');
   });
 
   it('substitutes interactive answers into .env when provided', async () => {

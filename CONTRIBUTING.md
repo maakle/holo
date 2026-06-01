@@ -22,6 +22,8 @@ pnpm dev       # runs web + gateway + worker locally with hot reload
 
 `pnpm bootstrap` is idempotent — safe to re-run. To reset the database, run `docker compose down -v && pnpm bootstrap`.
 
+**Public testing.** When you need a public URL for OAuth or MCP testing (e.g., wiring a real Slack workspace to a local dev environment), run `ngrok http 3000` and set `WEB_PUBLIC_URL` in `.env` to the tunnel URL. One tunnel is enough — the web app reverse-proxies `/mcp`, `/v1/*`, and webhooks to the gateway internally. See [ADR 0009](./docs/decisions/0009-single-origin-gateway.md).
+
 Before `pnpm dev` boots, [scripts/check-env.mjs](./scripts/check-env.mjs) validates that every boot-required env var is filled in. If `.env` is missing GitHub OAuth credentials (which `pnpm bootstrap` doesn't generate — you need to create the OAuth app), it tells you exactly what to add.
 
 ## Project shape

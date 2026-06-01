@@ -205,6 +205,18 @@ curl -X POST http://localhost:8080/v1/search \
   -d '{"q": "how do we onboard a new ATS partner?", "topK": 5}'
 ```
 
+### One public URL
+
+Self-hosters need **one** public URL (DNS + TLS + tunnel/proxy) pointing at the web service on `:3000`. The web app reverse-proxies agent traffic (`/mcp`, `/v1/*`, webhooks like `/slack/*`) to the gateway internally — see [ADR 0009](./docs/decisions/0009-single-origin-gateway.md) for the design and the two-origin override.
+
+Quick local tunnel:
+
+```bash
+ngrok http 3000           # or: cloudflared tunnel run <your-tunnel>
+```
+
+Then set `WEB_PUBLIC_URL` and `BETTER_AUTH_URL` in `.env` to the tunnel URL and restart. `MCP_PUBLIC_URL` derives automatically — no need to set it.
+
 ---
 
 ## Deploy (Railway)
@@ -223,13 +235,24 @@ Three categories, three different mechanisms:
 |---|---|---|
 | **Auto-wired by Railway** | `DATABASE_URL`, `REDIS_URL` | Reference variables (`${{Postgres.DATABASE_URL}}`, `${{Redis.REDIS_URL}}`) — set them once on `holo-web`/`holo-gateway`/`holo-worker` after the DB and Redis services come up. |
 | **You generate (secrets)** | `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `HOLO_TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32` for each. Paste into the project's env panel before the first deploy. `POSTGRES_PASSWORD` must match what `DATABASE_URL` references. |
-| **You provide (public URLs + OAuth)** | `BETTER_AUTH_URL`, `WEB_PUBLIC_URL`, `MCP_PUBLIC_URL`, `GITHUB_LOGIN_CLIENT_ID`/`_SECRET`, `ANTHROPIC_API_KEY` | Set after the first deploy gives you the public hostnames. `BETTER_AUTH_URL` and `WEB_PUBLIC_URL` point at `holo-web`'s public URL; `MCP_PUBLIC_URL` points at `holo-gateway`'s. The GitHub OAuth app's callback must be `${BETTER_AUTH_URL}/api/auth/callback/github`. |
+| **You provide (public URLs + OAuth)** | `BETTER_AUTH_URL`, `WEB_PUBLIC_URL`, `GITHUB_LOGIN_CLIENT_ID`/`_SECRET`, `ANTHROPIC_API_KEY` | Set after the first deploy gives you the public hostnames. `BETTER_AUTH_URL` and `WEB_PUBLIC_URL` point at `holo-web`'s public URL. The GitHub OAuth app's callback must be `${BETTER_AUTH_URL}/api/auth/callback/github`. **Single-origin model:** `MCP_PUBLIC_URL` is derived from `WEB_PUBLIC_URL` by default — set it explicitly only if you intentionally publish the gateway on a separate hostname (see [ADR 0009](./docs/decisions/0009-single-origin-gateway.md)). |
 
 Connector credentials (Slack, GitHub App, GitLab, HubSpot, Salesforce, Pylon, Notion, Grain, Linear, Airtable, Asana, Jira, Confluence, Stripe, Zendesk, Google Drive / Chat service account, Prismic, Mintlify, Webcrawl/Firecrawl) are **not** required at boot — leave them blank, deploy, then add them per-connector in the Holo dashboard once `apps/web` is reachable. The only worker-side env that gates a connector at boot is `FIRECRAWL_API_KEY` (powers the Webcrawl connector, since it's Holo-team-operated rather than per-org).
 
 Full env reference: [`.env.example`](./.env.example).
 
 > **Note on the Railway template format.** `railway.toml`'s multi-service block (`[[services]]`) is best-effort — Railway's first-class multi-service experience is via the published Template Marketplace, which we haven't shipped yet ([`docs/ROADMAP.md` ↗](./docs/ROADMAP.md)). After clicking the button, verify each service in the Railway dashboard and set reference variables. Tracking issue welcome.
+
+### Migrating from a two-host deployment
+
+If you deployed Holo before [ADR 0009](./docs/decisions/0009-single-origin-gateway.md) and currently expose both `holo-web` and `holo-gateway` publicly, migrate to single-origin without downtime in this order:
+
+1. **On `holo-web`** — add `GATEWAY_INTERNAL_URL` pointing at the gateway's internal address (e.g., `http://${{Gateway.RAILWAY_PRIVATE_DOMAIN}}:8080` on Railway, `http://gateway:8080` on Docker Compose / Coolify). Redeploy. The `/mcp` and `/v1/*` rewrites now have a working internal target.
+2. **On `holo-gateway` and `holo-worker`** — set `MCP_PUBLIC_URL` to the same value as `WEB_PUBLIC_URL`. (Or unset `MCP_PUBLIC_URL` on `holo-web` only; it derives from `WEB_PUBLIC_URL`.)
+3. **Update external services** — OAuth callbacks (GitHub login, connector OAuth flows) and webhook URLs (Slack Events/Commands/Interactivity, Stripe, GitHub App, Google Chat, Teams) to point at the single `holo-web` origin.
+4. **Remove the gateway's public domain** in your hosting dashboard and delete the obsolete DNS record.
+
+Doing step 1 before step 4 avoids a window where `/mcp` returns 502 because the web has no proxy target yet.
 
 ---
 
