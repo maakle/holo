@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-// @ts-expect-error - next.config.mjs has no type declarations
 import nextConfig from '../../../next.config.mjs';
 
 describe('Next.js gateway rewrites', () => {
