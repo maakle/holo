@@ -90,6 +90,12 @@ const EnvSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   MCP_PUBLIC_URL: z.url().default('http://localhost:8080'),
+  /**
+   * Where the Next.js web app proxies gateway-bound requests internally
+   * (Next.js rewrites). In Docker this is the compose service hostname;
+   * in local dev it's the gateway's published port. Never exposed publicly.
+   */
+  GATEWAY_INTERNAL_URL: z.url().default('http://localhost:8080'),
   WEB_PUBLIC_URL: z.url().optional(),
   MCP_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
   /**

@@ -72,3 +72,18 @@ describe('parseEnv', () => {
     expect(env.EMAIL_FROM).toBe('Holo <noreply@example.com>');
   });
 });
+
+describe('GATEWAY_INTERNAL_URL', () => {
+  it('parses when set to a valid URL', () => {
+    const env = parseEnv({
+      ...COMPLETE_ENV,
+      GATEWAY_INTERNAL_URL: 'http://gateway:8080',
+    });
+    expect(env.GATEWAY_INTERNAL_URL).toBe('http://gateway:8080');
+  });
+
+  it('defaults to http://localhost:8080 when unset', () => {
+    const env = parseEnv(COMPLETE_ENV);
+    expect(env.GATEWAY_INTERNAL_URL).toBe('http://localhost:8080');
+  });
+});
