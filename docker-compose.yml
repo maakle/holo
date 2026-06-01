@@ -84,11 +84,16 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-    environment: *app_env
+    environment:
+      <<: *app_env
+      # Inside the compose network the gateway is reachable at its service
+      # hostname. Used only by Next.js rewrites to proxy /mcp, /v1, etc.
+      GATEWAY_INTERNAL_URL: http://gateway:8080
     ports:
       - "3000:3000"
     depends_on:
       migrate: { condition: service_completed_successfully }
+      gateway: { condition: service_started }
 
 volumes:
   holo_pg_data:
