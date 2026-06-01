@@ -87,3 +87,32 @@ describe('GATEWAY_INTERNAL_URL', () => {
     expect(env.GATEWAY_INTERNAL_URL).toBe('http://localhost:8080');
   });
 });
+
+describe('MCP_PUBLIC_URL derivation', () => {
+  it('defaults to WEB_PUBLIC_URL when MCP_PUBLIC_URL is unset', () => {
+    const env = parseEnv({
+      ...COMPLETE_ENV,
+      WEB_PUBLIC_URL: 'https://holo.example.com',
+      MCP_PUBLIC_URL: undefined,
+    });
+    expect(env.MCP_PUBLIC_URL).toBe('https://holo.example.com');
+  });
+
+  it('keeps MCP_PUBLIC_URL when explicitly set (two-origin mode)', () => {
+    const env = parseEnv({
+      ...COMPLETE_ENV,
+      WEB_PUBLIC_URL: 'https://holo.example.com',
+      MCP_PUBLIC_URL: 'https://gateway.example.com',
+    });
+    expect(env.MCP_PUBLIC_URL).toBe('https://gateway.example.com');
+  });
+
+  it('falls back to BETTER_AUTH_URL when neither is set (dev default)', () => {
+    const env = parseEnv({
+      ...COMPLETE_ENV,
+      WEB_PUBLIC_URL: undefined,
+      MCP_PUBLIC_URL: undefined,
+    });
+    expect(env.MCP_PUBLIC_URL).toBe('http://localhost:3000');
+  });
+});

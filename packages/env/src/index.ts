@@ -89,7 +89,13 @@ const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   ANTHROPIC_API_KEY: z.string().optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  MCP_PUBLIC_URL: z.url().default('http://localhost:8080'),
+  /**
+   * Base URL agents use to reach the MCP gateway. In single-origin mode
+   * (the default) this equals WEB_PUBLIC_URL; the Next.js app proxies
+   * `/mcp` and friends to the gateway internally. Set this explicitly
+   * only if you're publishing the gateway on a separate hostname.
+   */
+  MCP_PUBLIC_URL: z.url().optional(),
   /**
    * Where the Next.js web app proxies gateway-bound requests internally
    * (Next.js rewrites). In Docker this is the compose service hostname;
@@ -155,7 +161,7 @@ const EnvSchema = z.object({
   },
 );
 
-export type Env = z.infer<typeof EnvSchema>;
+export type Env = z.infer<typeof EnvSchema> & { MCP_PUBLIC_URL: string };
 
 export function parseEnv(raw: Record<string, string | undefined>): Env {
   const result = EnvSchema.safeParse(raw);
@@ -170,5 +176,11 @@ export function parseEnv(raw: Record<string, string | undefined>): Env {
       fix: 'Verify your .env file matches .env.example. Generate secrets with `openssl rand -base64 32`.',
     });
   }
-  return result.data;
+  const env = result.data as Env;
+  // Single-origin convenience: MCP_PUBLIC_URL defaults to WEB_PUBLIC_URL,
+  // then to BETTER_AUTH_URL (which is required and always set in dev/prod).
+  if (!env.MCP_PUBLIC_URL) {
+    env.MCP_PUBLIC_URL = env.WEB_PUBLIC_URL ?? env.BETTER_AUTH_URL;
+  }
+  return env;
 }
