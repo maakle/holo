@@ -12,7 +12,7 @@ const nextConfig = {
   // normalization; opt out so the reverse proxy works.
   skipTrailingSlashRedirect: true,
   allowedDevOrigins: [
-    'holo-app.maakle.com',
+    'holo.maakle.com',
   ],
   async rewrites() {
     // Keep this fallback in sync with the GATEWAY_INTERNAL_URL default in
