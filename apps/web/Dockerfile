@@ -24,6 +24,14 @@ ARG NEXT_PUBLIC_HOLO_BILLING_ENABLED
 ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
 ENV NEXT_PUBLIC_HOLO_BILLING_ENABLED=$NEXT_PUBLIC_HOLO_BILLING_ENABLED
+# GATEWAY_INTERNAL_URL is consumed by next.config.mjs's rewrites() to set
+# the proxy destination for /mcp, /v1/*, etc. (single-origin model, ADR
+# 0009). Next.js evaluates rewrites() at build time and bakes the
+# destinations into the routes manifest, so this MUST be set during the
+# build — a runtime env var alone falls back to http://localhost:8080 and
+# every proxied path 500s with ECONNREFUSED inside the container.
+ARG GATEWAY_INTERNAL_URL
+ENV GATEWAY_INTERNAL_URL=$GATEWAY_INTERNAL_URL
 RUN pnpm -F @holo/web build
 # Bundle the DB migration runner into a single self-contained file so the
 # slim runtime image can run migrations as a Railway Pre-Deploy step
