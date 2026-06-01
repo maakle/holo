@@ -11,7 +11,7 @@
 //
 // Pass = all checks green. Doesn't verify a full MCP session — see Task 9
 // for the Claude Desktop end-to-end procedure.
-const BASE = process.env.WEB_BASE_URL || 'http://localhost:3000';
+const BASE = (process.env.WEB_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
 
 let failed = 0;
 function check(name, cond, detail = '') {
@@ -21,32 +21,38 @@ function check(name, cond, detail = '') {
 
 console.log(`Verifying single-origin gateway at ${BASE}\n`);
 
-// 1. /v1/health
-{
-  const r = await fetch(`${BASE}/v1/health`);
-  const body = await r.json().catch(() => null);
-  check('GET /v1/health returns 200', r.status === 200, `status=${r.status}`);
-  check('GET /v1/health body is JSON', body !== null);
-}
+try {
+  // 1. /v1/health
+  {
+    const r = await fetch(`${BASE}/v1/health`);
+    const body = await r.json().catch(() => null);
+    check('GET /v1/health returns 200', r.status === 200, `status=${r.status}`);
+    check('GET /v1/health body is JSON', body !== null);
+  }
 
-// 2. /openapi.json
-{
-  const r = await fetch(`${BASE}/openapi.json`);
-  const body = await r.json().catch(() => null);
-  check('GET /openapi.json returns 200', r.status === 200, `status=${r.status}`);
-  check('GET /openapi.json has paths', body && typeof body.paths === 'object');
-}
+  // 2. /openapi.json
+  {
+    const r = await fetch(`${BASE}/openapi.json`);
+    const body = await r.json().catch(() => null);
+    check('GET /openapi.json returns 200', r.status === 200, `status=${r.status}`);
+    check('GET /openapi.json has paths', body && typeof body.paths === 'object');
+  }
 
-// 3. /mcp 401 + correct WWW-Authenticate
-{
-  const r = await fetch(`${BASE}/mcp`, { method: 'POST' });
-  check('POST /mcp returns 401 (no bearer)', r.status === 401, `status=${r.status}`);
-  const wwwAuth = r.headers.get('www-authenticate') || '';
-  check(
-    'WWW-Authenticate points at single-origin host',
-    wwwAuth.includes(BASE) && !wwwAuth.includes('localhost:8080'),
-    `header=${wwwAuth || '(missing)'}`,
-  );
+  // 3. /mcp 401 + correct WWW-Authenticate
+  {
+    const r = await fetch(`${BASE}/mcp`, { method: 'POST' });
+    check('POST /mcp returns 401 (no bearer)', r.status === 401, `status=${r.status}`);
+    const wwwAuth = r.headers.get('www-authenticate') || '';
+    check(
+      'WWW-Authenticate points at single-origin host',
+      wwwAuth.includes(BASE) && !wwwAuth.includes('localhost:8080'),
+      `header=${wwwAuth || '(missing)'}`,
+    );
+  }
+} catch (e) {
+  console.error(`\n\x1b[31mNetwork error:\x1b[0m ${e.message}`);
+  console.error(`Is the dev server running at ${BASE}? Try \`pnpm dev\` in another terminal.`);
+  process.exit(1);
 }
 
 console.log('');
