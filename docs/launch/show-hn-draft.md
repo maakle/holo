@@ -17,13 +17,14 @@ Working draft of the Show HN post for the v0.1.0 launch. Tweak the numbers and l
 ## Title (≤80 chars, no marketing words)
 
 ```
-Show HN: Holo – Self-hosted shared context layer for AI agents (MCP + REST)
+Show HN: Holo – Self-hosted shared context layer for AI agents / company brain
 ```
 
 Alternates if the above feels off:
 
+- `Show HN: Holo – Self-hosted shared context layer for AI agents (MCP + REST)`
 - `Show HN: Holo – One MCP endpoint for every agent your team builds`
-- `Show HN: Holo – Stop re-implementing context fetchers per AI agent`
+- `Show HN: Holo – The company brain behind a Slack bot that knows everything`
 
 ---
 
@@ -31,15 +32,19 @@ Alternates if the above feels off:
 
 > Hi HN — I'm Mathias. For the last ten months I've been Head of Engineering at a 60-person YC dev-tools company, and I kept watching us implement the same context fetcher three times: once for our Slack-triggered support-question agent, once for an interview-prep agent, once for a customer-success draft-reply agent. Each one had its own bespoke retriever over Slack threads, GitHub PRs, Notion pages, Grain calls, Pylon tickets, HubSpot deals. They drifted. They had different ACL stories. None of them could actually answer "what was the resolution on the EGYM ticket Mark closed last week" without a separate fetch.
 >
+> The thing every team kept asking me for was simpler to describe than to build: **a Slack bot that knows everything** — a company brain you can ask "how do we handle a refund past 30 days?" or "what did we tell Acme about SOC 2?" and get an answer grounded in the actual Slack threads, PRs, docs, and call transcripts, with citations, and *without* leaking data the asker can't already see. Every agent we built was really a different front-end onto that same missing layer.
+>
 > Holo is the tier I wanted. Connect Slack / GitHub / Notion / Grain / Pylon / HubSpot / Linear / Mintlify / Zendesk once. Holo ingests with cursor-based incremental sync (no nightly full re-pulls), chunks per-source-type, embeds, and indexes them in a single Postgres + pgvector + tsvector store. Hybrid retrieval (RRF fusion) over a single ACL-aware index. Then a tiny MCP tool surface (`search` for fuzzy queries, `bash` for `ls` / `cat` / `grep -r` over a virtual filesystem of every synced artifact) and a parallel REST/OpenAPI endpoint serve every agent on the team — Claude, Cursor, ChatGPT, Gemini, your own. Same chunks, same ACL, same audit log.
+>
+> So "the Slack bot that knows everything" stops being a six-week internal project and becomes ~20 lines against the MCP surface — and the next agent your team ships inherits the exact same brain, scopes, and audit trail instead of forking its own retriever.
 >
 > Three things I think are different:
 >
-> **1. Multi-agent first.** The point isn't to be a chatbot. The point is that the agents your team is already shipping stop maintaining their own retrievers. We migrated three internal agents off bespoke fetchers onto holo before this release; they all see the same context now.
+> **1. Multi-agent first.** The point isn't to be a chatbot. The point is that the agents your team is already shipping — the company-brain Slack bot, the support drafter, the call-prep agent — stop maintaining their own retrievers. We migrated three internal agents off bespoke fetchers onto holo before this release; they all see the same context now.
 >
 > **2. Procedures, not just unified search.** Onyx, Dust, PipesHub already do unified search well. Holo also extracts *labeled procedures* from your team's actual artifacts — "this thread is a refund-handling procedure," "this PR is a security-review procedure" — and exposes them as callable skills in the same MCP surface as search. There's a small eval harness so prompt iteration on synthesis doesn't silently regress.
 >
-> **3. Governance is real.** Ingestion-time allowlists (which channels / repos / spaces actually enter holo) are mandatory and enforced in the connector spec, not bolted on. Per-user OAuth ACL fan-out for Slack is shipped — agents see only the data the calling user can. Per-skill `toolAllowlist` enforcement is the next slice. Read-only replay diff lets you see exactly what context any past agent invocation used.
+> **3. Governance is real.** Ingestion-time allowlists (which channels / repos / spaces actually enter holo) are mandatory and enforced in the connector spec, not bolted on. Per-user OAuth ACL fan-out for Slack is shipped — so the company-brain bot answers each person only from data they can already see, not everything the bot's token can reach. Per-skill `toolAllowlist` enforcement is the next slice. Read-only replay diff lets you see exactly what context any past agent invocation used.
 >
 > **Self-host on day one.** If `docker compose up` doesn't work, it doesn't ship. Community Edition is AGPL-3.0 — self-host freely, fork it, modify it. An optional Enterprise Edition (SSO, RBAC, query history, whitelabeling, custom-code hooks) lives under `**/ee/**` for teams that need it. There's no managed cloud yet — that lives behind v0.2 demand.
 >
@@ -53,7 +58,7 @@ Alternates if the above feels off:
 >
 > **What I want from this post:**
 >
-> - If you've built an internal AI agent at your company, I'd love to hear how you're handling the retrieval / ACL story. Especially the dual-routing pain (some queries to your bespoke fetcher, some to a unified search) — that's where holo started.
+> - If you've built an internal AI agent — or that one company-brain Slack bot everyone keeps asking for — I'd love to hear how you're handling the retrieval / ACL story. Especially the dual-routing pain (some queries to your bespoke fetcher, some to a unified search) — that's where holo started.
 > - If you self-host things and want to try a fresh project, the install path above is the only one. Bug reports go to GitHub Discussions; I'm triaging daily for the first week.
 > - If your company runs on Microsoft / Atlassian / Salesforce instead of the 9 sources we ship, those are the next 15 connectors on the roadmap (Confluence + Jira are the most-asked).
 >
